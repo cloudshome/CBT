@@ -6,13 +6,13 @@ position sizing, smart TP ladders with percentage gains, entry zones, and active
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 
 def compute_hold_time_and_expiry(timeframe: str) -> tuple[str, str, int]:
     """Returns (expected_hold_time, active_until_utc_str, expiry_epoch_ms)."""
     tf = timeframe.lower().strip()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if tf in ("1m", "3m"):
         hold_str = "15–45 Minutes"
         expiry = now + timedelta(minutes=45)

@@ -11,12 +11,11 @@ from __future__ import annotations
 import argparse
 import logging
 import os
-import shutil
 import sqlite3
 import sys
 import tarfile
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Any
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("cbt_restore")
@@ -44,7 +43,7 @@ def verify_db_integrity(db_path: Path) -> bool:
         return False
 
 
-def run_restore(archive_path: Path, target_data_dir: Path) -> Dict[str, Any]:
+def run_restore(archive_path: Path, target_data_dir: Path) -> dict[str, Any]:
     """Extracts and restores database files safely into target_data_dir."""
     if not archive_path.exists():
         raise FileNotFoundError(f"Archive file not found: {archive_path}")
@@ -52,7 +51,7 @@ def run_restore(archive_path: Path, target_data_dir: Path) -> Dict[str, Any]:
     target_data_dir.mkdir(parents=True, exist_ok=True)
     resolved_target = target_data_dir.resolve()
 
-    restored_files: List[str] = []
+    restored_files: list[str] = []
 
     with tarfile.open(archive_path, "r:gz") as tar:
         for member in tar.getmembers():

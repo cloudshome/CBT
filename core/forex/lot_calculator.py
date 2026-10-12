@@ -6,6 +6,7 @@ Prevents account ruin by properly deriving lots from pip distance and enforcing 
 from __future__ import annotations
 
 import math
+
 from core.forex.types import ForexSymbolSpec, LotSizingResult
 
 DEFAULT_SPECS: dict[str, ForexSymbolSpec] = {

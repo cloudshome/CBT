@@ -13,7 +13,7 @@ import hashlib
 import json
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 logger = logging.getLogger("ai_quant_sentinel.research_firewall")
 
@@ -25,9 +25,9 @@ class DataLeakageException(Exception):
 
 @dataclass
 class DatasetPartition:
-    train_data: List[Dict[str, Any]]
-    val_data: List[Dict[str, Any]]
-    test_data: List[Dict[str, Any]]     # Quarantined
+    train_data: list[dict[str, Any]]
+    val_data: list[dict[str, Any]]
+    test_data: list[dict[str, Any]]     # Quarantined
     train_hash: str
     val_hash: str
     test_hash: str
@@ -45,7 +45,7 @@ class ResearchFirewall:
 
     def partition_dataset(
         self,
-        records: List[Dict[str, Any]],
+        records: list[dict[str, Any]],
         train_ratio: float = 0.60,
         val_ratio: float = 0.20,
         test_ratio: float = 0.20,
@@ -90,7 +90,7 @@ class ResearchFirewall:
         self,
         partition: DatasetPartition,
         caller_role: str = "OPTIMIZATION_SEARCH",
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Guards the OOS test partition. Only the official Quarantine Validator may access it.
         """
@@ -105,7 +105,7 @@ class ResearchFirewall:
         logger.info(f"Authorized OOS test access granted to '{caller_role}'.")
         return partition.test_data
 
-    def _compute_hash(self, records: List[Dict[str, Any]]) -> str:
+    def _compute_hash(self, records: list[dict[str, Any]]) -> str:
         serialized = json.dumps(records, sort_keys=True)
         return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 

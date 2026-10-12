@@ -31,19 +31,25 @@ import json
 import math
 import subprocess
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, List
 
 import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from core.risk_engine.hierarchical_risk_parity import (
-    HierarchicalRiskParityEngine,
-    LedoitWolfCovarianceEstimator,
-    MultiAssetPortfolioOptimizer,
+from core.execution.latency_arb.amm_pool_math import (
+    ConcentratedLiquidityPool,
+    ConstantProductPool,
+    SwapDirection,
+)
+from core.execution.latency_arb.cex_dex_arb_sentinel import (
+    CEXDEXLatencyArbSentinel,
+)
+from core.execution.latency_arb.mev_bundle_simulator import (
+    MEVBundleSimulator,
+    RouteChannel,
 )
 from core.execution.market_making.avellaneda_stoikov import (
     AvellanedaStoikovModel,
@@ -54,19 +60,6 @@ from core.execution.market_making.hawkes_intensity import (
 from core.execution.market_making.market_maker_sentinel import (
     ASMarketMakerSentinel,
 )
-from core.execution.latency_arb.amm_pool_math import (
-    ConcentratedLiquidityPool,
-    ConstantProductPool,
-    SwapDirection,
-)
-from core.execution.latency_arb.mev_bundle_simulator import (
-    MEVBundleSimulator,
-    RouteChannel,
-)
-from core.execution.latency_arb.cex_dex_arb_sentinel import (
-    CEXDEXLatencyArbSentinel,
-    CEXOrderBookSnapshot,
-)
 from core.execution.rl_execution.execution_environment import (
     MicrostructureExecutionEnvironment,
 )
@@ -74,17 +67,20 @@ from core.execution.rl_execution.ppo_execution_policy import (
     PPOActorCriticPolicy,
 )
 from core.execution.rl_execution.rl_execution_sentinel import (
-    ExecutionStrategyMode,
     RLExecutionSentinel,
 )
-from core.risk_engine.stress_testing.portfolio_stress_engine import (
-    AssetPosition,
-    PortfolioStressEngine,
-    StressScenarioId,
+from core.risk_engine.hierarchical_risk_parity import (
+    HierarchicalRiskParityEngine,
+    LedoitWolfCovarianceEstimator,
+    MultiAssetPortfolioOptimizer,
 )
 from core.risk_engine.stress_testing.multi_strategy_ensemble import (
     MarketRegimeClassification,
     MultiStrategyEnsembleCoordinator,
+)
+from core.risk_engine.stress_testing.portfolio_stress_engine import (
+    AssetPosition,
+    PortfolioStressEngine,
 )
 
 
@@ -101,7 +97,7 @@ def run_audit() -> bool:
     print("SKY GENERATION 7 INDEPENDENT AUDIT (MILESTONE 40-R)")
     print("=" * 72)
 
-    results: List[AuditObligationResult] = []
+    results: list[AuditObligationResult] = []
 
     # OBL-01: Milestone 18 Surface
     print("[1/15] Verifying OBL-01: Milestone 18 Execution Boundary...")

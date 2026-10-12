@@ -22,7 +22,7 @@ The gate combines:
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from config import (
     ACCOUNT_BALANCE,
@@ -74,7 +74,7 @@ def effective_risk() -> dict:
 
 
 def _day_start_utc(now: datetime | None = None) -> int:
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     return int(start.timestamp() * 1000)
 
@@ -89,7 +89,7 @@ def _week_start_utc(now: datetime | None = None) -> int:
     the previous month (38 days of 2026). The weekly loss limit is a hard B6
     control, so on those dates the whole risk gate raised instead of answering.
     """
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     return int((start - timedelta(days=start.weekday())).timestamp() * 1000)
 

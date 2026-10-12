@@ -16,13 +16,13 @@ import os
 import sqlite3
 import sys
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Any
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("cbt_db_maintenance")
 
 
-def get_db_files(data_dir: Path) -> List[Path]:
+def get_db_files(data_dir: Path) -> list[Path]:
     """Finds all primary SQLite database files."""
     if not data_dir.exists():
         return []
@@ -30,7 +30,7 @@ def get_db_files(data_dir: Path) -> List[Path]:
     return [p for p in data_dir.glob("*") if p.suffix in db_extensions and not p.name.endswith("-wal") and not p.name.endswith("-shm")]
 
 
-def optimize_database(db_path: Path) -> Dict[str, Any]:
+def optimize_database(db_path: Path) -> dict[str, Any]:
     """Performs integrity check, reindex, and vacuum on a single SQLite database."""
     size_before_bytes = db_path.stat().st_size
     try:
@@ -77,7 +77,7 @@ def optimize_database(db_path: Path) -> Dict[str, Any]:
         }
 
 
-def run_maintenance(data_dir: Path) -> Dict[str, Any]:
+def run_maintenance(data_dir: Path) -> dict[str, Any]:
     """Executes full maintenance routine on all database files."""
     db_files = get_db_files(data_dir)
     if not db_files:

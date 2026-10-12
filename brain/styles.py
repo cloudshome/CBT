@@ -159,8 +159,8 @@ def classify_styles(mtf: dict, ctx: dict, frame: dict) -> dict:
     # ── Day (HTF bias + LTF trigger + structure) ─────────────────────────
     dy = styles["Day"]
     if (
-        htf_dir
-        and score >= 20
+        (htf_dir
+        and score >= 20)
         or (htf_dir and event in ("bos_up", "choch_up", "bos_down", "choch_down"))
     ):
         if htf_dir:

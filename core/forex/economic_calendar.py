@@ -6,6 +6,7 @@ Guards trading desks against non-farm payrolls (NFP), CPI, and FOMC rate shocks.
 from __future__ import annotations
 
 import time
+
 from core.forex.types import EconomicEvent, EconomicImpact
 
 

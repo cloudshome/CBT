@@ -9,12 +9,12 @@ Quantitative benchmarks for:
 """
 
 import asyncio
-import os
-from pathlib import Path
 import sqlite3
 import sys
 import tempfile
 import time
+from pathlib import Path
+
 import numpy as np
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -170,7 +170,7 @@ def benchmark_wal_concurrency():
         t1 = time.perf_counter()
         read_latency_ms = (t1 - t0) * 1000.0
 
-        print(f"  Reader during active uncommitted write:")
+        print("  Reader during active uncommitted write:")
         print(f"    Read succeeded? {'YES' if row_count == 1000 else 'NO'} (sees {row_count} rows, isolating uncommitted write)")
         print(f"    Read latency: {read_latency_ms:.3f} ms (Non-blocking: {'PASS' if read_latency_ms < 5.0 else 'FAIL'})")
 

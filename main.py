@@ -7,33 +7,86 @@ Master entrypoint for SKY / CBT operations and SDCC collective commands.
 import sys
 
 try:
-    from cli.common import (  # noqa: F401
-        _client, _load_calibration, _source_key_arg, _sym, _symbols, run_scan,
+    from cli.analytics import (  # noqa: F401
+        cmd_calendar,
+        cmd_quality,
+        cmd_scorecard,
     )
-    from cli.validation import (  # noqa: F401
-        cmd_backtest, cmd_edge_validate, cmd_monte, cmd_validate, cmd_xau_evidence,
+    from cli.common import (  # noqa: F401
+        _client,
+        _load_calibration,
+        _source_key_arg,
+        _sym,
+        _symbols,
+        run_scan,
     )
     from cli.daily import (  # noqa: F401
-        cmd_scan, _print_human, cmd_watch, cmd_sources, cmd_signal, cmd_learn, cmd_coach,
-        cmd_glossary, _print_context, cmd_intelligence, cmd_card, cmd_analyze, cmd_state,
-        cmd_stats, cmd_web, cmd_sourcetrust, cmd_risk, cmd_tradestate, cmd_journal, cmd_ask,
-        cmd_postreview, cmd_agent, cmd_brief, cmd_health, cmd_desk, cmd_daily, cmd_weekly,
+        _print_context,
+        _print_human,
+        cmd_agent,
+        cmd_analyze,
+        cmd_ask,
+        cmd_brief,
+        cmd_card,
+        cmd_coach,
+        cmd_daily,
+        cmd_desk,
+        cmd_glossary,
+        cmd_health,
+        cmd_intelligence,
+        cmd_journal,
+        cmd_learn,
+        cmd_postreview,
         cmd_practice,
-    )
-    from cli.paper import (  # noqa: F401
-        _print_review_row, cmd_review, _decide, cmd_approve, cmd_reject, cmd_execute,
-        cmd_close, _print_paper_run, cmd_paper, cmd_simulator,
-    )
-    from cli.analytics import (  # noqa: F401
-        cmd_scorecard, cmd_calendar, cmd_quality,
+        cmd_risk,
+        cmd_scan,
+        cmd_signal,
+        cmd_sources,
+        cmd_sourcetrust,
+        cmd_state,
+        cmd_stats,
+        cmd_tradestate,
+        cmd_watch,
+        cmd_web,
+        cmd_weekly,
     )
     from cli.market import (  # noqa: F401
-        cmd_backfill, cmd_store, cmd_doctor, cmd_channels, cmd_derivatives, cmd_cross,
+        cmd_backfill,
+        cmd_channels,
         cmd_correlation,
+        cmd_cross,
+        cmd_derivatives,
+        cmd_doctor,
+        cmd_store,
+    )
+    from cli.paper import (  # noqa: F401
+        _decide,
+        _print_paper_run,
+        _print_review_row,
+        cmd_approve,
+        cmd_close,
+        cmd_execute,
+        cmd_paper,
+        cmd_reject,
+        cmd_review,
+        cmd_simulator,
     )
     from cli.system import (  # noqa: F401
-        cmd_preflight, cmd_mcp, cmd_sky_agent, cmd_release, cmd_companion, cmd_hub,
-        cmd_hidden, cmd_skill,
+        cmd_companion,
+        cmd_hidden,
+        cmd_hub,
+        cmd_mcp,
+        cmd_preflight,
+        cmd_release,
+        cmd_skill,
+        cmd_sky_agent,
+    )
+    from cli.validation import (  # noqa: F401
+        cmd_backtest,
+        cmd_edge_validate,
+        cmd_monte,
+        cmd_validate,
+        cmd_xau_evidence,
     )
 except ImportError:
     pass
@@ -52,6 +105,7 @@ def main(argv: list[str] | None = None) -> int:
     if args and args[0] == "validate":
         import argparse
         import json
+
         from data.validation import print_lookahead, scan_lookahead
 
         parser = argparse.ArgumentParser(prog="validate lookahead")
@@ -68,6 +122,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args and args[0] == "scorecard":
         import argparse
+
         from cli.analytics import cmd_scorecard
 
         parser = argparse.ArgumentParser(prog="scorecard")
@@ -96,6 +151,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args and args[0] == "release":
         import argparse
+
         from cli.system import cmd_release
 
         parser = argparse.ArgumentParser(prog="release")
@@ -110,7 +166,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args and args[0] == "sky-agent":
         import argparse
-        from cli.system import cmd_sky_agent
+
 
         parser = argparse.ArgumentParser(prog="sky-agent")
         parser.add_argument("sky_agent_action", nargs="?", default="health",

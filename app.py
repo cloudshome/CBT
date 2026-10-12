@@ -6,7 +6,6 @@ Multiplexes real-time WebSocket streams and comprehensive REST APIs across all 1
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
 import hmac
 import json
 import logging
@@ -16,6 +15,7 @@ import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import asdict
+from datetime import UTC, datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any
@@ -40,6 +40,8 @@ from pydantic import BaseModel, Field, field_validator
 
 from core.analogue_engine import analogue_engine
 from core.api_health_guard import api_health_guard
+from core.arbitrage.cexdex_routes import router as cexdex_router
+from core.arbitrage.routes import router as arbitrage_router
 from core.asset_dossier_engine import asset_dossier_engine
 from core.audit_bus import audit_bus
 from core.auth import (
@@ -49,6 +51,7 @@ from core.auth import (
     require_api_key,
     sanitize_text,
 )
+from core.auth.hardware_key_routes import hardware_key_router
 from core.autonomous_auditor import autonomous_risk_auditor
 from core.autonomous_research.empirical_tester import empirical_tester
 from core.autonomous_research.pipeline import autonomous_research_pipeline
@@ -59,28 +62,9 @@ from core.autonomous_research.provenance_tracker import provenance_tracker
 from core.autonomous_research.storage import research_storage
 from core.autonomous_research.storage.storage_manager import storage_manager
 from core.autonomous_research.storage.storage_manifest import storage_manifest
-from core.knowledge_os.routes import router as knowledge_os_router
-from core.volatility import volatility_router
+from core.autonomous_trader import autonomous_trader
 from core.collective.routes import router as collective_router
 from core.collective.sync_daemon import cluster_sync_daemon
-from core.arbitrage.routes import router as arbitrage_router
-from core.mbo.routes import router as mbo_router
-from core.execution.live_routes import router as live_execution_router_api
-from core.execution.phase23_routes import router as phase23_execution_router
-from core.execution.strategy_gateway.routes import router as strategy_gateway_router
-from core.setup_service import setup_router
-from core.auth.hardware_key_routes import hardware_key_router
-from core.web3.web3_routes import router as web3_router
-from core.heatmap_routes import heatmap_router
-from core.strategist_routes import strategist_router
-from core.arbitrage.cexdex_routes import router as cexdex_router
-from core.kronos.kronos_routes import kronos_router
-from core.terminal_routes import terminal_router
-from core.intelligence.routes import router as intelligence_router
-from core.institutional_routes import router as institutional_suite_router
-from core.execution.testnet.routes import router as testnet_router
-from core.risk_engine.routes import router as risk_engine_router
-from core.autonomous_trader import autonomous_trader
 from core.command_executor import command_executor
 from core.conservative_kelly import conservative_kelly
 from core.cvd_absorption import cvd_absorption_engine
@@ -121,41 +105,42 @@ from core.execution import (
     reconciliation_ledger,
     smart_order_router,
 )
+from core.execution.live_routes import router as live_execution_router_api
+from core.execution.phase23_routes import router as phase23_execution_router
 from core.execution.sor_benchmarks import run_sor_microbenchmarks
+from core.execution.strategy_gateway.routes import router as strategy_gateway_router
+from core.execution.testnet.routes import router as testnet_router
 from core.execution.ws_reconciliation import ws_reconciliation_stream
 from core.genetic_optimizer import genetic_strategy_optimizer
 from core.half_kelly_sizer import half_kelly_position_sizer
+from core.heatmap_routes import heatmap_router
 from core.hf_telemetry_pipeline import hf_telemetry_pipeline
 from core.incident_escalation import incident_escalation_engine
 from core.institutional_alpha import institutional_alpha_engine
+from core.institutional_routes import router as institutional_suite_router
+from core.intelligence.forward_validation import global_paper_ingestion_engine
+from core.intelligence.routes import router as intelligence_router
 from core.knowledge_graph_engine import knowledge_graph_engine
+from core.knowledge_os.research_automation_orchestrator import research_automation_orchestrator
+from core.knowledge_os.routes import router as knowledge_os_router
+from core.kronos.kronos_routes import kronos_router
 from core.macro_gold_engine import macro_gold_engine
 from core.macro_network import macro_network_engine
 from core.macro_sentinel import macro_sentinel
 from core.market_providers import market_gateway
 from core.market_state import market_state_compiler
+from core.mastermind.mastermind_arbiter import mastermind_arbiter
+from core.mbo.routes import router as mbo_router
 from core.metrics import generate_prometheus_metrics
 
 # Frontier Quantitative Engines (Phase 14)
 from core.microstructure_engine import microstructure_engine
-from core.models.kronos import (
-    kronos_adapter,
-    kronos_health_monitor,
-)
-from core.models.kronos.ablation_benchmark import kronos_ablation_benchmark
-from core.models.kronos.advisory_engine import kronos_advisory_engine
-from core.models.kronos.calibration import kronos_probability_calibrator
-from core.models.kronos.persistence import (
-    freeze_kronos_forecast,
-    get_kronos_forecasts,
-)
 from core.monte_carlo_stress import monte_carlo_stress_tester
 from core.orderbook_imbalance import orderbook_imbalance_engine
 from core.patch_governor import patch_governor
 from core.path_simulator import path_simulator
 from core.pattern_engine import pattern_engine
 from core.portfolio_shadow import portfolio_shadow
-from core.intelligence.forward_validation import global_paper_ingestion_engine
 from core.prediction_ladder import prediction_ladder_engine
 from core.prediction_ledger import prediction_ledger
 from core.probability_calibrator import probability_calibrator
@@ -163,10 +148,12 @@ from core.provenance_engine import provenance_engine
 from core.quant_mentor import quant_mentor
 from core.rate_limiter import RateLimitMiddleware
 from core.regime_transition import regime_transition_detector
+from core.risk_engine.routes import router as risk_engine_router
 from core.sandbox_lab import sandbox_lab
 from core.scenario_engine import scenario_engine
 from core.scenario_monitor import scenario_monitor
 from core.sentiment_engine import sentiment_engine
+from core.setup_service import setup_router
 from core.shadow_burn_in_orchestrator import shadow_burn_in_orchestrator
 from core.sky_intelligence import (
     derivatives_engine,
@@ -186,19 +173,21 @@ from core.sky_intelligence import (
 )
 from core.smart_execution import smart_execution_engine
 from core.smc_engine import smc_engine
+from core.strategist_routes import strategist_router
 from core.strategy_compiler import strategy_compiler
 from core.strategy_league import strategy_league_manager
 from core.system_evolver import system_evolver
 from core.telegram.jobs import job_manager
 from core.telegram_bot import telegram_bot
+from core.terminal_routes import terminal_router
 from core.ttl_cache import market_state_cache, sky_decision_cache
 from core.uncertainty_engine import uncertainty_engine
 from core.universal_ingestor import universal_ingestor
 from core.voice_interface import voice_interface
+from core.volatility import volatility_router
 from core.walk_forward_engine import walk_forward_engine
+from core.web3.web3_routes import router as web3_router
 from core.youtube.agent import youtube_agent
-from core.knowledge_os.research_automation_orchestrator import research_automation_orchestrator
-from core.mastermind.mastermind_arbiter import mastermind_arbiter
 
 log_dir = Path(os.getenv("DATA_DIR", "data")) / "logs"
 log_dir.mkdir(parents=True, exist_ok=True)
@@ -1678,7 +1667,7 @@ async def get_paper_desk_overview():
 
         opened_at_ts = p.get("opened_at")
         opened_at_fmt = (
-            datetime.fromtimestamp(opened_at_ts / 1000.0, tz=timezone.utc).strftime(
+            datetime.fromtimestamp(opened_at_ts / 1000.0, tz=UTC).strftime(
                 "%Y-%m-%d %H:%M:%S UTC"
             )
             if opened_at_ts
@@ -1741,14 +1730,14 @@ async def get_paper_desk_overview():
         opened_at_ts = p.get("opened_at")
         closed_at_ts = p.get("closed_at")
         opened_at_fmt = (
-            datetime.fromtimestamp(opened_at_ts / 1000.0, tz=timezone.utc).strftime(
+            datetime.fromtimestamp(opened_at_ts / 1000.0, tz=UTC).strftime(
                 "%Y-%m-%d %H:%M:%S UTC"
             )
             if opened_at_ts
             else None
         )
         closed_at_fmt = (
-            datetime.fromtimestamp(closed_at_ts / 1000.0, tz=timezone.utc).strftime(
+            datetime.fromtimestamp(closed_at_ts / 1000.0, tz=UTC).strftime(
                 "%Y-%m-%d %H:%M:%S UTC"
             )
             if closed_at_ts
@@ -2402,7 +2391,9 @@ async def ingest_research_text(req: ResearchIngestRequest):
     target_url = req.source_uri or (req.content.strip() if req.content.strip().startswith(("http://", "https://")) else None)
     if target_url:
         try:
-            from core.knowledge_os.universal_ingestor import universal_ingestor as evidence_universal_ingestor
+            from core.knowledge_os.universal_ingestor import (
+                universal_ingestor as evidence_universal_ingestor,
+            )
             evidence_universal_ingestor.ingest_url(
                 url=target_url,
                 options={"author": req.author_creator, "title": req.title},

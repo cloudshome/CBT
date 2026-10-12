@@ -16,7 +16,7 @@ rest of the brain keeps working. Results are cached for a few minutes so the
 from __future__ import annotations
 
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import requests
 
@@ -158,7 +158,7 @@ def equities() -> dict:
 # ── Macro events ─────────────────────────────────────────────────────────
 def macro_events() -> dict:
     def _m():
-        today = datetime.now(timezone.utc).date()
+        today = datetime.now(UTC).date()
         events = []
         for d in FOMC_2026:
             days = (d.date() - today).days
@@ -220,7 +220,7 @@ def macro_events() -> dict:
 
 # ── Cycle (halving phase + long-term position) ───────────────────────────
 def cycle(sma200_1d: float | None = None, price_1d: float | None = None) -> dict:
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(UTC).replace(tzinfo=None)
     # latest past halving
     past = [h for h in HALVINGS if h <= now]
     last_h = max(past) if past else HALVINGS[0]
@@ -375,5 +375,5 @@ def collect(
         "social": social,
         "geopolitics": geo,
         "risk_regime": regime,
-        "collected_at": datetime.now(timezone.utc).isoformat(),
+        "collected_at": datetime.now(UTC).isoformat(),
     }

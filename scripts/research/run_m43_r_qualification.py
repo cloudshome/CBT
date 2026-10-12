@@ -22,8 +22,6 @@ from __future__ import annotations
 
 import json
 import logging
-import math
-import os
 import subprocess
 import sys
 import time
@@ -37,16 +35,8 @@ from core.execution.cross_venue import (
     ArbitrageLeg,
     ArbitrageType,
     CrossVenueOpportunity,
-    CrossVenueSentinel,
-    ExecutionPlan,
-    LatencyDecayAssessment,
-    LatencyPenaltyModeler,
-    OptimalCrossVenueRouter,
     OrderBookLevel,
     RateEdge,
-    RoutingSplit,
-    SentinelEvaluationResult,
-    TriangularArbitrageEngine,
     VenueDepthSnapshot,
     VenueType,
     cross_venue_sentinel,

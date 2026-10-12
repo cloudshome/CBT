@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import argparse
 import datetime
-import gzip
 import logging
 import os
 import shutil
@@ -19,13 +18,13 @@ import sqlite3
 import sys
 import tarfile
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("cbt_backup")
 
 
-def get_db_files(data_dir: Path) -> List[Path]:
+def get_db_files(data_dir: Path) -> list[Path]:
     """Finds all SQLite database files in the data directory."""
     if not data_dir.exists():
         return []
@@ -54,9 +53,9 @@ def backup_single_database(source_path: Path, dest_path: Path) -> bool:
         return False
 
 
-def run_backup(data_dir: Path, backup_root: Path, retention_days: int = 14) -> Dict[str, Any]:
+def run_backup(data_dir: Path, backup_root: Path, retention_days: int = 14) -> dict[str, Any]:
     """Executes full online database backup and creates timestamped compressed archive."""
-    timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%SZ")
+    timestamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d_%H%M%SZ")
     backup_root.mkdir(parents=True, exist_ok=True)
     temp_dir = backup_root / f"temp_{timestamp}"
     temp_dir.mkdir(parents=True, exist_ok=True)
@@ -84,11 +83,11 @@ def run_backup(data_dir: Path, backup_root: Path, retention_days: int = 14) -> D
 
     # Prune old backups
     pruned_count = 0
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.now(datetime.UTC)
     cutoff = now - datetime.timedelta(days=retention_days)
 
     for old_archive in backup_root.glob("cbt_backup_*.tar.gz"):
-        mtime = datetime.datetime.fromtimestamp(old_archive.stat().st_mtime, tz=datetime.timezone.utc)
+        mtime = datetime.datetime.fromtimestamp(old_archive.stat().st_mtime, tz=datetime.UTC)
         if mtime < cutoff:
             old_archive.unlink()
             pruned_count += 1

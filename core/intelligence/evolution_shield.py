@@ -28,7 +28,6 @@ import logging
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
 
 logger = logging.getLogger("ai_quant_sentinel.intelligence.evolution_shield")
 

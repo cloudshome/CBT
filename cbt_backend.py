@@ -17,8 +17,9 @@ import socket
 import sys
 from pathlib import Path
 
-from dotenv import load_dotenv
 import uvicorn
+from dotenv import load_dotenv
+
 
 def _resolve_repo_root() -> Path:
     env_root = os.getenv("CBT_APP_ROOT")
@@ -49,7 +50,7 @@ def is_port_available(port: int) -> bool:
         try:
             s.bind((HOST, port))
             return True
-        except socket.error:
+        except OSError:
             return False
 
 

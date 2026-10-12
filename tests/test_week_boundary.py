@@ -20,7 +20,7 @@ and pin the immune check to always returning a verdict rather than dying.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest import mock
 
 import pytest
@@ -37,9 +37,9 @@ from brain.risk_gate import (
 from data.database import SignalDB
 
 # 2026-09-01 is a Tuesday; its week began Monday 2026-08-31 (previous month).
-CROSSING = datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc)
+CROSSING = datetime(2026, 9, 1, 12, 0, 0, tzinfo=UTC)
 # 2026-08-16 is a Sunday; its week began Monday 2026-08-10 (same month).
-SAFE = datetime(2026, 8, 16, 12, 0, 0, tzinfo=timezone.utc)
+SAFE = datetime(2026, 8, 16, 12, 0, 0, tzinfo=UTC)
 
 
 def _frozen(now: datetime):
@@ -70,43 +70,43 @@ def _monday_of(now: datetime) -> datetime:
     ],
 )
 def test_week_start_survives_month_and_year_boundaries(stamp):
-    now = datetime.fromisoformat(stamp).replace(hour=12, tzinfo=timezone.utc)
-    got = datetime.fromtimestamp(_week_start_utc(now) / 1000, timezone.utc)
+    now = datetime.fromisoformat(stamp).replace(hour=12, tzinfo=UTC)
+    got = datetime.fromtimestamp(_week_start_utc(now) / 1000, UTC)
     assert got == _monday_of(now)
     assert got.weekday() == 0
 
 
 def test_week_start_is_always_the_correct_monday_over_six_years():
     """Exhaustive sweep: the previous implementation failed 38 days a year."""
-    day = datetime(2024, 1, 1, tzinfo=timezone.utc)
-    end = datetime(2030, 1, 1, tzinfo=timezone.utc)
+    day = datetime(2024, 1, 1, tzinfo=UTC)
+    end = datetime(2030, 1, 1, tzinfo=UTC)
     while day < end:
         for hour in (0, 12, 23):
             now = day.replace(hour=hour)
-            got = datetime.fromtimestamp(_week_start_utc(now) / 1000, timezone.utc)
+            got = datetime.fromtimestamp(_week_start_utc(now) / 1000, UTC)
             assert got == _monday_of(now), now.isoformat()
             assert got.weekday() == 0, now.isoformat()
         day += timedelta(days=1)
 
 
 def test_week_start_is_idempotent_on_monday_itself():
-    monday = datetime(2026, 8, 31, 0, 0, 0, tzinfo=timezone.utc)
+    monday = datetime(2026, 8, 31, 0, 0, 0, tzinfo=UTC)
     assert monday.weekday() == 0
-    got = datetime.fromtimestamp(_week_start_utc(monday) / 1000, timezone.utc)
+    got = datetime.fromtimestamp(_week_start_utc(monday) / 1000, UTC)
     assert got == monday
 
 
 def test_week_start_is_never_after_now_and_within_seven_days():
     for stamp in ("2026-09-01", "2026-08-16", "2027-01-01", "2026-03-01"):
-        now = datetime.fromisoformat(stamp).replace(hour=12, tzinfo=timezone.utc)
-        got = datetime.fromtimestamp(_week_start_utc(now) / 1000, timezone.utc)
+        now = datetime.fromisoformat(stamp).replace(hour=12, tzinfo=UTC)
+        got = datetime.fromtimestamp(_week_start_utc(now) / 1000, UTC)
         assert got <= now
         assert (now - got) < timedelta(days=7)
 
 
 def test_day_start_is_unchanged_across_a_month_boundary():
     now = CROSSING
-    got = datetime.fromtimestamp(_day_start_utc(now) / 1000, timezone.utc)
+    got = datetime.fromtimestamp(_day_start_utc(now) / 1000, UTC)
     assert got == now.replace(hour=0, minute=0, second=0, microsecond=0)
 
 
@@ -243,6 +243,6 @@ def test_ordinary_week_is_unaffected(tmp_path):
         gate = evaluate(db)
     assert dw["week"]["n"] == 0
     assert gate["allowed"] is True
-    got = datetime.fromtimestamp(_week_start_utc(SAFE) / 1000, timezone.utc)
-    assert got == datetime(2026, 8, 10, tzinfo=timezone.utc)
+    got = datetime.fromtimestamp(_week_start_utc(SAFE) / 1000, UTC)
+    assert got == datetime(2026, 8, 10, tzinfo=UTC)
     db.close()

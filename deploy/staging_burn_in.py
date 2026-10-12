@@ -13,19 +13,17 @@ from __future__ import annotations
 
 import argparse
 import datetime
-import json
 import logging
 import sys
-import time
-import urllib.request
 import urllib.error
-from typing import Dict, Any, List, Tuple
+import urllib.request
+from typing import Any
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("cbt_staging_burn_in")
 
 
-def http_get(url: str, timeout: float = 5.0) -> Tuple[int, str]:
+def http_get(url: str, timeout: float = 5.0) -> tuple[int, str]:
     """Helper to execute HTTP GET using standard library."""
     req = urllib.request.Request(url, headers={"User-Agent": "CBT-BurnIn/1.0"})
     try:
@@ -37,7 +35,7 @@ def http_get(url: str, timeout: float = 5.0) -> Tuple[int, str]:
         return 0, str(e)
 
 
-def run_burn_in_validation(base_node_url: str = "http://localhost:3000", base_python_url: str = "http://localhost:8000") -> Dict[str, Any]:
+def run_burn_in_validation(base_node_url: str = "http://localhost:3000", base_python_url: str = "http://localhost:8000") -> dict[str, Any]:
     """Executes full diagnostic burn-in checks."""
     checks = []
 
@@ -84,7 +82,7 @@ def run_burn_in_validation(base_node_url: str = "http://localhost:3000", base_py
     verdict = "READY FOR PRODUCTION DEPLOYMENT" if all_passed else "FAILURES DETECTED — ACTION REQUIRED"
 
     report = {
-        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
         "total_checks": total_checks,
         "passed_checks": passed_checks,
         "all_passed": all_passed,

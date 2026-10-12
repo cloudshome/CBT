@@ -19,7 +19,6 @@ from dataclasses import asdict
 from typing import Any
 
 from fastapi import APIRouter, Query
-from pydantic import BaseModel, Field
 
 from core.debate_committee import debate_committee
 from core.dynamic_hedger import dynamic_hedger

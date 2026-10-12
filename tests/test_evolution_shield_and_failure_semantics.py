@@ -25,7 +25,6 @@ from core.intelligence.lesson_health import (
     QuantitativeResearchLesson,
 )
 
-
 # ===========================================================================
 # 1. Evolution Shield Adversarial Tests
 # ===========================================================================

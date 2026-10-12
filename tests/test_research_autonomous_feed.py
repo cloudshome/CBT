@@ -5,14 +5,9 @@ Tests for autonomous research feed extractor, registry, and pipeline ingestion.
 Ensures zero-touch RSS ingestion, XML parsing, database persistence, and invariant safety.
 """
 
-import os
-import tempfile
-import pytest
-from pathlib import Path
 
-from core.knowledge_os.feed_extractor import FeedExtractor, FeedItem
-from core.knowledge_os.research_source_registry import ResearchSourceRegistry, ResearchFeedSource
-
+from core.knowledge_os.feed_extractor import FeedExtractor
+from core.knowledge_os.research_source_registry import ResearchSourceRegistry
 
 SAMPLE_RSS_XML = """<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0">

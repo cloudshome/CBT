@@ -10,9 +10,9 @@ Verifies sub-millisecond decision latency (< 250 microseconds target).
 
 from __future__ import annotations
 
-from pathlib import Path
 import sys
 import time
+from pathlib import Path
 
 # Ensure repository root is on sys.path
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent

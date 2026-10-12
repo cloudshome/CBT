@@ -20,7 +20,10 @@ import re
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from core.telegram.rbac import TelegramUserIdentity
 
 import aiohttp
 from dotenv import load_dotenv

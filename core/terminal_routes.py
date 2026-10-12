@@ -25,7 +25,7 @@ except ImportError:
     data_streamer = None
 
 try:
-    from core.smc_engine import smc_engine, SMCPatternType
+    from core.smc_engine import SMCPatternType, smc_engine
 except ImportError:
     smc_engine = None
     SMCPatternType = None

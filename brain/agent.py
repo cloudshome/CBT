@@ -20,7 +20,7 @@ import json
 import os
 import platform
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from config import (
     BARS,
@@ -121,7 +121,7 @@ def health_report() -> dict:
         "ok": False,
         "version": VERSION,
         "python": platform.python_version(),
-        "time": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "time": datetime.now(UTC).isoformat(timespec="seconds"),
         "data": _data_mode(),
     }
     try:
@@ -387,7 +387,7 @@ def morning_briefing(
         assets.append(entry)
 
     briefing: dict = {
-        "time": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "time": datetime.now(UTC).isoformat(timespec="seconds"),
         "timeframe": timeframe,
         "assets": assets,
         "narrative": "",
@@ -1120,7 +1120,7 @@ def desk_status() -> dict:
     """
     from data.database import SignalDB
 
-    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    now = datetime.now(UTC).isoformat(timespec="seconds")
     status: dict = {
         "time": now,
         "version": VERSION,

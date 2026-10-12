@@ -10,15 +10,12 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import sys
-import time
 from pathlib import Path
 
 # Add project root to sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from core.database import db_manager
 from core.data_streamer import data_streamer
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")

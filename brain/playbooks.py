@@ -23,7 +23,7 @@ losing.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pandas as pd
 
@@ -101,7 +101,7 @@ def primary_plan_types(symbol: str) -> set | None:
 
 # ── Session awareness (decision B8) ──────────────────────────────────────
 def utc_hour(now: datetime | None = None) -> int:
-    return (now or datetime.now(timezone.utc)).hour
+    return (now or datetime.now(UTC)).hour
 
 
 def session_status(symbol: str, hour: int | None = None) -> dict:

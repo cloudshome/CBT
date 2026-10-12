@@ -10,7 +10,6 @@ Specialists produce normalized CandidateProposal contracts. They have ZERO direc
 from __future__ import annotations
 
 import time
-import uuid
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass, field
 from enum import StrEnum

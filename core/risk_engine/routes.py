@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any
+
 import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field

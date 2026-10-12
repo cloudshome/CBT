@@ -17,12 +17,12 @@ Safe to run while the stack is live — TRUNCATE checkpoint mode completes
 atomically once all readers have finished, never blocking active writes.
 """
 
+import logging
 import os
 import sqlite3
 import time
-import logging
+from datetime import UTC, datetime
 from pathlib import Path
-from datetime import datetime, timezone
 
 logging.basicConfig(
     level=logging.INFO,
@@ -93,7 +93,7 @@ def checkpoint_db(db_path: Path) -> dict:
 
 def main():
     log.info("=" * 60)
-    log.info(f"SKY / CBT WAL Checkpoint — {datetime.now(timezone.utc).isoformat()}")
+    log.info(f"SKY / CBT WAL Checkpoint — {datetime.now(UTC).isoformat()}")
     log.info(f"Data directory: {DATA_DIR}")
     log.info("=" * 60)
 

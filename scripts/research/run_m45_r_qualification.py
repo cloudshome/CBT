@@ -22,8 +22,6 @@ from __future__ import annotations
 
 import json
 import logging
-import math
-import os
 import subprocess
 import sys
 import time
@@ -34,15 +32,9 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from core.execution.mev_mitigation import (
-    BuilderBundleBid,
-    FairSequencingBatch,
-    MEVProtectedOrderPlan,
-    MEVRiskLevel,
-    MempoolRouteType,
-    PBSSimulator,
     REAL_CAPITAL_ENABLED,
-    SandwichAttackEvaluator,
-    SandwichVulnerabilityReport,
+    MempoolRouteType,
+    MEVRiskLevel,
     mev_mitigation_sentinel,
     pbs_simulator,
     sandwich_attack_evaluator,

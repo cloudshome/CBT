@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC
+
 from brain.decision import _top_plan_type, build_decision
 from data.database import SignalDB
 
@@ -65,13 +67,13 @@ def test_clean_trade_allowed_when_gates_open(tmp_path):
 
 
 def test_playbook_veto_gold_news(tmp_path):
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     db = SignalDB(tmp_path / "d.db")
     payload = _payload("BUY")
     payload["context"] = {"macro": {"high_impact_imminent": True, "available": True}}
     d = build_decision(
-        payload, "XAUUSD", db, now=datetime(2026, 8, 9, 14, 0, tzinfo=timezone.utc)
+        payload, "XAUUSD", db, now=datetime(2026, 8, 9, 14, 0, tzinfo=UTC)
     )
     assert d["action"] == "NO TRADE"
     assert any("playbook" in b.lower() for b in d["blocked_by"])

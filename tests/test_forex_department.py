@@ -6,23 +6,22 @@ Validates session clock, weekend closure, lot calculations, notional leverage ca
 from __future__ import annotations
 
 import datetime
-import pytest
 
+from core.forex.economic_calendar import EconomicCalendarFilter
+from core.forex.lot_calculator import ForexLotCalculator
+from core.forex.service import ForexDepartmentService
+from core.forex.session_clock import ForexSessionClock
 from core.forex.types import (
-    ForexSession,
     EconomicEvent,
     EconomicImpact,
+    ForexSession,
 )
-from core.forex.session_clock import ForexSessionClock
-from core.forex.lot_calculator import ForexLotCalculator
-from core.forex.economic_calendar import EconomicCalendarFilter
-from core.forex.service import ForexDepartmentService
 
 
 class TestForexSessionClock:
     def test_weekend_market_close(self):
         # Saturday 12:00 UTC
-        sat = datetime.datetime(2026, 10, 17, 12, 0, 0, tzinfo=datetime.timezone.utc)
+        sat = datetime.datetime(2026, 10, 17, 12, 0, 0, tzinfo=datetime.UTC)
         st = ForexSessionClock.get_status(sat)
         assert not st.is_market_open
         assert ForexSession.WEEKEND_CLOSED in st.active_sessions
@@ -30,7 +29,7 @@ class TestForexSessionClock:
 
     def test_london_ny_overlap_peak_liquidity(self):
         # Wednesday 14:00 UTC (London + NY overlap, NY Open Killzone)
-        wed = datetime.datetime(2026, 10, 14, 14, 0, 0, tzinfo=datetime.timezone.utc)
+        wed = datetime.datetime(2026, 10, 14, 14, 0, 0, tzinfo=datetime.UTC)
         st = ForexSessionClock.get_status(wed)
         assert st.is_market_open
         assert ForexSession.LONDON in st.active_sessions
@@ -42,7 +41,7 @@ class TestForexSessionClock:
 
     def test_asian_session(self):
         # Tuesday 02:00 UTC
-        tue = datetime.datetime(2026, 10, 13, 2, 0, 0, tzinfo=datetime.timezone.utc)
+        tue = datetime.datetime(2026, 10, 13, 2, 0, 0, tzinfo=datetime.UTC)
         st = ForexSessionClock.get_status(tue)
         assert st.is_market_open
         assert ForexSession.ASIAN in st.active_sessions
@@ -145,7 +144,7 @@ class TestForexDepartmentService:
         svc = ForexDepartmentService()
         # Mock open weekday time:
         svc.session_clock.get_status = lambda *args, **kwargs: ForexSessionClock.get_status(
-            datetime.datetime(2026, 10, 14, 13, 0, 0, tzinfo=datetime.timezone.utc)
+            datetime.datetime(2026, 10, 14, 13, 0, 0, tzinfo=datetime.UTC)
         )
         res = svc.evaluate_order_risk(
             symbol="EUR/USD",

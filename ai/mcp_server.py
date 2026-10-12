@@ -38,6 +38,10 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from mcp.types import CallToolResult
 
 from config import VERSION
 

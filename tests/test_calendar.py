@@ -38,7 +38,7 @@ MINUTE = 60_000
 def ms(iso: str) -> int:
     """UTC epoch ms for a naive ISO string interpreted as UTC."""
     return int(
-        dt.datetime.fromisoformat(iso).replace(tzinfo=dt.timezone.utc).timestamp()
+        dt.datetime.fromisoformat(iso).replace(tzinfo=dt.UTC).timestamp()
         * 1000
     )
 

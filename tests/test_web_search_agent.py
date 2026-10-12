@@ -15,6 +15,7 @@ Tests:
 from __future__ import annotations
 
 import pytest
+
 from core.knowledge_os.web_search_agent import (
     SafeHTMLTextExtractor,
     SecurityValidationError,
@@ -227,12 +228,12 @@ def test_claim_extraction_worker_epistemic_tagging():
 
 def test_research_critic_worker_and_triage_staging():
     """Worker 5 Test: Critic evaluates claims and stages into wiki_triage_inbox."""
+    from core.knowledge_os.research_wikipedia import research_wikipedia_engine
     from core.knowledge_os.web_search_agent import (
         ClaimExtractionWorker,
         CleanTextDocument,
         ResearchCriticWorker,
     )
-    from core.knowledge_os.research_wikipedia import research_wikipedia_engine
 
     doc = CleanTextDocument(
         url="https://critic-test.example.com",
@@ -272,6 +273,7 @@ async def test_execute_bounded_research_cycle():
 def test_rest_web_search_cycle_endpoint():
     """REST Endpoint Test: POST /api/knowledge/web-search/cycle returns bounded cycle result."""
     from fastapi.testclient import TestClient
+
     from app import app
 
     client = TestClient(app)

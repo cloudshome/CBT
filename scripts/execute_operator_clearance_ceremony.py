@@ -19,7 +19,6 @@ from __future__ import annotations
 import datetime
 import hashlib
 import json
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -58,7 +57,7 @@ class GateG21ClearanceCeremony:
         self.operator_role = operator_role
         self.clearance_scope = clearance_scope
         self.signing_key_id = signing_key_id
-        self.timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        self.timestamp = datetime.datetime.now(datetime.UTC).isoformat()
 
     def run_ceremony(self) -> bool:
         print("=" * 80)
@@ -90,7 +89,7 @@ class GateG21ClearanceCeremony:
             print("[ABORT] RELEASE_MANIFEST.json does not exist!")
             return False
 
-        with open(manifest_file, "r", encoding="utf-8") as f:
+        with open(manifest_file, encoding="utf-8") as f:
             manifest_data = json.load(f)
 
         gates = manifest_data.get("gates", {})

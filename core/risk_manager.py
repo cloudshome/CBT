@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
+from typing import Any
 
 logger = logging.getLogger("ai_quant_sentinel.risk_manager")
 
@@ -59,8 +60,9 @@ class RiskManager:
     def _persist_state(self, key: str, value: Any) -> None:
         """Persists risk state atomically to SQLite."""
         try:
-            from core.database import db_manager
             import json
+
+            from core.database import db_manager
             now_ms = int(time.time() * 1000)
             val_json = json.dumps(value)
             with db_manager.get_brain_conn() as conn:

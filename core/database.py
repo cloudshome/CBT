@@ -18,6 +18,7 @@ logger = logging.getLogger("ai_quant_sentinel.database")
 
 import sys
 
+
 # Ensure data directory exists
 def _resolve_data_dir() -> Path:
     env_dir = os.getenv("DATA_DIR")

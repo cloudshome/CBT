@@ -7,10 +7,12 @@ Unit & integration tests verifying:
 3. Zero-Fabrication epistemic firewall adherence (confidence = 0.0 for qualitative claims).
 """
 
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import patch, MagicMock
-from core.url_extractor import url_extractor, URLExtractor
+
 from core.universal_ingestor import universal_ingestor
+from core.url_extractor import url_extractor
 
 
 def test_url_extractor_generic_article_mock():

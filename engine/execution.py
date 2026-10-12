@@ -22,6 +22,8 @@ Example (BUY, entry 100, SL 99, TP 102, 1R risk):
 
 from __future__ import annotations
 
+import pandas as pd
+
 # One-sided half-spread as a fraction of price, per symbol.  Retail-ish
 # spreads for the execution timeframe; widen for lower-liquidity instruments.
 SPREADS: dict[str, float] = {

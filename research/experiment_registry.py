@@ -9,8 +9,8 @@ from __future__ import annotations
 import json
 import logging
 import time
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import asdict, dataclass
+from typing import Any
 
 from core.database import db_manager
 
@@ -25,13 +25,13 @@ class ExperimentRecord:
     dataset_hash: str
     feature_schema_version: str
     strategy_dna_hash: str
-    parameters: Dict[str, Any]
+    parameters: dict[str, Any]
     oos_sharpe: float
     deflated_sharpe: float
     p_value: float
     status: str                         # "PROMOTED", "REJECTED", "QUARANTINED"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -44,7 +44,7 @@ class ExperimentRegistry:
         dataset_hash: str,
         feature_schema_version: str,
         strategy_dna_hash: str,
-        parameters: Dict[str, Any],
+        parameters: dict[str, Any],
         oos_sharpe: float,
         deflated_sharpe: float,
         p_value: float,
@@ -82,7 +82,7 @@ class ExperimentRegistry:
         logger.info(f"Logged experiment {exp_id} in registry (DSR={deflated_sharpe:.2f}, Status={status}).")
         return exp_id
 
-    def get_experiments(self, limit: int = 50) -> List[Dict[str, Any]]:
+    def get_experiments(self, limit: int = 50) -> list[dict[str, Any]]:
         with db_manager.get_experiment_conn() as conn:
             cursor = conn.execute(
                 """

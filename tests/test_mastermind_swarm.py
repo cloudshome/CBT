@@ -6,17 +6,17 @@ Verifies candidate proposals, specialist evaluations, arbiter correlation handli
 rejection reasons, and risk gate compliance.
 """
 
-import pytest
 import time
-from core.mastermind.specialist_base import SpecialistArchetype, CandidateProposal
+
+import pytest
+
+from core.mastermind.mastermind_arbiter import MastermindArbiterCouncil
 from core.mastermind.specialists import (
     BtcMacroSpecialist,
     EthSpecialist,
-    SolSpecialist,
-    MemeMomentumSpecialist,
     LowCapBreakoutSpecialist,
+    MemeMomentumSpecialist,
 )
-from core.mastermind.mastermind_arbiter import MastermindArbiterCouncil
 from core.sky_intelligence.types import DecisionAction
 
 

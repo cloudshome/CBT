@@ -52,10 +52,6 @@ from core.intelligence.forward_validation.orderbook_tracker import (
     OrderBookLevel,
     OrderBookSnapshot,
 )
-from core.intelligence.forward_validation.paper_ingestion_engine import (
-    ForwardPaperIngestionEngine,
-    global_paper_ingestion_engine,
-)
 from core.intelligence.forward_validation.paper_fill_simulator import (
     FeedIntegrityError,
     InsufficientLiquidityError,
@@ -63,6 +59,10 @@ from core.intelligence.forward_validation.paper_fill_simulator import (
     OrderType,
     PaperFill,
     RealisticPaperFillSimulator,
+)
+from core.intelligence.forward_validation.paper_ingestion_engine import (
+    ForwardPaperIngestionEngine,
+    global_paper_ingestion_engine,
 )
 from core.intelligence.forward_validation.qualification_engine import (
     M31RQualificationDecision,
@@ -109,7 +109,6 @@ __all__ = [
     "ForwardPaperIngestionEngine",
     "ForwardPerformanceLedger",
     "FrozenStrategyDossier",
-    "global_paper_ingestion_engine",
     "HumanApprovalRequiredError",
     "InsufficientLiquidityError",
     "LeagueStrategyRecord",
@@ -144,4 +143,5 @@ __all__ = [
     "StrategyNotFoundError",
     "SuspensionController",
     "SuspensionPolicy",
+    "global_paper_ingestion_engine",
 ]

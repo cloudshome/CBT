@@ -386,7 +386,7 @@ def main() -> None:
     m31_qualified = False
     if m31_decision_file.exists():
         try:
-            with open(m31_decision_file, "r") as f:
+            with open(m31_decision_file) as f:
                 dec = json.load(f)
                 m31_qualified = dec.get("status") == "QUALIFIED"
         except Exception:

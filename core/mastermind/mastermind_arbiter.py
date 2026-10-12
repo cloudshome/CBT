@@ -10,7 +10,6 @@ Records an immutable audit trail in SQLite (mastermind_decisions table).
 
 from __future__ import annotations
 
-import json
 import logging
 import time
 import uuid
@@ -265,6 +264,7 @@ class MastermindArbiterCouncil:
     async def start_loop(self, interval_sec: float = 60.0) -> None:
         """Runs the continuous Mastermind Swarm polling loop in the background."""
         import asyncio
+
         from core.data_streamer import data_streamer
 
         logger.info("MastermindArbiterCouncil: Continuous Swarm loop started (interval: %.1fs).", interval_sec)

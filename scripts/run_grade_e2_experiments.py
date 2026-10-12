@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-
 from typing import Any
 
 # Ensure repository root is on sys.path

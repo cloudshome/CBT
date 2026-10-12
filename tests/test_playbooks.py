@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pandas as pd
 
@@ -60,7 +60,7 @@ def test_gold_news_block():
     res = apply_playbook(
         "XAUUSD",
         "BUY",
-        now=datetime(2026, 8, 9, 14, 0, tzinfo=timezone.utc),
+        now=datetime(2026, 8, 9, 14, 0, tzinfo=UTC),
         news_imminent=True,
         df_1d=_d1_frame(),
     )
@@ -74,7 +74,7 @@ def test_gold_session_warn(monkeypatch):
     res = apply_playbook(
         "XAUUSD",
         "BUY",
-        now=datetime(2026, 8, 9, 3, 0, tzinfo=timezone.utc),
+        now=datetime(2026, 8, 9, 3, 0, tzinfo=UTC),
         news_imminent=False,
         df_1d=_d1_frame(),
     )
@@ -91,7 +91,7 @@ def test_gold_session_block_mode():
         res = apply_playbook(
             "XAUUSD",
             "BUY",
-            now=datetime(2026, 8, 9, 3, 0, tzinfo=timezone.utc),
+            now=datetime(2026, 8, 9, 3, 0, tzinfo=UTC),
             news_imminent=False,
         )
         assert res["blocked"] is True

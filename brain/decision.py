@@ -16,7 +16,7 @@ portfolio exposure, risk limits, or a behavioral flag all produce NO TRADE.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from config import DESK_DEFAULT
 from data.database import SignalDB
@@ -182,7 +182,7 @@ def _build_decision_inner(
         "regime": features.get("regime_name"),
         "regime_label": features.get("regime_label"),
         "desk_default": DESK_DEFAULT,
-        "utc": (now or datetime.now(timezone.utc)).strftime("%Y-%m-%d %H:%M UTC"),
+        "utc": (now or datetime.now(UTC)).strftime("%Y-%m-%d %H:%M UTC"),
         "decision_text": (
             "WAIT — no trade"
             if final == "NO TRADE"

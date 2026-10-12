@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import json
 import logging
-import math
 import random
 import sys
 import time
@@ -33,34 +32,20 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from core.execution.concentrated_amm import (
+    MAX_TICK,
+    MIN_TICK,
+    REAL_CAPITAL_ENABLED,
     BaseV4Hook,
     ConcentratedLPAnalytics,
     ConcentratedPoolState,
     ConcentratedSwapEngine,
     DynamicFeeHook,
     HookPermissions,
-    HookResult,
-    HookSandbox,
-    LPPositionMetrics,
-    MAX_SQRT_RATIO,
-    MAX_TICK,
-    MIN_SQRT_RATIO,
-    MIN_TICK,
-    QUALIFICATION_MAX_PRICE_IMPACT_BPS,
-    REAL_CAPITAL_ENABLED,
-    SwapExecutionReport,
-    TickTable,
     VolatilityCircuitBreakerHook,
-    compute_swap_step,
     evaluate_price_impact_constraint,
-    get_amount0_delta,
-    get_amount1_delta,
     get_sqrt_ratio_at_tick,
     get_tick_at_sqrt_ratio,
-    price_to_sqrt_ratio_x96,
     price_to_tick,
-    sqrt_ratio_x96_to_price,
-    tick_to_price,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -175,7 +160,7 @@ def evaluate_m42_r_obligations() -> dict:
     results["OBL-3"] = {
         "title": "Price Impact Qualification Ceiling Enforcement (5.0 bps)",
         "status": obl3_status,
-        "details": f"Simulation qualification constraint strictly evaluated: 2.0 bps -> Qualified, 5.0 bps -> Qualified, 10.0 bps -> Flagged/Unqualified.",
+        "details": "Simulation qualification constraint strictly evaluated: 2.0 bps -> Qualified, 5.0 bps -> Qualified, 10.0 bps -> Flagged/Unqualified.",
     }
 
     # --------------------------------------------------------------------------
@@ -434,9 +419,9 @@ def main() -> int:
     dossier_path.write_text("\n".join(md_lines), encoding="utf-8")
     logger.info(f"Emitted M42-R Markdown Dossier: {dossier_path}")
 
-    print(f"\n=======================================================")
+    print("\n=======================================================")
     print(f"M42-R QUALIFICATION RESULT: {report['qualification_status']} ({report['obligations_passed']}/{report['obligations_evaluated']} PASS)")
-    print(f"=======================================================")
+    print("=======================================================")
     return 0 if report["qualification_status"] == "QUALIFIED" else 1
 
 

@@ -7,10 +7,11 @@ from __future__ import annotations
 
 import datetime
 from typing import Any
-from core.forex.types import EconomicEvent, EconomicImpact, ForexSessionStatus, LotSizingResult
-from core.forex.session_clock import ForexSessionClock
-from core.forex.lot_calculator import ForexLotCalculator
+
 from core.forex.economic_calendar import EconomicCalendarFilter
+from core.forex.lot_calculator import ForexLotCalculator
+from core.forex.session_clock import ForexSessionClock
+from core.forex.types import ForexSessionStatus, LotSizingResult
 
 
 class ForexDepartmentService:
@@ -24,7 +25,7 @@ class ForexDepartmentService:
         self.economic_filter = EconomicCalendarFilter(lockout_window_minutes=30.0)
 
     def get_market_status(self) -> dict[str, Any]:
-        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        now_utc = datetime.datetime.now(datetime.UTC)
         st: ForexSessionStatus = self.session_clock.get_status(now_utc)
         return {
             "utc_time": now_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),

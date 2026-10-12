@@ -16,22 +16,16 @@ Exit Codes:
 from __future__ import annotations
 
 import ast
-from dataclasses import dataclass
 import logging
 import sys
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Tuple
-
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from core.governance.architecture_registry import (
-    ArchitectureLayer,
-    ModuleAuthority,
-    resolve_module_authority,
-    resolve_module_layer,
     validate_import_direction,
 )
 
@@ -59,7 +53,7 @@ def file_to_module_name(file_path: Path, repo_root: Path) -> str:
     return ".".join(parts)
 
 
-def scan_file_imports(file_path: Path, repo_root: Path) -> List[Tuple[int, str]]:
+def scan_file_imports(file_path: Path, repo_root: Path) -> list[tuple[int, str]]:
     """Parses a Python file with ast and extracts (line_number, imported_module)."""
     try:
         source_code = file_path.read_text(encoding="utf-8")
@@ -68,7 +62,7 @@ def scan_file_imports(file_path: Path, repo_root: Path) -> List[Tuple[int, str]]
         logger.warning(f"Could not parse {file_path}: {e}")
         return []
 
-    imported_modules: List[Tuple[int, str]] = []
+    imported_modules: list[tuple[int, str]] = []
 
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -90,10 +84,10 @@ def scan_file_imports(file_path: Path, repo_root: Path) -> List[Tuple[int, str]]
     return imported_modules
 
 
-def run_architecture_boundary_verification(root_path: Optional[Path] = None) -> Tuple[bool, List[ImportViolation], int, int]:
+def run_architecture_boundary_verification(root_path: Path | None = None) -> tuple[bool, list[ImportViolation], int, int]:
     """Scans all Python files under core/ and root app.py for boundary compliance."""
     target_root = root_path or REPO_ROOT
-    files_to_scan: List[Path] = []
+    files_to_scan: list[Path] = []
 
     # 1. Collect core/ files
     core_dir = target_root / "core"
@@ -106,7 +100,7 @@ def run_architecture_boundary_verification(root_path: Optional[Path] = None) -> 
     if app_py.exists():
         files_to_scan.append(app_py)
 
-    violations: List[ImportViolation] = []
+    violations: list[ImportViolation] = []
     total_imports_checked = 0
 
     for fpath in files_to_scan:

@@ -6,6 +6,7 @@ Accurately maps UTC market hours, weekend market close, and high-liquidity kill 
 from __future__ import annotations
 
 import datetime
+
 from core.forex.types import ForexSession, ForexSessionStatus
 
 
@@ -17,9 +18,9 @@ class ForexSessionClock:
     @staticmethod
     def get_status(dt_utc: datetime.datetime | None = None) -> ForexSessionStatus:
         if dt_utc is None:
-            dt_utc = datetime.datetime.now(datetime.timezone.utc)
+            dt_utc = datetime.datetime.now(datetime.UTC)
         elif dt_utc.tzinfo is None:
-            dt_utc = dt_utc.replace(tzinfo=datetime.timezone.utc)
+            dt_utc = dt_utc.replace(tzinfo=datetime.UTC)
 
         ts_ms = int(dt_utc.timestamp() * 1000)
         day_of_week = dt_utc.weekday()  # 0=Monday, 4=Friday, 5=Saturday, 6=Sunday

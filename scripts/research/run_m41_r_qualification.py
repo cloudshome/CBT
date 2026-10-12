@@ -308,9 +308,9 @@ def main():
     dossier_path.write_text("\n".join(md_lines), encoding="utf-8")
     logger.info(f"Emitted M41-R Markdown Dossier: {dossier_path}")
 
-    print(f"\n=======================================================")
+    print("\n=======================================================")
     print(f"M41-R QUALIFICATION RESULT: {report['qualification_status']} ({report['obligations_passed']}/{report['obligations_evaluated']} PASS)")
-    print(f"=======================================================")
+    print("=======================================================")
     return 0 if report["qualification_status"] == "QUALIFIED" else 1
 
 

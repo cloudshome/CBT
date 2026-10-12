@@ -8,6 +8,13 @@ const router = Router();
 // Apply rate limiting
 router.use(defaultRateLimiter);
 
+// Institutional governance header: flag legacy Express fallback
+router.use((_req: Request, res: Response, next) => {
+  res.setHeader('X-Legacy-Fallback', 'true');
+  res.setHeader('X-Authoritative-Paper-Service', 'FastAPI:8000');
+  next();
+});
+
 /**
  * POST /api/paper/trade
  *

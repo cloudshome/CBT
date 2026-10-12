@@ -9,8 +9,8 @@ Adversarial Verification & Quality Gate Tests for Phases 3, 4, 5:
 
 from __future__ import annotations
 
-import tempfile
 from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -155,9 +155,10 @@ def test_rest_endpoints_backlinks_and_merge(temp_wiki_engine: ResearchWikipediaE
     """
     Phase 4 & 5: Verifies REST routing for /wiki/article/{id}/backlinks and /wiki/triage/{id}/merge.
     """
-    from core.knowledge_os.routes import router
     from fastapi import FastAPI
+
     import core.knowledge_os.research_wikipedia as rw_mod
+    from core.knowledge_os.routes import router
 
     app = FastAPI()
     app.include_router(router)

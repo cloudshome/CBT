@@ -148,7 +148,7 @@ class StrictDataContract:
                 available_samples=available_samples,
                 timestamp_ns=timestamp_ns,
                 is_valid=False,
-                provenance_note=f"ERROR: Computation failed: {str(e)}",
+                provenance_note=f"ERROR: Computation failed: {e!s}",
                 real_capital_enabled=False,
             )
 

@@ -7,8 +7,8 @@ Institutional Research Wikipedia Relational Ledger, Versioning, Citations & Tria
 
 from __future__ import annotations
 
-import tempfile
 from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 

@@ -518,6 +518,9 @@ class AutonomousQuantStrategist:
             else f"🟡 {dossier.verdict.value} (Quarantine Blocked)"
         )
 
+        novelty_str = r"PASS (\rho < 0.65)" if is_novel else r"FAIL (\rho \ge 0.65)"
+        novelty_status = "APPROVED" if is_novel else "REDUNDANT"
+
         lines = [
             f"# Institutional Strategy Tear Sheet: {compiled.name}",
             f"**Job ID:** `{job_id}` | **Strategy ID:** `{compiled.strategy_id}`",
@@ -533,7 +536,7 @@ class AutonomousQuantStrategist:
             f"| **White's Reality Check (WRC)** | $p = {w.wrc_p_value:.4f}$ | $p \\le {self.policy.wrc_significance_alpha}$ | {'PASS' if w.is_alpha_significant else 'FAIL'} |",
             f"| **Perturbation Plateau Ratio** | {p.plateau_survival_ratio * 100.0:.1f}% | $\\ge {self.policy.plateau_survival_ratio * 100.0:.0f}\\%$ | {'PLATEAU' if p.is_plateau_confirmed else 'NEEDLE_OVERFIT'} |",
             f"| **OOS/IS Stability Ratio** | {c.stability_index:.2f} | $\\ge 0.45$ | {'PASS' if c.stability_index >= 0.45 else 'FRAGILE'} |",
-            f"| **Novelty Correlation Check** | {'PASS (\\rho < 0.65)' if is_novel else 'FAIL (\\rho \\ge 0.65)'} | Low Redundancy | {'APPROVED' if is_novel else 'REDUNDANT'} |",
+            f"| **Novelty Correlation Check** | {novelty_str} | Low Redundancy | {novelty_status} |",
             "",
             "## 2. Venue-Parameterized Friction Stress Matrix",
             "| Friction Tier | Maker / Taker Fees | Slippage | Net Sharpe | Win Rate | Max Drawdown |",

@@ -9,7 +9,7 @@ Provides:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from brain.full_pipeline import analyze_full
 from brain.playbooks import session_status
@@ -114,7 +114,7 @@ def generate_morning_brief(
     try:
         biases = {}
         notes = []
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         for sym in target_symbols:
             try:

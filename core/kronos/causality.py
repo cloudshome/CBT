@@ -58,7 +58,7 @@ class PointInTimeScaler:
         if not np.all(np.isfinite(causal_vals)):
             raise CausalityViolationError("Cannot fit scaler on non-finite (NaN/Inf) values")
 
-        self.sample_count = int(len(causal_vals))
+        self.sample_count = len(causal_vals)
         self.fit_start_ts = int(arr_ts[causal_mask][0])
         self.fit_end_ts = int(arr_ts[causal_mask][-1])
 

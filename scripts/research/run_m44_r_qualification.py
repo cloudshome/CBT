@@ -22,8 +22,6 @@ from __future__ import annotations
 
 import json
 import logging
-import math
-import os
 import subprocess
 import sys
 import time
@@ -34,19 +32,12 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from core.execution.liquidity_surface import (
+    REAL_CAPITAL_ENABLED,
     ExecutionUrgency,
     HighFrequencyToxicFlowDetector,
-    LiquiditySurfaceGeometryEngine,
     LiquiditySurfaceSentinel,
-    OrderBookSurfaceSnapshot,
-    ProtectiveExecutionAdjustment,
-    REAL_CAPITAL_ENABLED,
-    SurfaceCurveParams,
-    ToxicFlowAssessment,
-    ToxicityRegime,
     liquidity_surface_geometry_engine,
     surface_sentinel,
-    toxic_flow_detector,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")

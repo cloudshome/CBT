@@ -47,7 +47,7 @@ import json
 import sys
 import tempfile
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest import mock
 
@@ -59,9 +59,9 @@ from data.database import SignalDB
 from data.paper_trading import PaperTradingRunner
 
 # 2026-09-01 is a Tuesday; its week began Monday 2026-08-31 — previous month.
-CROSSING = datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc)
+CROSSING = datetime(2026, 9, 1, 12, 0, 0, tzinfo=UTC)
 # 2026-08-16 is a Sunday; its week began Monday 2026-08-10 — same month.
-SAFE = datetime(2026, 8, 16, 12, 0, 0, tzinfo=timezone.utc)
+SAFE = datetime(2026, 8, 16, 12, 0, 0, tzinfo=UTC)
 
 
 def _frozen(now: datetime):

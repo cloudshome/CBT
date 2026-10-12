@@ -12,12 +12,12 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import sys
 import time
 import tracemalloc
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Any
+
 import numpy as np
 
 # Ensure root on python path
@@ -25,18 +25,17 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.database import db_manager
 from core.monte_carlo_stress import monte_carlo_stress_tester
-from core.empirical_accumulator import empirical_accumulator
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("cbt_performance_profile")
 
 
-def run_latency_and_memory_profile(iterations: int = 100) -> Dict[str, Any]:
+def run_latency_and_memory_profile(iterations: int = 100) -> dict[str, Any]:
     """Profiles execution latency and memory overhead across core quantitative engines."""
     tracemalloc.start()
     mem_start_current, mem_start_peak = tracemalloc.get_traced_memory()
     
-    latencies_ms: List[float] = []
+    latencies_ms: list[float] = []
 
     for i in range(iterations):
         t0 = time.perf_counter()

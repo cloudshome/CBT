@@ -73,7 +73,7 @@ class Generation6IndependentAuditor:
         if not manifest_path.exists():
             return AuditObligationResult("AUDIT_01_M18_IMMUTABILITY", "M18 Immutability", False, str(manifest_path), "Manifest missing", {})
 
-        with open(manifest_path, "r", encoding="utf-8") as f:
+        with open(manifest_path, encoding="utf-8") as f:
             m18_data = json.load(f)
 
         certified_commit = m18_data.get("M18_CERTIFIED_COMMIT", "")
@@ -122,9 +122,9 @@ class Generation6IndependentAuditor:
         if not decision_file.exists() or not evidence_file.exists():
             return AuditObligationResult("AUDIT_02_M31R_EVIDENCE_REPRODUCIBILITY", "M31-R Evidence", False, "docs/research/", "Files missing", {})
 
-        with open(decision_file, "r", encoding="utf-8") as f:
+        with open(decision_file, encoding="utf-8") as f:
             dec = json.load(f)
-        with open(evidence_file, "r", encoding="utf-8") as f:
+        with open(evidence_file, encoding="utf-8") as f:
             ev = json.load(f)
 
         status_ok = dec.get("status") == "QUALIFIED"
@@ -159,7 +159,7 @@ class Generation6IndependentAuditor:
         if not freeze_file.exists():
             return AuditObligationResult("AUDIT_03_M31_5_FREEZE_BINDING", "M31.5 Freeze Binding", False, str(freeze_file), "Manifest missing", {})
 
-        with open(freeze_file, "r", encoding="utf-8") as f:
+        with open(freeze_file, encoding="utf-8") as f:
             freeze_data = json.load(f)
 
         master_digest = freeze_data.get("master_freeze_digest", "")
@@ -185,7 +185,7 @@ class Generation6IndependentAuditor:
         if not quality_file.exists() or not dossier_file.exists():
             return AuditObligationResult("AUDIT_04_TIME_CONSERVATION_AND_EXCLUSION_RECONCILIATION", "Time Reconciliation", False, "docs/execution/", "Files missing", {})
 
-        with open(quality_file, "r", encoding="utf-8") as f:
+        with open(quality_file, encoding="utf-8") as f:
             q_data = json.load(f)
 
         wall = q_data.get("wall_clock_hours", 0.0)
@@ -233,7 +233,7 @@ class Generation6IndependentAuditor:
         if not rec_file.exists():
             return AuditObligationResult("AUDIT_05_LOST_ACK_STATE_TRANSITIONS", "Lost-ACK Matrix", False, str(rec_file), "Report missing", {})
 
-        with open(rec_file, "r", encoding="utf-8") as f:
+        with open(rec_file, encoding="utf-8") as f:
             rec_data = json.load(f)
 
         unreconciled = rec_data.get("unreconciled_ambiguous", -1)
@@ -369,7 +369,7 @@ class Generation6IndependentAuditor:
         if not signing_report.exists():
             return AuditObligationResult("AUDIT_11_AUTHENTICODE_AND_RFC3161_SIGNATURES", "Code Signing", False, str(signing_report), "Report missing", {})
 
-        with open(signing_report, "r", encoding="utf-8") as f:
+        with open(signing_report, encoding="utf-8") as f:
             sign_data = json.load(f)
 
         results = sign_data.get("results", [])
@@ -425,7 +425,7 @@ class Generation6IndependentAuditor:
         """Verifies institutional invariant: Installer on disk != operational authorization."""
         self.log("--> Interrogating Obligation 13: Installer Non-Authorization Invariant...")
         manifest_file = self.repo_root / "release" / "RELEASE_MANIFEST.json"
-        with open(manifest_file, "r", encoding="utf-8") as f:
+        with open(manifest_file, encoding="utf-8") as f:
             mf = json.load(f)
 
         state = mf.get("release_state", "")

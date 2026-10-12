@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+
 import numpy as np
 from scipy import stats
 
@@ -35,7 +35,7 @@ class StrategySelectionGuard:
     def __init__(self, significance_alpha: float = 0.05):
         self.significance_alpha = significance_alpha
         self._total_trials_n = 0
-        self._historical_sharpe_distribution: List[float] = []
+        self._historical_sharpe_distribution: list[float] = []
 
     def register_trial(self, sharpe: float) -> int:
         """Increments trial counter and updates empirical Sharpe distribution variance."""
@@ -46,7 +46,7 @@ class StrategySelectionGuard:
     def compute_deflated_sharpe_ratio(
         self,
         strategy_returns: np.ndarray,
-        num_trials: Optional[int] = None,
+        num_trials: int | None = None,
     ) -> DSRVerificationResult:
         """
         Computes Deflated Sharpe Ratio adjusting for sample size, skewness, kurtosis, and N trials.

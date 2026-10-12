@@ -6,17 +6,16 @@ and reproducible feature engineering across research and production.
 
 from __future__ import annotations
 
-import json
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set, Tuple
+from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass
 class FeatureSpec:
     name: str
     dtype: str  # "float", "int", "bool", "category"
-    min_val: Optional[float] = None
-    max_val: Optional[float] = None
+    min_val: float | None = None
+    max_val: float | None = None
     description: str = ""
     default: Any = 0.0
 
@@ -25,7 +24,7 @@ class FeatureSpec:
 class SchemaVersion:
     version: str
     release_date: str
-    features: Dict[str, FeatureSpec]
+    features: dict[str, FeatureSpec]
     description: str = ""
 
 
@@ -35,7 +34,7 @@ class FeatureRegistry:
     CURRENT_VERSION = "v2.1.0"
 
     def __init__(self):
-        self._schemas: Dict[str, SchemaVersion] = {}
+        self._schemas: dict[str, SchemaVersion] = {}
         self._register_default_schemas()
 
     def _register_default_schemas(self) -> None:
@@ -85,7 +84,7 @@ class FeatureRegistry:
         }
         self.register_schema("v2.1.0", "2026-08-27", v2_1_features, "Institutional Master 12-Layer State Schema")
 
-    def register_schema(self, version: str, release_date: str, features: Dict[str, FeatureSpec], description: str = "") -> None:
+    def register_schema(self, version: str, release_date: str, features: dict[str, FeatureSpec], description: str = "") -> None:
         self._schemas[version] = SchemaVersion(
             version=version,
             release_date=release_date,
@@ -93,13 +92,13 @@ class FeatureRegistry:
             description=description,
         )
 
-    def get_schema(self, version: Optional[str] = None) -> SchemaVersion:
+    def get_schema(self, version: str | None = None) -> SchemaVersion:
         v = version or self.CURRENT_VERSION
         if v not in self._schemas:
             raise KeyError(f"Feature schema version '{v}' not registered in FeatureRegistry.")
         return self._schemas[v]
 
-    def validate_state_vector(self, state_dict: Dict[str, Any], version: Optional[str] = None) -> Tuple[bool, List[str]]:
+    def validate_state_vector(self, state_dict: dict[str, Any], version: str | None = None) -> tuple[bool, list[str]]:
         """
         Validates state dictionary against schema definitions and checks value bounds.
         """
@@ -108,7 +107,7 @@ class FeatureRegistry:
         errors = []
 
         # Flatten nested keys
-        flat_state: Dict[str, Any] = {}
+        flat_state: dict[str, Any] = {}
         for k, val in state_dict.items():
             if isinstance(val, dict) and k != "forward_outcomes":
                 for sub_k, sub_v in val.items():

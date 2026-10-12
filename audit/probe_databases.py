@@ -5,7 +5,6 @@ Forensic database inspection script for SQLite databases in data/.
 Measures page sizes, pragmas, journal modes, WAL checkpoints, table row counts, and schema stats.
 """
 
-import os
 import sqlite3
 from pathlib import Path
 
