@@ -199,10 +199,11 @@ class AutonomousTrader:
                             )
                             continue
 
-                    # Half-Kelly Position Sizing
-                    pos_size_usd = decision_out.suggested_position_size_usd or (
+                    # Half-Kelly Position Sizing with hard account equity notional cap
+                    raw_pos_size_usd = decision_out.suggested_position_size_usd or (
                         self.account_equity_usd * 0.02
                     )
+                    pos_size_usd = min(raw_pos_size_usd, self.account_equity_usd * 1.0)
                     units = max(0.001, round(pos_size_usd / entry_price, 4))
                     direction_str = decision_out.decision.value
 

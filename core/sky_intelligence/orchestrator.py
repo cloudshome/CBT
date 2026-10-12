@@ -259,7 +259,9 @@ class SKYIntelligenceOrchestrator:
         stop_dist_pct = (
             abs(best_setup.entry_price - best_setup.invalidation_sl) / best_setup.entry_price
         )
-        position_size_usd = risk_budget_usd / max(stop_dist_pct, 0.005)
+        raw_position_size_usd = risk_budget_usd / max(stop_dist_pct, 0.005)
+        # Cap single-position notional size to 1.0x account equity (max 100% portfolio allocation per setup)
+        position_size_usd = min(raw_position_size_usd, account_equity_usd * 1.0)
 
         # Risk Gate hurdle: Net EV must exceed +0.25R
         risk_passed = net_ev >= 0.25
