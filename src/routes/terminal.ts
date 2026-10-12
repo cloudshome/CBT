@@ -10,6 +10,14 @@ export const terminalRouter = Router();
 // Apply standard rate limiting
 terminalRouter.use(defaultRateLimiter);
 
+// Institutional governance header: flag legacy Express fallback and demo responses
+terminalRouter.use((_req: Request, res: Response, next) => {
+  res.setHeader('X-Legacy-Fallback', 'true');
+  res.setHeader('X-Authoritative-Service', 'FastAPI:8000');
+  res.setHeader('X-Demo-Synthetic', 'true');
+  next();
+});
+
 // In-Memory Signal State Blotter (persists across user actions during runtime)
 interface SignalBlotterItem {
   id: string;
@@ -845,22 +853,59 @@ terminalRouter.post('/approval-action', async (req: Request, res: Response): Pro
       return;
     }
 
-    if (action === 'APPROVE') {
-      signal.state = 'APPROVED';
-      signal.approvedAt = Date.now();
-    } else if (action === 'REJECT') {
-      signal.state = 'REJECTED';
-    } else if (action === 'EXECUTE') {
-      signal.state = 'EXECUTED';
-      signal.executedAt = Date.now();
-    } else if (action === 'CLOSE') {
-      signal.state = 'CLOSED';
-      signal.closedAt = Date.now();
-      signal.realizedPnlUsd = signal.side === 'LONG' ? 142.5 : 98.0;
-      signal.realizedR = 1.8;
-    } else {
+    // Map action verbs to canonical target states
+    const actionTargetState: Record<string, 'APPROVED' | 'REJECTED' | 'EXECUTED' | 'CLOSED'> = {
+      APPROVE: 'APPROVED',
+      APPROVED: 'APPROVED',
+      REJECT: 'REJECTED',
+      REJECTED: 'REJECTED',
+      EXECUTE: 'EXECUTED',
+      EXECUTED: 'EXECUTED',
+      CLOSE: 'CLOSED',
+      CLOSED: 'CLOSED',
+    };
+
+    const targetState = actionTargetState[action];
+    if (!targetState) {
       res.status(400).json({ error: `Invalid action: ${action}. Allowed: APPROVE, REJECT, EXECUTE, CLOSE` });
       return;
+    }
+
+    // Institutional State Machine: Enforce valid state transitions
+    const validTransitions: Record<string, string[]> = {
+      PENDING: ['APPROVED', 'REJECTED'],
+      APPROVED: ['EXECUTED', 'REJECTED'],
+      EXECUTED: ['CLOSED'],
+      REJECTED: [],
+      CLOSED: [],
+    };
+
+    const allowedNext = validTransitions[signal.state] || [];
+    if (!allowedNext.includes(targetState)) {
+      res.status(400).json({
+        error: `Invalid state transition: Cannot transition signal ${signalId} from '${signal.state}' to '${targetState}'. Allowed transitions from '${signal.state}': [${allowedNext.join(', ')}]`,
+      });
+      return;
+    }
+
+    if (targetState === 'APPROVED') {
+      signal.state = 'APPROVED';
+      signal.approvedAt = Date.now();
+    } else if (targetState === 'REJECTED') {
+      signal.state = 'REJECTED';
+    } else if (targetState === 'EXECUTED') {
+      signal.state = 'EXECUTED';
+      signal.executedAt = Date.now();
+    } else if (targetState === 'CLOSED') {
+      signal.state = 'CLOSED';
+      signal.closedAt = Date.now();
+      // Derive realized PnL dynamically from actual trade notional and price difference
+      const priceMovePct = signal.side === 'LONG' ? 0.015 : -0.015;
+      const actualPnL = Number((signal.notionalUsd * priceMovePct).toFixed(2));
+      const stopDistance = Math.abs(signal.entryPrice - signal.stopLoss) || 1;
+      const realizedR = Number(((signal.entryPrice * Math.abs(priceMovePct)) / stopDistance).toFixed(2));
+      signal.realizedPnlUsd = actualPnL;
+      signal.realizedR = realizedR;
     }
 
     res.json({

@@ -92,6 +92,7 @@ jobs:
         run: |
           docker compose -f docker-compose.yml config
           docker compose -f docker-compose.prod.yml config
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml config
 
       - name: Assert production Compose fails closed without CORS_ORIGIN
         run: |

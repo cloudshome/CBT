@@ -65,10 +65,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-    restart: always
-    ports:
-      - "80:80"
-      - "443:443"
+    expose:
+      - "80"
     deploy:
       resources:
         limits:

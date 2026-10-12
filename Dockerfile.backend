@@ -29,9 +29,12 @@ ENV PORT=3000
 COPY package*.json ./
 COPY prisma ./prisma/
 
-RUN npm ci --omit=dev && npx prisma generate
+# Install production dependencies (including pinned prisma)
+RUN npm ci --omit=dev
 
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
 
 # Create persistent storage directory for SQLite database and grant permissions to node user
 RUN mkdir -p /app/data && chown -R node:node /app
@@ -41,5 +44,5 @@ USER node
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "npx prisma db push && node dist/server.js"]
+CMD ["sh", "-c", "npx prisma db push --skip-generate && node dist/server.js"]
 

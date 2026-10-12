@@ -19,21 +19,34 @@ router.use((_req: Request, res: Response, next) => {
  * POST /api/paper/trade
  *
  * Places a simulated paper trade, validated through Risk Gate middleware.
+ * Enforces atomic execution inside a Prisma transaction to eliminate race conditions.
  */
 router.post('/trade', riskGate, async (req: Request, res: Response): Promise<void> => {
   const { symbol, side, entryPrice, sl, tp, size } = req.body;
 
   try {
-    const trade = await prisma.paperTrade.create({
-      data: {
-        symbol,
-        side,
-        entryPrice,
-        sl,
-        tp,
-        size,
-        status: 'OPEN',
-      },
+    const trade = await prisma.$transaction(async (tx) => {
+      // Re-verify open trades limit inside transaction to prevent concurrent race condition
+      const riskConfig = (await tx.riskConfig.findFirst()) || { maxOpenTrades: 3 };
+      const currentOpenTrades = await tx.paperTrade.count({
+        where: { status: 'OPEN' },
+      });
+
+      if (currentOpenTrades >= riskConfig.maxOpenTrades) {
+        throw new Error(`CONCURRENCY_LIMIT_EXCEEDED:${riskConfig.maxOpenTrades}:${currentOpenTrades}`);
+      }
+
+      return await tx.paperTrade.create({
+        data: {
+          symbol,
+          side,
+          entryPrice,
+          sl,
+          tp,
+          size,
+          status: 'OPEN',
+        },
+      });
     });
 
     res.status(201).json({
@@ -42,6 +55,18 @@ router.post('/trade', riskGate, async (req: Request, res: Response): Promise<voi
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
+    if (msg.startsWith('CONCURRENCY_LIMIT_EXCEEDED:')) {
+      const parts = msg.split(':');
+      const maxTrades = Number(parts[1]);
+      const openTrades = Number(parts[2]);
+      res.status(403).json({
+        error: `Risk Gate Rejection: Maximum open trades limit reached (${maxTrades} open trades allowed).`,
+        currentOpenTrades: openTrades,
+        maxOpenTrades: maxTrades,
+      });
+      return;
+    }
+
     console.error('Error creating paper trade:', err);
     res.status(500).json({
       error: 'Failed to create paper trade record.',

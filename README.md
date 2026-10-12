@@ -31,7 +31,7 @@
 
 ## SKY — Professional Market Intelligence Engine
 
-> **Comprehensive Architecture & Specification:** 👉 [SKY_MARKET_INTELLIGENCE_ENGINE.md](file:///c:/Users/azims/CBT/SKY_MARKET_INTELLIGENCE_ENGINE.md)
+> **Comprehensive Architecture & Specification:** 👉 [SKY_MARKET_INTELLIGENCE_ENGINE.md](SKY_MARKET_INTELLIGENCE_ENGINE.md)
 
 SKY treats Smart Money Concepts (SMC), market structure, liquidity, volume, volatility, and derivatives not as subjective trading lore, but as a **rigorously defined, measurable feature-engineering layer**.
 - **Objective Mathematical Definitions:** Deterministic $(L, R)$ swing detection, BOS, CHoCH, MSS, liquidity sweeps with penetration/ATR metrics.

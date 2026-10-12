@@ -104,6 +104,39 @@ describe('Paper Trading & Risk Gate Endpoints (/api/paper)', () => {
       expect(res.body.error).toContain('Maximum open trades limit reached');
       expect(res.body.currentOpenTrades).toBe(3);
     });
+
+    it('should atomically reject concurrent requests attempting to exceed max open trades cap', async () => {
+      // Start with 2 open trades (cap is 3)
+      await prisma.paperTrade.createMany({
+        data: [
+          { symbol: 'BTCUSDT', side: 'BUY', entryPrice: 65000, sl: 64500, tp: 67000, size: 1.0, status: 'OPEN' },
+          { symbol: 'ETHUSDT', side: 'BUY', entryPrice: 3500, sl: 3450, tp: 3700, size: 10.0, status: 'OPEN' },
+        ],
+      });
+
+      // Fire 3 simultaneous requests trying to claim the last slot
+      const makeReq = () =>
+        request(app).post('/api/paper/trade').send({
+          symbol: 'SOLUSDT',
+          side: 'BUY',
+          entryPrice: 150,
+          sl: 148,
+          tp: 160,
+          size: 1.0,
+        });
+
+      const responses = await Promise.all([makeReq(), makeReq(), makeReq()]);
+      const statusCodes = responses.map((r) => r.status);
+      const successes = statusCodes.filter((s) => s === 201).length;
+      const rejections = statusCodes.filter((s) => s === 403).length;
+
+      // Exactly 1 can succeed, remaining 2 must be rejected with 403
+      expect(successes).toBe(1);
+      expect(rejections).toBe(2);
+
+      const totalOpen = await prisma.paperTrade.count({ where: { status: 'OPEN' } });
+      expect(totalOpen).toBe(3);
+    });
   });
 
   describe('Risk Gate Enforcement (Rule 2: Max 2% Account Risk)', () => {

@@ -97,7 +97,7 @@ export function createApp(): Express {
   app.use('/api/paper', apiKeyAuth, paperRouter);
   app.use('/api/desk', apiKeyAuth, deskRouter);
   app.use('/api/institutional', apiKeyAuth, institutionalRouter);
-  app.use('/api/terminal', terminalRouter);
+  app.use('/api/terminal', apiKeyAuth, terminalRouter);
 
   // Payload too large error handler (HTTP 413)
   app.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {

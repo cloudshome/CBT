@@ -20,7 +20,7 @@ on:
         default: false
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   DATABASE_URL: "file:./dev.db"
@@ -174,6 +174,8 @@ jobs:
     needs: [build-windows, build-linux]
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: write
 
     steps:
       - name: Download Windows Artifacts
@@ -195,13 +197,21 @@ jobs:
           sha256sum * > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
-      - name: Determine Release Tag
+      - name: Determine and Validate Release Tag
         id: release_info
+        env:
+          INPUT_TAG: ${{ github.event.inputs.release_tag }}
+          REF_TAG: ${{ github.ref_name }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ github.event.inputs.release_tag }}"
+            TAG="$INPUT_TAG"
           else
-            TAG="${GITHUB_REF#refs/tags/}"
+            TAG="$REF_TAG"
+          fi
+          # Strictly validate semantic version tag format (e.g. v4.0.0, v1.2.3-rc1)
+          if ! echo "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$'; then
+            echo "::error::Invalid release tag format: '$TAG'. Must match '^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$'"
+            exit 1
           fi
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
