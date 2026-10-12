@@ -257,11 +257,11 @@ class DataStreamer:
         )
 
         candles = []
-        current_price = base_price * 0.98
+        current_price = base_price
 
         for i in range(count):
             c_time = t_start + (i * tf_ms)
-            ret = float(np.random.normal(0.0001, vol))
+            ret = float(np.random.normal(0.0, vol))
             open_p = current_price
             close_p = open_p * (1.0 + ret)
             high_p = max(open_p, close_p) * (1.0 + abs(float(np.random.normal(0, vol * 0.7))))
@@ -283,9 +283,6 @@ class DataStreamer:
                 }
             )
             current_price = close_p
-
-        self._last_known_prices[symbol] = current_price
-        return candles
 
         self._last_known_prices[symbol] = current_price
         return candles

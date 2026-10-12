@@ -2598,13 +2598,32 @@ class TelegramBotDispatcher:
             logger.info("Telegram polling loop is already running.")
             return
 
+        lock_fd = None
+        try:
+            import fcntl
+
+            lock_path = "/tmp/cbt_telegram_polling_supervisor.lock"
+            lock_fd = open(lock_path, "w")  # noqa: SIM115
+            fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            logger.info(
+                "Telegram polling passive in worker PID %d (another worker holds polling lock).",
+                os.getpid(),
+            )
+            if lock_fd is not None:
+                lock_fd.close()
+            return
+        except Exception:  # noqa: BLE001
+            pass
+
         self._is_polling = True
         logger.info("Starting Telegram Bot long-polling listener...")
+        invalid_token_logged = False
 
         while self._is_polling:
             token = self.bot_token
             if not token:
-                await asyncio.sleep(10)
+                await asyncio.sleep(30)
                 continue
 
             url = f"https://api.telegram.org/bot{token}/getUpdates"
@@ -2616,6 +2635,7 @@ class TelegramBotDispatcher:
                         url, params=params, timeout=aiohttp.ClientTimeout(total=25)
                     ) as resp:
                         if resp.status == 200:
+                            invalid_token_logged = False
                             data = await resp.json()
                             updates = data.get("result", [])
                             for up in updates:
@@ -2623,18 +2643,25 @@ class TelegramBotDispatcher:
                                 if update_id > self._last_update_id:
                                     self._last_update_id = update_id
                                 await self.handle_webhook_update(up)
+                        elif resp.status in (401, 404):
+                            if not invalid_token_logged:
+                                logger.warning(
+                                    f"Telegram getUpdates returned {resp.status} (invalid/unconfigured token); backing off 300s."
+                                )
+                                invalid_token_logged = True
+                            await asyncio.sleep(300)
                         elif resp.status == 409:
                             # Another instance is polling or webhook is active
-                            logger.warning("Telegram polling conflict (409). Backing off 5s.")
-                            await asyncio.sleep(5)
+                            logger.warning("Telegram polling conflict (409). Backing off 15s.")
+                            await asyncio.sleep(15)
                         else:
                             logger.warning(f"Telegram getUpdates returned status {resp.status}")
-                            await asyncio.sleep(5)
+                            await asyncio.sleep(10)
             except asyncio.CancelledError:
                 break
             except Exception as e:  # noqa: BLE001 — defensive fallback
                 logger.error(f"Error in Telegram polling loop: {e}")
-                await asyncio.sleep(5)
+                await asyncio.sleep(10)
 
     async def start_continuous_broadcaster(self, interval_seconds: int = 30) -> None:
         """

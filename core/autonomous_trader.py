@@ -95,20 +95,34 @@ class AutonomousTrader:
                 if not candles_15m or len(candles_15m) < 15:
                     continue
 
+                # Constitutional Anti-Fabrication Guard: Never trade on synthetic random-walk candles
+                if any(int(c.get("is_synthetic", 0) or 0) == 1 for c in candles_15m):
+                    logger.warning(
+                        f"AutonomousTrader skipping {sym}: 15m series contains synthetic/fabricated bars."
+                    )
+                    continue
+
                 latest_candle_ts = int(candles_15m[-1]["timestamp"])
 
                 # Guard 1: Candle Bar Deduplication — do not re-trade the exact same candle bar
                 if self._last_traded_candle_ts.get(sym) == latest_candle_ts:
                     continue
 
-                tf_map = {
-                    "1d": data_streamer.get_candles(sym, "1d", limit=30),
-                    "4h": data_streamer.get_candles(sym, "4h", limit=30),
-                    "1h": data_streamer.get_candles(sym, "1h", limit=30),
-                    "15m": candles_15m,
-                    "5m": data_streamer.get_candles(sym, "5m", limit=30),
-                    "1m": data_streamer.get_candles(sym, "1m", limit=30),
-                }
+                tf_map: dict[str, list[dict[str, Any]]] = {"15m": candles_15m}
+                for tf in ("1d", "4h", "1h", "5m", "1m"):
+                    cached_tf = data_streamer.get_candles(sym, tf, limit=30)
+                    if (
+                        not cached_tf
+                        or len(cached_tf) < 15
+                        or any(int(c.get("is_synthetic", 0) or 0) == 1 for c in cached_tf)
+                    ):
+                        try:
+                            fresh_tf = await data_streamer.fetch_external_ohlcv(sym, tf, limit=30)
+                            if fresh_tf:
+                                cached_tf = fresh_tf
+                        except Exception as tf_ex:  # noqa: BLE001
+                            logger.debug(f"Could not refresh {sym} {tf} external OHLCV: {tf_ex}")
+                    tf_map[tf] = cached_tf
 
                 # 3. Evaluate 12-Stage SKY Decision Engine
                 decision_out = sky_orchestrator.analyze_market(
@@ -199,15 +213,22 @@ class AutonomousTrader:
                             )
                             continue
 
-                    # Half-Kelly Position Sizing with hard account equity notional cap
+                    # Half-Kelly Position Sizing with hard account equity notional & 1.0% stop-loss risk cap
                     raw_pos_size_usd = decision_out.suggested_position_size_usd or (
-                        self.account_equity_usd * 0.02
+                        current_eq * 0.02
                     )
-                    pos_size_usd = min(raw_pos_size_usd, self.account_equity_usd * 1.0)
-                    units = max(0.001, round(pos_size_usd / entry_price, 4))
+                    pos_size_usd = min(raw_pos_size_usd, current_eq * 1.0)
+                    stop_dist = abs(entry_price - sl)
+                    max_stop_loss_usd = current_eq * 0.01  # 1.0% max loss per trade (<1.5% constitutional limit)
+                    if stop_dist > 0:
+                        risk_capped_units = max_stop_loss_usd / stop_dist
+                        notional_units = pos_size_usd / entry_price
+                        units = max(0.001, round(min(notional_units, risk_capped_units), 4))
+                    else:
+                        units = max(0.001, round(pos_size_usd / entry_price, 4))
                     direction_str = decision_out.decision.value
 
-                    # 5. Open Position in Shadow Portfolio
+                    # 5. Open Position in Shadow Portfolio (with atomic duplicate-symbol & risk limits)
                     reason_desc = (
                         f"Autonomous SMC ({direction_str}) | Net-EV: {decision_out.net_ev_r:.2f}R | "
                         f"Kelly: {decision_out.kelly_fraction:.1%}"
@@ -220,6 +241,10 @@ class AutonomousTrader:
                         stop_loss=sl,
                         take_profit=tp,
                         entry_reason=reason_desc,
+                        enforce_atomic_limits=True,
+                        max_open_limit=self.max_open_positions,
+                        max_risk_usd=current_eq * 0.015,
+                        prevent_duplicate_symbol=True,
                     )
                     self.total_trades_executed += 1
                     self._last_traded_candle_ts[sym] = latest_candle_ts
@@ -250,15 +275,78 @@ class AutonomousTrader:
                         f"AutonomousTrader executed {direction_str} on {sym}: {pos_id} (Size: {units})"
                     )
 
+                    # 7. Mirror qualified crypto trade to real Binance Spot Testnet during burn-in
+                    await self._mirror_trade_to_testnet(sym, direction_str)
+
             except Exception as e:  # noqa: BLE001 — defensive fallback
                 logger.error(f"AutonomousTrader scan error for {sym}: {e}")
 
         return executed_actions
 
+    async def _mirror_trade_to_testnet(self, symbol: str, direction: str) -> None:
+        """
+        Mirrors qualified autonomous trades onto real Binance Spot Testnet (https://testnet.binance.vision)
+        when BINANCE TESTNET credentials are active and we are not inside a unit test.
+        """
+        import os
+
+        if os.getenv("PYTEST_CURRENT_TEST"):
+            return
+        if os.getenv("AUTONOMOUS_TESTNET_MIRROR", "true").lower() != "true":
+            return
+        exchange_sym = symbol.replace("/", "").upper()
+        if not exchange_sym.endswith("USDT"):
+            return
+        try:
+            from core.auth.credential_vault import credential_vault
+            from core.execution.live_canary_runner import CanaryRunRequest, live_canary_runner
+
+            cred = credential_vault.get_credential("BINANCE", "TESTNET")
+            if not cred or not cred.is_active:
+                return
+            side = "BUY" if direction.upper() == "LONG" else "SELL"
+            req = CanaryRunRequest(
+                exchange="BINANCE",
+                symbol=exchange_sym,
+                notional_usd=15.0,
+                side=side,
+                is_dry_run=False,
+                environment="TESTNET",
+            )
+            res = await live_canary_runner.execute_canary_order(req)
+            logger.info(
+                f"AutonomousTrader mirrored {side} {exchange_sym} to BINANCE TESTNET: "
+                f"status={res.status} order_id={res.exchange_order_id} ack={res.dispatch_to_ack_latency_ms}ms"
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"AutonomousTrader Testnet mirror skipped for {symbol}: {exc}")
+
     async def start_loop(self) -> None:
-        """Runs the continuous autonomous trading loop in the background."""
+        """
+        Runs the continuous autonomous trading loop in the background.
+        Uses a non-blocking OS file lock so only one uvicorn worker executes autonomous scans.
+        """
+        import os
+
+        lock_fd = None
+        try:
+            import fcntl
+
+            lock_path = "/tmp/cbt_autonomous_trader_supervisor.lock"
+            lock_fd = open(lock_path, "w")  # noqa: SIM115
+            fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            logger.info(
+                f"AutonomousTrader loop passive in worker PID {os.getpid()} (another worker holds supervisor lock)."
+            )
+            if lock_fd is not None:
+                lock_fd.close()
+            return
+        except Exception:  # noqa: BLE001
+            pass
+
         logger.info(
-            f"AutonomousTrader background loop online (Interval: {self.scan_interval_sec}s)."
+            f"AutonomousTrader background loop online in PID {os.getpid()} (Interval: {self.scan_interval_sec}s)."
         )
         while True:
             try:

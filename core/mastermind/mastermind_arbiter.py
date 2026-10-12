@@ -113,7 +113,7 @@ class MastermindArbiterCouncil:
         # 1. Authoritative Daily Drawdown Circuit Breaker Check
         accounting = portfolio_shadow.get_portfolio_accounting(starting_capital=self.account_equity_usd)
         current_eq = float(accounting.get("virtual_equity", self.account_equity_usd))
-        realized_pnl = float(accounting.get("total_realized_pnl", 0.0))
+        realized_pnl = float(accounting.get("daily_realized_pnl", 0.0))
         unrealized_pnl = float(accounting.get("total_unrealized_pnl", 0.0))
 
         gate = risk_manager.evaluate_risk_gate(
@@ -181,10 +181,17 @@ class MastermindArbiterCouncil:
                 is_approved = True
                 approved_notional = proposal.suggested_notional_usd or (current_eq * 0.02)
 
-                # Open virtual paper position in Shadow Portfolio
+                # Open virtual paper position in Shadow Portfolio with 1.0% stop-risk cap
                 direction_str = proposal.direction.value
                 cur_price = proposal.entry_price
-                units = max(0.0001, round(approved_notional / cur_price, 4))
+                stop_dist = abs(cur_price - proposal.stop_loss)
+                max_stop_loss_usd = current_eq * 0.01
+                notional_units = approved_notional / cur_price if cur_price > 0 else 0.0001
+                if stop_dist > 0:
+                    risk_capped_units = max_stop_loss_usd / stop_dist
+                    units = max(0.0001, round(min(notional_units, risk_capped_units), 4))
+                else:
+                    units = max(0.0001, round(notional_units, 4))
                 reason = f"Mastermind Arbiter [{spec.specialist_id}]: {proposal.thesis[:120]}"
 
                 try:
@@ -196,6 +203,10 @@ class MastermindArbiterCouncil:
                         stop_loss=proposal.stop_loss,
                         take_profit=proposal.take_profit,
                         entry_reason=reason,
+                        enforce_atomic_limits=True,
+                        max_open_limit=max_active_portfolio_positions,
+                        max_risk_usd=current_eq * 0.015,
+                        prevent_duplicate_symbol=True,
                     )
                     existing_symbols.add(sym)
                     logger.info("Mastermind approved and deployed: %s %s (Notional: $%.2f)", direction_str, sym, approved_notional)
@@ -264,8 +275,27 @@ class MastermindArbiterCouncil:
     async def start_loop(self, interval_sec: float = 60.0) -> None:
         """Runs the continuous Mastermind Swarm polling loop in the background."""
         import asyncio
+        import os
 
         from core.data_streamer import data_streamer
+
+        lock_fd = None
+        try:
+            import fcntl
+
+            lock_path = "/tmp/cbt_mastermind_arbiter_supervisor.lock"
+            lock_fd = open(lock_path, "w")  # noqa: SIM115
+            fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            logger.info(
+                "MastermindArbiterCouncil loop passive in worker PID %d (another worker holds supervisor lock).",
+                os.getpid(),
+            )
+            if lock_fd is not None:
+                lock_fd.close()
+            return
+        except Exception:  # noqa: BLE001
+            pass
 
         logger.info("MastermindArbiterCouncil: Continuous Swarm loop started (interval: %.1fs).", interval_sec)
         await asyncio.sleep(15.0)  # Initial boot stagger
@@ -281,10 +311,17 @@ class MastermindArbiterCouncil:
                     except Exception:  # noqa: BLE001
                         candles_15m = data_streamer.get_candles(sym, "15m", limit=30)
 
-                    if candles_15m:
+                    if candles_15m and not any(
+                        int(c.get("is_synthetic", 0) or 0) == 1 for c in candles_15m
+                    ):
+                        tf_map = {"15m": candles_15m}
+                        for tf in ("1d", "4h", "1h", "5m"):
+                            c_tf = data_streamer.get_candles(sym, tf, limit=30, exclude_synthetic=True)
+                            if c_tf:
+                                tf_map[tf] = c_tf
                         market_data[sym] = {
                             "15m": candles_15m,
-                            "multi_tf": {"15m": candles_15m},
+                            "multi_tf": tf_map,
                             "order_book": data_streamer.get_orderbook(sym) if hasattr(data_streamer, "get_orderbook") else None,
                         }
 

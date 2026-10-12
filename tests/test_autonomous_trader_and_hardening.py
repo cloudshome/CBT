@@ -269,3 +269,54 @@ def test_daily_realized_pnl_isolates_prior_days_from_lockout():
     assert res.is_trading_allowed is True
 
 
+@pytest.mark.asyncio
+async def test_autonomous_trader_rejects_synthetic_candles_and_duplicate_symbols():
+    """Verifies AutonomousTrader skips synthetic 15m bars and PortfolioShadowManager atomically blocks duplicate open symbols."""
+    from unittest.mock import AsyncMock, patch
+
+    from core.autonomous_trader import AutonomousTrader
+
+    trader = AutonomousTrader(active_symbols=["ETH/USDT"], max_open_positions=5)
+    synth_candles = [
+        {
+            "timestamp": 1788696900000 + i * 900000,
+            "close": 2500.0,
+            "open": 2490.0,
+            "high": 2510.0,
+            "low": 2480.0,
+            "volume": 100.0,
+            "is_synthetic": 1,
+        }
+        for i in range(20)
+    ]
+
+    with patch(
+        "core.autonomous_trader.data_streamer.fetch_external_ohlcv",
+        new_callable=AsyncMock,
+        return_value=synth_candles,
+    ):
+        trades = await trader.scan_and_execute()
+        assert trades == []
+
+    # Verify atomic duplicate-symbol prevention in PortfolioShadowManager.open_position
+    pos1 = portfolio_shadow.open_position(
+        symbol="SOL/USDT",
+        direction="LONG",
+        size=1.0,
+        entry_price=150.0,
+        stop_loss=145.0,
+        take_profit=160.0,
+        prevent_duplicate_symbol=True,
+    )
+    assert pos1.startswith("POS_SOL_USDT")
+
+    with pytest.raises(ValueError, match="already exists"):
+        portfolio_shadow.open_position(
+            symbol="SOL/USDT",
+            direction="LONG",
+            size=1.0,
+            entry_price=150.0,
+            stop_loss=145.0,
+            take_profit=160.0,
+            prevent_duplicate_symbol=True,
+        )
