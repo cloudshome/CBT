@@ -60,17 +60,3 @@ export async function authFetch(input: RequestInfo | URL, init?: RequestInit): P
     headers,
   });
 }
-
-export async function handleResponse<T>(res: Response): Promise<T> {
-  if (!res.ok) {
-    let errorDetail = res.statusText;
-    try {
-      const errJson = await res.json();
-      errorDetail = errJson.detail || errJson.message || JSON.stringify(errJson);
-    } catch {
-      // Body not JSON
-    }
-    throw new Error(`API Error [${res.status}]: ${errorDetail}`);
-  }
-  return res.json() as Promise<T>;
-}

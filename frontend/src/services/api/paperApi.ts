@@ -38,8 +38,10 @@ export const paperApi = {
   async getPaperPositions(): Promise<PaperPositionsResponse> {
     const res = await authFetch(`${BASE_URL}/api/paper/positions`);
     const data = await handleResponse<any>(res);
+    const positions = Array.isArray(data?.positions) ? data.positions : Array.isArray(data) ? data : [];
     return {
-      positions: Array.isArray(data?.positions) ? data.positions : Array.isArray(data) ? data : [],
+      positions,
+      count: typeof data?.count === 'number' ? data.count : positions.length,
     };
   },
 

@@ -876,14 +876,16 @@
 
 ---
 
-## 🚀 Milestone 35: Generation 6 Institutional Platform Release & Packaging (v4.0.0) (PLANNED 🚀)
+## 🚀 Milestone 35: Generation 6 Institutional Platform Release & Packaging (v4.0.0) (COMPLETED ✅)
 
-- [ ] **Task 35.1: 17-Point Production Release Blocker Matrix Audit (`scripts/build_windows_app.py`)**
-  - Comprehensive pre-flight check across all 17 release blockers.
-- [ ] **Task 35.2: Dual-Profile Authenticode Signing & Timestamping (`scripts/sign_windows_binaries.py`)**
-  - Development self-signed vs production Authenticode certificate validation.
-- [ ] **Task 35.3: Native Windows Installer Compilation (`release/CTB_Setup_v4.0.0.exe`)**
-  - Generate production binary assets and GNU `release/SHA256SUMS.txt`.
+- [x] **Task 35.1: 21-Point Production Release Blocker Matrix Audit (`scripts/build_windows_app.py`)**
+  - Comprehensive pre-flight check across all 21 release blockers (G-01 through G-21).
+  - Emitted `release/RELEASE_MANIFEST.json` and `release/RELEASE_CERTIFICATION.json` with status `RELEASE_CANDIDATE`.
+- [x] **Task 35.2: Dual-Profile Authenticode Signing & Timestamping (`scripts/sign_windows_binaries.py`)**
+  - Development self-signed vs production Authenticode certificate validation with RFC-3161 HTTPS DigiCert timestamping.
+  - Emitted `release/CODE_SIGNING_REPORT.json` (3/3 signed PE binaries verified).
+- [x] **Task 35.3: Native Windows Installer Compilation & Packaging (`release/CTB_Setup_v4.0.0.exe`)**
+  - Verified PE header architecture, non-destructive installer layout, and GNU `release/SHA256SUMS.txt` digests via `scripts/verify_installer.py`.
 
 
 
