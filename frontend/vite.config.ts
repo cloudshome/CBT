@@ -79,6 +79,10 @@ const PYTHON_PREFIXES = [
   '/api/heatmap',
   '/api/portfolio',
   '/api/strategist',
+  '/api/mastermind',
+  '/api/risk',
+  '/api/trader',
+  '/api/metrics',
   '/api/v1',
   '/api/web3',
   '/api/testnet',
@@ -108,6 +112,10 @@ export default defineConfig({
   base: './',
   plugins: [react()],
   server: {
+    port: 5173,
+    proxy: proxyMap,
+  },
+  preview: {
     port: 5173,
     proxy: proxyMap,
   },
