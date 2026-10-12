@@ -71,9 +71,16 @@ class PaperTradeRequest(BaseModel):
 
 
 class PaperCloseRequest(BaseModel):
-    positionId: str = Field(min_length=1, max_length=128)
+    positionId: str | None = Field(default=None, max_length=128)
+    tradeId: str | None = Field(default=None, max_length=128)
     exitPrice: float | None = Field(default=None, gt=0)
     reason: str | None = Field(default="MANUAL_CLOSE", description="Exit reason")
+
+    def get_effective_id(self) -> str:
+        pid = self.positionId or self.tradeId
+        if not pid:
+            raise ValueError("Either positionId or tradeId must be provided")
+        return pid
 
 
 # ==============================================================================
@@ -120,7 +127,7 @@ def enforce_paper_risk_gate(order: PaperTradeRequest) -> None:
 # ENDPOINTS
 # ==============================================================================
 
-@paper_router.get("/api/paper/desk-overview")
+@paper_router.get("/api/paper/desk-overview", dependencies=[Depends(require_api_key)])
 async def get_paper_desk_overview():
     """
     Returns full institutional overview of the Shadow Paper Desk:
@@ -294,52 +301,54 @@ async def get_paper_desk_overview():
         )
 
     if len(past) == 0:
-        past.extend(
-            [
-                {
-                    "id": "POS_BTC_HIST_01",
-                    "symbol": "BTC/USDT",
-                    "side": "BUY",
-                    "size": 0.025,
-                    "entryPrice": 76500.0,
-                    "exitPrice": 78200.0,
-                    "sl": 75800.0,
-                    "tp": 78200.0,
-                    "realizedPnlUsd": 42.50,
-                    "realizedPnlPct": 2.22,
-                    "openedAt": int(time.time() * 1000) - 86400000,
-                    "closedAt": int(time.time() * 1000) - 43200000,
-                    "openedAtFormatted": "2026-10-05 12:00:00 UTC",
-                    "closedAtFormatted": "2026-10-05 23:59:00 UTC",
-                    "entryReason": "Fair Value Gap fill with continuous bullish CVD delta",
-                    "exitReason": "TAKE_PROFIT_HIT",
-                    "autopsyCategory": "VALIDATED_PROFIT",
-                    "autopsyCause": "Fair Value Gap fill with continuous bullish CVD delta.",
-                    "autopsyRecommendation": "Take-Profit 1 executed; runner trailed to breakeven.",
-                },
-                {
-                    "id": "POS_ETH_HIST_02",
-                    "symbol": "ETH/USDT",
-                    "side": "BUY",
-                    "size": 0.85,
-                    "entryPrice": 2420.0,
-                    "exitPrice": 2385.0,
-                    "sl": 2385.0,
-                    "tp": 2490.0,
-                    "realizedPnlUsd": -29.75,
-                    "realizedPnlPct": -1.45,
-                    "openedAt": int(time.time() * 1000) - 172800000,
-                    "closedAt": int(time.time() * 1000) - 129600000,
-                    "openedAtFormatted": "2026-10-04 12:00:00 UTC",
-                    "closedAtFormatted": "2026-10-04 23:59:00 UTC",
-                    "entryReason": "Asian session range expansion attempt",
-                    "exitReason": "STOP_LOSS_HIT",
-                    "autopsyCategory": "LIQUIDITY_FAILURE",
-                    "autopsyCause": "Asian session high sweep triggered sudden mean-reversion selloff.",
-                    "autopsyRecommendation": "Avoid initiating longs into unmitigated H4 supply wicks.",
-                },
-            ]
-        )
+        demo_past = [
+            {
+                "id": "DEMO_BTC_HIST_01",
+                "symbol": "BTC/USDT",
+                "side": "BUY",
+                "size": 0.025,
+                "entryPrice": 76500.0,
+                "exitPrice": 78200.0,
+                "sl": 75800.0,
+                "tp": 78200.0,
+                "realizedPnlUsd": 42.50,
+                "realizedPnlPct": 2.22,
+                "openedAt": int(time.time() * 1000) - 86400000,
+                "closedAt": int(time.time() * 1000) - 43200000,
+                "openedAtFormatted": "2026-10-05 12:00:00 UTC",
+                "closedAtFormatted": "2026-10-05 23:59:00 UTC",
+                "entryReason": "Fair Value Gap fill with continuous bullish CVD delta",
+                "exitReason": "TAKE_PROFIT_HIT",
+                "autopsyCategory": "VALIDATED_PROFIT",
+                "autopsyCause": "Fair Value Gap fill with continuous bullish CVD delta.",
+                "autopsyRecommendation": "Take-Profit 1 executed; runner trailed to breakeven.",
+                "isDemo": True,
+            },
+            {
+                "id": "DEMO_ETH_HIST_02",
+                "symbol": "ETH/USDT",
+                "side": "BUY",
+                "size": 0.85,
+                "entryPrice": 2420.0,
+                "exitPrice": 2385.0,
+                "sl": 2385.0,
+                "tp": 2490.0,
+                "realizedPnlUsd": -29.75,
+                "realizedPnlPct": -1.45,
+                "openedAt": int(time.time() * 1000) - 172800000,
+                "closedAt": int(time.time() * 1000) - 129600000,
+                "openedAtFormatted": "2026-10-04 12:00:00 UTC",
+                "closedAtFormatted": "2026-10-04 23:59:00 UTC",
+                "entryReason": "Asian session range expansion attempt",
+                "exitReason": "STOP_LOSS_HIT",
+                "autopsyCategory": "LIQUIDITY_FAILURE",
+                "autopsyCause": "Asian session high sweep triggered sudden mean-reversion selloff.",
+                "autopsyRecommendation": "Avoid initiating longs into unmitigated H4 supply wicks.",
+                "isDemo": True,
+            },
+        ]
+        # Include demo trades for UI display preview but strictly isolate them from actual accounting metrics
+        past.extend(demo_past)
 
     future_queue = [
         {
@@ -447,7 +456,7 @@ async def get_paper_desk_overview():
     }
 
 
-@paper_router.get("/api/paper/positions")
+@paper_router.get("/api/paper/positions", dependencies=[Depends(require_api_key)])
 async def get_paper_positions():
     """
     Returns active shadow portfolio positions mapped to the PaperPositionsResponse schema for the Web UI.
@@ -476,7 +485,7 @@ async def get_paper_positions():
     return {"positions": mapped, "count": len(mapped)}
 
 
-@paper_router.get("/api/paper/config")
+@paper_router.get("/api/paper/config", dependencies=[Depends(require_api_key)])
 async def get_paper_risk_config():
     """
     Returns the active paper desk risk configuration for the Web UI.
@@ -503,15 +512,23 @@ async def place_paper_trade(order: PaperTradeRequest):
     """
     enforce_paper_risk_gate(order)
     direction = "LONG" if order.side.upper() in ["BUY", "LONG"] else "SHORT"
-    pos_id = portfolio_shadow.open_position(
-        symbol=order.symbol,
-        direction=direction,
-        size=order.size or 1.0,
-        entry_price=order.entryPrice,
-        stop_loss=order.sl,
-        take_profit=order.tp,
-        entry_reason=order.reason,
-    )
+    try:
+        balance = float(os.getenv("MAX_PAPER_ACCOUNT_BALANCE", "10000"))
+        max_risk_pct = float(os.getenv("MAX_PAPER_RISK_PCT", "0.02"))
+        pos_id = portfolio_shadow.open_position(
+            symbol=order.symbol,
+            direction=direction,
+            size=order.size or 1.0,
+            entry_price=order.entryPrice,
+            stop_loss=order.sl,
+            take_profit=order.tp,
+            entry_reason=order.reason,
+            enforce_atomic_limits=True,
+            max_open_limit=int(os.getenv("MAX_PAPER_OPEN_POSITIONS", "3")),
+            max_risk_usd=balance * max_risk_pct,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     return {
         "message": "Simulated order filled successfully",
         "trade": {
@@ -530,14 +547,45 @@ async def place_paper_trade(order: PaperTradeRequest):
     }
 
 
+@paper_router.put("/api/paper/config", dependencies=[Depends(require_api_key)])
+async def update_paper_risk_config(config: dict[str, Any]):
+    """
+    Updates the active paper desk risk configuration from the Web UI.
+    Supports maxRiskPerTrade, maxOpenTrades, maxDrawdown, and accountBalance.
+    """
+    if "maxOpenTrades" in config:
+        os.environ["MAX_PAPER_OPEN_POSITIONS"] = str(int(config["maxOpenTrades"]))
+    if "maxRiskPerTrade" in config:
+        os.environ["MAX_PAPER_RISK_PCT"] = str(float(config["maxRiskPerTrade"]))
+    if "accountBalance" in config:
+        os.environ["MAX_PAPER_ACCOUNT_BALANCE"] = str(float(config["accountBalance"]))
+
+    base_balance = float(os.getenv("MAX_PAPER_ACCOUNT_BALANCE", "10000.0"))
+    accounting = portfolio_shadow.get_portfolio_accounting(starting_capital=base_balance)
+    return {
+        "accountBalance": accounting["settled_cash"],
+        "startingCapital": accounting["starting_capital"],
+        "virtualEquity": accounting["virtual_equity"],
+        "maxDrawdown": float(config.get("maxDrawdown", 0.025)),
+        "maxOpenTrades": int(os.getenv("MAX_PAPER_OPEN_POSITIONS", "3")),
+        "dailyLossLimit": round(accounting["settled_cash"] * 0.05, 2),
+        "maxRiskPerTrade": float(os.getenv("MAX_PAPER_RISK_PCT", "0.02")),
+    }
+
+
 @paper_router.post("/api/paper/close", dependencies=[Depends(require_api_key)])
 async def close_paper_trade(req: PaperCloseRequest):
     """
     Closes an active paper position directly from the Web UI.
     """
+    try:
+        eff_id = req.get_effective_id()
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
     success = portfolio_shadow.close_position(
-        req.positionId, req.exitPrice, exit_reason=req.reason or "MANUAL_CLOSE"
+        eff_id, req.exitPrice, exit_reason=req.reason or "MANUAL_CLOSE"
     )
     if not success:
-        raise HTTPException(status_code=404, detail="Position not found or already closed.")
-    return {"status": "SUCCESS", "message": f"Position {req.positionId} closed."}
+        raise HTTPException(status_code=404, detail=f"Position {eff_id} not found or already closed.")
+    return {"status": "SUCCESS", "message": f"Position {eff_id} closed."}

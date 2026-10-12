@@ -8,6 +8,7 @@ and fires breakeven triggers (+1.5R milestone).
 from __future__ import annotations
 
 import logging
+import os
 import time
 import uuid
 from dataclasses import asdict, dataclass
@@ -70,6 +71,9 @@ class PortfolioShadowManager:
         stop_loss: float,
         take_profit: float,
         entry_reason: str | None = None,
+        enforce_atomic_limits: bool = False,
+        max_open_limit: int | None = None,
+        max_risk_usd: float | None = None,
     ) -> str:
         self._ensure_columns_exist()
         now = int(time.time() * 1000)
@@ -85,6 +89,21 @@ class PortfolioShadowManager:
         )
 
         with db_manager.get_trading_conn() as conn:
+            conn.execute("BEGIN IMMEDIATE;")
+            if enforce_atomic_limits:
+                cursor = conn.execute("SELECT COUNT(*) FROM shadow_positions WHERE status = 'OPEN';")
+                open_count = cursor.fetchone()[0]
+                eff_max_open = max_open_limit if max_open_limit is not None else int(os.getenv("MAX_PAPER_OPEN_POSITIONS", "3"))
+                if open_count >= eff_max_open:
+                    conn.rollback()
+                    raise ValueError(f"Risk Gate Rejection: {open_count} open positions — maximum {eff_max_open} reached.")
+
+                if max_risk_usd is not None:
+                    trade_risk = float(size) * abs(float(entry_price) - float(stop_loss))
+                    if trade_risk > max_risk_usd:
+                        conn.rollback()
+                        raise ValueError(f"Risk Gate Rejection: trade risk ${trade_risk:.2f} exceeds allowable ${max_risk_usd:.2f}.")
+
             conn.execute(
                 """
                 INSERT INTO shadow_positions (

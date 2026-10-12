@@ -286,7 +286,10 @@ app.include_router(paper_router)
 
 # CORS — fail closed in production: CORS_ORIGIN must be an explicit allowlist.
 _cors_origin = os.getenv("CORS_ORIGIN", "").strip()
-_is_production = os.getenv("ENV", os.getenv("NODE_ENV", "")).lower() in ("production", "prod")
+_is_production = any(
+    os.getenv(k, "").lower() in ("production", "prod")
+    for k in ("APP_ENV", "ENV", "NODE_ENV")
+)
 if _is_production and (not _cors_origin or _cors_origin == "*"):
     raise RuntimeError(
         "Security misconfiguration: CORS_ORIGIN must be set to an explicit "

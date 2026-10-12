@@ -62,7 +62,7 @@ export const paperApi = {
   ): Promise<{ message: string; trade: PaperTrade }> {
     const res = await authFetch(`${BASE_URL}/api/paper/close`, {
       method: 'POST',
-      body: JSON.stringify({ tradeId, exitPrice }),
+      body: JSON.stringify({ positionId: tradeId, tradeId, exitPrice }),
     });
     return handleResponse<{ message: string; trade: PaperTrade }>(res);
   },
