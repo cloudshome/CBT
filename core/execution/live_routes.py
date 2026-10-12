@@ -176,17 +176,41 @@ async def revoke_vault_credential_endpoint(req: VaultRevokeRequest):
 
 
 @router.get("/live-canary/status")
-async def get_live_canary_status():
-    """Returns the current operational canary boundaries and readiness posture."""
-    readiness = await account_probe.get_portfolio_readiness()
+async def get_live_canary_status(
+    environment: str = Query("PRODUCTION", description="PRODUCTION or TESTNET"),
+):
+    """Returns the current operational canary boundaries, readiness posture, and recent canary executions."""
+    from core.database import db_manager
+
+    readiness = await account_probe.get_portfolio_readiness(environment=environment)
+    active_env = environment.upper()
+    if not readiness.active_exchanges and active_env == "PRODUCTION":
+        testnet_readiness = await account_probe.get_portfolio_readiness(environment="TESTNET")
+        if testnet_readiness.active_exchanges:
+            readiness = testnet_readiness
+            active_env = "TESTNET"
+
+    recent_executions = []
+    try:
+        with db_manager.get_trading_conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM canary_execution_ledger ORDER BY created_at_ms DESC LIMIT 20"
+            ).fetchall()
+            recent_executions = [dict(r) for r in rows]
+    except Exception as exc:  # noqa: BLE001
+        logger.debug(f"Could not query recent canary executions: {exc}")
+
     return {
         "status": "OPERATIONAL",
+        "environment": active_env,
         "min_canary_notional_usd": live_canary_runner.min_canary_notional_usd,
         "max_canary_notional_usd": live_canary_runner.max_canary_notional_usd,
         "vault_unlocked": readiness.vault_unlocked,
         "is_ready_for_canary": readiness.is_ready_for_canary_trade,
         "single_trade_cap_usd": readiness.single_trade_equity_cap_usd,
+        "active_exchanges": readiness.active_exchanges,
         "reasons": readiness.reasons,
+        "recent_executions": recent_executions,
         "timestamp_ms": int(time.time() * 1000),
     }
 

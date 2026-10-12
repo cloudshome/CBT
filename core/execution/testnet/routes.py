@@ -122,6 +122,11 @@ class CampaignActionResponse(BaseModel):
 async def get_campaign_status() -> dict[str, Any]:
     """Returns the sequence-monotonic campaign telemetry snapshot."""
     orchestrator = get_orchestrator()
+    if orchestrator.state == CampaignState.IDLE and orchestrator.config.venues:
+        try:
+            await orchestrator.initialize()
+        except Exception as exc:  # noqa: BLE001
+            logger.debug(f"Campaign auto-initialize skipped: {exc}")
     snapshot = orchestrator.get_telemetry_snapshot()
     return {
         "campaign_id": snapshot.campaign_id,
@@ -150,6 +155,11 @@ async def get_burnin_report(
     Returns the comprehensive TestnetBurnInReport matching the frontend TypeScript contract.
     """
     orchestrator = get_orchestrator()
+    if orchestrator.state == CampaignState.IDLE and orchestrator.config.venues:
+        try:
+            await orchestrator.initialize()
+        except Exception as exc:  # noqa: BLE001
+            logger.debug(f"Campaign auto-initialize skipped: {exc}")
     snapshot = orchestrator.get_telemetry_snapshot()
     now = time.time()
 

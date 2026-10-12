@@ -216,7 +216,9 @@ class CanonicalExecutionReconciler:
         if symbol_filter:
             tracked_symbols.add(symbol_filter.upper().replace("/", "").replace("-", ""))
         else:
-            tracked_symbols.update({"BTCUSDT", "ETHUSDT", "SOLUSDT"})
+            tracked_symbols.update(
+                {"BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "DOGEUSDT", "PEPEUSDT", "XRPUSDT", "LINKUSDT", "LTCUSDT"}
+            )
 
         # Get latest market prices
         market_prices: dict[str, float] = {}
@@ -225,6 +227,9 @@ class CanonicalExecutionReconciler:
                 # Normalize symbol with slash for market gateway if needed
                 slash_sym = f"{s[:-4]}/{s[-4:]}" if s.endswith("USDT") else s
                 px = market_gateway.get_latest_price(slash_sym)
+                if not px or px <= 0:
+                    ticker = await market_gateway.get_ticker(slash_sym)
+                    px = float(ticker.get("price", 0.0) or 0.0)
                 if px and px > 0:
                     market_prices[s] = px
             except Exception as e:  # noqa: BLE001
@@ -285,16 +290,21 @@ class CanonicalExecutionReconciler:
                 logger.warning(f"[Reconciler] Error fetching Bybit positions: {e}")
 
         elif ex_norm == "BINANCE":
-            # For spot, inspect balances
+            # For spot, inspect balances (filtering out 500+ non-ASCII/numeric Binance Testnet faucet tokens)
             try:
+                allowed_testnet_assets = {
+                    "BTC", "ETH", "SOL", "BNB", "DOGE", "PEPE", "XRP", "ADA", "AVAX", "LINK", "LTC", "DOT", "UNI", "ATOM"
+                }
                 balances = await conn.get_balances()
                 for b in balances:
                     asset = b.asset.upper()
                     if asset in ("USDT", "USDC", "FDUSD", "BUSD"):
                         continue
                     sym = f"{asset}USDT"
-                    curr_qty = b.free + b.locked
                     bracket = self.get_bracket(sym)
+                    if env_norm == "TESTNET" and asset not in allowed_testnet_assets and not bracket:
+                        continue
+                    curr_qty = b.free + b.locked
                     mk_px = market_prices.get(sym, 0.0)
                     if mk_px <= 0 and bracket and bracket.entry_price > 0:
                         mk_px = bracket.entry_price

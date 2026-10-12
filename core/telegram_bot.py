@@ -2622,8 +2622,13 @@ class TelegramBotDispatcher:
 
         while self._is_polling:
             token = self.bot_token
-            if not token:
-                await asyncio.sleep(30)
+            if not token or ":" not in token:
+                if token and not invalid_token_logged:
+                    logger.warning(
+                        "Telegram bot token in .env is missing ':' (@BotFather format <id>:<secret>); pausing getUpdates polling."
+                    )
+                    invalid_token_logged = True
+                await asyncio.sleep(60)
                 continue
 
             url = f"https://api.telegram.org/bot{token}/getUpdates"

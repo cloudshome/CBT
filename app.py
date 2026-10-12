@@ -2750,15 +2750,25 @@ async def handle_telegram_webhook(request: Request, update: TelegramWebhookReque
 
 
 @app.get("/api/telegram/live-status")
-async def get_telegram_live_status():
+async def get_telegram_live_status(
+    environment: str = Query("PRODUCTION", description="PRODUCTION or TESTNET"),
+):
     """Returns Telegram Live Trading Commander operational status and schedule."""
     from core.daily_learning_reporter import daily_learning_reporter
     from core.execution.account_probe import account_probe
 
-    readiness = await account_probe.get_portfolio_readiness()
+    readiness = await account_probe.get_portfolio_readiness(environment=environment)
+    if not readiness.active_exchanges and environment.upper() == "PRODUCTION":
+        testnet_readiness = await account_probe.get_portfolio_readiness(environment="TESTNET")
+        if testnet_readiness.active_exchanges:
+            readiness = testnet_readiness
+
+    token_valid = bool(
+        telegram_bot.bot_token and ":" in telegram_bot.bot_token and telegram_bot.chat_id
+    )
     return {
-        "status": "OPERATIONAL",
-        "bot_configured": bool(telegram_bot.bot_token and telegram_bot.chat_id),
+        "status": "OPERATIONAL" if token_valid else "TOKEN_INVALID_FORMAT",
+        "bot_configured": token_valid,
         "bd_time_str": daily_learning_reporter.get_current_bd_datetime().strftime("%I:%M %p BST"),
         "is_ready_for_canary": readiness.is_ready_for_canary_trade,
         "single_trade_cap_usd": readiness.single_trade_equity_cap_usd,
