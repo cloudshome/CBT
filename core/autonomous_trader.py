@@ -67,7 +67,7 @@ class AutonomousTrader:
         # Master Risk Gate Guard: Check 3.0% daily drawdown circuit breaker
         from core.risk_manager import risk_manager
         accounting = portfolio_shadow.get_portfolio_accounting(starting_capital=self.account_equity_usd)
-        realized_pnl = float(accounting.get("total_realized_pnl", 0.0))
+        realized_pnl = float(accounting.get("daily_realized_pnl", 0.0))
         unrealized_pnl = float(accounting.get("total_unrealized_pnl", 0.0))
         current_eq = float(accounting.get("virtual_equity", self.account_equity_usd))
 

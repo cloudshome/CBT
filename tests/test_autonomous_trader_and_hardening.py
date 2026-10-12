@@ -220,3 +220,52 @@ async def test_autonomous_trader_emits_open_event():
         severity="INFO",
         details=trades[0],
     )
+
+
+def test_daily_realized_pnl_isolates_prior_days_from_lockout():
+    """Verifies historical multi-day realized losses reduce equity but do not trigger today's daily drawdown lockout."""
+    from core.risk_manager import risk_manager
+
+    risk_manager.reset_lockout()
+    now_ms = int(time.time() * 1000)
+    two_days_ago_ms = now_ms - (2 * 86_400_000)
+
+    with db_manager.get_trading_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO shadow_positions (
+                position_id, opened_at, closed_at, symbol, direction, size,
+                entry_price, current_price, stop_loss, take_profit,
+                unrealized_pnl, realized_pnl, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0.0, ?, 'CLOSED')
+            """,
+            (
+                "POS-HIST-OLD",
+                two_days_ago_ms - 3600000,
+                two_days_ago_ms,
+                "BTC/USDT",
+                "LONG",
+                0.1,
+                65000.0,
+                59300.0,
+                60000.0,
+                70000.0,
+                -570.0,
+            ),
+        )
+        conn.commit()
+
+    accounting = portfolio_shadow.get_portfolio_accounting()
+    assert accounting["total_realized_pnl"] <= -570.0
+    assert accounting["daily_realized_pnl"] == 0.0
+
+    # Evaluating Risk Gate with daily_realized_pnl must NOT trigger daily drawdown kill-switch
+    res = risk_manager.evaluate_risk_gate(
+        current_equity=accounting["virtual_equity"],
+        daily_realized_pnl=accounting["daily_realized_pnl"],
+        daily_unrealized_pnl=0.0,
+    )
+    assert res.lockout_active is False
+    assert res.is_trading_allowed is True
+
+

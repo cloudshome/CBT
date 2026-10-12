@@ -131,6 +131,44 @@ class TestPermissionNormalization:
         assert is_safe is False
         assert "UNKNOWN_PERMISSIONS" in reason
 
+    def test_binance_testnet_account_fallback_with_commission_rates(self):
+        """Binance Spot Testnet /api/v3/account fallback includes commissionRates and simulated canWithdraw=True."""
+        testnet_account_raw = {
+            "makerCommission": 0,
+            "takerCommission": 0,
+            "buyerCommission": 0,
+            "sellerCommission": 0,
+            "commissionRates": {
+                "maker": "0.00000000",
+                "taker": "0.00000000",
+                "buyer": "0.00000000",
+                "seller": "0.00000000",
+            },
+            "canTrade": True,
+            "canWithdraw": True,
+            "canDeposit": True,
+            "brokered": False,
+            "requireSelfTradePrevention": False,
+            "preventSor": False,
+            "updateTime": 1775832651073,
+            "accountType": "SPOT",
+            "balances": [{"asset": "USDT", "free": "10000.00000000", "locked": "0.00000000"}],
+            "permissions": ["TRD_GRP_002", "SPOT"],
+            "uid": 123456789,
+        }
+        # In TESTNET environment, this /api/v3/account fallback is safe when permissions exclude WITHDRAW
+        testnet_profile = normalize_binance_permissions(testnet_account_raw, environment="TESTNET")
+        assert len(testnet_profile.unknown_permissions) == 0
+        assert testnet_profile.spot_trade is True
+        assert testnet_profile.withdrawal is False
+        assert testnet_profile.is_strictly_safe_for_trading()[0] is True
+
+        # In PRODUCTION environment, the exact same fallback with canWithdraw=True MUST still fail closed
+        prod_profile = normalize_binance_permissions(testnet_account_raw, environment="PRODUCTION")
+        assert prod_profile.withdrawal is True
+        assert prod_profile.is_strictly_safe_for_trading()[0] is False
+
+
     def test_bybit_positive_withdrawal_disabled_proof(self):
         """Bybit must provide positive proof that Wallet permissions do not contain Withdraw."""
         valid_raw = {

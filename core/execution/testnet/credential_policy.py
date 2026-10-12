@@ -82,8 +82,18 @@ class CredentialPolicy:
         # Binance Spot account response check
         if venue.upper().startswith("BINANCE"):
             permissions = account_info.get("permissions", [])
-            # If account explicitly lists withdrawal or margin borrow transfer
-            if account_info.get("canWithdraw", False):
+            perms_upper = [str(p).upper() for p in permissions] if isinstance(permissions, list) else []
+            is_testnet_spot_scoped = (
+                "TESTNET" in venue.upper()
+                and bool(perms_upper)
+                and "commissionRates" in account_info
+                and "WITHDRAW" not in perms_upper
+                and "WITHDRAWALS" not in perms_upper
+            )
+            # If account explicitly lists withdrawal or lacks testnet spot scope
+            if (account_info.get("canWithdraw", False) and not is_testnet_spot_scoped) or (
+                "WITHDRAW" in perms_upper or "WITHDRAWALS" in perms_upper
+            ):
                 msg = f"SECURITY ALERT: Exchange account reports canWithdraw=True on {venue}!"
                 logger.critical(msg)
                 raise CredentialScopeError(msg)

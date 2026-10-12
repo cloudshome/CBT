@@ -314,11 +314,16 @@ class CredentialVerificationResult:
         }
 
 
-def normalize_binance_permissions(raw: dict[str, Any]) -> CredentialPermissionProfile:
+def normalize_binance_permissions(
+    raw: dict[str, Any],
+    environment: str = "PRODUCTION",
+) -> CredentialPermissionProfile:
     """
     Normalizes Binance API key restrictions or account permissions into a standard profile.
     Enforces positive proof: 'enableWithdrawals' (or 'canWithdraw') MUST be explicitly present and False.
     If missing, non-boolean, or True -> withdrawal is marked True (FAIL CLOSED).
+    On Binance Spot Testnet (/api/v3/account fallback where SAPI does not exist), simulated accounts
+    always report account-level canWithdraw=True while API key scopes are listed in 'permissions'.
     """
     if not isinstance(raw, dict) or not raw:
         return CredentialPermissionProfile(
@@ -381,6 +386,7 @@ def normalize_binance_permissions(raw: dict[str, Any]) -> CredentialPermissionPr
             "takerCommission",
             "buyerCommission",
             "sellerCommission",
+            "commissionRates",
             "canTrade",
             "canWithdraw",
             "canDeposit",
@@ -395,12 +401,22 @@ def normalize_binance_permissions(raw: dict[str, Any]) -> CredentialPermissionPr
         }
         unknown = [k for k, v in raw.items() if k not in known_account_keys and bool(v)]
         w_val = raw.get("canWithdraw")
-        withdrawal_flag = True if (w_val is not False) else False
+        perms = raw.get("permissions", [])
+        perms_upper = [str(p).upper() for p in perms] if isinstance(perms, list) else []
+
+        if (
+            environment.upper().strip() == "TESTNET"
+            and perms_upper
+            and "WITHDRAW" not in perms_upper
+            and "WITHDRAWALS" not in perms_upper
+        ):
+            withdrawal_flag = False
+        else:
+            withdrawal_flag = True if (w_val is not False) else False
+
         spot_flag = bool(raw.get("canTrade", False))
         read_flag = True
-
-        perms = raw.get("permissions", [])
-        derivatives_flag = "FUTURES" in perms or "LEVERAGED" in perms
+        derivatives_flag = "FUTURES" in perms_upper or "LEVERAGED" in perms_upper
 
         return CredentialPermissionProfile(
             read=read_flag,
@@ -1414,7 +1430,7 @@ class CredentialVault:
 
                     if status == 200:
                         data = json.loads(raw_text)
-                        profile = normalize_binance_permissions(data)
+                        profile = normalize_binance_permissions(data, environment=env)
                         return (
                             profile,
                             latency_ms,
@@ -1433,7 +1449,7 @@ class CredentialVault:
                         acc_text = await acc_resp.text()
                         if acc_resp.status == 200:
                             acc_data = json.loads(acc_text)
-                            profile = normalize_binance_permissions(acc_data)
+                            profile = normalize_binance_permissions(acc_data, environment=env)
                             return (
                                 profile,
                                 latency_ms,

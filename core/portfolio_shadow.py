@@ -547,6 +547,14 @@ class PortfolioShadowManager:
         total_realized_pnl = sum(float(p.get("realized_pnl", 0.0)) for p in closed_positions)
         total_unrealized_pnl = sum(float(p.get("unrealized_pnl", 0.0)) for p in open_positions)
 
+        now_ms = int(time.time() * 1000)
+        utc_day_start_ms = (now_ms // 86_400_000) * 86_400_000
+        daily_realized_pnl = sum(
+            float(p.get("realized_pnl", 0.0))
+            for p in closed_positions
+            if int(p.get("closed_at") or 0) >= utc_day_start_ms
+        )
+
         settled_cash = starting_capital + total_realized_pnl
         virtual_equity = settled_cash + total_unrealized_pnl
 
@@ -595,6 +603,7 @@ class PortfolioShadowManager:
             "settled_cash": round(settled_cash, 2),
             "virtual_equity": round(virtual_equity, 2),
             "total_realized_pnl": round(total_realized_pnl, 2),
+            "daily_realized_pnl": round(daily_realized_pnl, 2),
             "total_unrealized_pnl": round(total_unrealized_pnl, 2),
             "gross_profit": round(gross_profit, 2),
             "gross_loss": round(gross_loss, 2),

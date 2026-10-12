@@ -42,16 +42,71 @@ def set_active_orchestrator(orchestrator: CampaignOrchestrator | None) -> None:
 def get_orchestrator() -> CampaignOrchestrator:
     global _active_campaign_orchestrator
     if _active_campaign_orchestrator is None:
+        from core.auth.credential_vault import credential_vault
+        from core.database import db_manager
+        from core.execution.testnet.binance_spot import BinanceSpotTestnetAdapter
+        from core.execution.testnet.bybit_v5 import BybitV5TestnetAdapter
         from core.execution.testnet.campaign_orchestrator import CampaignConfig
+        from core.execution.testnet.credential_policy import TestnetCredentials
+        from core.execution.testnet.endpoint_policy import Environment
         from core.execution.testnet.multi_venue_bridge import MultiVenueTestnetBridge
+        from core.execution.testnet.qualification_tracker import (
+            Continuous14DayQualificationTracker,
+        )
+
+        bridge = MultiVenueTestnetBridge()
+        configured_venues: list[str] = []
+
+        try:
+            bin_cred = credential_vault.get_credential("BINANCE", "TESTNET")
+            if bin_cred and bin_cred.api_key and bin_cred.api_secret and bin_cred.is_active:
+                bin_adapter = BinanceSpotTestnetAdapter(
+                    credentials=TestnetCredentials(
+                        api_key=bin_cred.api_key,
+                        api_secret=bin_cred.api_secret,
+                        environment=Environment.BINANCE_TESTNET,
+                    )
+                )
+                bridge.register_adapter("BINANCE_SPOT_TESTNET", bin_adapter)
+                bridge.register_adapter("BINANCE_SPOT", bin_adapter)
+                bridge.register_adapter("BINANCE", bin_adapter)
+                configured_venues.append("binance_spot")
+        except Exception as exc:  # noqa: BLE001
+            logger.debug(f"Binance Spot Testnet adapter auto-registration skipped: {exc}")
+
+        try:
+            byb_cred = credential_vault.get_credential("BYBIT", "TESTNET")
+            if byb_cred and byb_cred.api_key and byb_cred.api_secret and byb_cred.is_active:
+                byb_adapter = BybitV5TestnetAdapter(
+                    credentials=TestnetCredentials(
+                        api_key=byb_cred.api_key,
+                        api_secret=byb_cred.api_secret,
+                        environment=Environment.BYBIT_TESTNET,
+                    )
+                )
+                bridge.register_adapter("BYBIT_V5_TESTNET", byb_adapter)
+                bridge.register_adapter("BYBIT_V5", byb_adapter)
+                bridge.register_adapter("BYBIT", byb_adapter)
+                configured_venues.append("bybit_v5")
+        except Exception as exc:  # noqa: BLE001
+            logger.debug(f"Bybit V5 Testnet adapter auto-registration skipped: {exc}")
+
         default_config = CampaignConfig(
             campaign_id="CAMP-REHEARSAL-01",
-            venues=["binance_spot", "bybit_v5"],
+            venues=configured_venues or ["binance_spot", "bybit_v5"],
             allowed_symbols=["BTCUSDT", "ETHUSDT"],
+            db_path=str(db_manager.trading_db_path),
+        )
+        qual_tracker = Continuous14DayQualificationTracker(
+            campaign_id="CAMP-REHEARSAL-01",
+            target_hours=336.0,
+            db_conn=db_manager.get_trading_conn(),
         )
         _active_campaign_orchestrator = CampaignOrchestrator(
             config=default_config,
-            bridge=MultiVenueTestnetBridge(),
+            bridge=bridge,
+            db_conn=db_manager.get_trading_conn(),
+            qualification_tracker=qual_tracker,
         )
     return _active_campaign_orchestrator
 
