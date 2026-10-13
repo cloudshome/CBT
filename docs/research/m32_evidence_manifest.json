@@ -1,0 +1,118 @@
+{
+  "manifest_version": "1.0.0",
+  "audit_identifier": "M32-AUDIT-2026-10-13",
+  "auditor_role": "Principal Quantitative Systems Auditor & Independent Risk Guardian",
+  "governance_locks": {
+    "real_capital_enabled": false,
+    "m18_certified_files_read_only": true,
+    "m18_certification_status": "PRODUCTION_PASS_REVALIDATED",
+    "m18_passing_test_count": 149,
+    "m18_test_identity_sha256": "2acbff25f391249cb1881bd40a4440384cecdd7682c6f83b91487d8744d0b57b"
+  },
+  "datasets_audited": [
+    {
+      "symbol": "BTC/USDT",
+      "timeframe": "1h",
+      "candle_count": 1349,
+      "source": "data/market_data.db::candles",
+      "dataset_hash": "BTCUSDT:1h:1349:73611.5:82435.0"
+    },
+    {
+      "symbol": "BTC/USDT",
+      "timeframe": "4h",
+      "candle_count": 1043,
+      "source": "data/market_data.db::candles",
+      "dataset_hash": "BTCUSDT:4h:1043:58210.0:82435.0"
+    }
+  ],
+  "candidate_reproduction_results_1h": {
+    "CAND_A_TSMOM_VOL_TREND": {
+      "concept_id": "TC_001",
+      "nominal_trades": 22,
+      "effective_n_eff": 22.0,
+      "gross_expectancy_r": 0.520,
+      "net_expectancy_base_r": 0.313,
+      "net_expectancy_conservative_1_5x_r": 0.232,
+      "net_expectancy_stress_2_5x_r": 0.117,
+      "profit_factor_net": 1.56,
+      "max_drawdown_r": 4.98,
+      "sealed_oos_trades": 3,
+      "sealed_oos_net_r": 0.927,
+      "gate_status": "NEEDS_MORE_DATA",
+      "reason": "OOS effective trade count (3) < minimum threshold (25); fails closed to research priority."
+    },
+    "CAND_B_TREND_PULLBACK": {
+      "concept_id": "TC_014",
+      "nominal_trades": 5,
+      "effective_n_eff": 5.0,
+      "gross_expectancy_r": 0.920,
+      "net_expectancy_base_r": 0.602,
+      "net_expectancy_conservative_1_5x_r": 0.481,
+      "net_expectancy_stress_2_5x_r": 0.314,
+      "profit_factor_net": 2.25,
+      "max_drawdown_r": 1.23,
+      "sealed_oos_trades": 1,
+      "sealed_oos_net_r": 1.938,
+      "gate_status": "NEEDS_MORE_DATA",
+      "reason": "Sample size N=5 is insufficient to establish statistical significance; retained as Research Priority #1."
+    },
+    "CAND_C_VOL_COMPRESSION_BREAKOUT": {
+      "concept_id": "TC_010",
+      "nominal_trades": 16,
+      "effective_n_eff": 16.0,
+      "gross_expectancy_r": -0.146,
+      "net_expectancy_base_r": -0.394,
+      "net_expectancy_conservative_1_5x_r": -0.488,
+      "net_expectancy_stress_2_5x_r": -0.614,
+      "profit_factor_net": 0.56,
+      "max_drawdown_r": 9.67,
+      "gate_status": "NEEDS_MORE_DATA"
+    },
+    "CAND_D_REGIME_MEAN_REVERSION": {
+      "concept_id": "TC_005",
+      "nominal_trades": 17,
+      "effective_n_eff": 17.0,
+      "gross_expectancy_r": -0.082,
+      "net_expectancy_base_r": -0.393,
+      "net_expectancy_conservative_1_5x_r": -0.509,
+      "net_expectancy_stress_2_5x_r": -0.667,
+      "profit_factor_net": 0.53,
+      "max_drawdown_r": 7.96,
+      "gate_status": "NEEDS_MORE_DATA"
+    },
+    "CAND_E_FUNDING_TREND_FILTER": {
+      "concept_id": "TC_039",
+      "nominal_trades": 33,
+      "effective_n_eff": 33.0,
+      "gross_expectancy_r": 0.312,
+      "net_expectancy_base_r": 0.099,
+      "net_expectancy_conservative_1_5x_r": 0.016,
+      "net_expectancy_stress_2_5x_r": -0.102,
+      "profit_factor_net": 1.16,
+      "max_drawdown_r": 4.75,
+      "gate_status": "NEEDS_MORE_DATA"
+    },
+    "CAND_F_SMC_SWEEP_FVG": {
+      "concept_id": "TC_017",
+      "nominal_trades": 41,
+      "effective_n_eff": 41.0,
+      "gross_expectancy_r": 0.085,
+      "net_expectancy_base_r": -0.133,
+      "net_expectancy_conservative_1_5x_r": -0.216,
+      "net_expectancy_stress_2_5x_r": -0.331,
+      "profit_factor_net": 0.78,
+      "max_drawdown_r": 9.16,
+      "gate_status": "QUARANTINED",
+      "reason": "Gross expectancy positive but net expectancy negative after realistic fees; automated quarantine active."
+    }
+  },
+  "audit_verdict": {
+    "verdict": "PASS_WITH_RESTRICTIONS",
+    "system_architecture": "PASS",
+    "causal_evaluation_engine": "PASS",
+    "promotion_gate_enforcement": "PASS_FAIL_CLOSED",
+    "live_trading_clearance": "RESTRICTED_ZERO_CAPITAL",
+    "research_priority_1": "Candidate B (TC_014 Trend Pullback)",
+    "research_priority_2": "Candidate A (TC_001 TSMOM / Vol-Trend)"
+  }
+}
