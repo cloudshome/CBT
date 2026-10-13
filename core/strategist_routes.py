@@ -14,6 +14,8 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from core.autonomous_quant_strategist import autonomous_quant_strategist
+from core.research.concept_evaluation import regime_orchestration_advisor
+from core.research.concept_registry import REAL_CAPITAL_ENABLED, concept_registry
 from core.statistical_defense import ACTIVE_STATISTICAL_POLICY, multi_testing_auditor
 from core.strategy_league import strategy_league_manager
 from core.strategy_lineage import strategy_lineage_graph
@@ -38,6 +40,21 @@ class SynthesizeRequest(BaseModel):
 
 class DaemonToggleRequest(BaseModel):
     enable: bool
+
+
+class ConceptCompareRequest(BaseModel):
+    concept_ids: list[str] = Field(min_length=2, max_length=20)
+
+
+class ConceptTransitionRequest(BaseModel):
+    concept_id: str = Field(min_length=3, max_length=32)
+    requested_status: str = Field(min_length=3, max_length=40)
+    evidence: dict[str, Any] = Field(default_factory=dict)
+
+
+class ConceptDemotionCheckRequest(BaseModel):
+    concept_id: str = Field(min_length=3, max_length=32)
+    monitoring_metrics: dict[str, Any] = Field(default_factory=dict)
 
 
 @strategist_router.post("/synthesize")
@@ -135,3 +152,136 @@ async def toggle_daemon(request: DaemonToggleRequest) -> dict[str, Any]:
     """Toggles the background research exploration daemon."""
     active = autonomous_quant_strategist.toggle_daemon(request.enable)
     return {"status": "SUCCESS", "is_daemon_active": active}
+
+
+# ============================================================================
+# Trading Concept Intelligence System Endpoints (Phases 2, 4, 6, 8)
+# ============================================================================
+
+
+@strategist_router.get("/concepts/summary")
+async def get_concepts_taxonomy_summary() -> dict[str, Any]:
+    """Returns high-level summary of the 60-concept taxonomy across 15 families."""
+    return {
+        "status": "SUCCESS",
+        "summary": concept_registry.get_taxonomy_summary(),
+    }
+
+
+@strategist_router.get("/concepts")
+async def list_trading_concepts(
+    family_id: str | None = Query(default=None),
+    role: str | None = Query(default=None),
+    lifecycle_status: str | None = Query(default=None),
+    timeframe: str | None = Query(default=None),
+    market: str | None = Query(default=None),
+    regime: str | None = Query(default=None),
+    q: str | None = Query(default=None),
+) -> dict[str, Any]:
+    """Searches and filters the 60-concept Master Trading Concept Registry."""
+    records = concept_registry.list_concepts(
+        family_id=family_id,
+        role=role,
+        lifecycle_status=lifecycle_status,
+        timeframe=timeframe,
+        market=market,
+        regime=regime,
+        search_query=q,
+    )
+    return {
+        "status": "SUCCESS",
+        "real_capital_enabled": REAL_CAPITAL_ENABLED,
+        "count": len(records),
+        "concepts": [r.to_dict() for r in records],
+    }
+
+
+@strategist_router.get("/concepts/overlaps")
+async def detect_concept_overlaps(
+    threshold: float = Query(default=0.55, ge=0.1, le=1.0),
+) -> dict[str, Any]:
+    """Detects overlapping or redundant concepts across the taxonomy."""
+    overlaps = concept_registry.detect_concept_overlaps(threshold=threshold)
+    return {
+        "status": "SUCCESS",
+        "threshold": threshold,
+        "overlap_count": len(overlaps),
+        "overlaps": overlaps,
+    }
+
+
+@strategist_router.post("/concepts/compare")
+async def compare_trading_concepts(request: ConceptCompareRequest) -> dict[str, Any]:
+    """Compares two or more trading concepts side-by-side."""
+    result = concept_registry.compare_concepts(request.concept_ids)
+    return {"status": "SUCCESS", **result}
+
+
+@strategist_router.get("/concepts/arbiter/allocation")
+async def get_arbiter_regime_allocation(
+    regime: str = Query(default="TRENDING_UP"),
+    strict_paper_only: bool = Query(default=False),
+) -> dict[str, Any]:
+    """Computes regime-aware strategy orchestration weights for the SKY Arbiter."""
+    allocation = regime_orchestration_advisor.compute_arbiter_allocation(
+        current_regime=regime,
+        strict_paper_qualification=strict_paper_only,
+    )
+    return {"status": "SUCCESS", "allocation": allocation}
+
+
+@strategist_router.get("/concepts/{concept_id}")
+async def get_trading_concept_detail(concept_id: str) -> dict[str, Any]:
+    """Retrieves full specification and experiment history for a single concept."""
+    rec = concept_registry.get_concept(concept_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"Concept '{concept_id}' not found.")
+    transitions = concept_registry.get_transition_history(concept_id=concept_id)
+    return {
+        "status": "SUCCESS",
+        "concept": rec.to_dict(),
+        "transitions": transitions,
+    }
+
+
+@strategist_router.post("/concepts/transition")
+async def transition_trading_concept(request: ConceptTransitionRequest) -> dict[str, Any]:
+    """Requests an evidence-gated lifecycle state transition for a concept."""
+    try:
+        verdict = concept_registry.request_lifecycle_transition(
+            concept_id=request.concept_id,
+            requested_status=request.requested_status,
+            evidence=request.evidence,
+        )
+        return {
+            "status": "SUCCESS",
+            "approved": verdict.approved,
+            "from_status": verdict.from_status,
+            "requested_status": verdict.requested_status,
+            "final_status": verdict.final_status,
+            "reasons": verdict.reasons,
+            "timestamp_ms": verdict.timestamp_ms,
+        }
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@strategist_router.post("/concepts/demotion-check")
+async def check_concept_demotion(request: ConceptDemotionCheckRequest) -> dict[str, Any]:
+    """Evaluates online drift/degradation triggers and applies automatic demotion/quarantine."""
+    try:
+        verdict = concept_registry.evaluate_and_apply_demotion(
+            concept_id=request.concept_id,
+            monitoring_metrics=request.monitoring_metrics,
+        )
+        return {
+            "status": "SUCCESS",
+            "demoted_or_quarantined": verdict.approved,
+            "from_status": verdict.from_status,
+            "final_status": verdict.final_status,
+            "reasons": verdict.reasons,
+            "timestamp_ms": verdict.timestamp_ms,
+        }
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
