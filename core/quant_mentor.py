@@ -19,7 +19,7 @@ class QuantMentor:
 
     def __init__(self):
         self.api_key = os.getenv("GEMINI_API_KEY", "")
-        self.model_name = os.getenv("GEMINI_MODEL", "gemini-3.7-flash")
+        self.model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
         self._client = None
         self._init_client()
 
@@ -47,39 +47,41 @@ class QuantMentor:
 
         # If Gemini client is active, generate grounded response
         if self._client:
-            try:
-                system_prompt = (
-                    "You are the Lead Quantitative Financial Engineer and AI Risk Mentor of Crypto Brain Terminal (CBT). "
-                    "You provide sharp, mathematically grounded, institutional market analysis. "
-                    "You support English, Bangla, and Banglish naturally. "
-                    "Always prioritize scientific risk discipline, positive Net EV, and capital preservation over hype. "
-                    f"Live Telemetry Context: {telemetry_ctx}"
-                )
+            for candidate_model in (self.model_name, "gemini-2.0-flash", "gemini-1.5-flash"):
+                try:
+                    system_prompt = (
+                        "You are the Lead Quantitative Financial Engineer and AI Risk Mentor of Crypto Brain Terminal (CBT). "
+                        "You provide sharp, mathematically grounded, institutional market analysis. "
+                        "You support English, Bangla, and Banglish naturally. "
+                        "Always prioritize scientific risk discipline, positive Net EV, and capital preservation over hype. "
+                        f"Live Telemetry Context: {telemetry_ctx}"
+                    )
 
-                prompt = f"{system_prompt}\n\nUser Question: {user_message}"
-                response = self._client.models.generate_content(
-                    model=self.model_name,
-                    contents=prompt,
-                )
-                if response and response.text:
-                    return response.text.strip()
-            except Exception as e:  # noqa: BLE001 — defensive fallback
-                logger.error(
-                    f"Gemini API generation error: {e}. Falling back to local heuristic response."
-                )
+                    prompt = f"{system_prompt}\n\nUser Question: {user_message}"
+                    response = self._client.models.generate_content(
+                        model=candidate_model,
+                        contents=prompt,
+                    )
+                    if response and response.text:
+                        return response.text.strip()
+                except Exception as e:  # noqa: BLE001 — defensive fallback
+                    logger.debug(
+                        f"Gemini API generation error with model '{candidate_model}': {e}"
+                    )
 
         # Local High-Precision Heuristic Fallback
         return self._generate_heuristic_response(user_message, telemetry_ctx, language_preference)
 
     def _detect_symbol(self, text: str, default: str = "BTC/USDT") -> str:
         t = text.upper()
-        if "ETH" in t or "ETHEREUM" in t:
+        lower = text.lower()
+        if "ETH" in t or "ETHEREUM" in t or "ইথেরিয়াম" in lower or "ইটিএইচ" in lower:
             return "ETH/USDT"
-        if "SOL" in t or "SOLANA" in t:
+        if "SOL" in t or "SOLANA" in t or "সোলানা" in lower:
             return "SOL/USDT"
-        if "XAU" in t or "GOLD" in t or "PAXG" in t:
+        if "XAU" in t or "GOLD" in t or "PAXG" in t or "স্বর্ণ" in lower or "সোনা" in lower or "গোল্ড" in lower:
             return "XAU/USD"
-        if "BTC" in t or "BITCOIN" in t:
+        if "BTC" in t or "BITCOIN" in t or "বিটকয়েন" in lower or "বিটিসি" in lower:
             return "BTC/USDT"
         return default
 

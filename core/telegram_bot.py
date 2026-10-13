@@ -416,11 +416,31 @@ class DeskStateMind:
             )
         except Exception as e:
             logger.error(f"Error handling conversational AI query in Telegram: {e}", exc_info=True)
-            return (
-                "🤖 **CBT Quant Desk Copilot**\n\n"
-                "I am monitoring live telemetry. Our risk desk is enforcing strict Half-Kelly capital allocation. "
-                "You can send `/signal` to scan for setups, `/positions` to inspect open trades, or `/debate` for council deliberation."
-            )
+            try:
+                from core.market_providers import market_gateway
+                btc_t = await market_gateway.get_ticker("BTC/USDT")
+                btc_p = float(btc_t.get("price", 0.0))
+                btc_chg = float(btc_t.get("change_24h_pct", 0.0))
+                eth_t = await market_gateway.get_ticker("ETH/USDT")
+                eth_p = float(eth_t.get("price", 0.0))
+                return (
+                    "🤖 **CBT Quant Desk Copilot (Live Telemetry Active)**\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"💵 **BTC/USDT:** **${btc_p:,.2f}** (`{btc_chg:+.2f}%`) | **ETH/USDT:** **${eth_p:,.2f}**\n"
+                    "🛡️ **Risk Desk:** Half-Kelly Active | Real Capital: `LOCKED (Simulation Mode)`\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━\n"
+                    "You can ask me directly:\n"
+                    "• Price / analysis: `BTC`, `ETH`, `SOL`, `GOLD`, `market`\n"
+                    "• Scan for setups: `/signal`\n"
+                    "• Inspect open positions: `/positions`\n"
+                    "• Council deliberation: `/debate`"
+                )
+            except Exception:
+                return (
+                    "🤖 **CBT Quant Desk Copilot**\n\n"
+                    "Live risk desk is enforcing strict Half-Kelly capital allocation (Max 2.5% equity).\n"
+                    "Ask `BTC`, `ETH`, `market`, or send `/signal` to scan for setups."
+                )
 
 
 # ==============================================================================

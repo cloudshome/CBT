@@ -39,3 +39,4 @@ Before ANY concept may be promoted from `NEEDS_MORE_DATA` to `OUT_OF_SAMPLE_VALI
 3. **Net Profitability Under Friction:** Net expectancy must exceed **$+0.05R$** under Base friction AND remain strictly **$> 0.00R$** under 1.5x Conservative friction.
 4. **Deflated Sharpe Ratio Pass:** Deflated Sharpe Ratio must achieve **$\text{DSR} \ge 0.85$**, confirming the result cannot be attributed to multiple testing.
 5. **Deterministic Risk Gate Audit:** Position sizing must be verified against Half-Kelly caps, maximum drawdown throttle, and `REAL_CAPITAL_ENABLED = False`.
+

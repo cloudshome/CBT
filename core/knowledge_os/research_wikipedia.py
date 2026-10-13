@@ -224,6 +224,63 @@ class ResearchWikipediaEngine:
                 """
             )
             conn.execute("CREATE INDEX IF NOT EXISTS idx_wiki_triage_status ON wiki_triage_inbox(status);")
+
+            # 6. research_claims (Epistemic claims ledger)
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS research_claims (
+                    claim_id TEXT PRIMARY KEY,
+                    source_id TEXT NOT NULL,
+                    wiki_article_id TEXT,
+                    speaker_claim TEXT NOT NULL,
+                    claim_type TEXT NOT NULL,
+                    speaker TEXT,
+                    timestamp_marker TEXT,
+                    time_period TEXT,
+                    confidence_score REAL NOT NULL,
+                    verification_status TEXT NOT NULL,
+                    cross_verification_evidence TEXT,
+                    empirical_dataset_reference TEXT,
+                    created_at INTEGER NOT NULL
+                );
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_claims_source ON research_claims(source_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_claims_type ON research_claims(claim_type);")
+
+            # 7. research_evidence (Empirical verification ledger)
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS research_evidence (
+                    evidence_id TEXT PRIMARY KEY,
+                    claim_id TEXT NOT NULL,
+                    evidence_type TEXT NOT NULL,
+                    source_reference TEXT NOT NULL,
+                    citation_text TEXT NOT NULL,
+                    data_ledger TEXT,
+                    confidence REAL NOT NULL,
+                    created_at INTEGER NOT NULL
+                );
+                """
+            )
+
+            # 8. research_theses (Institutional theses ledger)
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS research_theses (
+                    thesis_id TEXT PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    description TEXT NOT NULL,
+                    asset_class TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    supporting_claims_count INTEGER DEFAULT 0,
+                    contradicting_claims_count INTEGER DEFAULT 0,
+                    confidence_score REAL NOT NULL,
+                    created_at INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL
+                );
+                """
+            )
             conn.commit()
 
     def list_articles(

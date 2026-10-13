@@ -130,14 +130,18 @@ class UnifiedProjectKnowledgeRAG:
     def retrieve_wiki_articles(self, query: str, limit: int = 5) -> list[RetrievedWikiItem]:
         """Searches wiki_articles and research_sources for top matching articles."""
         tokens = self._tokenize(query)
-        with self._get_wiki_conn() as conn:
-            rows = conn.execute(
-                """
-                SELECT article_id, title, category, executive_summary, verification_score
-                FROM wiki_articles
-                ORDER BY updated_at DESC LIMIT 50;
-                """
-            ).fetchall()
+        try:
+            with self._get_wiki_conn() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT article_id, title, category, executive_summary, verification_score
+                    FROM wiki_articles
+                    ORDER BY updated_at DESC LIMIT 50;
+                    """
+                ).fetchall()
+        except Exception as e:
+            logger.debug(f"[ProjectRAG] retrieve_wiki_articles fallback: {e}")
+            return []
 
         results: list[tuple[float, RetrievedWikiItem]] = []
         for r in rows:
@@ -171,15 +175,19 @@ class UnifiedProjectKnowledgeRAG:
     def retrieve_claims(self, query: str, limit: int = 5) -> list[RetrievedClaimItem]:
         """Searches research_claims for verified or empirical claims."""
         tokens = self._tokenize(query)
-        with self._get_wiki_conn() as conn:
-            rows = conn.execute(
-                """
-                SELECT claim_id, speaker_claim, claim_type, speaker,
-                       confidence_score, verification_status, cross_verification_evidence
-                FROM research_claims
-                ORDER BY created_at DESC LIMIT 50;
-                """
-            ).fetchall()
+        try:
+            with self._get_wiki_conn() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT claim_id, speaker_claim, claim_type, speaker,
+                           confidence_score, verification_status, cross_verification_evidence
+                    FROM research_claims
+                    ORDER BY created_at DESC LIMIT 50;
+                    """
+                ).fetchall()
+        except Exception as e:
+            logger.debug(f"[ProjectRAG] retrieve_claims fallback: {e}")
+            return []
 
         results: list[tuple[float, RetrievedClaimItem]] = []
         for r in rows:
@@ -217,14 +225,18 @@ class UnifiedProjectKnowledgeRAG:
     def retrieve_theses(self, query: str, limit: int = 3) -> list[RetrievedThesisItem]:
         """Retrieves institutional theses matching query keywords."""
         tokens = self._tokenize(query)
-        with self._get_wiki_conn() as conn:
-            rows = conn.execute(
-                """
-                SELECT thesis_id, title, status, confidence_score, description
-                FROM research_theses
-                ORDER BY updated_at DESC LIMIT 20;
-                """
-            ).fetchall()
+        try:
+            with self._get_wiki_conn() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT thesis_id, title, status, confidence_score, description
+                    FROM research_theses
+                    ORDER BY updated_at DESC LIMIT 20;
+                    """
+                ).fetchall()
+        except Exception as e:
+            logger.debug(f"[ProjectRAG] retrieve_theses fallback: {e}")
+            return []
 
         results: list[tuple[float, RetrievedThesisItem]] = []
         for r in rows:
@@ -254,15 +266,19 @@ class UnifiedProjectKnowledgeRAG:
     def retrieve_strategies(self, query: str, limit: int = 3) -> list[RetrievedStrategyItem]:
         """Searches strategy_candidates for tested or relevant setups."""
         tokens = self._tokenize(query)
-        with db_manager.get_brain_conn() as conn:
-            rows = conn.execute(
-                """
-                SELECT candidate_id, strategy_name, hypothesis, validation_stage,
-                       backtest_expectancy, backtest_win_rate
-                FROM strategy_candidates
-                ORDER BY created_at DESC LIMIT 30;
-                """
-            ).fetchall()
+        try:
+            with db_manager.get_brain_conn() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT candidate_id, strategy_name, hypothesis, validation_stage,
+                           backtest_expectancy, backtest_win_rate
+                    FROM strategy_candidates
+                    ORDER BY created_at DESC LIMIT 30;
+                    """
+                ).fetchall()
+        except Exception as e:
+            logger.debug(f"[ProjectRAG] retrieve_strategies fallback: {e}")
+            return []
 
         results: list[tuple[float, RetrievedStrategyItem]] = []
         for r in rows:

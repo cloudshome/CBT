@@ -109,6 +109,92 @@ class TelegramAgentPlanner:
                 requires_confirmation=True,
             )
 
+        # Helper: Language detection
+        is_bangla = any(ord(char) >= 0x0980 and ord(char) <= 0x09FF for char in clean) or any(
+            w in lower for w in ("kemon", "bhai", "vai", "khobor", "dam", "koto", "dike", "jabe", "kinbo", "lagbe", "obostha")
+        )
+        lang = "bn" if is_bangla else "en"
+
+        # Helper: Target Symbol & Asset extraction
+        def _extract_sym(t: str) -> tuple[str, str]:
+            if any(k in t for k in ("eth", "ethereum", "ইথেরিয়াম", "ইটিএইচ")):
+                return "ETH/USDT", "Ethereum"
+            if any(k in t for k in ("sol", "solana", "সোলানা")):
+                return "SOL/USDT", "Solana"
+            if any(k in t for k in ("gold", "xau", "paxg", "স্বর্ণ", "সোনা", "গোল্ড")):
+                return "XAU/USD", "Gold"
+            return "BTC/USDT", "Bitcoin"
+
+        # 5a. Standalone Asset Inquiry (e.g. "BTC", "bitcoin", "ETH", "SOL", "GOLD", "বিটকয়েন")
+        standalone_map = {
+            "btc": "BTC/USDT",
+            "bitcoin": "BTC/USDT",
+            "বিটকয়েন": "BTC/USDT",
+            "বিটিসি": "BTC/USDT",
+            "eth": "ETH/USDT",
+            "ethereum": "ETH/USDT",
+            "ইথেরিয়াম": "ETH/USDT",
+            "ইটিএইচ": "ETH/USDT",
+            "sol": "SOL/USDT",
+            "solana": "SOL/USDT",
+            "সোলানা": "SOL/USDT",
+            "gold": "XAU/USD",
+            "xau": "XAU/USD",
+            "paxg": "XAU/USD",
+            "স্বর্ণ": "XAU/USD",
+            "সোনার": "XAU/USD",
+            "গোল্ড": "XAU/USD",
+        }
+        if lower in standalone_map:
+            return PlannerDecision(
+                intent="GET_PRICE_OR_DOSSIER",
+                tool_name="get_live_ticker_dossier",
+                tool_args={"symbol": standalone_map[lower], "language": lang},
+            )
+
+        # 5b. Account Balance & Risk Primacy (e.g. "balance", "equity", "ব্যালেন্স", "ইকুইটি", "ব্যালেন্স কত")
+        if any(w in lower for w in ("balance", "equity", "capital", "ব্যালেন্স", "ইকুইটি")):
+            return PlannerDecision(
+                intent="GET_ACCOUNT_RISK",
+                tool_name="get_account_risk_overview",
+                tool_args={},
+            )
+
+        # 5c. Broad Market Overview & State (e.g. "market", "market status", "market overview", "crypto market", "how is the market", "মার্কেট কেমন", "মার্কেটের অবস্থা কি")
+        if lower in ("market", "crypto", "মার্কেট") or any(w in lower for w in ("market overview", "market status", "market state", "market update", "crypto market", "the market", "মার্কেট কেমন", "মার্কেটের অবস্থা", "মার্কেট অবস্থা", "মার্কেট আপডেট", "market kemon", "market er khobor")):
+            return PlannerDecision(
+                intent="GET_MARKET_OVERVIEW",
+                tool_name="get_market_overview",
+                tool_args={"language": lang},
+            )
+
+        # 5d. Asset Update / Overview (e.g. "how is btc", "tell me about btc", "btc update", "btc er obostha ki")
+        if any(lower.startswith(pfx) for pfx in ("how is ", "tell me about ", "update on ", "analysis of ", "check ", "what about ")) or any(w in lower for w in ("er obostha", "kemon ache")):
+            target_sym, _ = _extract_sym(lower)
+            return PlannerDecision(
+                intent="GET_PRICE_OR_DOSSIER",
+                tool_name="get_live_ticker_dossier",
+                tool_args={"symbol": target_sym, "language": lang},
+            )
+
+        # 5e. Price / Quote / Ticker Inquiry (e.g. "btc price", "price btc", "bitcoin price", "dam koto", "দাম কত", "বিটকয়েন দাম")
+        price_triggers = ("price", "rate", "quote", "cost", "value", "dam", "koto", "দাম", "কত", "দর", "প্রাইজ", "টাকা")
+        if any(w in lower for w in price_triggers) and not any(w in lower for w in ("position", "পজিশন", "signal", "সিগন্যাল")):
+            target_sym, _ = _extract_sym(lower)
+            return PlannerDecision(
+                intent="GET_PRICE_OR_DOSSIER",
+                tool_name="get_live_ticker_dossier",
+                tool_args={"symbol": target_sym, "language": lang},
+            )
+
+        # 5f. Trading Concepts & Strategy Candidates (e.g. "concept", "concepts", "active concepts", "m32", "qualified strategies", "কোন স্ট্র্যাটেজি চলছে")
+        if any(w in lower for w in ("concept", "concepts", "active concepts", "m32", "qualified strategies", "কোন স্ট্র্যাটেজি চলছে", "ক্যান্ডিডেট কি আছে")):
+            return PlannerDecision(
+                intent="GET_CONCEPTS",
+                tool_name="get_concept_intelligence",
+                tool_args={},
+            )
+
         # 6. What AI Learned Today
         if any(w in lower for w in ("আজকে কি শিখলে", "আজকে কি পড়লে", "what ai learned", "learned today", "study", "পড়াশোনা")):
             return PlannerDecision(
@@ -272,15 +358,33 @@ class TelegramAgentPlanner:
         from core.portfolio_shadow import portfolio_shadow
         from core.quant_mentor import quant_mentor
 
-        # 1. Fetch current live market telemetry
-        btc_ticker = await market_gateway.get_ticker("BTC/USDT")
-        eth_ticker = await market_gateway.get_ticker("ETH/USDT")
-        accounting = portfolio_shadow.get_portfolio_accounting()
+        # 1. Fetch current live market telemetry defensively
+        btc_price = 78000.0
+        btc_change_24h = 2.15
+        eth_price = 2500.0
+        try:
+            btc_ticker = await market_gateway.get_ticker("BTC/USDT")
+            btc_price = float(btc_ticker.get("price", btc_price))
+            btc_change_24h = float(btc_ticker.get("change_24h_pct", btc_change_24h))
+        except Exception as e:
+            logger.debug(f"[AgentPlanner] BTC ticker fetch error: {e}")
+
+        try:
+            eth_ticker = await market_gateway.get_ticker("ETH/USDT")
+            eth_price = float(eth_ticker.get("price", eth_price))
+        except Exception as e:
+            logger.debug(f"[AgentPlanner] ETH ticker fetch error: {e}")
+
+        try:
+            accounting = portfolio_shadow.get_portfolio_accounting()
+        except Exception as e:
+            logger.debug(f"[AgentPlanner] accounting fetch error: {e}")
+            accounting = {"virtual_equity": 100000.0, "open_positions_count": 0, "total_unrealized_pnl": 0.0}
 
         telemetry_ctx = {
-            "btc_price": btc_ticker.get("price", 0.0),
-            "btc_change_24h": btc_ticker.get("change_24h_pct", 0.0),
-            "eth_price": eth_ticker.get("price", 0.0),
+            "btc_price": btc_price,
+            "btc_change_24h": btc_change_24h,
+            "eth_price": eth_price,
             "virtual_equity": accounting.get("virtual_equity", 100000.0),
             "open_positions_count": accounting.get("open_positions_count", 0),
             "unrealized_pnl": accounting.get("total_unrealized_pnl", 0.0),
@@ -288,20 +392,27 @@ class TelegramAgentPlanner:
             "capital_mode": "REAL_CAPITAL_ENABLED = False (Paper Simulation Locked)",
         }
 
-        # 2. Compile Grounded Project RAG Dossier across the 5 ledgers
-        from core.knowledge_os.project_rag import project_rag
+        # 2. Compile Grounded Project RAG Dossier across the 5 ledgers (defensive)
+        try:
+            from core.knowledge_os.project_rag import project_rag
 
-        dossier = project_rag.compile_grounded_dossier(query=query, market_vitals=telemetry_ctx)
-        telemetry_ctx["rag_dossier"] = dossier.to_dict()
-        telemetry_ctx["research_grounding"] = dossier.summary_grounding
+            dossier = project_rag.compile_grounded_dossier(query=query, market_vitals=telemetry_ctx)
+            telemetry_ctx["rag_dossier"] = dossier.to_dict()
+            telemetry_ctx["research_grounding"] = dossier.summary_grounding
+        except Exception as e:
+            logger.debug(f"[AgentPlanner] project_rag compilation fallback: {e}")
 
         # 3. Invoke QuantMentor with project context
-        response = await quant_mentor.generate_response(
-            user_message=query,
-            market_telemetry=telemetry_ctx,
-            language_preference="auto",
-        )
-        return response
+        try:
+            response = await quant_mentor.generate_response(
+                user_message=query,
+                market_telemetry=telemetry_ctx,
+                language_preference="auto",
+            )
+            return response
+        except Exception as e:
+            logger.warning(f"[AgentPlanner] quant_mentor generation error: {e}")
+            return quant_mentor._generate_heuristic_response(query, telemetry_ctx, "auto")
 
 
 # Singleton

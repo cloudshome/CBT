@@ -271,7 +271,7 @@ class BacktestQueueManager:
             f"📊 **Sample Window:** `{symbol}` ({timeframe}, {len(candles)} bars)\n"
             f"⚖️ **Validation Result:** `{badge}`\n"
             f"📈 **New Governance Stage:** `[{new_stage}]`\n\n"
-            f"🎯 **Performance Metrics:**\n"
+            f"🎯 **Performance Metrics (3-Tier Cost Modeled):**\n"
             f"• **Net Expectancy:** `{expectancy_r:+.2f}R` per trade\n"
             f"• **Win Rate:** `{rep.win_rate * 100:.1f}%` ({rep.total_trades} trades)\n"
             f"• **Sharpe Ratio:** `{rep.sharpe_ratio:.2f}`\n"

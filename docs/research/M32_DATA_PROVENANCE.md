@@ -67,3 +67,4 @@ GROUP BY symbol, timeframe;
 When `ConceptEvaluationEngine.evaluate_candidate()` executes, it computes a deterministic dataset digest:
 $$\text{Digest} = \text{SHA256}(\text{Symbol} : \text{Timeframe} : N_{\text{bars}} : \text{Price}_0 : \text{Price}_{-1})[:16]$$
 This digest is permanently linked to the experiment record in `concept_experiments` in `data/brain_memory.db`, guaranteeing complete provenance linking every backtest result to the exact raw market observations used.
+

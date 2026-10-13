@@ -82,3 +82,4 @@ To eliminate the 32x overlapping window inflation identified in historical P12.5
 2. **STRATEGY DEPLOYMENT RESTRICTION: RESTRICTED TO RESEARCH / SHADOW.** Due to limited historical sample depth on real data ($N_{\text{eff}} < 25$ in Sealed OOS on current local datasets), **ZERO directional strategies are promoted to `OUT_OF_SAMPLE_VALIDATED` or `PAPER_QUALIFIED`**.
 3. **RESEARCH PRIORITY RETENTION:** `Candidate B` (Trend Pullback) and `Candidate A` (TSMOM) are approved as **Primary Research Priorities** at status `NEEDS_MORE_DATA`.
 4. **QUARANTINE ENFORCEMENT:** `Candidate F` (SMC Sweep + FVG) and `TC_017` remain strictly `QUARANTINED` due to negative net expectancy under realistic transaction costs. `TC_009` (Naive Breakout Buy) remains `REJECTED`.
+

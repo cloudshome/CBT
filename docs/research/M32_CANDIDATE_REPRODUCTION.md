@@ -62,3 +62,4 @@
 ### 3.5 Candidates C & D (Breakout Expansion & Mean Reversion)
 - **Results:** Both strategies showed negative gross and net expectancy on the tested unhedged directional bars without post-only maker rebates or higher-timeframe trend alignment.
 - **Auditor Verdict:** Retained at `NEEDS_MORE_DATA` / unproven baseline.
+
