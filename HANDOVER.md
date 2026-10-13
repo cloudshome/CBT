@@ -1,8 +1,22 @@
 # SKY — Session Handover
 
-**Read this first if you are the next coding session.**
+**Read this first if you are the next coding session (Windows or Ubuntu).**
 
-Last updated: 2026-08-22 · **P13 Edge Validation — plan + first code shipped**
+Last updated: **2026-10-14 · Multi-Style Asset Intelligence & Anti-Cannibalization Shipped** (Commit `2f3ba27`).
+- **P0 Defect Resolved:** Fixed Priority-Zero evidence governance defect in `core/strategy_league.py` — now queries empirical forward returns from `shadow_positions` and verifies `DSR >= 0.95` with `>= 30` samples.
+- **Multi-Style Asset Trading Intelligence Active:**
+  - Automated classification for all 5 styles: `[SCALP]`, `[DAY]`, `[TREND]`, `[RANGE]`, `[SWING]`.
+  - Anti-Cannibalization Guard (Fail-Closed): Opposing SHORT vs LONG trades on the same asset are strictly rejected.
+  - Style Sub-Books: Multi-style positions in the same direction can co-exist while identical style duplicates are blocked.
+  - Cumulative Asset Risk Governor: Enforces the constitutional 1.5% equity cap across all active styles for an asset.
+  - Institutional Desk Reporting: Paper routes format positions with institutional names (`BTC Desk (Scalp Specialist)`, etc.).
+- **Test Integrity:** All 40 regression tests passed (100% green); Milestone 18 cryptographic certification verified across all 14 gates (149/149 passed).
+- **24/7 Ubuntu Daemon Status:** `cbt-fastapi` daemon is actively running with 5 background supervisors (`ShadowBurnInOrchestrator`, `AutonomousTrader`, `Mastermind Arbiter`, `Telegram Bot`, `ClusterSyncDaemon`).
+- **Next Session:** On Windows PC, run `git pull origin main` to pull commit `2f3ba27`. Continue monitoring forward burn-in accumulation towards Gate 5 clearance.
+
+---
+
+**Previous:** 2026-08-22 · **P13 Edge Validation — plan + first code shipped**
 (`docs/HANDOVER_2026-08-22_EDGE_VALIDATION.md`,
 `docs/P13_EDGE_VALIDATION_SPEC.md`, `docs/STRATEGIC_CONSIDERATION_2026-08-22.md`).
 A strategic second opinion on the Accio review re-prioritised SKY around
