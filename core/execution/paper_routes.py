@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import time
 from datetime import UTC, datetime
 from typing import Any
@@ -170,28 +171,59 @@ async def get_paper_desk_overview():
         tp_dist = abs(tp_val - entry) if tp_val > 0 else 0.0
         rr_ratio = round(tp_dist / max(1e-4, sl_dist), 2)
 
-        if sl_pct < 1.5:
+        sym = p.get("symbol", "")
+        entry_reason_val = p.get("entry_reason") or ""
+        style_match = re.search(r"\[([A-Z0-9]+)_([A-Z0-9]+)\]", entry_reason_val)
+        if style_match:
+            asset_matched = style_match.group(1)
+            style_matched = style_match.group(2)
+            horizon = style_matched
+            style_desk_names = {
+                "SCALP": f"{asset_matched} Desk (Scalp Specialist)",
+                "DAY": f"{asset_matched} Desk (Intraday SMC)",
+                "TREND": f"{asset_matched} Desk (Trend Hunter)",
+                "RANGE": f"{asset_matched} Desk (Range Specialist)",
+                "SWING": f"{asset_matched} Desk (Macro Swing)",
+            }
+            agent_mgr = style_desk_names.get(style_matched, f"{asset_matched} Desk ({style_matched})")
+            strat_name = f"{asset_matched} {style_matched.title()} Execution"
+            thesis = entry_reason_val
+        elif sl_pct < 1.5:
             horizon = "SCALP"
             agent_mgr = "Microstructure & L2 OBI Engine"
+            if "ETH" in sym:
+                strat_name = "SMC H4 Demand + 15m MSS"
+                thesis = f"Bullish expansion targeting ${tp_val:,.2f} liquidity pool. Invalidation strictly below ${sl_val:,.2f} swing low."
+            elif "BTC" in sym:
+                strat_name = "Judas Swing Sweep + FVG Expansion"
+                thesis = f"Long liquidity run towards ${tp_val:,.2f}. Breakeven arms automatically at +1.5R."
+            else:
+                strat_name = "Multi-Timeframe SMC Breakout"
+                thesis = f"Momentum continuation targeting ${tp_val:,.2f}."
         elif sl_pct <= 5.0:
             horizon = "DAY"
             agent_mgr = "Autonomous Trader (SMC Order Flow)"
+            if "ETH" in sym:
+                strat_name = "SMC H4 Demand + 15m MSS"
+                thesis = f"Bullish expansion targeting ${tp_val:,.2f} liquidity pool. Invalidation strictly below ${sl_val:,.2f} swing low."
+            elif "BTC" in sym:
+                strat_name = "Judas Swing Sweep + FVG Expansion"
+                thesis = f"Long liquidity run towards ${tp_val:,.2f}. Breakeven arms automatically at +1.5R."
+            else:
+                strat_name = "Multi-Timeframe SMC Breakout"
+                thesis = f"Momentum continuation targeting ${tp_val:,.2f}."
         else:
             horizon = "SWING"
             agent_mgr = "Macro Regime & Strategy League"
-
-        sym = p.get("symbol", "")
-        if "ETH" in sym:
-            strat_name = "SMC H4 Demand + 15m MSS"
-            thesis = f"Bullish expansion targeting ${tp_val:,.2f} liquidity pool. Invalidation strictly below ${sl_val:,.2f} swing low."
-        elif "BTC" in sym:
-            strat_name = "Judas Swing Sweep + FVG Expansion"
-            thesis = (
-                f"Long liquidity run towards ${tp_val:,.2f}. Breakeven arms automatically at +1.5R."
-            )
-        else:
-            strat_name = "Multi-Timeframe SMC Breakout"
-            thesis = f"Momentum continuation targeting ${tp_val:,.2f}."
+            if "ETH" in sym:
+                strat_name = "SMC H4 Demand + 15m MSS"
+                thesis = f"Bullish expansion targeting ${tp_val:,.2f} liquidity pool. Invalidation strictly below ${sl_val:,.2f} swing low."
+            elif "BTC" in sym:
+                strat_name = "Judas Swing Sweep + FVG Expansion"
+                thesis = f"Long liquidity run towards ${tp_val:,.2f}. Breakeven arms automatically at +1.5R."
+            else:
+                strat_name = "Multi-Timeframe SMC Breakout"
+                thesis = f"Momentum continuation targeting ${tp_val:,.2f}."
 
         opened_at_ts = p.get("opened_at")
         opened_at_fmt = (
@@ -466,6 +498,26 @@ async def get_paper_positions():
     for p in open_pos:
         side = "BUY" if p.get("direction") == "LONG" else "SELL"
         pnl = float(p.get("unrealized_pnl", 0.0))
+        entry_reason_val = p.get("entry_reason") or ""
+        style_match = re.search(r"\[([A-Z0-9]+)_([A-Z0-9]+)\]", entry_reason_val)
+        if style_match:
+            asset_matched = style_match.group(1)
+            style_matched = style_match.group(2)
+            horizon = style_matched
+            style_desk_names = {
+                "SCALP": f"{asset_matched} Desk (Scalp Specialist)",
+                "DAY": f"{asset_matched} Desk (Intraday SMC)",
+                "TREND": f"{asset_matched} Desk (Trend Hunter)",
+                "RANGE": f"{asset_matched} Desk (Range Specialist)",
+                "SWING": f"{asset_matched} Desk (Macro Swing)",
+            }
+            agent_mgr = style_desk_names.get(style_matched, f"{asset_matched} Desk ({style_matched})")
+            strat_name = f"{asset_matched} {style_matched.title()} Execution"
+        else:
+            horizon = "DAY"
+            agent_mgr = "Autonomous Trader (SMC Order Flow)"
+            strat_name = "Multi-Timeframe SMC Breakout"
+
         mapped.append(
             {
                 "id": p.get("position_id", ""),
@@ -480,6 +532,10 @@ async def get_paper_positions():
                 "pnl": round(pnl, 2),
                 "breakevenTriggered": bool(p.get("breakeven_triggered", 0)),
                 "createdAt": str(p.get("opened_at", "")),
+                "horizon": horizon,
+                "agentManager": agent_mgr,
+                "strategyName": strat_name,
+                "entryReason": entry_reason_val,
             }
         )
     return {"positions": mapped, "count": len(mapped)}

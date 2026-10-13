@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from enum import IntEnum
 from typing import Any
 
@@ -48,6 +48,7 @@ class StrategyGenome:
     research_score: float = 0.0  # Statistical purity [0.0, 100.0]
     allocation_weight: float = 0.0  # Live capital weight [0.0, 1.0]
     is_active: bool = True
+    observed_returns: list[float] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -130,7 +131,27 @@ class StrategyLeagueManager:
         self._strategies[s3.dna_id] = s3
         self.rebalance_capital_weights()
 
-    def evaluate_promotion(self, dna_id: str) -> tuple[bool, str]:
+    def _fetch_strategy_returns(self, dna_id: str) -> list[float]:
+        """Queries empirical trade returns for this strategy from shadow_positions."""
+        try:
+            with db_manager.get_trading_conn() as conn:
+                cur = conn.execute(
+                    """
+                    SELECT (current_price - entry_price) / entry_price AS ret
+                    FROM shadow_positions
+                    WHERE status = 'CLOSED' AND (entry_reason LIKE ? OR position_id LIKE ?)
+                    ORDER BY closed_at ASC
+                    """,
+                    (f"%{dna_id}%", f"%{dna_id}%"),
+                )
+                return [float(r[0]) for r in cur.fetchall()]
+        except Exception as e:
+            logger.debug(f"Could not query shadow returns for {dna_id}: {e}")
+            return []
+
+    def evaluate_promotion(
+        self, dna_id: str, returns: list[float] | None = None
+    ) -> tuple[bool, str]:
         """
         Evaluates strict graduation criteria across quarantine tiers.
         """
@@ -155,8 +176,16 @@ class StrategyLeagueManager:
             # Enforce Selection-Bias Guard (Deflated Sharpe Ratio DSR >= 0.95)
             from core.strategy_selection_guard import strategy_selection_guard
 
+            obs_returns = (
+                returns
+                if returns is not None
+                else getattr(strat, "observed_returns", [])
+            )
+            if not obs_returns:
+                obs_returns = self._fetch_strategy_returns(dna_id)
+
             guard_rep = strategy_selection_guard.evaluate_strategy(
-                strat.dna_id, [], strat.rolling_sharpe_30d
+                strat.dna_id, obs_returns, strat.rolling_sharpe_30d
             )
 
             if not guard_rep.is_statistically_significant:

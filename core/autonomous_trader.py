@@ -19,9 +19,44 @@ from core.audit_bus import audit_bus
 from core.data_streamer import data_streamer
 from core.portfolio_shadow import portfolio_shadow
 from core.sky_intelligence.orchestrator import sky_orchestrator
-from core.sky_intelligence.types import DecisionAction
+from core.sky_intelligence.types import DecisionAction, SetupType, SKYSetup
 
 logger = logging.getLogger("ai_quant_sentinel.autonomous_trader")
+
+
+def classify_trading_style(
+    symbol: str,
+    setup: SKYSetup | None,
+    entry_price: float,
+    stop_loss: float,
+    timeframe: str = "15m",
+) -> tuple[str, str]:
+    """
+    Classifies the trading style and institutional desk archetype for an asset.
+    Returns:
+        (style_code, desk_label)
+        e.g. ("DAY", "BTC Desk (Intraday SMC)"), ("SCALP", "BTC Desk (Scalp Specialist)")
+    """
+    asset_prefix = symbol.split("/")[0].upper() if "/" in symbol else symbol.upper()
+    stop_dist_pct = abs(entry_price - stop_loss) / entry_price if entry_price > 0 else 0.0
+
+    # 1. Swing Trading: Higher timeframes (4h/1d) or wide structural stop distance (>= 3.5%)
+    if timeframe in ("4h", "1d", "1D") or stop_dist_pct >= 0.035:
+        return "SWING", f"{asset_prefix} Desk (Macro Swing)"
+
+    if setup:
+        st = getattr(setup, "setup_type", None)
+        if st == SetupType.SETUP_E_VWAP_RECLAIM:
+            return "SCALP", f"{asset_prefix} Desk (Scalp Specialist)"
+        elif st in (SetupType.SETUP_B_PULLBACK_FVG, SetupType.SETUP_C_BREAKOUT_EXPANSION):
+            return "TREND", f"{asset_prefix} Desk (Trend Hunter)"
+        elif st == SetupType.SETUP_D_RANGE_SWEEP_RECLAIM:
+            return "RANGE", f"{asset_prefix} Desk (Range Specialist)"
+        elif st == SetupType.SETUP_A_SWEEP_MSS:
+            return "DAY", f"{asset_prefix} Desk (Intraday SMC)"
+
+    # Default intraday style
+    return "DAY", f"{asset_prefix} Desk (Intraday SMC)"
 
 
 class AutonomousTrader:
@@ -149,9 +184,15 @@ class AutonomousTrader:
                         )
                         continue
 
-                    # Prevent duplicate positions in same symbol
-                    if any(p.get("symbol") == sym for p in open_positions):
-                        continue
+                    # Check existing open positions for this symbol
+                    existing_sym_positions = [p for p in open_positions if p.get("symbol") == sym]
+                    if existing_sym_positions:
+                        # Anti-Cannibalization Guard: reject opposing direction (fail-closed)
+                        if any(p.get("direction") != decision_out.decision.value for p in existing_sym_positions):
+                            logger.info(
+                                f"Skipping {sym} trade: Opposing {existing_sym_positions[0].get('direction')} position already open (anti-cannibalization guard)."
+                            )
+                            continue
 
                     # Guard 2: Live Market Price Alignment
                     try:
@@ -213,13 +254,50 @@ class AutonomousTrader:
                             )
                             continue
 
-                    # Half-Kelly Position Sizing with hard account equity notional & 1.0% stop-loss risk cap
+                    # Multi-Style Classification & Sub-Book Dedup
+                    style_code, desk_label = classify_trading_style(
+                        symbol=sym,
+                        setup=setup,
+                        entry_price=entry_price,
+                        stop_loss=sl,
+                        timeframe="15m",
+                    )
+                    asset_prefix = sym.split("/")[0].upper() if "/" in sym else sym.upper()
+                    style_tag = f"[{asset_prefix}_{style_code}]"
+
+                    # Prevent duplicate positions of the exact same style sub-book on this asset
+                    if any(
+                        p.get("entry_reason") and style_tag.upper() in p.get("entry_reason", "").upper()
+                        for p in existing_sym_positions
+                    ):
+                        logger.info(
+                            f"Skipping {sym} trade: Style sub-book {style_tag} already active."
+                        )
+                        continue
+
+                    # Half-Kelly Position Sizing with cumulative asset risk cap (1.5% max risk per asset)
                     raw_pos_size_usd = decision_out.suggested_position_size_usd or (
                         current_eq * 0.02
                     )
                     pos_size_usd = min(raw_pos_size_usd, current_eq * 1.0)
                     stop_dist = abs(entry_price - sl)
-                    max_stop_loss_usd = current_eq * 0.01  # 1.0% max loss per trade (<1.5% constitutional limit)
+
+                    # Deduct existing open risk on this symbol to respect 1.5% constitutional asset cap
+                    existing_sym_risk = sum(
+                        float(p.get("size", 0.0)) * abs(float(p.get("entry_price", 0.0)) - float(p.get("stop_loss", 0.0)))
+                        for p in existing_sym_positions
+                        if p.get("stop_loss") is not None
+                    )
+                    max_allowed_asset_risk = current_eq * 0.015
+                    remaining_asset_risk = max(0.0, max_allowed_asset_risk - existing_sym_risk)
+                    max_stop_loss_usd = min(current_eq * 0.01, remaining_asset_risk)
+
+                    if max_stop_loss_usd <= 0.0:
+                        logger.info(
+                            f"Skipping {sym} trade: Cumulative risk cap on {sym} (${existing_sym_risk:.2f}/${max_allowed_asset_risk:.2f}) reached."
+                        )
+                        continue
+
                     if stop_dist > 0:
                         risk_capped_units = max_stop_loss_usd / stop_dist
                         notional_units = pos_size_usd / entry_price
@@ -228,10 +306,17 @@ class AutonomousTrader:
                         units = max(0.001, round(pos_size_usd / entry_price, 4))
                     direction_str = decision_out.decision.value
 
-                    # 5. Open Position in Shadow Portfolio (with atomic duplicate-symbol & risk limits)
+                    # 5. Open Position in Shadow Portfolio (with atomic multi-style sub-books & risk limits)
+                    st_obj = getattr(setup, "setup_type", None) if setup else None
+                    if hasattr(st_obj, "value"):
+                        setup_label = st_obj.value
+                    elif st_obj:
+                        setup_label = str(st_obj)
+                    else:
+                        setup_label = "SMC Structure"
                     reason_desc = (
-                        f"Autonomous SMC ({direction_str}) | Net-EV: {decision_out.net_ev_r:.2f}R | "
-                        f"Kelly: {decision_out.kelly_fraction:.1%}"
+                        f"{style_tag} {setup_label} ({direction_str}) | "
+                        f"Net-EV: {decision_out.net_ev_r:.2f}R | Kelly: {decision_out.kelly_fraction:.1%}"
                     )
                     pos_id = portfolio_shadow.open_position(
                         symbol=sym,
@@ -245,6 +330,8 @@ class AutonomousTrader:
                         max_open_limit=self.max_open_positions,
                         max_risk_usd=current_eq * 0.015,
                         prevent_duplicate_symbol=True,
+                        style_tag=style_tag,
+                        allow_multi_style=True,
                     )
                     self.total_trades_executed += 1
                     self._last_traded_candle_ts[sym] = latest_candle_ts
@@ -259,6 +346,8 @@ class AutonomousTrader:
                         "take_profit": tp,
                         "net_ev_r": decision_out.net_ev_r,
                         "kelly_fraction": decision_out.kelly_fraction,
+                        "style": style_code,
+                        "desk": desk_label,
                         "timestamp": int(time.time() * 1000),
                     }
                     executed_actions.append(action_record)

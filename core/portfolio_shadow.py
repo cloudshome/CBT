@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import time
 import uuid
 from dataclasses import asdict, dataclass
@@ -75,6 +76,8 @@ class PortfolioShadowManager:
         max_open_limit: int | None = None,
         max_risk_usd: float | None = None,
         prevent_duplicate_symbol: bool = False,
+        style_tag: str | None = None,
+        allow_multi_style: bool = False,
     ) -> str:
         self._ensure_columns_exist()
         now = int(time.time() * 1000)
@@ -91,16 +94,52 @@ class PortfolioShadowManager:
 
         with db_manager.get_trading_conn() as conn:
             conn.execute("BEGIN IMMEDIATE;")
-            if prevent_duplicate_symbol:
-                sym_cur = conn.execute(
-                    "SELECT COUNT(*) FROM shadow_positions WHERE status = 'OPEN' AND symbol = ?;",
-                    (symbol,),
-                )
-                if sym_cur.fetchone()[0] > 0:
+            dir_upper = direction.upper()
+
+            # 1. Fetch existing open positions for this symbol
+            sym_cur = conn.execute(
+                "SELECT position_id, direction, entry_reason, size, entry_price, stop_loss FROM shadow_positions WHERE status = 'OPEN' AND symbol = ?;",
+                (symbol,),
+            )
+            existing_sym_positions = sym_cur.fetchall()
+
+            # Anti-Cannibalization Guard (Deterministic Fail-Closed):
+            # Opposing directions (LONG vs SHORT) on the same asset are strictly prohibited
+            for _, ex_dir, _, _, _, _ in existing_sym_positions:
+                if ex_dir.upper() != dir_upper:
                     conn.rollback()
                     raise ValueError(
-                        f"Risk Gate Rejection: an OPEN position for {symbol} already exists."
+                        f"Risk Gate Rejection: Cannibalization detected! Existing {symbol} {ex_dir.upper()} opposes proposed {dir_upper}."
                     )
+
+            if prevent_duplicate_symbol:
+                if not allow_multi_style:
+                    if len(existing_sym_positions) > 0:
+                        conn.rollback()
+                        raise ValueError(
+                            f"Risk Gate Rejection: an OPEN position for {symbol} already exists."
+                        )
+                else:
+                    # Multi-style enabled: Check if a position with the SAME style_tag is already open
+                    eff_style = style_tag
+                    if not eff_style and reason_text:
+                        m = re.search(r"\[([A-Z0-9_]+)\]", reason_text)
+                        if m:
+                            eff_style = m.group(1)
+
+                    if not eff_style:
+                        if len(existing_sym_positions) > 0:
+                            conn.rollback()
+                            raise ValueError(
+                                f"Risk Gate Rejection: an OPEN position for {symbol} already exists (no distinct style_tag)."
+                            )
+                    else:
+                        for _, _, ex_reason, _, _, _ in existing_sym_positions:
+                            if ex_reason and eff_style.upper() in ex_reason.upper():
+                                conn.rollback()
+                                raise ValueError(
+                                    f"Risk Gate Rejection: An OPEN position for {symbol} with style '{eff_style}' already exists."
+                                )
 
             if enforce_atomic_limits:
                 cursor = conn.execute("SELECT COUNT(*) FROM shadow_positions WHERE status = 'OPEN';")
@@ -115,6 +154,18 @@ class PortfolioShadowManager:
                     if trade_risk > max_risk_usd:
                         conn.rollback()
                         raise ValueError(f"Risk Gate Rejection: trade risk ${trade_risk:.2f} exceeds allowable ${max_risk_usd:.2f}.")
+
+                    # Cumulative asset risk cap across all active styles for this symbol
+                    existing_sym_risk = sum(
+                        float(r[3]) * abs(float(r[4]) - float(r[5]))
+                        for r in existing_sym_positions
+                        if r[5] is not None
+                    )
+                    if (existing_sym_risk + trade_risk) > max_risk_usd:
+                        conn.rollback()
+                        raise ValueError(
+                            f"Risk Gate Rejection: cumulative {symbol} risk ${(existing_sym_risk + trade_risk):.2f} exceeds allowable cap ${max_risk_usd:.2f}."
+                        )
 
 
             conn.execute(
