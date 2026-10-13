@@ -121,44 +121,53 @@ class MacroReleaseRecord:
 
         if not self.scheduled_timestamp_ms:
             self.scheduled_timestamp_ms = int(time.time() * 1000)
-        if self.released_timestamp_ms is None:
+
+        is_pending = (
+            not self.actual
+            or str(self.actual).strip().upper() in ("TBD", "PENDING", "NONE", "")
+            or self.actual_num is None
+        )
+
+        # Only assign released_timestamp_ms if the event has actually released
+        if not is_pending and self.released_timestamp_ms is None:
             self.released_timestamp_ms = int(time.time() * 1000)
 
-        # Populate defaults for prices if missing
-        if self.btc_price_before <= 0:
-            self.btc_price_before = 68000.0
-            if "DOVISH" in self.surprise_direction or self.surprise_deviation < 0:
-                self.btc_price_after = 69500.0
-                self.btc_change_pct = 2.21
-            elif "HAWKISH" in self.surprise_direction or self.surprise_deviation > 0:
-                self.btc_price_after = 66500.0
-                self.btc_change_pct = -2.21
-            else:
-                self.btc_price_after = 68150.0
-                self.btc_change_pct = 0.22
+        # Populate defaults for prices if missing and event has actually released
+        if not is_pending:
+            if self.btc_price_before <= 0:
+                self.btc_price_before = 68000.0
+                if "DOVISH" in self.surprise_direction or self.surprise_deviation < 0:
+                    self.btc_price_after = 69500.0
+                    self.btc_change_pct = 2.21
+                elif "HAWKISH" in self.surprise_direction or self.surprise_deviation > 0:
+                    self.btc_price_after = 66500.0
+                    self.btc_change_pct = -2.21
+                else:
+                    self.btc_price_after = 68150.0
+                    self.btc_change_pct = 0.22
 
-        if self.eth_price_before <= 0:
-            self.eth_price_before = 2480.0
-            self.eth_price_after = 2550.0 if self.btc_change_pct >= 0 else 2410.0
-            self.eth_change_pct = 2.82 if self.btc_change_pct >= 0 else -2.82
+            if self.eth_price_before <= 0:
+                self.eth_price_before = 2480.0
+                self.eth_price_after = 2550.0 if self.btc_change_pct >= 0 else 2410.0
+                self.eth_change_pct = 2.82 if self.btc_change_pct >= 0 else -2.82
 
-        if self.iv_crush_pct == 0.0:
-            self.iv_crush_pct = -4.5
+            if self.iv_crush_pct == 0.0:
+                self.iv_crush_pct = -4.5
 
-        if not self.fvg_zone_usd:
-            self.fvg_zone_usd = (
-                "$68,100 — $68,750 (15m Bullish FVG)"
-                if self.btc_change_pct >= 0
-                else "$66,800 — $67,400 (15m Bearish FVG)"
-            )
+            if not self.fvg_zone_usd:
+                self.fvg_zone_usd = (
+                    "$68,100 — $68,750 (15m Bullish FVG)"
+                    if self.btc_change_pct >= 0
+                    else "$66,800 — $67,400 (15m Bearish FVG)"
+                )
 
-        if not self.market_impact_summary:
-            if "DOVISH" in self.surprise_direction:
-                self.market_impact_summary = "Cooler than expected print triggered aggressive risk-on short squeeze and liquidity expansion."
-            elif "HAWKISH" in self.surprise_direction:
-                self.market_impact_summary = "Hotter than expected print triggered hawkish repricing and long liquidation flush."
-            else:
-                self.market_impact_summary = "Event release aligned with consensus forecasts, triggering volatility contraction and range continuation."
+            if not self.market_impact_summary:
+                if "DOVISH" in self.surprise_direction:
+                    self.market_impact_summary = "Cooler than expected print triggered aggressive risk-on short squeeze and liquidity expansion."
+                elif "HAWKISH" in self.surprise_direction:
+                    self.market_impact_summary = "Hotter than expected print triggered hawkish repricing and long liquidation flush."
+                else:
+                    self.market_impact_summary = "Event release aligned with consensus forecasts, triggering volatility contraction and range continuation."
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -306,7 +315,7 @@ class MacroEventReporter:
                 eth_change_pct=0.0,
                 iv_crush_pct=0.0,
                 fvg_zone_usd="",
-                is_dispatched=False,
+                is_dispatched=True,
             ),
         ]
 
@@ -436,7 +445,15 @@ class MacroEventReporter:
         time_str = dt_bd.strftime("%d %b %Y, %I:%M %p BST")
 
         # Surprise Emoji & Direction
-        if "DOVISH" in record.surprise_direction or record.surprise_deviation < 0:
+        is_pending = (
+            not record.actual
+            or str(record.actual).strip().upper() in ("TBD", "PENDING", "NONE", "")
+            or record.actual_num is None
+            or "PENDING" in record.surprise_direction
+        )
+        if is_pending:
+            surprise_badge = "⏳ PENDING OFFICIAL RELEASE"
+        elif "DOVISH" in record.surprise_direction or record.surprise_deviation < 0:
             surprise_badge = "🟢 COOLER THAN EXPECTED (DOVISH DISINFLATION BEAT)"
         elif "HAWKISH" in record.surprise_direction or record.surprise_deviation > 0:
             surprise_badge = "🔴 HOTTER THAN EXPECTED (HAWKISH INFLATION SURPRISE)"
@@ -446,6 +463,12 @@ class MacroEventReporter:
         btc_sign = "+" if record.btc_change_pct >= 0 else ""
         eth_sign = "+" if record.eth_change_pct >= 0 else ""
 
+        delta_line = (
+            f"  • **Status:** `{surprise_badge}` (Consensus: {record.forecast})"
+            if is_pending
+            else f"  • **Surprise Delta:** `{record.surprise_deviation:+0.2f}{record.unit}` ({surprise_badge})"
+        )
+
         lines = [
             f"🔴 **MACRO CATALYST FLASH & MARKET IMPACT REPORT: {record.title}**",
             f"📅 *Released:* `{time_str}` (Bangladesh Time)",
@@ -454,7 +477,7 @@ class MacroEventReporter:
             f"  • **Actual:** `{record.actual}`",
             f"  • **Forecast:** `{record.forecast}` (Consensus)",
             f"  • **Previous:** `{record.previous}`",
-            f"  • **Surprise Delta:** `{record.surprise_deviation:+0.2f}{record.unit}` ({surprise_badge})",
+            delta_line,
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
             "📈 **Immediate Asset & Volatility Impact:**",
             f"  • **BTC/USDT Price Displacement:** `${record.btc_price_before:,.0f}` ➔ `${record.btc_price_after:,.0f}` (`{btc_sign}{record.btc_change_pct:.2f}%`)",
@@ -623,13 +646,22 @@ class MacroEventReporter:
                 cur = conn.execute(
                     """
                     SELECT * FROM macro_event_releases
-                    WHERE released_timestamp_ms IS NOT NULL AND is_dispatched = 0
+                    WHERE released_timestamp_ms IS NOT NULL 
+                      AND is_dispatched = 0
+                      AND actual NOT IN ('', 'TBD', 'PENDING', 'None')
                     ORDER BY released_timestamp_ms ASC
                     """
                 )
                 rows = cur.fetchall()
                 for row in rows:
                     rec = self._row_to_record(row)
+                    # Filter out any unreleased/placeholder records
+                    if (
+                        not rec.actual
+                        or str(rec.actual).strip().upper() in ("TBD", "PENDING", "NONE", "")
+                        or rec.actual_num is None
+                    ):
+                        continue
                     report = self.format_event_flash_report(rec)
                     pending.append(
                         {

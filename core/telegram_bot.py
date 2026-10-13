@@ -717,6 +717,7 @@ class SmartBrainNotificationEngine:
                 if tag not in self._notified_milestones and text:
                     self._notified_milestones.add(tag)
                     await self.bot.send_message(text)
+                    macro_event_reporter.mark_notified(event_id)
                     logger.info(f"SmartNotifier: Dispatched macro flash alert for {event_id}")
         except Exception as e:  # noqa: BLE001 — defensive fallback
             logger.error(f"SmartNotifier macro event release check error: {e}")

@@ -274,3 +274,45 @@ def test_command_registration_and_aliases():
     assert command_registry.get("/schedule") is not None
     assert command_registry.get("/sessions") is not None
     assert command_registry.get("/bdtime") is not None
+
+
+def test_unreleased_pending_event_never_dispatched_and_no_mock_prices():
+    """
+    Verifies that unreleased / upcoming catalysts (actual='TBD')
+    maintain released_timestamp_ms=None, zero price displacements,
+    and are NEVER dispatched by check_and_generate_pending_releases.
+    """
+    from core.macro_event_reporter import MacroReleaseRecord, macro_event_reporter
+    import time
+
+    pending_rec = MacroReleaseRecord(
+        event_id="TEST_PENDING_CATALYST_ISOLATION",
+        title="FOMC Interest Rate Decision (Pending)",
+        country="US",
+        category="CENTRAL_BANK",
+        scheduled_timestamp_ms=int(time.time() * 1000) + 3600000,
+        released_timestamp_ms=None,
+        actual="TBD",
+        forecast="5.25%",
+        previous="5.50%",
+        actual_num=None,
+        forecast_num=5.25,
+        previous_num=5.50,
+        surprise_direction="PENDING",
+        btc_price_before=0.0,
+        btc_price_after=0.0,
+        is_dispatched=False,
+    )
+
+    assert pending_rec.released_timestamp_ms is None
+    assert pending_rec.btc_price_before == 0.0
+    assert pending_rec.btc_price_after == 0.0
+
+    report = macro_event_reporter.format_event_flash_report(pending_rec)
+    assert "PENDING OFFICIAL RELEASE" in report
+    assert "IN-LINE WITH CONSENSUS" not in report
+
+    pending_list = macro_event_reporter.check_and_generate_pending_releases()
+    matching = [p for p in pending_list if p.get("event_id") == "TEST_PENDING_CATALYST_ISOLATION"]
+    assert len(matching) == 0
+
