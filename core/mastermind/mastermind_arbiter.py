@@ -210,6 +210,32 @@ class MastermindArbiterCouncil:
                     )
                     existing_symbols.add(sym)
                     logger.info("Mastermind approved and deployed: %s %s (Notional: $%.2f)", direction_str, sym, approved_notional)
+
+                    # Dispatch immediate notification to Telegram
+                    try:
+                        import asyncio
+                        from core.telegram_bot import telegram_bot
+
+                        emoji_dir = "🟢 LONG" if direction_str == "LONG" else "🔴 SHORT"
+                        telegram_msg = (
+                            f"⚡ *MASTERMIND SPECIALIST TRADE DEPLOYED*\n"
+                            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                            f"🤖 *Specialist:* `{spec.specialist_id}`\n"
+                            f"🪙 *Symbol:* `{sym}`\n"
+                            f"🧭 *Direction:* {emoji_dir}\n"
+                            f"💵 *Entry Price:* `${cur_price:,.2f}`\n"
+                            f"🛡️ *Stop-Loss:* `${proposal.stop_loss:,.2f}`\n"
+                            f"🎯 *Take-Profit:* `${proposal.take_profit:,.2f}`\n"
+                            f"📐 *Risk-Reward:* `{proposal.risk_reward_ratio:.2f}R`\n"
+                            f"📊 *Net EV:* `+{proposal.expected_value_r:.2f}R` | *Conf:* `{proposal.confidence_score*100:.0f}%`\n"
+                            f"💼 *Approved Sizing:* `${approved_notional:,.2f}` ({units:.4f} units)\n"
+                            f"📝 *Thesis:* _{proposal.thesis[:160]}_\n"
+                            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                            f"Darwinian Mastermind Council • Virtual Paper Execution"
+                        )
+                        asyncio.create_task(telegram_bot.send_message(telegram_msg, parse_mode="Markdown"))
+                    except Exception as t_err:  # noqa: BLE001
+                        logger.warning("Failed to dispatch Mastermind trade alert to Telegram: %s", t_err)
                 except Exception as ex:  # noqa: BLE001
                     is_approved = False
                     rejection_reason = f"Shadow execution rejected: {ex}"
@@ -280,22 +306,23 @@ class MastermindArbiterCouncil:
         from core.data_streamer import data_streamer
 
         lock_fd = None
-        try:
-            import fcntl
+        if os.name != "nt":
+            try:
+                import fcntl
 
-            lock_path = "/tmp/cbt_mastermind_arbiter_supervisor.lock"
-            lock_fd = open(lock_path, "w")  # noqa: SIM115
-            fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError:
-            logger.info(
-                "MastermindArbiterCouncil loop passive in worker PID %d (another worker holds supervisor lock).",
-                os.getpid(),
-            )
-            if lock_fd is not None:
-                lock_fd.close()
-            return
-        except Exception:  # noqa: BLE001
-            pass
+                lock_path = "/tmp/cbt_mastermind_arbiter_supervisor.lock"
+                lock_fd = open(lock_path, "w")  # noqa: SIM115
+                fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                logger.info(
+                    "MastermindArbiterCouncil loop passive in worker PID %d (another worker holds supervisor lock).",
+                    os.getpid(),
+                )
+                if lock_fd is not None:
+                    lock_fd.close()
+                return
+            except Exception:  # noqa: BLE001
+                pass
 
         logger.info("MastermindArbiterCouncil: Continuous Swarm loop started (interval: %.1fs).", interval_sec)
         await asyncio.sleep(15.0)  # Initial boot stagger

@@ -53,7 +53,7 @@ logger = logging.getLogger("ai_quant_sentinel.knowledge_os.automation")
 INTERVAL_HYPOTHESIS_BACKTEST = 30 * 60  # 30 minutes
 INTERVAL_QUIZ_REMINDER = 60 * 60  # 1 hour
 INTERVAL_YOUTUBE_CRAWLER = 6 * 60 * 60  # 6 hours
-INTERVAL_RESEARCH_FEED_CRAWLER = 2 * 60 * 60  # 2 hours
+INTERVAL_RESEARCH_FEED_CRAWLER = 30 * 60  # 30 minutes
 INTERVAL_KNOWLEDGE_AUDIT = 24 * 60 * 60  # 24 hours
 INTERVAL_DRIVE_SYNC = 6 * 60 * 60  # 6 hours
 
@@ -153,7 +153,7 @@ class ResearchAutomationOrchestrator:
         logger.info("ResearchAutomationOrchestrator: Shutdown signal sent to all pipelines.")
 
     async def trigger_pipeline(self, name: str) -> dict[str, Any]:
-        """Manually triggers a named pipeline immediately (for API endpoint)."""
+        """Manually triggers a named pipeline immediately (for API endpoint or Telegram)."""
         runners = {
             "hypothesis_backtest": self._run_hypothesis_backtest,
             "quiz_reminder": self._run_quiz_reminder,
@@ -164,11 +164,34 @@ class ResearchAutomationOrchestrator:
         }
         if name not in runners:
             return {"error": f"Unknown pipeline: {name}"}
+        run_id = f"MANUAL_{name.upper()}_{uuid.uuid4().hex[:8]}"
+        started_at = int(time.time() * 1000)
+        ps = self.pipeline_status.get(name)
+        if ps:
+            ps.is_running = True
         try:
             result = await runners[name]()
+            items = result.get("items_processed", 0)
+            if ps:
+                ps.last_run_status = "OK"
+                ps.last_items_processed = items
+                ps.total_items_processed += items
+                ps.last_error = None
+                ps.last_run_at = int(time.time() * 1000)
+                ps.total_runs += 1
+            self._log_run(run_id, name, "OK", result, started_at)
             return {"triggered": name, "result": result}
         except Exception as exc:  # noqa: BLE001
+            if ps:
+                ps.last_run_status = "ERROR"
+                ps.last_error = str(exc)
+                ps.last_run_at = int(time.time() * 1000)
+                ps.total_runs += 1
+            self._log_run(run_id, name, "ERROR", {}, started_at, error=str(exc))
             return {"triggered": name, "error": str(exc)}
+        finally:
+            if ps:
+                ps.is_running = False
 
     # ------------------------------------------------------------------
     # Generic loop wrapper
@@ -179,9 +202,9 @@ class ResearchAutomationOrchestrator:
         # Stagger startup to avoid all pipelines hitting DB simultaneously
         stagger = {
             "hypothesis_backtest": 10,
+            "research_feed_crawler": 15,
             "quiz_reminder": 25,
             "youtube_crawler": 40,
-            "research_feed_crawler": 45,
             "knowledge_audit": 60,
             "drive_sync": 80,
         }.get(name, 30)

@@ -198,3 +198,41 @@ async def test_end_to_end_webhook_natural_language_pipeline():
     res_bn = await telegram_bot.handle_webhook_update(up_bn)
     assert res_bn["status"] == "AI_CONVERSATION_EXECUTED"
     assert "লাইভ মার্কেট ইন্টেলিজেন্স" in res_bn["response"]
+
+
+@pytest.mark.asyncio
+async def test_intent_resolution_swarm_and_collector():
+    uid = 999003
+    d1 = telegram_agent_planner.resolve_intent("ডেডিকেটেড এজেন্টদের অবস্থা কি?", uid)
+    assert d1.tool_name == "get_mastermind_swarm_status"
+
+    d2 = telegram_agent_planner.resolve_intent("কালেক্টর কি ডাটা কালেক্ট করেছে?", uid)
+    assert d2.tool_name == "get_autonomous_collector_status"
+
+    d3 = telegram_agent_planner.resolve_intent("অনলাইন ডাটা কালেক্ট করো", uid)
+    assert d3.tool_name == "trigger_autonomous_crawl"
+
+
+@pytest.mark.asyncio
+async def test_typed_commands_swarm_collector_crawl():
+    from core.telegram.handlers import handle_swarm, handle_collector, handle_crawl
+    from core.telegram.rbac import TelegramUserIdentity
+
+    identity = TelegramUserIdentity(user_id=999004, chat_id=999004, role=TelegramRole.SUPER_ADMIN)
+
+    # 1. /swarm
+    swarm_res = await handle_swarm("", identity=identity)
+    assert "MASTERMIND ARBITER COUNCIL" in swarm_res
+    assert "Active Specialists" in swarm_res
+    assert "spec_btc_macro" in swarm_res
+
+    # 2. /collector
+    collector_res = await handle_collector("", identity=identity)
+    assert "AUTONOMOUS ONLINE DATA COLLECTOR" in collector_res
+    assert "Active Intelligence Feeds" in collector_res
+
+    # 3. /crawl
+    crawl_res = await handle_crawl("", identity=identity)
+    assert "AUTONOMOUS CRAWL CYCLE COMPLETE" in crawl_res
+
+

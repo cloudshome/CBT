@@ -232,6 +232,15 @@ class TelegramToolGateway:
             query = arguments.get("query", "")
             return await self._tool_query_project_rag(query, identity)
 
+        elif tool_name == "get_mastermind_swarm_status":
+            return await self._tool_get_mastermind_swarm_status(identity)
+
+        elif tool_name == "get_autonomous_collector_status":
+            return await self._tool_get_autonomous_collector_status(identity)
+
+        elif tool_name == "trigger_autonomous_crawl":
+            return await self._tool_trigger_autonomous_crawl(identity)
+
         # ---------------------------------------------------------------------
         # CLASS B: RESEARCH & ANALYSIS
         # -------------------------------------------------------------------------
@@ -822,6 +831,123 @@ class TelegramToolGateway:
             tool_class=ToolClass.CLASS_A_READONLY,
             output_text=dossier.summary_grounding,
             data=dossier.to_dict(),
+        )
+
+    async def _tool_get_mastermind_swarm_status(
+        self, identity: TelegramUserIdentity
+    ) -> ToolResult:
+        """Returns live status of all 5 Specialist Swarm nodes and recent Arbiter decisions."""
+        from core.mastermind.mastermind_arbiter import mastermind_arbiter
+        from core.portfolio_shadow import portfolio_shadow
+
+        accounting = portfolio_shadow.get_portfolio_accounting(starting_capital=mastermind_arbiter.account_equity_usd)
+        current_eq = float(accounting.get("virtual_equity", mastermind_arbiter.account_equity_usd))
+        open_pos = portfolio_shadow.get_open_positions()
+        recent_decisions = mastermind_arbiter.get_recent_decisions(limit=5)
+
+        lines = [
+            "🏛️ **MASTERMIND ARBITER COUNCIL & SPECIALIST SWARM**",
+            "━━━━━━━━━━━━━━━━━━━━━━",
+            "🏆 **League:** `DARWINIAN 1-COIN SPECIALISTS`",
+            f"💰 **Virtual Equity:** `${current_eq:,.2f}` | **Open Positions:** `{len(open_pos)}`",
+            "━━━━━━━━━━━━━━━━━━━━━━",
+            "🤖 **5 Specialist Nodes:**",
+        ]
+        for s in mastermind_arbiter.specialists:
+            lines.append(f"• `{s.specialist_id}` ({s.target_symbol}) — _{s.archetype.value}_")
+
+        lines.append("━━━━━━━━━━━━━━━━━━━━━━")
+        lines.append("📋 **Recent Arbiter Evaluations:**")
+        if not recent_decisions:
+            lines.append("  _No candidate proposals evaluated yet._")
+        else:
+            for d in recent_decisions:
+                tag = "✅ APPROVED" if d.get("is_approved") else "❌ REJECTED"
+                dir_str = d.get("direction", "NEUTRAL")
+                ev = d.get("expected_value_r", 0.0)
+                conf = d.get("confidence_score", 0.0) * 100
+                reason = d.get("rejection_reason") or "Edge verified & risk passed"
+                lines.append(
+                    f"• `{d.get('specialist_id')}` [{d.get('symbol')}]: {tag} ({dir_str})\n"
+                    f"  Net EV: `{ev:.2f}R` | Conf: `{conf:.0f}%` | Rationale: _{reason[:60]}_"
+                )
+        lines.append("━━━━━━━━━━━━━━━━━━━━━━")
+        lines.append("⚖️ _Governed strictly by Half-Kelly sizing & Zero-Bypass Risk Primacy._")
+
+        return ToolResult(
+            success=True,
+            tool_name="get_mastermind_swarm_status",
+            tool_class=ToolClass.CLASS_A_READONLY,
+            output_text="\n".join(lines),
+            data={"equity": current_eq, "open_positions": len(open_pos), "decisions": recent_decisions},
+        )
+
+    async def _tool_get_autonomous_collector_status(
+        self, identity: TelegramUserIdentity
+    ) -> ToolResult:
+        """Returns status of Autonomous Online Data Collector feeds and Research Wikipedia."""
+        from core.knowledge_os.research_source_registry import research_source_registry
+        from core.knowledge_os.research_wikipedia import research_wikipedia_engine
+
+        sources = research_source_registry.list_sources()
+        due_sources = research_source_registry.get_sources_due_for_crawl()
+        articles = research_wikipedia_engine.list_articles(limit=5)
+        total_articles = len(research_wikipedia_engine.list_articles(limit=500))
+
+        lines = [
+            "🌐 **AUTONOMOUS ONLINE DATA COLLECTOR STATUS**",
+            "━━━━━━━━━━━━━━━━━━━━━━",
+            f"📚 **Wikipedia Articles:** `{total_articles}` total entries",
+            f"📡 **Active Intelligence Feeds:** `{len(sources)}` sources (`{len(due_sources)}` due)",
+            "━━━━━━━━━━━━━━━━━━━━━━",
+            "📰 **Registered Feeds:**",
+        ]
+        for s in sources:
+            items = s.get("total_items_ingested", 0)
+            lines.append(f"• **{s.get('name')}** (`{s.get('source_type')}`): `{items}` items ingested")
+
+        lines.append("━━━━━━━━━━━━━━━━━━━━━━")
+        if articles:
+            lines.append("📑 **Latest Research Articles:**")
+            for a in articles[:3]:
+                lines.append(f"• _{a.get('title')[:60]}_ (`{a.get('category')}`)")
+            lines.append("━━━━━━━━━━━━━━━━━━━━━━")
+        lines.append("💡 _Say 'অনলাইন ডাটা কালেক্ট করো' or send /crawl to trigger ingestion._")
+
+        return ToolResult(
+            success=True,
+            tool_name="get_autonomous_collector_status",
+            tool_class=ToolClass.CLASS_A_READONLY,
+            output_text="\n".join(lines),
+            data={"total_articles": total_articles, "sources_count": len(sources)},
+        )
+
+    async def _tool_trigger_autonomous_crawl(
+        self, identity: TelegramUserIdentity
+    ) -> ToolResult:
+        """Triggers immediate online crawl and returns ingested count."""
+        from core.knowledge_os.research_automation_orchestrator import research_automation_orchestrator
+
+        res = await research_automation_orchestrator.trigger_pipeline("research_feed_crawler")
+        details = res.get("result", {})
+        sources_crawled = details.get("sources_crawled", 0)
+        articles_created = details.get("articles_created", 0)
+
+        msg = (
+            "✅ **AUTONOMOUS CRAWL CYCLE COMPLETE**\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"• **Feeds Crawled:** `{sources_crawled}`\n"
+            f"• **New Research Articles Ingested:** `{articles_created}`\n"
+            f"• **Destination:** `research_wiki.db` & Provenance Ledger\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "💡 _All newly ingested entries are indexed in Wikipedia and Project RAG._"
+        )
+        return ToolResult(
+            success=True,
+            tool_name="trigger_autonomous_crawl",
+            tool_class=ToolClass.CLASS_B_ANALYSIS,
+            output_text=msg,
+            data=details,
         )
 
     # -------------------------------------------------------------------------

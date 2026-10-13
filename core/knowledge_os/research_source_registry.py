@@ -46,22 +46,22 @@ DEFAULT_CURATED_SOURCES: list[ResearchFeedSource] = [
         description="Official Federal Reserve monetary policy and FOMC statements.",
     ),
     ResearchFeedSource(
-        feed_id="src_bis_speeches",
-        name="Bank for International Settlements (BIS) Research",
-        url="https://www.bis.org/doclist/rss/speeches.rss",
+        feed_id="src_coindesk",
+        name="CoinDesk Institutional Market & Policy Feed",
+        url="https://www.coindesk.com/arc/outboundfeeds/rss/",
         source_type="RSS_FEED",
-        category="Monetary & Debt",
-        crawl_interval_hours=24,
-        description="Global central bank reserve research and financial stability papers.",
+        category="Market Structure",
+        crawl_interval_hours=6,
+        description="Global digital asset institutional flows, market microstructure, and policy news.",
     ),
     ResearchFeedSource(
-        feed_id="src_imf_news",
-        name="International Monetary Fund (IMF) News",
-        url="https://www.imf.org/en/News/rss",
+        feed_id="src_cointelegraph",
+        name="Cointelegraph Market Intelligence Feed",
+        url="https://cointelegraph.com/rss",
         source_type="RSS_FEED",
-        category="Macro Geopolitics",
-        crawl_interval_hours=24,
-        description="Multilateral macroeconomic outlook and cross-border capital flows.",
+        category="Crypto Liquidity",
+        crawl_interval_hours=6,
+        description="Realtime cryptocurrency market movements, protocol upgrades, and regulatory intelligence.",
     ),
 
     # 2. Institutional Crypto Research & Ethereum Foundation
@@ -182,6 +182,8 @@ class ResearchSourceRegistry:
                         (s.feed_id, s.url, s.name, s.crawl_interval_hours, now_ms, now_ms),
                     )
 
+            # Deactivate legacy obsolete 404 feeds
+            conn.execute("UPDATE research_source_registry SET is_active = 0 WHERE source_id IN ('src_bis_speeches', 'src_imf_news');")
             conn.commit()
 
         if seeded > 0:

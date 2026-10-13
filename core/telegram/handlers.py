@@ -516,6 +516,126 @@ async def handle_wiki(
     return msg
 
 
+async def handle_swarm(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
+    """Returns status and recent proposals of the Mastermind Arbiter Council & Specialist Swarm."""
+    from core.mastermind.mastermind_arbiter import mastermind_arbiter
+    from core.portfolio_shadow import portfolio_shadow
+    from core.telegram_bot import telegram_bot
+
+    accounting = portfolio_shadow.get_portfolio_accounting(starting_capital=mastermind_arbiter.account_equity_usd)
+    current_eq = float(accounting.get("virtual_equity", mastermind_arbiter.account_equity_usd))
+    open_pos = portfolio_shadow.get_open_positions()
+    recent_decisions = mastermind_arbiter.get_recent_decisions(limit=10)
+
+    lines = [
+        "🏛️ **MASTERMIND ARBITER COUNCIL & SPECIALIST SWARM**",
+        "━━━━━━━━━━━━━━━━━━━━━━",
+        "🏆 **League:** `DARWINIAN 1-COIN SPECIALISTS`",
+        f"💰 **Virtual Equity:** `${current_eq:,.2f}` | **Open Positions:** `{len(open_pos)}`",
+        "━━━━━━━━━━━━━━━━━━━━━━",
+        "🤖 **Active Specialists (5 Nodes):**",
+    ]
+
+    for s in mastermind_arbiter.specialists:
+        lines.append(f"• `{s.specialist_id}` ({s.target_symbol}) — _{s.archetype.value}_")
+
+    lines.append("━━━━━━━━━━━━━━━━━━━━━━")
+    lines.append("📋 **Recent Arbiter Decisions (Audit Trail):**")
+
+    if not recent_decisions:
+        lines.append("  _No proposals recorded in database yet._")
+    else:
+        for d in recent_decisions[:5]:
+            status_tag = "✅ APPROVED" if d.get("is_approved") else "❌ REJECTED"
+            dir_str = d.get("direction", "NEUTRAL")
+            ev = d.get("expected_value_r", 0.0)
+            conf = d.get("confidence_score", 0.0) * 100
+            reason = d.get("rejection_reason") or "Cleared all risk & edge hurdles"
+            lines.append(
+                f"• `{d.get('specialist_id')}` [{d.get('symbol')}]: {status_tag} ({dir_str})\n"
+                f"  Net EV: `{ev:.2f}R` | Conf: `{conf:.0f}%`\n"
+                f"  Rationale: _{reason[:80]}_"
+            )
+
+    lines.append("━━━━━━━━━━━━━━━━━━━━━━")
+    lines.append("💡 _Governed strictly by Half-Kelly sizing & Zero-Bypass Risk Primacy._")
+    msg = "\n".join(lines)
+    if chat_id:
+        await telegram_bot.send_message(msg, chat_id=chat_id)
+    return msg
+
+
+async def handle_collector(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
+    """Returns Autonomous Online Data Collector status, active feeds, and Wikipedia stats."""
+    from core.knowledge_os.research_source_registry import research_source_registry
+    from core.knowledge_os.research_wikipedia import research_wikipedia_engine
+    from core.telegram_bot import telegram_bot
+
+    sources = research_source_registry.list_sources()
+    due_sources = research_source_registry.get_sources_due_for_crawl()
+    articles = research_wikipedia_engine.list_articles(limit=5)
+    total_articles = len(research_wikipedia_engine.list_articles(limit=500))
+
+    lines = [
+        "🌐 **AUTONOMOUS ONLINE DATA COLLECTOR**",
+        "━━━━━━━━━━━━━━━━━━━━━━",
+        f"📚 **Research Wikipedia Articles:** `{total_articles}` total entries",
+        f"📡 **Active Intelligence Feeds:** `{len(sources)}` sources (`{len(due_sources)}` due)",
+        "━━━━━━━━━━━━━━━━━━━━━━",
+        "📰 **Registered Intelligence Feeds:**",
+    ]
+
+    for s in sources:
+        items = s.get("total_items_ingested", 0)
+        lines.append(f"• **{s.get('name')}** (`{s.get('source_type')}`)\n  Category: `{s.get('category')}` | Ingested: `{items}` items")
+
+    lines.append("━━━━━━━━━━━━━━━━━━━━━━")
+    if articles:
+        lines.append("📑 **Latest Wikipedia Entries:**")
+        for a in articles[:3]:
+            lines.append(f"• _{a.get('title')[:60]}_ (`{a.get('category')}`)")
+        lines.append("━━━━━━━━━━━━━━━━━━━━━━")
+
+    lines.append("💡 _Use `/crawl` to trigger immediate autonomous collection now._")
+    msg = "\n".join(lines)
+    if chat_id:
+        await telegram_bot.send_message(msg, chat_id=chat_id)
+    return msg
+
+
+async def handle_crawl(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
+    """Triggers an immediate live crawl across all active intelligence feeds."""
+    from core.knowledge_os.research_automation_orchestrator import research_automation_orchestrator
+    from core.telegram_bot import telegram_bot
+
+    if chat_id:
+        await telegram_bot.send_message("🔄 **Autonomous Data Collector activated!** Crawling online feeds...", chat_id=chat_id)
+
+    res = await research_automation_orchestrator.trigger_pipeline("research_feed_crawler")
+    details = res.get("result", {})
+    sources_crawled = details.get("sources_crawled", 0)
+    articles_created = details.get("articles_created", 0)
+
+    msg = (
+        "✅ **AUTONOMOUS CRAWL CYCLE COMPLETE**\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"• **Feeds Processed:** `{sources_crawled}`\n"
+        f"• **New Research Articles Ingested:** `{articles_created}`\n"
+        f"• **Destination:** `research_wiki.db` & Provenance Ledger\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        "💡 _View latest entries using `/wiki` or `/collector`._"
+    )
+    if chat_id:
+        await telegram_bot.send_message(msg, chat_id=chat_id)
+    return msg
+
+
 async def handle_risk(
     args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
 ) -> str:
@@ -1299,6 +1419,30 @@ def register_all_v5_commands() -> None:
             aliases=["/yes", "/approve"],
             argument_schema="[token]",
             risk_level="MEDIUM",
+        ),
+        TelegramCommand(
+            name="/swarm",
+            description="Mastermind Arbiter Council & 5 Specialist Swarm nodes live status",
+            handler=handle_swarm,
+            required_role=TelegramRole.ANALYST,
+            aliases=["/mastermind", "/specialists", "/agents"],
+            argument_schema="",
+        ),
+        TelegramCommand(
+            name="/collector",
+            description="Autonomous Online Data Collector feeds, sources, and Wikipedia status",
+            handler=handle_collector,
+            required_role=TelegramRole.ANALYST,
+            aliases=["/collector_status", "/feeds", "/sources"],
+            argument_schema="",
+        ),
+        TelegramCommand(
+            name="/crawl",
+            description="Trigger immediate autonomous collection across active intelligence feeds",
+            handler=handle_crawl,
+            required_role=TelegramRole.ANALYST,
+            aliases=["/collect", "/fetch_intel"],
+            argument_schema="",
         ),
     ]
 

@@ -258,6 +258,42 @@ class TelegramAgentPlanner:
                 tool_args={"event_name": ev},
             )
 
+        # 11b. Mastermind Arbiter Council & Specialist Swarm
+        if any(w in lower for w in ("সোয়ার্ম", "স্পেশালিস্ট", "ডেডিকেটেড এজেন্ট", "মাস্টারমাইন্ড", "swarm", "specialist", "specialists", "mastermind", "arbiter")):
+            return PlannerDecision(
+                intent="GET_SWARM_STATUS",
+                tool_name="get_mastermind_swarm_status",
+                tool_args={},
+            )
+
+        # 11c. Autonomous Online Data Collector & Crawl Trigger
+        if any(w in lower for w in ("কালেক্টর", "ডাটা কালেক্টর", "collector", "crawler", "feeds", "ফিড")):
+            if any(w in lower for w in ("চালু কর", "চালাও", "করো", "start", "run", "crawl", "trigger")):
+                return PlannerDecision(
+                    intent="TRIGGER_CRAWL",
+                    tool_name="trigger_autonomous_crawl",
+                    tool_args={},
+                )
+            return PlannerDecision(
+                intent="GET_COLLECTOR_STATUS",
+                tool_name="get_autonomous_collector_status",
+                tool_args={},
+            )
+
+        if any(w in lower for w in ("ডাটা কালেক্ট করো", "ক্রল করো", "ক্রল চালাও", "crawl", "collect intel", "fetch intel", "অনলাইন ডাটা আনো")):
+            return PlannerDecision(
+                intent="TRIGGER_CRAWL",
+                tool_name="trigger_autonomous_crawl",
+                tool_args={},
+            )
+
+        if any(w in lower for w in ("অনলাইন ডাটা", "অনলাইন ডেটা")):
+            return PlannerDecision(
+                intent="GET_COLLECTOR_STATUS",
+                tool_name="get_autonomous_collector_status",
+                tool_args={},
+            )
+
         # 12. Unified Project RAG & Evidence Dossier
         if any(w in lower for w in ("ডসিয়ার", "dossier", "প্রজেক্ট নলেজ", "project knowledge", "rag", "এভিডেন্স সামারি", "রিসার্চ রিপোর্ট")):
             q = clean.replace("ডসিয়ার", "").replace("dossier", "").strip()
