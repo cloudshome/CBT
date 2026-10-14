@@ -1185,6 +1185,12 @@ class UniversalIngestor:
         except Exception as e:  # noqa: BLE001
             logger.debug(f"Post-ingestion epistemic graph hook error (non-fatal): {e}")
 
+        try:
+            from core.knowledge_os.research_vault_sync import export_to_git_vault
+            export_to_git_vault()
+        except Exception as e:
+            logger.debug(f"Post-ingestion vault export error: {e}")
+
         return article, real_life_summary
 
 

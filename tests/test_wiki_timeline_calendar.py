@@ -55,3 +55,4 @@ def test_wiki_file_download_safety(client):
     # Non-existent file
     response = client.get("/api/knowledge/wiki/files/non_existent_paper_9999.pdf")
     assert response.status_code == 404
+

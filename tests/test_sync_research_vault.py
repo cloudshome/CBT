@@ -123,3 +123,4 @@ def test_import_bundle_into_fresh_environment(sandbox_env, monkeypatch):
     # Check database rows
     count = get_sqlite_table_count(second_wiki, "wiki_articles")
     assert count == 1
+

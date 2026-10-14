@@ -95,6 +95,7 @@ class ResearchWikipediaEngine:
         self.articles_dir.mkdir(parents=True, exist_ok=True)
         self._init_db()
         self._ensure_seed_articles()
+        self._auto_rehydrate_vault()
 
     def _get_connection(self) -> sqlite3.Connection:
         conn = sqlite3.connect(str(self.db_path), timeout=10.0, check_same_thread=False)
@@ -545,6 +546,23 @@ class ResearchWikipediaEngine:
         md_file = self.articles_dir / f"{article.article_id}.md"
         md_file.write_text(article.full_markdown_content, encoding="utf-8")
         logger.info(f"Saved Research Wikipedia article: {article.article_id} (v{next_version}) -> {md_file}")
+        self._export_vault()
+
+    def _auto_rehydrate_vault(self) -> None:
+        """Seamlessly rehydrates SQLite from Git-synced data/research/vault/ on startup."""
+        try:
+            from core.knowledge_os.research_vault_sync import auto_rehydrate_from_git_vault
+            auto_rehydrate_from_git_vault(wiki_db_path=self.db_path, articles_dir=self.articles_dir)
+        except Exception as e:
+            logger.debug(f"Vault rehydration skipped: {e}")
+
+    def _export_vault(self) -> None:
+        """Mirrors local research knowledge into data/research/vault/ for effortless git sync."""
+        try:
+            from core.knowledge_os.research_vault_sync import export_to_git_vault
+            export_to_git_vault(wiki_db_path=self.db_path, articles_dir=self.articles_dir)
+        except Exception as e:
+            logger.debug(f"Vault export skipped: {e}")
 
     def get_article_versions(self, article_id: str) -> list[dict[str, Any]]:
         """Returns chronological version history for an article."""

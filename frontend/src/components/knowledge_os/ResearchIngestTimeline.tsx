@@ -340,3 +340,4 @@ export const ResearchIngestTimeline: React.FC<ResearchIngestTimelineProps> = ({
     </div>
   );
 };
+
