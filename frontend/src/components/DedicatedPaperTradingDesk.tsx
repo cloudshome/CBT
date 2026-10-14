@@ -201,9 +201,12 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
                 <h1 className="text-lg font-mono font-bold text-white tracking-wide">
                   SHADOW PAPER TRADING DESK
                 </h1>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-mono border border-emerald-500/30 font-bold flex items-center gap-1">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-mono border border-emerald-500/30 font-bold flex items-center gap-1" title="Governed by CentralTradingMind 6 Constitutional Invariants">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  STATE MIND ACTIVE
+                  CENTRAL MIND GOVERNED
+                </span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 font-mono border border-sky-500/30 font-bold hidden sm:flex items-center gap-1" title="Single trade max risk capped at 1.5% virtual equity">
+                  HALF-KELLY (1.5% CAP)
                 </span>
               </div>
               <p className="text-xs text-slate-400 font-mono">

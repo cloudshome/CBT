@@ -72,12 +72,12 @@ class PortfolioShadowManager:
         stop_loss: float,
         take_profit: float,
         entry_reason: str | None = None,
-        enforce_atomic_limits: bool = False,
+        enforce_atomic_limits: bool = True,
         max_open_limit: int | None = None,
         max_risk_usd: float | None = None,
-        prevent_duplicate_symbol: bool = False,
+        prevent_duplicate_symbol: bool = True,
         style_tag: str | None = None,
-        allow_multi_style: bool = False,
+        allow_multi_style: bool = True,
     ) -> str:
         self._ensure_columns_exist()
         now = int(time.time() * 1000)

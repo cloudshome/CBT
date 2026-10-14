@@ -582,8 +582,64 @@ async def place_paper_trade(order: PaperTradeRequest):
             enforce_atomic_limits=True,
             max_open_limit=int(os.getenv("MAX_PAPER_OPEN_POSITIONS", "3")),
             max_risk_usd=balance * max_risk_pct,
+            prevent_duplicate_symbol=True,
+            allow_multi_style=True,
         )
+
+        # Record approved execution into Central Mind immutable decision ledger
+        try:
+            import uuid
+            from core.central_mind import central_mind, CentralMindVerdict
+            now_ms = int(time.time() * 1000)
+            trade_risk = round(float(order.size or 1.0) * abs(float(order.entryPrice) - float(order.sl)), 2)
+            v = CentralMindVerdict(
+                verdict_id=f"V_{uuid.uuid4().hex[:10].upper()}",
+                proposal_id=f"PROP_{uuid.uuid4().hex[:10].upper()}",
+                origin="MANUAL_UI",
+                symbol=order.symbol,
+                direction=direction,
+                style="DAY",
+                is_approved=True,
+                rejection_reason=None,
+                approved_size=order.size or 1.0,
+                approved_entry_price=order.entryPrice,
+                approved_stop_loss=order.sl,
+                approved_take_profit=order.tp,
+                risk_usd=trade_risk,
+                risk_pct_equity=round((trade_risk / balance) * 100.0, 2),
+                executed_position_id=pos_id,
+                timestamp_ms=now_ms,
+            )
+            central_mind._persist_verdict(v)
+        except Exception as cm_err:
+            logger.debug(f"Central Mind audit logging note: {cm_err}")
     except ValueError as e:
+        # Also log rejection if from risk gate
+        try:
+            import uuid
+            from core.central_mind import central_mind, CentralMindVerdict
+            now_ms = int(time.time() * 1000)
+            v = CentralMindVerdict(
+                verdict_id=f"V_{uuid.uuid4().hex[:10].upper()}",
+                proposal_id=f"PROP_{uuid.uuid4().hex[:10].upper()}",
+                origin="MANUAL_UI",
+                symbol=order.symbol,
+                direction=direction,
+                style="DAY",
+                is_approved=False,
+                rejection_reason=str(e),
+                approved_size=0.0,
+                approved_entry_price=order.entryPrice,
+                approved_stop_loss=order.sl,
+                approved_take_profit=order.tp,
+                risk_usd=0.0,
+                risk_pct_equity=0.0,
+                executed_position_id=None,
+                timestamp_ms=now_ms,
+            )
+            central_mind._persist_verdict(v)
+        except Exception:
+            pass
         raise HTTPException(status_code=422, detail=str(e))
     return {
         "message": "Simulated order filled successfully",
