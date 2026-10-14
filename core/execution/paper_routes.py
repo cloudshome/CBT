@@ -645,3 +645,11 @@ async def close_paper_trade(req: PaperCloseRequest):
     if not success:
         raise HTTPException(status_code=404, detail=f"Position {eff_id} not found or already closed.")
     return {"status": "SUCCESS", "message": f"Position {eff_id} closed."}
+
+
+@paper_router.get("/api/central-mind/status")
+async def get_central_mind_status():
+    """Returns real-time governance and supervisory status of the Central Trading Mind."""
+    from core.central_mind import central_mind
+    return central_mind.get_system_governance_report()
+
