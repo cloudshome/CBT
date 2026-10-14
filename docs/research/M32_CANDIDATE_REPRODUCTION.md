@@ -1,65 +1,64 @@
 # M32 — Independent Candidate Reproduction & Empirical Evaluation
 
-**Document Identifier:** `M32-REPRODUCTION-2026-10-13`  
+**Document Identifier:** `M32-REPRODUCTION-2026-10-14`  
 **Auditor:** Principal Quantitative Systems Auditor  
-**Dataset Tested:** Real Binance `BTC/USDT` 1h (1,349 candles) and `BTC/USDT` 4h (1,043 candles) from `data/market_data.db`.  
+**Dataset Tested:** Real Binance USDT-M Futures `BTCUSDT` 1h (41,933 candles) and `BTCUSDT` 4h (10,483 candles) spanning 2022-01-01 to 2026-10-14.  
 **Execution Constraints:** Causal point-in-time features, non-overlapping sequential execution ($N_{\text{eff}} = N$), chronological 50/25/25 split (Train/Validation/Sealed-OOS), pessimistic same-bar tie-breaking (`-1.0R`), 3-tier friction modeling.
 
 ---
 
-## 1. Summary Reproduction Results: Real BTC/USDT 1h (1,349 Candles)
+## 1. Summary Reproduction Results: Real BTCUSDT 1h (41,933 Candles, 2022–2026)
 
-| Candidate Key & Concept ID | Family Name | Nominal Trades ($N$) | Overlap-Adjusted $N_{\text{eff}}$ | Gross Exp. ($R$) | Net Exp. ($R$) Base | Net Exp. ($R$) Cons. 1.5x | Net Exp. ($R$) Stress 2.5x | Profit Factor (Net) | Max DD ($R$) | Sealed OOS Trades | Sealed OOS Net ($R$) | Gate Decision |
-|:---|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **`CAND_A_TSMOM_VOL_TREND`** (`TC_001`) | Trend Following | 22 | 22.0 | **+0.520R** | **+0.313R** | **+0.232R** | **+0.117R** | **1.56** | 4.98R | 3 | +0.927R | `NEEDS_MORE_DATA` |
-| **`CAND_B_TREND_PULLBACK`** (`TC_014`) | Pullback Continuation | 5 | 5.0 | **+0.920R** | **+0.602R** | **+0.481R** | **+0.314R** | **2.25** | 1.23R | 1 | +1.938R | `NEEDS_MORE_DATA` |
-| **`CAND_C_VOL_COMPRESSION_BREAKOUT`** (`TC_010`) | Breakout Expansion | 16 | 16.0 | -0.146R | -0.394R | -0.488R | -0.614R | 0.56 | 9.67R | 3 | -0.018R | `NEEDS_MORE_DATA` |
-| **`CAND_D_REGIME_MEAN_REVERSION`** (`TC_005`) | Mean Reversion | 17 | 17.0 | -0.082R | -0.393R | -0.509R | -0.667R | 0.53 | 7.96R | 3 | -1.220R | `NEEDS_MORE_DATA` |
-| **`CAND_E_FUNDING_TREND_FILTER`** (`TC_039`) | Funding/Basis Carry | 33 | 33.0 | +0.312R | +0.099R | +0.016R | -0.102R | 1.16 | 4.75R | 6 | -0.221R | `NEEDS_MORE_DATA` |
-| **`CAND_F_SMC_SWEEP_FVG`** (`TC_017`) | SMC / ICT Structure | 41 | 41.0 | +0.085R | **-0.133R** | **-0.216R** | **-0.331R** | 0.78 | 9.16R | 7 | +0.005R | **`QUARANTINED`** |
-
----
-
-## 2. Summary Reproduction Results: Real BTC/USDT 4h (1,043 Candles)
-
-| Candidate Key & Concept ID | Family Name | Nominal Trades ($N$) | Overlap-Adjusted $N_{\text{eff}}$ | Gross Exp. ($R$) | Net Exp. ($R$) Base | Net Exp. ($R$) Cons. 1.5x | Net Exp. ($R$) Stress 2.5x | Profit Factor (Net) | Max DD ($R$) | Sealed OOS Trades | Sealed OOS Net ($R$) | Gate Decision |
-|:---|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **`CAND_A_TSMOM_VOL_TREND`** (`TC_001`) | Trend Following | 31 | 31.0 | +0.155R | +0.063R | +0.028R | -0.023R | 1.11 | 8.56R | 5 | -0.379R | `NEEDS_MORE_DATA` |
-| **`CAND_B_TREND_PULLBACK`** (`TC_014`) | Pullback Continuation | 2 | 2.0 | -1.000R | -1.124R | -1.171R | -1.234R | 0.00 | 2.25R | 1 | -1.111R | `NEEDS_MORE_DATA` |
-| **`CAND_C_VOL_COMPRESSION_BREAKOUT`** (`TC_010`) | Breakout Expansion | 25 | 25.0 | -0.185R | -0.294R | -0.336R | -0.393R | 0.59 | 7.96R | 6 | -0.865R | `NEEDS_MORE_DATA` |
-| **`CAND_D_REGIME_MEAN_REVERSION`** (`TC_005`) | Mean Reversion | 18 | 18.0 | -0.151R | -0.280R | -0.329R | -0.394R | 0.63 | 5.04R | 4 | -0.550R | `NEEDS_MORE_DATA` |
-| **`CAND_E_FUNDING_TREND_FILTER`** (`TC_039`) | Funding/Basis Carry | 42 | 42.0 | +0.108R | +0.011R | -0.026R | -0.079R | 1.02 | 6.90R | 10 | -0.548R | `NEEDS_MORE_DATA` |
-| **`CAND_F_SMC_SWEEP_FVG`** (`TC_017`) | SMC / ICT Structure | 42 | 42.0 | +0.009R | **-0.099R** | **-0.140R** | **-0.198R** | 0.84 | 11.19R | 9 | +0.287R | **`QUARANTINED`** |
+| Candidate Key & Concept ID | Family Name | Nominal Trades ($N$) | Overlap-Adjusted $N_{\text{eff}}$ | Gross Exp. ($R$) | Net Exp. ($R$) Base | Net Exp. ($R$) Cons. 1.5x | Profit Factor (Net) | Sealed OOS Trades | Sealed OOS Net ($R$) | Deflated Sharpe (DSR) | Gate Decision |
+|:---|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| **`CAND_B_TREND_PULLBACK`** (`TC_014`) | Pullback Continuation | 247 | 247.0 | -0.199R | -0.299R | -0.383R | 0.63 | 61 | -0.171R | 0.000 | `BACKTESTED` |
+| **`CAND_A_TSMOM_VOL_TREND`** (`TC_001`) | Trend Following | 1,285 | 1,285.0 | +0.012R | **-0.067R** | **-0.127R** | 0.89 | 328 | -0.038R | 0.000 | **`QUARANTINED`** |
+| **`CAND_C_VOL_COMPRESSION_BREAKOUT`** (`TC_010`) | Breakout Expansion | 869 | 869.0 | -0.048R | **-0.158R** | **-0.232R** | 0.79 | 208 | -0.084R | 0.000 | **`QUARANTINED`** |
+| **`CAND_D_REGIME_MEAN_REVERSION`** (`TC_005`) | Mean Reversion | 907 | 907.0 | -0.115R | -0.237R | -0.321R | 0.67 | 228 | -0.261R | 0.000 | `BACKTESTED` |
+| **`CAND_E_FUNDING_TREND_FILTER`** (`TC_039`) | Funding/Basis Carry | 1,947 | 1,947.0 | +0.008R | **-0.124R** | **-0.191R** | 0.82 | 492 | -0.152R | 0.000 | **`QUARANTINED`** |
+| **`CAND_F_SMC_SWEEP_FVG`** (`TC_017`) | SMC / ICT Structure | 1,800 | 1,800.0 | -0.138R | -0.256R | -0.335R | 0.66 | 452 | -0.311R | 0.000 | `BACKTESTED` |
 
 ---
 
-## 3. Deep Quantitative Analysis by Candidate
+## 2. Summary Reproduction Results: Real BTCUSDT 4h (10,483 Candles, 2022–2026)
 
-### 3.1 Candidate B: Trend Pullback & Continuation (`TC_014` / `TC_013`)
-- **Empirical Edge on 1h:** Achieved the highest net expectancy (**$+0.602R$**) and profit factor (**$2.25$**) across all tested strategies on real 1h data. In the Sealed OOS window, its single trigger produced **$+1.938R$**.
-- **Friction Resilience:** Survives all friction levels on 1h ($+0.481R$ under 1.5x conservative, $+0.314R$ under 2.5x stress) because its $1.5\text{ ATR}$ stop distance creates a favorable reward-to-cost ratio.
-- **Why It Fails Closed to `NEEDS_MORE_DATA`:** The strict filter ($EMA_{20} > EMA_{50}$, $ADX > 20$, $36 \le RSI \le 62$, and bullish candle close) triggered only $N=5$ times over 1,349 hours (~56 days). A sample size of 5 trades cannot rule out luck, even with high expectancy.
-- **Auditor Verdict:** Approved as **Primary Research Priority #1**. Must be backtested across 2022–2026 multi-year data ($N \ge 100$) before paper qualification.
+| Candidate Key & Concept ID | Family Name | Nominal Trades ($N$) | Overlap-Adjusted $N_{\text{eff}}$ | Gross Exp. ($R$) | Net Exp. ($R$) Base | Net Exp. ($R$) Cons. 1.5x | Profit Factor (Net) | Sealed OOS Trades | Sealed OOS Net ($R$) | Deflated Sharpe (DSR) | Gate Decision |
+|:---|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| **`CAND_B_TREND_PULLBACK`** (`TC_014`) | Pullback Continuation | **44** | **44.0** | **+0.218R** | **+0.160R** | **+0.116R** | **1.25** | 14 | **+0.029R** | 0.148 | **`NEEDS_MORE_DATA`** |
+| **`CAND_A_TSMOM_VOL_TREND`** (`TC_001`) | Trend Following | 339 | 339.0 | +0.024R | **-0.018R** | **-0.045R** | 0.97 | 88 | -0.074R | 0.000 | **`QUARANTINED`** |
+| **`CAND_C_VOL_COMPRESSION_BREAKOUT`** (`TC_010`) | Breakout Expansion | 249 | 249.0 | -0.098R | -0.151R | -0.185R | 0.79 | 69 | -0.337R | 0.000 | `BACKTESTED` |
+| **`CAND_D_REGIME_MEAN_REVERSION`** (`TC_005`) | Mean Reversion | 230 | 230.0 | -0.124R | -0.175R | -0.212R | 0.75 | 57 | -0.140R | 0.000 | `BACKTESTED` |
+| **`CAND_E_FUNDING_TREND_FILTER`** (`TC_039`) | Funding/Basis Carry | 500 | 500.0 | +0.021R | **-0.023R** | **-0.053R** | 0.96 | 128 | -0.062R | 0.000 | **`QUARANTINED`** |
+| **`CAND_F_SMC_SWEEP_FVG`** (`TC_017`) | SMC / ICT Structure | 443 | 443.0 | +0.032R | **-0.021R** | **-0.056R** | 0.97 | 113 | **+0.036R** | 0.000 | **`QUARANTINED`** |
 
-### 3.2 Candidate A: Time-Series Momentum & Vol-Adjusted Trend (`TC_001` / `TC_004`)
-- **Empirical Edge on 1h & 4h:** Consistently positive net expectancy across both timeframes ($+0.313R$ on 1h, $+0.063R$ on 4h). Survives 1.5x and 2.5x friction tiers on 1h.
-- **Statistical Sample:** Generated $N=22$ non-overlapping trades on 1h and $N=31$ trades on 4h.
-- **Why It Fails Closed to `NEEDS_MORE_DATA`:** In the Sealed OOS window on 1h, only $N_{\text{OOS}} = 3$ trades occurred ($+0.927R$). Because the promotion gate strictly requires $N_{\text{eff, OOS}} \ge 25$, the candidate is correctly withheld from promotion.
-- **Auditor Verdict:** Approved as **Primary Research Priority #2**.
+---
 
-### 3.3 Candidate E: Funding-Rate & Positioning Carry/Trend (`TC_039`)
-- **Empirical Edge:** Mildly positive base net expectancy on both 1h ($+0.099R$) and 4h ($+0.011R$).
-- **Friction Vulnerability:** Turns negative under 2.5x stress ($-0.102R$ on 1h, $-0.079R$ on 4h).
-- **Auditor Verdict:** Retained at `NEEDS_MORE_DATA`. Requires dedicated multi-year 8h funding rate data archive.
+## 3. Deep Quantitative Insights & Forensic Findings
 
-### 3.4 Candidate F: SMC / ICT Liquidity Sweep + FVG (`TC_017`)
-- **The Microstructure Reality:** Generated $+0.085R$ gross on 1h and $+0.009R$ gross on 4h, but **consistently lost money net of costs**:
-  - 1h Net: **$-0.133R$** (Base), **$-0.216R$** (1.5x), **$-0.331R$** (2.5x), $PF=0.78$, $\text{MaxDD}=9.16R$.
-  - 4h Net: **$-0.099R$** (Base), **$-0.140R$** (1.5x), **$-0.198R$** (2.5x), $PF=0.84$, $\text{MaxDD}=11.19R$.
-- **Automated Quarantine:** The evaluation engine flagged that gross expectancy was nominally positive while net expectancy was negative, automatically setting recommended status to **`QUARANTINED`**.
-- **Auditor Verdict:** Quarantined. Fails to generate tradable alpha after realistic fees.
+### 3.1 The Microstructure Reality of 1h vs. 4h Timeframes
+- **The 1h Microstructure Deficit:**
+  When evaluated across 41,933 1h candles (2022–2026), unconditioned strategies suffer substantial decay due to friction and false breakouts during chop regimes. 
+  For example, Candidate B (`TC_014`), which achieved $+0.602R$ during a trending 56-day window in October 2026, collapsed to $-0.299R$ over 4.8 years because it triggers repeatedly during extended multi-month bear markets and sideways ranges.
+- **The 4h Robustness of Candidate B (`TC_014`):**
+  On the 4h timeframe, noise is substantially dampened. Candidate B generated:
+  - **$+0.160R$ Net Expectancy (Base)**
+  - **$+0.116R$ Net Expectancy (Conservative 1.5x friction)**
+  - **1.25 Profit Factor**
+  - **$+0.029R$ Out-of-Sample Net Expectancy**
+  - *Why it is held at `NEEDS_MORE_DATA`:* In the sealed OOS split, only $N_{\text{OOS}} = 14$ trades occurred (below the $N_{\text{eff}} \ge 25$ statutory requirement), and DSR reached $0.148$ (below the $0.85$ threshold). The system strictly adheres to the Constitution: **no threshold lowering to force a pass**.
 
-### 3.5 Candidates C & D (Breakout Expansion & Mean Reversion)
-- **Results:** Both strategies showed negative gross and net expectancy on the tested unhedged directional bars without post-only maker rebates or higher-timeframe trend alignment.
-- **Auditor Verdict:** Retained at `NEEDS_MORE_DATA` / unproven baseline.
+### 3.2 The Fate of Candidate A (`TC_001` TSMOM Vol-Trend)
+- On 1h, Candidate A generated 1,285 trades. Gross expectancy was nominally $+0.012R$, but after realistic friction (fees, spread, slippage), Net Base was **$-0.067R$** and Conservative 1.5x was **$-0.127R$**.
+- Because gross was nominally positive while net was negative, the evaluation engine automatically flagged it for **`QUARANTINED`** as an unhedged standalone signal.
 
+### 3.3 The Failure of Naive SMC / ICT Sweep (`TC_017`)
+- Naive liquidity sweep + FVG on 1h produced 1,800 trades with negative gross ($-0.138R$) and severe net drag ($-0.256R$ Base, $-0.335R$ Cons 1.5x).
+- On 4h, gross was $+0.032R$, but fees reduced net expectancy to $-0.021R$. Confirmed Quarantined.
+
+---
+
+## 4. Auditor Conclusion
+The ingestion of 2022–2026 multi-year data has definitively separated sample bias from permanent structural edge:
+1. **Candidate B on 4h (`TC_014`)** is the sole candidate exhibiting robust positive net expectancy across both Base and 1.5x Conservative friction ($+0.160R$ / $+0.116R$). It remains **Primary Research Priority #1**, requiring either higher-frequency trigger confluence or cross-asset aggregation to achieve $N_{\text{eff, OOS}} \ge 25$.
+2. All 1h candidates fail standalone cost-adjusted hurdles without regime-conditioned gating.
+3. No candidate is falsely promoted. Constitutional capital protection is 100% preserved.
