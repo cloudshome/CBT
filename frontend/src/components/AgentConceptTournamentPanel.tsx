@@ -70,7 +70,7 @@ export const AgentConceptTournamentPanel: React.FC = () => {
     try {
       await paperApi.triggerArenaTournament({
         bars_count: 350,
-        deploy_to_paper: true,
+        deploy_to_paper: false,
         symbol: 'BTC/USDT',
       });
       await fetchLeaderboard();

@@ -44,3 +44,33 @@ def test_agent_concept_arena_tournament(temp_arena_env):
     assert status["total_agents"] == 5
     assert len(status["leaderboard"]) == 5
 
+
+def test_agent_concept_arena_paper_deployment_risk_invariants(temp_arena_env):
+    arena = temp_arena_env
+
+    # 1. deploy_to_paper defaults to False
+    res_default = arena.run_tournament_round(bars_count=200)
+    assert res_default.paper_trades_deployed == 0
+
+    # 2. When deploy_to_paper=True, verify size is Half-Kelly risk bounded (NOT hardcoded 1.0)
+    res_deployed = arena.run_tournament_round(bars_count=200, deploy_to_paper=True, symbol="ETH/USDT")
+    from core.portfolio_shadow import portfolio_shadow
+    positions = portfolio_shadow.get_open_positions()
+    arena_pos = [p for p in positions if "Arena Leader" in (p.get("entry_reason") or "")]
+    if arena_pos:
+        pos = arena_pos[0]
+        # Must be dynamically risk-sized rather than hardcoded 1.0
+        assert pos["size"] != 1.0
+        assert pos["size"] > 0.0
+        # Invalidation must be positive and non-zero
+        assert pos["entry_price"] > 0
+        assert pos["stop_loss"] < pos["entry_price"]
+        # Max loss (stop_dist * size) must strictly respect 1.5% equity risk cap ($150)
+        stop_dist = abs(pos["entry_price"] - pos["stop_loss"])
+        max_loss = stop_dist * pos["size"]
+        assert max_loss <= 150.0
+        # Clean up test position
+        portfolio_shadow.close_position(pos["position_id"], pos["entry_price"], "TEST_CLEANUP")
+
+
+

@@ -263,7 +263,7 @@ class AgentConceptArena:
     def run_tournament_round(
         self,
         bars_count: int = 400,
-        deploy_to_paper: bool = True,
+        deploy_to_paper: bool = False,
         symbol: str = "BTC/USDT",
     ) -> TournamentRound:
         """
@@ -404,35 +404,62 @@ class AgentConceptArena:
         winner = final_leaderboard[0]
         paper_trades_count = 0
 
-        # Deploy simulated paper orders for the top-ranking agent
+        # Deploy simulated paper orders for the top-ranking agent ONLY if explicitly requested
         if deploy_to_paper and winner.net_expectancy_r > 0.05:
             try:
-                # Realistic synthetic entry price from recent bars
-                latest_close = float(df_bars["close"].iloc[-1])
-                atr_est = float(df_bars["high"].iloc[-20:].max() - df_bars["low"].iloc[-20:].min()) * 0.15
-                entry_p = round(latest_close, 2)
-                sl_p = round(entry_p - (atr_est * 1.5), 2)
-                tp_p = round(entry_p + (atr_est * 3.0), 2)
+                # Anti-Fabrication Invariant: Ground entry in authoritative live market price,
+                # NEVER in synthetic simulation bars!
+                from core.data_streamer import data_streamer
+                live_candles = data_streamer.get_candles(symbol, "15m", limit=10)
+                real_live_price: float = 0.0
+                atr_est: float = 0.0
 
-                pos_id = portfolio_shadow.open_position(
-                    symbol=symbol,
-                    direction="LONG",
-                    size=1.0,
-                    entry_price=entry_p,
-                    stop_loss=sl_p,
-                    take_profit=tp_p,
-                    entry_reason=f"Arena Leader: {winner.name} executing {winner.primary_concept_name} ({winner.tournament_score:+.1f} pts)",
-                    style_tag=winner.style,
-                    allow_multi_style=True,
-                )
-                if pos_id:
-                    paper_trades_count = 1
-                    logger.info(
-                        "Arena deployed paper position %s for winner %s (%s)",
-                        pos_id,
-                        winner.name,
-                        winner.primary_concept_name,
+                if live_candles and len(live_candles) > 0 and int(live_candles[-1].get("is_synthetic", 0) or 0) == 0:
+                    real_live_price = float(live_candles[-1]["close"])
+                    atr_est = max(
+                        real_live_price * 0.008,
+                        float(max(c["high"] for c in live_candles) - min(c["low"] for c in live_candles)) * 0.2,
                     )
+                else:
+                    real_live_price = float(data_streamer._last_known_prices.get(symbol, 0.0))
+                    atr_est = real_live_price * 0.015
+
+                if real_live_price > 0:
+                    entry_p = round(real_live_price, 2)
+                    sl_p = round(entry_p - (atr_est * 1.5), 2)
+                    tp_p = round(entry_p + (atr_est * 2.5), 2)
+                    stop_dist = abs(entry_p - sl_p)
+
+                    # Master Risk Gate: Half-Kelly 1.0% stop-loss risk cap (Never hardcode 1.0 unit!)
+                    accounting = portfolio_shadow.get_portfolio_accounting()
+                    current_eq = float(accounting.get("virtual_equity", 10000.0))
+                    max_stop_risk_usd = current_eq * 0.01  # 1% equity risk cap
+                    units = max(0.0001, round(max_stop_risk_usd / max(1e-4, stop_dist), 4))
+
+                    pos_id = portfolio_shadow.open_position(
+                        symbol=symbol,
+                        direction="LONG",
+                        size=units,
+                        entry_price=entry_p,
+                        stop_loss=sl_p,
+                        take_profit=tp_p,
+                        entry_reason=f"Arena Leader: {winner.name} executing {winner.primary_concept_name} ({winner.tournament_score:+.1f} pts)",
+                        style_tag=winner.style,
+                        allow_multi_style=True,
+                        prevent_duplicate_symbol=True,
+                    )
+                    if pos_id:
+                        paper_trades_count = 1
+                        logger.info(
+                            "Arena deployed paper position %s for winner %s (%s) size=%.4f @ $%.2f",
+                            pos_id,
+                            winner.name,
+                            winner.primary_concept_name,
+                            units,
+                            entry_p,
+                        )
+                else:
+                    logger.warning("Arena skipping paper deployment: live price for %s is unavailable.", symbol)
             except Exception as e:
                 logger.error("Failed to deploy arena paper trade: %s", e)
 

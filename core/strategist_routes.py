@@ -300,7 +300,7 @@ async def get_agent_arena_leaderboard() -> dict[str, Any]:
 @strategist_router.post("/arena/tournament-round")
 async def trigger_arena_tournament_round(
     bars_count: int = Query(default=350, ge=100, le=2000),
-    deploy_to_paper: bool = Query(default=True),
+    deploy_to_paper: bool = Query(default=False),
     symbol: str = Query(default="BTC/USDT"),
 ) -> dict[str, Any]:
     """Triggers an empirical competitive tournament round across the 5 specialized agent personas."""
