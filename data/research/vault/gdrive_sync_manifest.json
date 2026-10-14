@@ -1,0 +1,31 @@
+{
+  "version": "1.0.0",
+  "updated_at": "2026-10-14T08:58:30.801900+00:00",
+  "target_account": "ypelectronics11@gmail.com",
+  "total_files": 2,
+  "total_bytes": 120482422,
+  "files": {
+    "data/uploads/0b08033e900f42ddbb3179c31c3374fb.pdf": {
+      "rel_path": "data/uploads/0b08033e900f42ddbb3179c31c3374fb.pdf",
+      "file_name": "0b08033e900f42ddbb3179c31c3374fb.pdf",
+      "file_size": 60241211,
+      "content_hash": "8c98171343f283915b8389c19aaa616ea1185f9d9cbca203fb235c7700a1b82a",
+      "drive_file_id": "gdrive_sim_8c98171343f28391",
+      "drive_folder": "SKY/01_RAW_SOURCES/PDF",
+      "synced_at": "2026-10-14T08:58:29.564608+00:00",
+      "is_live_drive": false,
+      "mime_type": "application/pdf"
+    },
+    "data/uploads/98703a3c10584fadade31763b06ba863.pdf": {
+      "rel_path": "data/uploads/98703a3c10584fadade31763b06ba863.pdf",
+      "file_name": "98703a3c10584fadade31763b06ba863.pdf",
+      "file_size": 60241211,
+      "content_hash": "8c98171343f283915b8389c19aaa616ea1185f9d9cbca203fb235c7700a1b82a",
+      "drive_file_id": "gdrive_sim_8c98171343f28391",
+      "drive_folder": "SKY/01_RAW_SOURCES/PDF",
+      "synced_at": "2026-10-14T08:58:30.801515+00:00",
+      "is_live_drive": false,
+      "mime_type": "application/pdf"
+    }
+  }
+}

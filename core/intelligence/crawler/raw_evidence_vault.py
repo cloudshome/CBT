@@ -233,3 +233,20 @@ class RawEvidenceVault:
             )
             ids = [r[0] for r in cursor.fetchall()]
         return [self.get_evidence(eid) for eid in ids if eid]
+
+    def get_by_source(self, source_id: str, limit: int = 50) -> list[RawEvidenceRecord]:
+        """Returns raw evidence records from a specific source ordered by observation time."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT evidence_id FROM raw_evidence_records
+                WHERE source_id = ?
+                ORDER BY observed_at_utc DESC
+                LIMIT ?;
+                """,
+                (source_id, limit),
+            )
+            ids = [r[0] for r in cursor.fetchall()]
+        return [self.get_evidence(eid) for eid in ids if eid]
+

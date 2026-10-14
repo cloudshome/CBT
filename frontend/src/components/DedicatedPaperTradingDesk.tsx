@@ -12,11 +12,13 @@ import {
   Crosshair,
   BarChart3,
   X,
-  ShieldAlert,
   Bot,
+  Trophy,
+  ShieldAlert,
 } from 'lucide-react';
 import { PaperDeskOverviewResponse, HalfKellySizingResponse } from '../types';
 import { api } from '../services/api';
+import { AgentConceptTournamentPanel } from './AgentConceptTournamentPanel';
 
 interface DedicatedPaperTradingDeskProps {
   onClosePosition: (positionId: string) => Promise<void>;
@@ -37,7 +39,7 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
   void onDeploySetupToPaper;
   const [data, setData] = useState<PaperDeskOverviewResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<'ALL' | 'CURRENT' | 'PAST' | 'FUTURE'>('ALL');
+  const [activeTab, setActiveTab] = useState<'ALL' | 'ARENA' | 'CURRENT' | 'PAST' | 'FUTURE'>('ALL');
   const [closingId, setClosingId] = useState<string | null>(null);
   const [deployingQueueId, setDeployingQueueId] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
@@ -322,6 +324,17 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
           <span>All-in-One Dashboard</span>
         </button>
         <button
+          onClick={() => setActiveTab('ARENA')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold transition-all ${
+            activeTab === 'ARENA'
+              ? 'bg-amber-500 text-slate-950 shadow-md font-bold'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Trophy className="w-4 h-4 text-amber-400" />
+          <span>Agent Concept Arena (60+ Concepts)</span>
+        </button>
+        <button
           onClick={() => setActiveTab('CURRENT')}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold transition-all ${
             activeTab === 'CURRENT'
@@ -355,6 +368,13 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
           <span>Future Trade Plans &amp; Setup Queue ({futureQueue.length})</span>
         </button>
       </div>
+
+      {/* ========================================================================= */}
+      {/* AGENT CONCEPT TOURNAMENT ARENA */}
+      {/* ========================================================================= */}
+      {(activeTab === 'ALL' || activeTab === 'ARENA') && (
+        <AgentConceptTournamentPanel />
+      )}
 
       {/* ========================================================================= */}
       {/* 1. CURRENT ACTIVE POSITIONS SECTION */}

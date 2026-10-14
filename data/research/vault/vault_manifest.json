@@ -1,8 +1,8 @@
 {
   "version": "1.0",
-  "updated_at": 1791966981687,
+  "updated_at": 1791968669837,
   "stats": {
-    "articles_count": 67,
+    "articles_count": 68,
     "sources_count": 4,
     "claims_count": 0
   },
@@ -1279,6 +1279,25 @@
       "verification_score": 87.0,
       "created_at": 1791955244279,
       "updated_at": 1791955244279
+    },
+    {
+      "article_id": "ART-CRAWL-EVENT_MACRO_",
+      "title": "FRB: Press Release - All Releases",
+      "category": "MACRO_REGIME",
+      "source_url": "https://www.federalreserve.gov/feeds/press_all.xml",
+      "source_type": "AUTONOMOUS_CRAWLER",
+      "provenance_id": "EVENT_MACRO_RATE_DECISION_20261014_FEDERAL_RESERVE_FOMC_DECISION",
+      "author_or_speaker": "FEDERAL_RESERVE",
+      "executive_summary": "Autonomously harvested from FEDERAL_RESERVE via src_macro_fed_bls.",
+      "key_claims_json": "[{\"claim_id\": \"CLM-DECISION\", \"speaker_claim\": \"Autonomous Crawler harvested FRB: Press Release - All Releases. Entities affected: BTC, ETH, SOL.\", \"epistemic_status\": \"[HYPOTHESIS] UNVERIFIED\", \"cross_verification_evidence\": \"Pending empirical backtest falsification against Binance historical perp candles.\", \"confidence_score\": 0.75, \"empirical_dataset_reference\": \"data/binance_historical/\"}]",
+      "wikilinks_json": "[\"[[BTC]]\", \"[[ETH]]\", \"[[SOL]]\"]",
+      "tags_json": "[\"crawler-harvest\", \"macro\", \"autonomous-intelligence\"]",
+      "contradictions_json": "[]",
+      "macro_regime_implications": "Potential impact on BTC, ETH, SOL.",
+      "full_markdown_content": "# FRB: Press Release - All Releases\n\n**Source Family:** `MACRO`  \n**Issuer / Authority:** `FEDERAL_RESERVE`  \n**Event Type:** `MACRO_RATE_DECISION`  \n**Observed At:** `2026-10-14T09:01:11.786968+00:00`  \n**Affected Entities:** `BTC, ETH, SOL`  \n**Jurisdiction:** `US`  \n**Causal Firewall Status:** `PASSED`\n\n---\n\n## Executive Summary\nThis document was autonomously captured by the SKY Scout Crawler. It contains empirical market or macroeconomic intelligence subject to quantitative evaluation.\n\n### Epistemic Claim Status: `[HYPOTHESIS]`\n> [!NOTE] Causal Firewall & Epistemic Protocol\n> This information is classified as an external hypothesis. It has not yet been backtested or promoted into live trading rules.\n\n**Payload Digest:** `5ce853920dc43203a2ef26158027f7cde19e76ae6bd4172c1c65059dcab2e2eb`\n",
+      "verification_score": 0.8,
+      "created_at": 1791968592075,
+      "updated_at": 1791968669779
     }
   ],
   "sources": [

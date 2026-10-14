@@ -156,3 +156,4 @@ def test_export_and_rehydrate_git_vault(sandbox_vault_env):
     # Verify target has the files
     assert (target_uploads / "doc.pdf").exists()
     assert (target_articles / "art_test_1.md").exists()
+

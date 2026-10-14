@@ -85,4 +85,65 @@ export const paperApi = {
     });
     return handleResponse<RiskConfig>(res);
   },
+
+  /**
+   * GET /api/strategist/arena/leaderboard - Mastermind concept tournament rankings
+   */
+  async getArenaLeaderboard(): Promise<any> {
+    const res = await authFetch(`${BASE_URL}/api/strategist/arena/leaderboard`);
+    return handleResponse<any>(res);
+  },
+
+  /**
+   * POST /api/strategist/arena/tournament-round - Run competitive tournament across 5 agents
+   */
+  async triggerArenaTournament(params?: { bars_count?: number; deploy_to_paper?: boolean; symbol?: string }): Promise<any> {
+    const query = new URLSearchParams({
+      bars_count: (params?.bars_count ?? 350).toString(),
+      deploy_to_paper: (params?.deploy_to_paper ?? true).toString(),
+      symbol: params?.symbol ?? 'BTC/USDT',
+    });
+    const res = await authFetch(`${BASE_URL}/api/strategist/arena/tournament-round?${query.toString()}`, {
+      method: 'POST',
+    });
+    return handleResponse<any>(res);
+  },
+
+  /**
+   * GET /api/knowledge/wiki/crawler/status - Autonomous crawler daemon status
+   */
+  async getCrawlerStatus(): Promise<any> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/wiki/crawler/status`);
+    return handleResponse<any>(res);
+  },
+
+  /**
+   * POST /api/knowledge/wiki/crawler/trigger - Trigger autonomous crawler harvest
+   */
+  async triggerCrawlerHarvest(domains?: string[]): Promise<any> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/wiki/crawler/trigger`, {
+      method: 'POST',
+      body: domains ? JSON.stringify(domains) : undefined,
+    });
+    return handleResponse<any>(res);
+  },
+
+  /**
+   * GET /api/knowledge/storage/gdrive-sync/status - 5-TB Google Drive sync status
+   */
+  async getGDriveSyncStatus(): Promise<any> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/storage/gdrive-sync/status`);
+    return handleResponse<any>(res);
+  },
+
+  /**
+   * POST /api/knowledge/storage/gdrive-sync/trigger - Trigger heavy data sync with 5-TB Drive
+   */
+  async triggerGDriveSync(direction: 'upload' | 'download' = 'upload'): Promise<any> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/storage/gdrive-sync/trigger?direction=${direction}`, {
+      method: 'POST',
+    });
+    return handleResponse<any>(res);
+  },
 };
+

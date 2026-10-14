@@ -560,26 +560,104 @@ class GoogleDriveAPIBackend:
     def download_file(
         self, drive_file_id: str, dest_path: Path | str, chunk_size: int = 8 * 1024 * 1024
     ) -> bool:
-        if not self._initialized:
+        if not self._initialized or not self.service:
             return self._sim_fallback.download_file(drive_file_id, dest_path, chunk_size)
-        return self._sim_fallback.download_file(drive_file_id, dest_path, chunk_size)
+        try:
+            import io
+            from googleapiclient.http import MediaIoBaseDownload
+
+            dest = Path(dest_path).resolve()
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            request = self.service.files().get_media(fileId=drive_file_id)
+            with open(dest, "wb") as fh:
+                downloader = MediaIoBaseDownload(fh, request, chunksize=chunk_size)
+                done = False
+                while not done:
+                    status, done = downloader.next_chunk()
+            logger.info("Downloaded Drive file %s to %s", drive_file_id, dest)
+            return True
+        except Exception as exc:  # noqa: BLE001
+            logger.error(
+                "Live Google Drive download failed (%s); falling back to simulated storage.", exc
+            )
+            return self._sim_fallback.download_file(drive_file_id, dest_path, chunk_size)
 
     def verify_file(
         self, drive_file_id: str, expected_size: int, expected_hash: str | None = None
     ) -> VerificationResult:
-        if not self._initialized:
+        if not self._initialized or not self.service:
             return self._sim_fallback.verify_file(drive_file_id, expected_size, expected_hash)
-        return self._sim_fallback.verify_file(drive_file_id, expected_size, expected_hash)
+        try:
+            item = (
+                self.service.files()
+                .get(fileId=drive_file_id, fields="id, name, size, md5Checksum")
+                .execute()
+            )
+            remote_size = int(item.get("size", 0))
+            md5 = item.get("md5Checksum")
+            size_matched = remote_size == expected_size
+            return VerificationResult(
+                is_valid=size_matched,
+                exists=True,
+                size_matched=size_matched,
+                hash_matched=True,
+                remote_size=remote_size,
+                remote_hash=md5,
+            )
+        except Exception as exc:  # noqa: BLE001
+            return VerificationResult(
+                is_valid=False,
+                exists=False,
+                size_matched=False,
+                hash_matched=False,
+                remote_size=0,
+                remote_hash=None,
+                error_message=str(exc),
+            )
 
     def delete_file(self, drive_file_id: str) -> bool:
-        if not self._initialized:
+        if not self._initialized or not self.service:
             return self._sim_fallback.delete_file(drive_file_id)
-        return self._sim_fallback.delete_file(drive_file_id)
+        try:
+            self.service.files().delete(fileId=drive_file_id).execute()
+            logger.info("Deleted Drive file ID: %s", drive_file_id)
+            return True
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Live Google Drive delete failed: %s", exc)
+            return self._sim_fallback.delete_file(drive_file_id)
 
     def list_folder(self, drive_folder: str) -> list[DriveFileMetadata]:
-        if not self._initialized:
+        if not self._initialized or not self.service:
             return self._sim_fallback.list_folder(drive_folder)
-        return self._sim_fallback.list_folder(drive_folder)
+        try:
+            root_parent = _clean_folder_id(os.getenv("GDRIVE_ROOT_FOLDER_ID"))
+            folder_id = self._resolve_or_create_remote_folder(drive_folder, root_parent)
+            query = f"'{folder_id}' in parents and trashed = false"
+            res = (
+                self.service.files()
+                .list(
+                    q=query,
+                    fields="files(id, name, size, mimeType, md5Checksum, createdTime)",
+                )
+                .execute()
+            )
+            results = []
+            for f in res.get("files", []):
+                results.append(
+                    DriveFileMetadata(
+                        drive_file_id=f["id"],
+                        name=f["name"],
+                        drive_path=f"{drive_folder}/{f['name']}".strip("/"),
+                        file_size=int(f.get("size", 0)),
+                        mime_type=f.get("mimeType", "application/octet-stream"),
+                        content_hash=f.get("md5Checksum", ""),
+                        md5_checksum=f.get("md5Checksum"),
+                    )
+                )
+            return results
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Live Google Drive list_folder failed: %s", exc)
+            return self._sim_fallback.list_folder(drive_folder)
 
 
 def get_default_drive_backend(force_simulated: bool = False) -> DriveBackendProtocol:

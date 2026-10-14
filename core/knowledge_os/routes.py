@@ -198,6 +198,14 @@ async def ingest_book(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed writing uploaded file: {e}") from e
 
+    # Auto-sync heavy PDF to 5-TB Google Drive storage tier
+    try:
+        from core.storage.heavy_data_sync import heavy_data_sync_manager
+
+        heavy_data_sync_manager.sync_file_to_drive(temp_path)
+    except Exception as drive_err:  # noqa: BLE001
+        logger.warning("Auto Google Drive sync deferred: %s", drive_err)
+
     # Process streaming generator
     last_update = {}
     try:
@@ -1192,5 +1200,53 @@ async def web_search_cycle_endpoint(payload: WebSearchCyclePayload) -> dict[str,
     return result.to_dict()
 
 
+# -----------------------------------------------------------------------------
+# AUTONOMOUS CRAWLER & 5-TB GOOGLE DRIVE HEAVY STORAGE ENDPOINTS
+# -----------------------------------------------------------------------------
+@router.get("/wiki/crawler/status")
+async def get_crawler_daemon_status() -> dict[str, Any]:
+    """Retrieves operational telemetry and health for the Autonomous Crawler Daemon."""
+    from dataclasses import asdict
+
+    from core.intelligence.crawler.crawler_daemon import crawler_daemon
+
+    status = crawler_daemon.get_status()
+    return asdict(status)
 
 
+@router.post("/wiki/crawler/trigger")
+async def trigger_crawler_daemon(
+    domains: list[str] | None = None,
+) -> dict[str, Any]:
+    """Triggers an immediate autonomous crawler harvest cycle."""
+    from core.intelligence.crawler.crawler_daemon import crawler_daemon
+
+    res = await crawler_daemon.execute_harvest_cycle(
+        domain_keys=domains,
+        requested_by="API_OPERATOR",
+    )
+    return res
+
+
+@router.get("/storage/gdrive-sync/status")
+async def get_gdrive_sync_status() -> dict[str, Any]:
+    """Returns 5-TB Google Drive Heavy Data Synchronization status and volume."""
+    from core.storage.heavy_data_sync import heavy_data_sync_manager
+
+    return heavy_data_sync_manager.get_status()
+
+
+@router.post("/storage/gdrive-sync/trigger")
+async def trigger_gdrive_sync(
+    direction: str = Query(default="upload"),
+) -> dict[str, Any]:
+    """Triggers upload or download rehydration with 5-TB Google Drive."""
+    from dataclasses import asdict
+
+    from core.storage.heavy_data_sync import heavy_data_sync_manager
+
+    if direction == "download":
+        rep = heavy_data_sync_manager.download_missing_heavy_files()
+    else:
+        rep = heavy_data_sync_manager.sync_all_heavy_data()
+    return asdict(rep)

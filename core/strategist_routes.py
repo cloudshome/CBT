@@ -285,3 +285,34 @@ async def check_concept_demotion(request: ConceptDemotionCheckRequest) -> dict[s
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
+
+# -----------------------------------------------------------------------------
+# AUTONOMOUS AGENT CONCEPT ARENA & TOURNAMENT ENDPOINTS
+# -----------------------------------------------------------------------------
+@strategist_router.get("/arena/leaderboard")
+async def get_agent_arena_leaderboard() -> dict[str, Any]:
+    """Retrieves current live competitive standings and agent metrics across the 60+ concepts."""
+    from core.research.agent_concept_arena import agent_concept_arena
+
+    return agent_concept_arena.get_leaderboard()
+
+
+@strategist_router.post("/arena/tournament-round")
+async def trigger_arena_tournament_round(
+    bars_count: int = Query(default=350, ge=100, le=2000),
+    deploy_to_paper: bool = Query(default=True),
+    symbol: str = Query(default="BTC/USDT"),
+) -> dict[str, Any]:
+    """Triggers an empirical competitive tournament round across the 5 specialized agent personas."""
+    from dataclasses import asdict
+
+    from core.research.agent_concept_arena import agent_concept_arena
+
+    rnd = agent_concept_arena.run_tournament_round(
+        bars_count=bars_count,
+        deploy_to_paper=deploy_to_paper,
+        symbol=symbol,
+    )
+    return asdict(rnd)
+
+
