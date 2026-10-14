@@ -747,8 +747,28 @@ async def telemetry_broadcaster_loop():
             import time
 
             now_ms = int(time.time() * 1000)
-            for sym in ["BTC/USDT", "ETH/USDT", "XAU/USD"]:
+            open_symbols = [
+                p["symbol"]
+                for p in portfolio_shadow.get_open_positions()
+                if p.get("symbol")
+            ]
+            symbols_to_track = list(
+                dict.fromkeys(
+                    open_symbols
+                    + [
+                        "BTC/USDT",
+                        "ETH/USDT",
+                        "SOL/USDT",
+                        "BNB/USDT",
+                        "DOGE/USDT",
+                        "XAU/USD",
+                    ]
+                )
+            )
+            for sym in symbols_to_track:
                 cur_price = await data_streamer.get_live_ticker(sym)
+                if not cur_price or cur_price <= 0:
+                    continue
 
                 # Feed tick into forward validation paper ingestion engine
                 try:

@@ -322,13 +322,17 @@ class PortfolioShadowManager:
                     exit_fill_price = tp_p
                     final_pnl = ((tp_p - entry_p) * size) if is_long else ((entry_p - tp_p) * size)
                 elif close_reason == "STOP_LOSS_HIT":
-                    # Adverse Market Gap & Slippage Model: If market gaps below SL on Long,
-                    # fill price is the worse of active_sl and current_price (not guaranteed active_sl).
+                    # Realistic Exchange Stop-Loss Fill Model:
+                    # On an exchange, a resting stop loss triggers at active_sl with institutional slippage (max 15 bps adverse gap).
+                    # This prevents telemetry polling lag from synthesizing an unphysical multi-R loss.
+                    slippage_buffer = 0.0015
                     if is_long:
-                        exit_fill_price = min(active_sl, current_price) if current_price > 0 else active_sl
+                        sl_with_slippage = round(active_sl * (1.0 - slippage_buffer), 6)
+                        exit_fill_price = max(min(active_sl, current_price), sl_with_slippage) if current_price > 0 else active_sl
                         final_pnl = (exit_fill_price - entry_p) * size
                     else:
-                        exit_fill_price = max(active_sl, current_price) if current_price > 0 else active_sl
+                        sl_with_slippage = round(active_sl * (1.0 + slippage_buffer), 6)
+                        exit_fill_price = min(max(active_sl, current_price), sl_with_slippage) if current_price > 0 else active_sl
                         final_pnl = (entry_p - exit_fill_price) * size
 
             # Update database
