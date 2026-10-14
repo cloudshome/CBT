@@ -9,12 +9,14 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import shutil
 import time
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from core.knowledge_os.human_brain import HumanQuestionMode, human_brain
@@ -453,6 +455,78 @@ class WikiIngestRequest(BaseModel):
     title: str | None = Field(default=None, description="Optional custom title")
     category: str | None = Field(default=None, description="Optional category")
     author: str | None = Field(default=None, description="Optional author or speaker attribution")
+
+
+@router.get("/wiki/timeline")
+async def get_wiki_ingestion_timeline(
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    source_type: str | None = Query(default=None),
+    search: str | None = Query(default=None),
+    date: str | None = Query(default=None),
+) -> dict[str, Any]:
+    """
+    Returns a chronological, timestamped timeline of all ingested research inputs,
+    including uploaded PDFs, URLs, authors, SHA-256 hashes, and claims breakdowns.
+    """
+    from core.knowledge_os.research_wikipedia import research_wikipedia_engine
+
+    return research_wikipedia_engine.get_ingestion_timeline(
+        limit=limit,
+        offset=offset,
+        source_type=source_type,
+        search_query=search,
+        date_str=date,
+    )
+
+
+@router.get("/wiki/calendar")
+async def get_wiki_calendar_activity(
+    date: str | None = Query(default=None),
+) -> dict[str, Any]:
+    """
+    Returns day-by-day research knowledge collection activity for the interactive calendar.
+    """
+    from core.knowledge_os.research_wikipedia import research_wikipedia_engine
+
+    return research_wikipedia_engine.get_calendar_activity(target_date=date)
+
+
+@router.get("/wiki/files/{filename}")
+async def view_or_download_research_file(filename: str):
+    """
+    Safely streams or downloads an uploaded research PDF or document.
+    Enforces strict path traversal defenses.
+    """
+    safe_basename = Path(filename).name
+    data_dir = Path(os.getenv("DATA_DIR", "data"))
+    uploads_dir = data_dir / "uploads"
+    target_path = uploads_dir / safe_basename
+
+    try:
+        resolved_target = target_path.resolve()
+        resolved_uploads = uploads_dir.resolve()
+        if not str(resolved_target).startswith(str(resolved_uploads)):
+            raise HTTPException(status_code=403, detail="Access denied: invalid file path.")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Malformed file path.")
+
+    if not target_path.exists() or not target_path.is_file():
+        raise HTTPException(status_code=404, detail=f"File '{safe_basename}' not found in research uploads.")
+
+    media_type = "application/octet-stream"
+    if safe_basename.lower().endswith(".pdf"):
+        media_type = "application/pdf"
+    elif safe_basename.lower().endswith((".txt", ".md")):
+        media_type = "text/plain"
+    elif safe_basename.lower().endswith(".json"):
+        media_type = "application/json"
+
+    return FileResponse(
+        path=str(target_path),
+        media_type=media_type,
+        filename=safe_basename,
+    )
 
 
 @router.get("/wiki/articles")

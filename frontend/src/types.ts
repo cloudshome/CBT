@@ -2996,6 +2996,55 @@ export interface WikiIngestRequestPayload {
   author?: string;
 }
 
+export interface WikiTimelineItem {
+  source_id: string;
+  title: string;
+  original_url: string;
+  source_domain: string;
+  source_type: string;
+  author_or_creator: string;
+  publication_date: string;
+  content_hash: string;
+  wiki_article_id?: string;
+  wiki_article_title?: string;
+  wiki_category?: string;
+  wiki_score?: number;
+  is_file: boolean;
+  file_name?: string;
+  file_size_bytes?: number;
+  file_size_mb?: number;
+  download_url?: string;
+  total_claims: number;
+  facts_count: number;
+  hypotheses_count: number;
+  contradictions_count: number;
+  created_at: number;
+  created_at_formatted: string;
+}
+
+export interface WikiTimelineResponse {
+  timeline: WikiTimelineItem[];
+  total_count: number;
+  limit: number;
+  offset: number;
+}
+
+export interface WikiCalendarDay {
+  date: string;
+  sources_count: number;
+  articles_count: number;
+  claims_count: number;
+  facts_count: number;
+  hypotheses_count: number;
+}
+
+export interface WikiCalendarResponse {
+  daily_activity: WikiCalendarDay[];
+  total_days_active: number;
+  target_date?: string;
+  target_day_data?: WikiTimelineResponse;
+}
+
 
 
 

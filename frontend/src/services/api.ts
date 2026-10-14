@@ -62,6 +62,8 @@ import {
   WikiArticlesResponse,
   WikiArticleDetailResponse,
   WikiIngestRequestPayload,
+  WikiTimelineResponse,
+  WikiCalendarResponse,
   CausalHypothesis,
   CausalFirewallDecision,
   HypothesisStatsResponse,
@@ -1833,6 +1835,46 @@ export const api = {
       method: 'DELETE',
     });
     return handleResponse<{ status: string; article_id: string }>(res);
+  },
+
+  /**
+   * GET /api/knowledge/wiki/timeline
+   * Chronological, timestamped timeline of all research inputs, PDFs, and extracted claims
+   */
+  async getWikiTimeline(params?: {
+    limit?: number;
+    offset?: number;
+    source_type?: string;
+    search?: string;
+    date?: string;
+  }): Promise<WikiTimelineResponse> {
+    const query = new URLSearchParams();
+    if (params?.limit) query.set('limit', String(params.limit));
+    if (params?.offset) query.set('offset', String(params.offset));
+    if (params?.source_type && params.source_type !== 'ALL') query.set('source_type', params.source_type);
+    if (params?.search) query.set('search', params.search);
+    if (params?.date) query.set('date', params.date);
+
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    const res = await authFetch(`${BASE_URL}/api/knowledge/wiki/timeline${qs}`);
+    return handleResponse<WikiTimelineResponse>(res);
+  },
+
+  /**
+   * GET /api/knowledge/wiki/calendar
+   * Day-by-day aggregated research activity for the interactive calendar
+   */
+  async getWikiCalendar(date?: string): Promise<WikiCalendarResponse> {
+    const qs = date ? `?date=${encodeURIComponent(date)}` : '';
+    const res = await authFetch(`${BASE_URL}/api/knowledge/wiki/calendar${qs}`);
+    return handleResponse<WikiCalendarResponse>(res);
+  },
+
+  /**
+   * Generates secure download/view URL for an uploaded research document
+   */
+  getWikiFileUrl(filename: string): string {
+    return `${BASE_URL}/api/knowledge/wiki/files/${encodeURIComponent(filename)}`;
   },
 
   /**

@@ -24,6 +24,7 @@ import sqlite3
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -225,7 +226,35 @@ class ResearchWikipediaEngine:
             )
             conn.execute("CREATE INDEX IF NOT EXISTS idx_wiki_triage_status ON wiki_triage_inbox(status);")
 
-            # 6. research_claims (Epistemic claims ledger)
+            # 6. research_sources (Universal research source inputs & documents)
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS research_sources (
+                    source_id TEXT PRIMARY KEY,
+                    original_url TEXT NOT NULL,
+                    canonical_url TEXT,
+                    source_domain TEXT NOT NULL,
+                    source_type TEXT NOT NULL,
+                    access_status TEXT NOT NULL,
+                    extraction_status TEXT NOT NULL,
+                    title TEXT,
+                    author_or_creator TEXT,
+                    publication_date TEXT,
+                    content_hash TEXT,
+                    raw_metadata_json TEXT,
+                    failure_reason TEXT,
+                    retry_count INTEGER DEFAULT 0,
+                    wiki_article_id TEXT,
+                    created_at INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL
+                );
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_research_sources_domain ON research_sources(source_domain);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_research_sources_type ON research_sources(source_type);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_research_sources_created ON research_sources(created_at);")
+
+            # 7. research_claims (Epistemic claims ledger)
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS research_claims (
@@ -716,6 +745,236 @@ class ResearchWikipediaEngine:
             md_file.unlink(missing_ok=True)
 
         return deleted
+
+    def get_ingestion_timeline(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+        source_type: str | None = None,
+        search_query: str | None = None,
+        date_str: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Retrieves a detailed, chronological ingestion timeline of all research inputs,
+        including uploaded PDFs, URLs, and research notes with claims breakdowns.
+        """
+        conditions: list[str] = []
+        params: list[Any] = []
+
+        if source_type and source_type.upper() != "ALL":
+            conditions.append("s.source_type = ?")
+            params.append(source_type.upper())
+
+        if search_query:
+            term = f"%{search_query.strip()}%"
+            conditions.append("(s.title LIKE ? OR s.original_url LIKE ? OR s.author_or_creator LIKE ?)")
+            params.extend([term, term, term])
+
+        if date_str:
+            conditions.append("date(s.created_at / 1000, 'unixepoch') = ?")
+            params.append(date_str)
+
+        where_clause = f" WHERE {' AND '.join(conditions)}" if conditions else ""
+        count_sql = f"SELECT COUNT(*) FROM research_sources s{where_clause}"
+
+        query = f"""
+            SELECT 
+                s.source_id,
+                s.original_url,
+                s.canonical_url,
+                s.source_domain,
+                s.source_type,
+                s.access_status,
+                s.extraction_status,
+                s.title,
+                s.author_or_creator,
+                s.publication_date,
+                s.content_hash,
+                s.wiki_article_id,
+                s.created_at,
+                s.updated_at,
+                w.title as wiki_article_title,
+                w.category as wiki_category,
+                w.verification_score as wiki_score,
+                COUNT(c.claim_id) as total_claims,
+                SUM(CASE WHEN c.claim_type = 'FACT' OR c.verification_status = 'VERIFIED' THEN 1 ELSE 0 END) as facts_count,
+                SUM(CASE WHEN c.claim_type = 'HYPOTHESIS' THEN 1 ELSE 0 END) as hypotheses_count,
+                SUM(CASE WHEN c.claim_type = 'CONTRADICTION' OR c.verification_status = 'CONTRADICTION' THEN 1 ELSE 0 END) as contradictions_count
+            FROM research_sources s
+            LEFT JOIN wiki_articles w ON s.wiki_article_id = w.article_id
+            LEFT JOIN research_claims c ON s.source_id = c.source_id
+            {where_clause}
+            GROUP BY s.source_id
+            ORDER BY s.created_at DESC
+            LIMIT ? OFFSET ?;
+        """
+        params.extend([limit, offset])
+
+        with self._get_connection() as conn:
+            total_count = conn.execute(count_sql, params[:-2]).fetchone()[0]
+            rows = conn.execute(query, params).fetchall()
+
+        timeline_items = []
+        uploads_dir = DATA_DIR / "uploads"
+
+        for r in rows:
+            orig_url = r["original_url"] or ""
+            is_file = False
+            file_name = None
+            file_size_bytes = 0
+            download_url = None
+
+            target_file = None
+            if orig_url and (orig_url.endswith(".pdf") or "uploads" in orig_url or not orig_url.startswith("http")):
+                candidate = Path(orig_url)
+                if candidate.exists() and candidate.is_file():
+                    target_file = candidate
+                elif (uploads_dir / candidate.name).exists():
+                    target_file = uploads_dir / candidate.name
+
+            if target_file and target_file.exists():
+                is_file = True
+                file_name = target_file.name
+                file_size_bytes = target_file.stat().st_size
+                download_url = f"/api/knowledge/wiki/files/{target_file.name}"
+
+            created_ts = r["created_at"]
+            created_dt = datetime.fromtimestamp(created_ts / 1000, tz=timezone.utc) if created_ts else None
+            formatted_date = created_dt.strftime("%Y-%m-%d %H:%M UTC") if created_dt else ""
+
+            timeline_items.append({
+                "source_id": r["source_id"],
+                "title": r["title"] or (file_name if is_file else orig_url) or "Untitled Research Source",
+                "original_url": orig_url,
+                "source_domain": r["source_domain"],
+                "source_type": r["source_type"],
+                "author_or_creator": r["author_or_creator"] or "Research Ingest",
+                "publication_date": r["publication_date"],
+                "content_hash": r["content_hash"],
+                "wiki_article_id": r["wiki_article_id"],
+                "wiki_article_title": r["wiki_article_title"],
+                "wiki_category": r["wiki_category"],
+                "wiki_score": r["wiki_score"],
+                "is_file": is_file,
+                "file_name": file_name,
+                "file_size_bytes": file_size_bytes,
+                "file_size_mb": round(file_size_bytes / (1024 * 1024), 2) if file_size_bytes else 0,
+                "download_url": download_url,
+                "total_claims": int(r["total_claims"] or 0),
+                "facts_count": int(r["facts_count"] or 0),
+                "hypotheses_count": int(r["hypotheses_count"] or 0),
+                "contradictions_count": int(r["contradictions_count"] or 0),
+                "created_at": created_ts,
+                "created_at_formatted": formatted_date,
+            })
+
+        return {
+            "timeline": timeline_items,
+            "total_count": total_count,
+            "limit": limit,
+            "offset": offset,
+        }
+
+    def get_calendar_activity(self, target_date: str | None = None) -> dict[str, Any]:
+        """
+        Aggregates research knowledge collection day-by-day across time.
+        Provides calendar heatmaps and daily research intelligence breakdowns.
+        """
+        with self._get_connection() as conn:
+            source_days = conn.execute(
+                """
+                SELECT 
+                    date(created_at / 1000, 'unixepoch') as activity_date,
+                    COUNT(*) as sources_count,
+                    COUNT(DISTINCT source_domain) as distinct_sources
+                FROM research_sources
+                GROUP BY activity_date
+                ORDER BY activity_date DESC;
+                """
+            ).fetchall()
+
+            article_days = conn.execute(
+                """
+                SELECT 
+                    date(created_at / 1000, 'unixepoch') as activity_date,
+                    COUNT(*) as articles_count
+                FROM wiki_articles
+                GROUP BY activity_date
+                ORDER BY activity_date DESC;
+                """
+            ).fetchall()
+
+            claim_days = conn.execute(
+                """
+                SELECT 
+                    date(created_at / 1000, 'unixepoch') as activity_date,
+                    COUNT(*) as total_claims,
+                    SUM(CASE WHEN claim_type = 'FACT' OR verification_status = 'VERIFIED' THEN 1 ELSE 0 END) as facts_count,
+                    SUM(CASE WHEN claim_type = 'HYPOTHESIS' THEN 1 ELSE 0 END) as hypotheses_count
+                FROM research_claims
+                GROUP BY activity_date
+                ORDER BY activity_date DESC;
+                """
+            ).fetchall()
+
+        calendar_map: dict[str, dict[str, Any]] = {}
+
+        for r in source_days:
+            d = r["activity_date"]
+            if not d:
+                continue
+            calendar_map.setdefault(d, {
+                "date": d,
+                "sources_count": 0,
+                "articles_count": 0,
+                "claims_count": 0,
+                "facts_count": 0,
+                "hypotheses_count": 0,
+            })
+            calendar_map[d]["sources_count"] = r["sources_count"]
+
+        for r in article_days:
+            d = r["activity_date"]
+            if not d:
+                continue
+            calendar_map.setdefault(d, {
+                "date": d,
+                "sources_count": 0,
+                "articles_count": 0,
+                "claims_count": 0,
+                "facts_count": 0,
+                "hypotheses_count": 0,
+            })
+            calendar_map[d]["articles_count"] = r["articles_count"]
+
+        for r in claim_days:
+            d = r["activity_date"]
+            if not d:
+                continue
+            calendar_map.setdefault(d, {
+                "date": d,
+                "sources_count": 0,
+                "articles_count": 0,
+                "claims_count": 0,
+                "facts_count": 0,
+                "hypotheses_count": 0,
+            })
+            calendar_map[d]["claims_count"] = r["total_claims"] or 0
+            calendar_map[d]["facts_count"] = int(r["facts_count"] or 0)
+            calendar_map[d]["hypotheses_count"] = int(r["hypotheses_count"] or 0)
+
+        daily_activity = sorted(calendar_map.values(), key=lambda x: x["date"], reverse=True)
+
+        day_items = None
+        if target_date:
+            day_items = self.get_ingestion_timeline(limit=100, date_str=target_date)
+
+        return {
+            "daily_activity": daily_activity,
+            "total_days_active": len(daily_activity),
+            "target_date": target_date,
+            "target_day_data": day_items,
+        }
 
     def ingest_url_or_content(
         self,

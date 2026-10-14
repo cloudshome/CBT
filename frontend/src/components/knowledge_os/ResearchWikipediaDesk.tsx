@@ -21,6 +21,8 @@ import {
   Inbox,
   CheckCircle2,
   XCircle,
+  Calendar,
+  Clock,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import {
@@ -31,6 +33,8 @@ import {
 import { WikiInfobox } from './WikiInfobox';
 import { WikiLink } from './WikiLinkHover';
 import { WikiPortalHome } from './WikiPortalHome';
+import { ResearchIngestTimeline } from './ResearchIngestTimeline';
+import { KnowledgeCalendarView } from './KnowledgeCalendarView';
 
 
 interface ResearchWikipediaDeskProps {
@@ -47,6 +51,10 @@ const CATEGORIES = [
 ];
 
 export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ onNotify }) => {
+  // Top-Level Research Desk Navigation Mode
+  const [deskMode, setDeskMode] = useState<'ENCYCLOPEDIA' | 'TIMELINE' | 'CALENDAR'>('ENCYCLOPEDIA');
+  const [calendarFilterDate, setCalendarFilterDate] = useState<string | null>(null);
+
   // Articles state
   const [articles, setArticles] = useState<WikiArticleSummary[]>([]);
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
@@ -412,22 +420,50 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <button
               onClick={() => {
+                setDeskMode('ENCYCLOPEDIA');
                 setSelectedArticleId(null);
                 setActiveArticle(null);
               }}
               className={`px-3 py-1.5 rounded border text-xs font-sans font-medium flex items-center gap-1.5 transition cursor-pointer shadow-xs ${
-                !selectedArticleId
+                deskMode === 'ENCYCLOPEDIA' && !selectedArticleId
                   ? 'border-[#3366cc] bg-[#eaf3ff] dark:bg-blue-950/60 text-[#3366cc] dark:text-blue-300 font-bold'
                   : 'border-[#c8ccd1] dark:border-[#384252] bg-white dark:bg-[#1e2738] hover:bg-[#f8f9fa] dark:hover:bg-[#253043] text-[#202122] dark:text-slate-200'
               }`}
               title="Return to Wikipedia Main Page Portal"
             >
               <BookOpen size={13} />
-              <span>Main Page</span>
+              <span>Encyclopedia</span>
             </button>
+
+            <button
+              onClick={() => setDeskMode('TIMELINE')}
+              className={`px-3 py-1.5 rounded border text-xs font-sans font-medium flex items-center gap-1.5 transition cursor-pointer shadow-xs ${
+                deskMode === 'TIMELINE'
+                  ? 'border-cyan-500 bg-cyan-950/60 text-cyan-300 font-bold'
+                  : 'border-[#c8ccd1] dark:border-[#384252] bg-white dark:bg-[#1e2738] hover:bg-[#f8f9fa] dark:hover:bg-[#253043] text-[#202122] dark:text-slate-200'
+              }`}
+              title="View all 100+ ingested PDFs and documents with timestamps"
+            >
+              <Clock size={13} className="text-cyan-400" />
+              <span>Ingest Chronology</span>
+            </button>
+
+            <button
+              onClick={() => setDeskMode('CALENDAR')}
+              className={`px-3 py-1.5 rounded border text-xs font-sans font-medium flex items-center gap-1.5 transition cursor-pointer shadow-xs ${
+                deskMode === 'CALENDAR'
+                  ? 'border-cyan-500 bg-cyan-950/60 text-cyan-300 font-bold'
+                  : 'border-[#c8ccd1] dark:border-[#384252] bg-white dark:bg-[#1e2738] hover:bg-[#f8f9fa] dark:hover:bg-[#253043] text-[#202122] dark:text-slate-200'
+              }`}
+              title="View Day-by-Day Knowledge Collection Calendar & Heatmap"
+            >
+              <Calendar size={13} className="text-cyan-400" />
+              <span>Knowledge Calendar</span>
+            </button>
+
             <button
               onClick={() => {
                 setShowTriageDrawer(true);
@@ -439,6 +475,7 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
               <Inbox size={13} />
               <span>Triage Inbox ({triageItems.length})</span>
             </button>
+
             <button
               onClick={loadArticles}
               className="px-3 py-1.5 rounded border border-[#c8ccd1] dark:border-[#384252] bg-white dark:bg-[#1e2738] hover:bg-[#f8f9fa] dark:hover:bg-[#253043] text-xs text-[#202122] dark:text-slate-200 flex items-center gap-1.5 transition font-sans shadow-xs"
@@ -491,8 +528,34 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
         </form>
       </div>
 
-      {/* 2. Main Split View: Left Articles Index vs Right Article Reader */}
-      <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
+      {/* 2. Main Content: Mode Switcher */}
+      {deskMode === 'TIMELINE' ? (
+        <div className="flex-1 overflow-hidden">
+          <ResearchIngestTimeline
+            onSelectArticle={(articleId) => {
+              setSelectedArticleId(articleId);
+              setDeskMode('ENCYCLOPEDIA');
+            }}
+            selectedDate={calendarFilterDate}
+            onClearDateFilter={() => setCalendarFilterDate(null)}
+          />
+        </div>
+      ) : deskMode === 'CALENDAR' ? (
+        <div className="flex-1 overflow-hidden">
+          <KnowledgeCalendarView
+            onSelectDate={(d) => {
+              setCalendarFilterDate(d);
+              setDeskMode('TIMELINE');
+            }}
+            onSelectArticle={(articleId) => {
+              setSelectedArticleId(articleId);
+              setDeskMode('ENCYCLOPEDIA');
+            }}
+          />
+        </div>
+      ) : (
+        /* 2. Main Split View: Left Articles Index vs Right Article Reader */
+        <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
         {/* Left Column: Article Browser (Wikipedia Navigation Sidebar style) */}
         <div className="w-full md:w-80 lg:w-96 border-r border-[#a2a9b1] dark:border-[#222e42] bg-[#f8f9fa] dark:bg-[#111722] flex flex-col min-h-0">
           {/* Category selector */}
@@ -1096,6 +1159,7 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
           )}
         </div>
       </div>
+      )}
 
       {/* 3. Human-in-the-Loop Triage Inbox Drawer (Phase 4) */}
       {showTriageDrawer && (
