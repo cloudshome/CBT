@@ -2,7 +2,36 @@
 
 **Read this first if you are the next coding session (Windows or Ubuntu).**
 
-Last updated: **2026-10-14 · Multi-Style Asset Intelligence & Anti-Cannibalization Shipped** (Commit `2f3ba27`).
+Last updated: **2026-10-15 · Central Trading Mind & Unified Execution Governance Shipped** (Commit `4b11cf1`).
+- **P0 Forensic Loss Autopsy & Equity Restoration:**
+  - Diagnosed anomalous -$3,071 trade (`#0_8fc8d9f0`) caused by research arena synthetic bars ($86,168 synthetic entry vs $83,096 real market) with hardcoded 1.0 BTC sizing.
+  - Purged corrupt transaction from `data/trading_logs.db`, fully restoring account cash to **$9,257.18** and equity to **$9,209.09** (`NORMAL` circuit breaker).
+  - Hardened `core/research/agent_concept_arena.py`: `deploy_to_paper=False` by default, real price grounding, and dynamic Half-Kelly sizing.
+- **Central Trading Mind Implemented (`core/central_mind.py`):**
+  - Singleton `central_mind` acts as the unbypassable "Supreme Arbiter" enforcing 6 Constitutional Invariants:
+    1. `REAL_PRICE_GROUNDING_STRICT`: Entry price must diverge $\le 1.5\%$ from live exchange ticker; synthetic bars physically rejected.
+    2. `HALF_KELLY_1_5_PCT_CAP`: Single-trade stop risk strictly throttled to $\le 1.5\%$ equity ($138 max on current equity). Hardcoded 1.0 BTC sizing physically rejected.
+    3. `ANTI_CANNIBALIZATION_LOCKED`: Opposing directions (LONG vs SHORT) on the same symbol are blocked.
+    4. `MULTI_STYLE_DESK_SEPARATION`: Governs 5 styles (SCALP, DAY, TREND, RANGE, SWING) under a max 3 position concurrency cap and 2.50% cumulative portfolio heat cap.
+    5. `CAUSAL_FIREWALL_SYNTHETIC_BLOCKED`: Blocks research simulation origins from writing to live/paper ledgers.
+    6. `IMMUTABLE_DECISION_LEDGER`: Persists 100% of verdicts into SQLite `central_mind_decisions`.
+  - Added REST endpoint: `GET /api/central-mind/status`.
+- **Defense-in-Depth & UI Integration:**
+  - `core/portfolio_shadow.py`: Defaults `enforce_atomic_limits=True`, `prevent_duplicate_symbol=True`, and `allow_multi_style=True`.
+  - `core/execution/paper_routes.py`: Logs manual UI paper trade executions and risk gate rejections into `central_mind_decisions`.
+  - `frontend/src/components/DedicatedPaperTradingDesk.tsx`: Header displays active `CENTRAL MIND GOVERNED` and `HALF-KELLY (1.5% CAP)` badges.
+  - Frontend production Vite bundle built cleanly in 15.71s with zero errors.
+- **Test Integrity & Certification:**
+  - Milestone 18 execution certification re-validated across all 14 gates (149/149 tests green).
+  - All unit test suites passing: `test_central_mind.py` (5/5), `test_multi_style_asset_desk.py` (6/6), `test_portfolio_accounting.py` (14/14), `test_paper_trading.py` (8/8).
+- **Capital Safety Directive:**
+  - `REAL_CAPITAL_ENABLED = False` physically maintained. Real exchange accounts remain completely untouched and unexposed.
+  - Stage 1 real-market shadow paper accumulation active 24/7 on Ubuntu.
+- **Next Session:** Continue 24/7 forward burn-in data collection. When ready for Stage 2 exchange order routing, connect free Binance/Bybit testnet credentials via `core/execution/testnet/`.
+
+---
+
+**Previous:** 2026-10-14 · **Multi-Style Asset Intelligence & Anti-Cannibalization Shipped** (Commit `2f3ba27`).
 - **P0 Defect Resolved:** Fixed Priority-Zero evidence governance defect in `core/strategy_league.py` — now queries empirical forward returns from `shadow_positions` and verifies `DSR >= 0.95` with `>= 30` samples.
 - **Multi-Style Asset Trading Intelligence Active:**
   - Automated classification for all 5 styles: `[SCALP]`, `[DAY]`, `[TREND]`, `[RANGE]`, `[SWING]`.
