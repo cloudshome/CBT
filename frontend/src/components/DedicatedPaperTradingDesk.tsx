@@ -453,7 +453,13 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
                                       ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
                                       : pos.horizon === 'DAY'
                                       ? 'bg-sky-500/20 text-sky-300 border-sky-500/40'
-                                      : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                      : pos.horizon === 'TREND'
+                                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                      : pos.horizon === 'RANGE'
+                                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                                      : pos.horizon === 'SWING'
+                                      ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
+                                      : 'bg-slate-800 text-slate-300 border-slate-700'
                                   }`}
                                 >
                                   {pos.horizon}

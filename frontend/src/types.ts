@@ -136,7 +136,7 @@ export interface PaperDeskOverviewResponse {
     capitalAtRiskUsd?: number;
     riskOfAccountPct?: number;
     riskRewardRatio?: string;
-    horizon?: 'SCALP' | 'DAY' | 'SWING';
+    horizon?: 'SCALP' | 'DAY' | 'TREND' | 'RANGE' | 'SWING';
     agentManager?: string;
     strategyName?: string;
     thesis?: string;
