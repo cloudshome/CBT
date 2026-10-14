@@ -14,6 +14,7 @@ bin/
 !/data/research/datasets/
 !/data/research/vault/
 !/data/research/vault/**
+/data/research/vault/documents/
 .venv/
 .env
 .DS_Store

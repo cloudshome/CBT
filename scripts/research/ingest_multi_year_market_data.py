@@ -147,16 +147,19 @@ def ingest_series(
     full_df = full_df[sane].reset_index(drop=True)
 
     # 1. Write to Parquet CandleStore
-    canon = normalise_klines(
-        full_df,
-        exchange="binance",
-        market=market,
-        symbol=symbol,
-        timeframe=timeframe,
-        source="rest",
-    )
-    store.write(canon)
-    logger.info("Persisted %d candles into CandleStore for %s %s.", len(full_df), symbol, timeframe)
+    try:
+        canon = normalise_klines(
+            full_df,
+            exchange="binance",
+            market=market,
+            symbol=symbol,
+            timeframe=timeframe,
+            source="rest",
+        )
+        store.write(canon)
+        logger.info("Persisted %d candles into CandleStore for %s %s.", len(full_df), symbol, timeframe)
+    except Exception as e:
+        logger.warning("Could not write to CandleStore Parquet (%s); proceeding with SQLite market_data.db.", e)
 
     # 2. Write to SQLite data/market_data.db
     # Write under both raw symbol ('BTCUSDT') and slash symbol ('BTC/USDT')
@@ -339,6 +342,8 @@ def main():
         ("BTCUSDT", "4h"),
         ("ETHUSDT", "1h"),
         ("ETHUSDT", "4h"),
+        ("SOLUSDT", "1h"),
+        ("SOLUSDT", "4h"),
     ]
 
     dfs: dict[str, pd.DataFrame] = {}
@@ -380,13 +385,36 @@ def main():
     promotions = advance_qualified_candidates(eval_results)
     logger.info("Promotions completed: %d candidates promoted.", len(promotions))
 
-    # Also evaluate on BTCUSDT 4h for multi-timeframe robustness verification
-    btc_4h = dfs.get("BTCUSDT_4h")
-    if btc_4h is not None and not btc_4h.empty:
-        logger.info("Robustness evaluation running on BTCUSDT 4h (%d total bars)...", len(btc_4h))
-        eval_4h = run_candidate_evaluation_pipeline(btc_4h, symbol="BTCUSDT", timeframe="4h")
-    else:
-        eval_4h = {}
+    # Multi-Asset 4h Robustness Evaluation for Candidate B across BTC, ETH, and SOL
+    logger.info("=" * 70)
+    logger.info("CANDIDATE B (TC_014) MULTI-ASSET 4H POOLED SAMPLE EVALUATION")
+    logger.info("=" * 70)
+    eval_4h: dict[str, CandidateEvaluationResult] = {}
+    candidate_b_4h: dict[str, CandidateEvaluationResult] = {}
+
+    for sym in ["BTCUSDT", "ETHUSDT", "SOLUSDT"]:
+        key = f"{sym}_4h"
+        df_4h = dfs.get(key)
+        if df_4h is None or df_4h.empty:
+            conn = sqlite3.connect(str(MARKET_DATA_DB))
+            slash_sym = f"{sym[:3]}/{sym[3:]}" if sym.endswith("USDT") else sym
+            df_4h = pd.read_sql(
+                "SELECT timestamp as ts, open, high, low, close, volume FROM candles WHERE symbol in (?, ?) AND timeframe = '4h' ORDER BY timestamp ASC",
+                conn,
+                params=(sym, slash_sym),
+            )
+            conn.close()
+        if df_4h is not None and not df_4h.empty:
+            logger.info("Running Candidate B on %s 4h (%d bars)...", sym, len(df_4h))
+            res_b = concept_evaluation_engine.evaluate_candidate(
+                candidate_key="CAND_B_TREND_PULLBACK",
+                df=df_4h,
+                symbol=sym,
+                timeframe="4h",
+                existing_return_streams=[],
+                record_to_registry=False,
+            )
+            candidate_b_4h[sym] = res_b
 
     # Print summary table
     print("\n" + "=" * 115)
@@ -410,6 +438,41 @@ def main():
             f"{res.deflated_sharpe_ratio:<7.3f} {res.recommended_lifecycle_status:<15}"
         )
     print("=" * 115)
+
+    if candidate_b_4h:
+        print("\n" + "=" * 115)
+        print("CANDIDATE B (TC_014) MULTI-ASSET 4H POOLED SAMPLE EVALUATION (2022-2026)")
+        print("=" * 115)
+        print(f"{'Asset':<12} {'Total N':<8} {'N_eff':<8} {'Net Base':<10} {'Net Cons 1.5x':<15} {'PF':<6} {'OOS N':<8} {'OOS N_eff':<10} {'OOS Net':<10} {'DSR':<7}")
+        print("-" * 115)
+        pooled_total_n = 0
+        pooled_oos_n = 0
+        pooled_oos_neff = 0.0
+        weighted_net_base = 0.0
+        weighted_oos_net = 0.0
+        for sym, res in candidate_b_4h.items():
+            print(
+                f"{sym:<12} {res.overall_metrics.nominal_trades:<8} "
+                f"{res.overall_metrics.effective_sample_size_n_eff:<8.1f} "
+                f"{res.overall_metrics.net_expectancy_r_base:<+10.3f} "
+                f"{res.overall_metrics.net_expectancy_r_conservative_1_5x:<+15.3f} "
+                f"{res.overall_metrics.profit_factor_net:<6.2f} "
+                f"{res.sealed_oos_metrics.nominal_trades:<8} "
+                f"{res.sealed_oos_metrics.effective_sample_size_n_eff:<10.1f} "
+                f"{res.sealed_oos_metrics.net_expectancy_r_base:<+10.3f} "
+                f"{res.deflated_sharpe_ratio:<7.3f}"
+            )
+            pooled_total_n += res.overall_metrics.nominal_trades
+            pooled_oos_n += res.sealed_oos_metrics.nominal_trades
+            pooled_oos_neff += res.sealed_oos_metrics.effective_sample_size_n_eff
+            weighted_net_base += res.overall_metrics.net_expectancy_r_base * res.overall_metrics.nominal_trades
+            weighted_oos_net += res.sealed_oos_metrics.net_expectancy_r_base * res.sealed_oos_metrics.nominal_trades
+
+        pooled_net_base = weighted_net_base / max(1, pooled_total_n)
+        pooled_oos_net_avg = weighted_oos_net / max(1, pooled_oos_n)
+        print("-" * 115)
+        print(f"POOLED 4H BASKET: Total Trades={pooled_total_n} | OOS Trades={pooled_oos_n} (OOS N_eff={pooled_oos_neff:.1f}) | Pooled Net Base={pooled_net_base:+.3f}R | Pooled OOS Net={pooled_oos_net_avg:+.3f}R")
+        print("=" * 115)
 
 
 if __name__ == "__main__":
