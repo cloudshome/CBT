@@ -132,3 +132,4 @@ def test_central_mind_governance_report(clean_central_mind):
     assert "HALF_KELLY_1_5_PCT_CAP" in report["governance_invariants"]
     assert "REAL_PRICE_GROUNDING_STRICT" in report["governance_invariants"]
     assert "max_positions" in report
+

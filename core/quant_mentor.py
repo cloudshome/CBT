@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from typing import Any
 
 logger = logging.getLogger("ai_quant_sentinel.quant_mentor")
@@ -85,6 +86,22 @@ class QuantMentor:
             return "BTC/USDT"
         return default
 
+    def _detect_timeframe(self, text: str, default: str = "15m") -> str:
+        lower = text.lower()
+        if re.search(r"\b15m\b", lower) or "15 মিনিট" in lower or "১৫ মিনিট" in lower or "১৫ মি" in lower:
+            return "15m"
+        if re.search(r"\b5m\b", lower) or "5 মিনিট" in lower or "৫ মিনিট" in lower:
+            return "5m"
+        if re.search(r"\b1m\b", lower) or "1 মিনিট" in lower or "১ মিনিট" in lower:
+            return "1m"
+        if re.search(r"\b4h\b", lower) or "4 ঘন্টা" in lower or "৪ ঘণ্টা" in lower or "৪ ঘন্টা" in lower:
+            return "4h"
+        if re.search(r"\b1h\b", lower) or "1 ঘন্টা" in lower or "১ ঘণ্টা" in lower or "১ ঘন্টা" in lower:
+            return "1h"
+        if re.search(r"\b1d\b", lower) or "daily" in lower or "১ দিন" in lower:
+            return "1d"
+        return default
+
     def _generate_heuristic_response(
         self, user_message: str, telemetry: dict[str, Any], lang: str
     ) -> str:
@@ -113,11 +130,11 @@ class QuantMentor:
         if "ETH" in target_sym:
             price = float(telemetry.get("eth_price", telemetry.get("current_price", 2425.0)))
         elif "SOL" in target_sym:
-            price = float(telemetry.get("sol_price", telemetry.get("current_price", 100.98)))
+            price = float(telemetry.get("sol_price", telemetry.get("current_price", 104.50)))
         elif "XAU" in target_sym or "GOLD" in target_sym:
-            price = float(telemetry.get("gold_price", telemetry.get("current_price", 4445.0)))
+            price = float(telemetry.get("gold_price", telemetry.get("current_price", 4110.0)))
         else:
-            price = float(telemetry.get("btc_price", telemetry.get("current_price", 77750.0)))
+            price = float(telemetry.get("btc_price", telemetry.get("current_price", 81750.0)))
 
         change_24h = float(telemetry.get("change_24h", 2.45))
         high_24h = float(telemetry.get("high_24h", round(price * 1.025, 2)))
@@ -410,11 +427,26 @@ class QuantMentor:
             "kinbo",
             "sell korbo",
             "what should i do",
+            "প্লান",
+            "প্ল্যান",
+            "ট্রেড",
+            "ট্রেডিং",
+            "সেটআপ",
+            "সিগন্যাল",
+            "কিনব",
+            "কিনবো",
+            "বেচব",
+            "বিক্রি",
+            "এন্ট্রি",
+            "টার্গেট",
+            "কখন কিনব",
+            "গোল্ড ট্রেড",
+            "গোল্ড প্লান",
         ]
         if any(w in msg_lower for w in plan_triggers):
             smc = telemetry.get("smc_setup")
             if smc:
-                tf_label = smc.get("timeframe", "15m").upper()
+                tf_label = smc.get("timeframe", self._detect_timeframe(user_message)).upper()
                 side = smc.get("action", "BUY / LONG on pullback")
                 entry_zone = smc.get("entry_zone")
                 sl = smc.get("stop_loss")
@@ -435,7 +467,7 @@ class QuantMentor:
                         f"🛑 **হার্ড স্টপ লস:** `${sl:,.2f}` (রিস্ক: `${risk_val:,.2f}` / `{risk_pct:.2f}%`)\n"
                         f"🎯 **টেক প্রফিট ১ (+1.5R):** `${tp1:,.2f}`\n"
                         f"🎯 **টেক প্রফিট ২ (+2.5R):** `${tp2:,.2f}`\n"
-                        f"⚖️ **পজিশন সাইজিং:** হাফ-কেলি রিস্ক: সর্বোচ্চ `1.85% ক্যাপিটাল`।\n"
+                        f"⚖️ **পজিশন সাইজিং:** হাফ-কেলি রিস্ক সীমা: সর্বোচ্চ `1.50% ক্যাপিটাল` (সাংবিধানিক নিয়ম)।\n"
                         f"━━━━━━━━━━━━━━━━━━━━━━\n"
                         f"লাইভ {tf_label} ক্যান্ডেল স্ক্যান সম্পন্ন। অটো-এক্সিকিউট করতে `/signal {target_sym}` পাঠান!"
                     )
@@ -449,7 +481,7 @@ class QuantMentor:
                         f"🛑 **Hard Stop Loss:** `${sl:,.2f}` (Strict risk: `${risk_val:,.2f}` / `{risk_pct:.2f}%`)\n"
                         f"🎯 **Take Profit 1:** `${tp1:,.2f}` (+1.5R mathematically validated)\n"
                         f"🎯 **Take Profit 2:** `${tp2:,.2f}` (+2.5R mathematical target)\n"
-                        f"⚖️ **Position Sizing:** Half-Kelly risk bounds: `1.85% portfolio equity` max.\n"
+                        f"⚖️ **Position Sizing:** Half-Kelly risk bounds: `1.50% portfolio equity` max (Constitutional Cap).\n"
                         f"━━━━━━━━━━━━━━━━━━━━━━\n"
                         f"Scanned dynamically across live {tf_label} candles. Send `/signal {target_sym}` to auto-deploy!"
                     )
@@ -467,19 +499,35 @@ class QuantMentor:
                     if bias == "BULLISH"
                     else round(price - (2.5 * risk_val), 2)
                 )
+                tf_label = self._detect_timeframe(user_message).upper()
 
-                return (
-                    f"📋 **{target_sym} ACTIONABLE TRADING PLAN**\n"
-                    f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                    f"🎯 **Action:** `{side}` on pullback\n"
-                    f"📥 **Ideal Entry Zone:** `${fvg_low:,.2f} — ${fvg_high:,.2f}`\n"
-                    f"🛑 **Hard Stop Loss:** `${sl:,.2f}` (Strict 1.2% risk)\n"
-                    f"🎯 **Take Profit 1:** `${tp1:,.2f}` (+1.5R: Arm Breakeven)\n"
-                    f"🎯 **Take Profit 2:** `${tp2:,.2f}` (+2.5R: Major Liquidity)\n"
-                    f"⚖️ **Risk Sizing:** Half-Kelly allocation: `2.15% equity` max.\n"
-                    f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                    f"Send `/signal {target_sym}` to auto-deploy this plan to the Shadow Desk!"
-                )
+                if is_bangla or lang == "bn":
+                    side_bn = "বাই / লং (পুলব্যাকে)" if bias == "BULLISH" else "সেল / শর্ট (পুলব্যাকে)"
+                    return (
+                        f"📋 **{target_sym} [{tf_label}] অ্যালগরিদমিক ট্রেডিং প্ল্যান:**\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"🎯 **অ্যাকশন:** `{side_bn}`\n"
+                        f"📥 **আইডিয়াল এন্ট্রি জোন:** `${fvg_low:,.2f} — ${fvg_high:,.2f}`\n"
+                        f"🛑 **হার্ড স্টপ লস:** `${sl:,.2f}` (কঠোর 1.2% রিস্ক)\n"
+                        f"🎯 **টেক প্রফিট ১ (+1.5R):** `${tp1:,.2f}` (ব্রেক-ইভেন শিল্ড অ্যাক্টিভ)\n"
+                        f"🎯 **টেক প্রফিট ২ (+2.5R):** `${tp2:,.2f}` (টার্গেট লিকুইডিটি পুল)\n"
+                        f"⚖️ **পজিশন সাইজিং:** হাফ-কেলি রিস্ক সীমা: সর্বোচ্চ `1.50% ক্যাপিটাল` (সাংবিধানিক নিয়ম)।\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"লাইভ মার্কেট প্রাইস `${price:,.2f}` এর উপর ভিত্তি করে প্রণীত। অটো-এক্সিকিউট করতে `/signal {target_sym}` পাঠান!"
+                    )
+                else:
+                    return (
+                        f"📋 **{target_sym} [{tf_label}] ACTIONABLE TRADING PLAN**\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"🎯 **Action:** `{side}` on pullback\n"
+                        f"📥 **Ideal Entry Zone:** `${fvg_low:,.2f} — ${fvg_high:,.2f}`\n"
+                        f"🛑 **Hard Stop Loss:** `${sl:,.2f}` (Strict 1.2% risk)\n"
+                        f"🎯 **Take Profit 1:** `${tp1:,.2f}` (+1.5R: Arm Breakeven)\n"
+                        f"🎯 **Take Profit 2:** `${tp2:,.2f}` (+2.5R: Major Liquidity)\n"
+                        f"⚖️ **Risk Sizing:** Half-Kelly allocation: `1.50% equity` max (Constitutional Cap).\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"Grounded in live price `${price:,.2f}`. Send `/signal {target_sym}` to auto-deploy this plan to the Shadow Desk!"
+                    )
 
         # --------------------------------------------------------------------------
         # INTENT 5: MACRO / NEWS / WHY DUMPING / WHY PUMPING / FOMC

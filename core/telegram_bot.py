@@ -2585,6 +2585,46 @@ class TelegramBotDispatcher:
                     )
                     return {"status": "ERROR", "command": cmd, "error": str(e)}
 
+            # Check if command is an asset/symbol query (e.g. /XAU 15m, /BTC, /ETH 1h, /SOL 15m)
+            raw_sym = cmd.lstrip("/").upper()
+            known_assets = {
+                "XAU", "GOLD", "PAXG", "BTC", "BITCOIN", "ETH", "ETHEREUM", "SOL", "SOLANA", "BNB", "AVAX", "DOGE"
+            }
+            if raw_sym in known_assets or raw_sym.endswith("USDT") or raw_sym.endswith("USD"):
+                asset_prompt = f"{raw_sym} {' '.join(args)} trading plan".strip()
+                try:
+                    ai_reply = await self.state_mind.handle_conversational_query(
+                        asset_prompt, chat_id=chat_id, identity=identity
+                    )
+                    if ai_reply and (
+                        not self.chat_id or str(chat_id) == str(self.chat_id) or not chat_id
+                    ):
+                        await self.send_message(ai_reply)
+                    telegram_audit.log_command_execution(
+                        identity, f"ASSET_COMMAND_{raw_sym}", " ".join(args), execution_result="EXECUTED"
+                    )
+                    return {"status": "EXECUTED", "command": cmd, "response": ai_reply}
+                except Exception as e:  # noqa: BLE001 — defensive fallback
+                    logger.error(f"Error handling asset command '{cmd}': {e}")
+
+            # Intelligent natural language fallback: if user typed a question with a leading slash
+            clean_query = text.lstrip("/").strip()
+            if len(clean_query) >= 3:
+                try:
+                    ai_reply = await self.state_mind.handle_conversational_query(
+                        clean_query, chat_id=chat_id, identity=identity
+                    )
+                    if ai_reply and (
+                        not self.chat_id or str(chat_id) == str(self.chat_id) or not chat_id
+                    ):
+                        await self.send_message(ai_reply)
+                    telegram_audit.log_command_execution(
+                        identity, "SLASH_NL_FALLBACK", clean_query, execution_result="EXECUTED"
+                    )
+                    return {"status": "EXECUTED", "command": cmd, "response": ai_reply}
+                except Exception as e:  # noqa: BLE001 — defensive fallback
+                    logger.debug(f"Conversational fallback for '{cmd}' failed: {e}")
+
             default_reply = (
                 "🤖 **SKY Institutional Quantitative Terminal Bot (V5)**\n\n"
                 "Type `/help` to see all available commands authorized for your role."

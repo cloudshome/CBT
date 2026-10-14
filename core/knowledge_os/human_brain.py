@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 from dataclasses import asdict, dataclass
 from enum import StrEnum
@@ -320,7 +321,7 @@ class HumanLearningEngine:
         }
 
     def _identify_target_concept(self, query: str) -> str:
-        """Matches user query to canonical taxonomy."""
+        """Matches user query to canonical taxonomy or dynamic persistent knowledge vault concepts."""
         q_lower = query.lower()
         if "sweep" in q_lower or "hunt" in q_lower:
             return "LIQUIDITY_SWEEP"
@@ -340,12 +341,31 @@ class HumanLearningEngine:
             return "POSITION_SIZING"
         if "backtest" in q_lower or "overfit" in q_lower:
             return "EMPIRICAL_BACKTESTING"
+
+        # Dynamic lookup in Knowledge Vault across all 363+ ingested concepts
+        try:
+            tokens = [t for t in re.findall(r"\w+", q_lower) if len(t) > 3]
+            with db_manager.get_brain_conn() as conn:
+                for token in tokens:
+                    row = conn.execute(
+                        """
+                        SELECT id, concept_title, category FROM knowledge_vault
+                        WHERE concept_title LIKE ? OR category LIKE ? OR tags LIKE ?
+                        LIMIT 1;
+                        """,
+                        (f"%{token}%", f"%{token}%", f"%{token}%"),
+                    ).fetchone()
+                    if row:
+                        return row["id"]
+        except Exception as e:
+            logger.debug(f"Knowledge vault concept lookup error: {e}")
+
         return "MARKET_STRUCTURE"
 
     def _check_missing_prerequisites(self, concept_id: str) -> list[str]:
         """Returns list of unmastered prerequisites for the concept."""
         info = CORE_CONCEPT_TAXONOMY.get(concept_id)
-        if not info or not info["prerequisites"]:
+        if not info or not info.get("prerequisites"):
             return []
 
         missing = []
@@ -365,7 +385,35 @@ class HumanLearningEngine:
     def _build_simple_explanation(
         self, question: str, concept_id: str, mode: HumanQuestionMode
     ) -> str:
-        """Builds plain-language pedagogical explanation."""
+        """Builds plain-language pedagogical explanation grounded in research concepts."""
+        # 1. Check dynamic Knowledge Vault first
+        if concept_id.startswith("KV_") or concept_id.startswith("KN_"):
+            try:
+                with db_manager.get_brain_conn() as conn:
+                    row = conn.execute(
+                        "SELECT concept_title, structured_explanation, category FROM knowledge_vault WHERE id = ?;",
+                        (concept_id,),
+                    ).fetchone()
+                    if row:
+                        title = row["concept_title"]
+                        desc = row["structured_explanation"] or ""
+                        category = row["category"] or "Quantitative Concept"
+                        if mode == HumanQuestionMode.TEACH:
+                            return (
+                                f"Let's break down {title} ({category}) step by step. {desc} "
+                                "In quantitative trading, this concept governs structural order book interaction "
+                                "and probability distributions across high-liquidity regimes."
+                            )
+                        if mode == HumanQuestionMode.COMPARE:
+                            return (
+                                f"Comparing {title}: In literature this is classified under {category}, "
+                                "whereas modern algorithmic order flow evaluates it through empirical liquidity exhaustion."
+                            )
+                        return f"{title} ({category}): {desc}"
+            except Exception as e:
+                logger.debug(f"Knowledge vault explanation query error: {e}")
+
+        # 2. Canonical taxonomy fallback
         info = CORE_CONCEPT_TAXONOMY.get(concept_id, {})
         title = info.get("title", "Market Concept")
         desc = info.get("description", "")

@@ -445,3 +445,4 @@ class CentralTradingMind:
 
 # Global authoritative singleton
 central_mind = CentralTradingMind()
+

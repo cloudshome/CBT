@@ -411,6 +411,20 @@ class TelegramAgentPlanner:
         except Exception as e:
             logger.debug(f"[AgentPlanner] ETH ticker fetch error: {e}")
 
+        sol_price = 105.0
+        try:
+            sol_ticker = await market_gateway.get_ticker("SOL/USDT")
+            sol_price = float(sol_ticker.get("price", sol_price))
+        except Exception as e:
+            logger.debug(f"[AgentPlanner] SOL ticker fetch error: {e}")
+
+        gold_price = 4110.0
+        try:
+            gold_ticker = await market_gateway.get_ticker("XAU/USD")
+            gold_price = float(gold_ticker.get("price", gold_price))
+        except Exception as e:
+            logger.debug(f"[AgentPlanner] Gold ticker fetch error: {e}")
+
         try:
             accounting = portfolio_shadow.get_portfolio_accounting()
         except Exception as e:
@@ -421,10 +435,12 @@ class TelegramAgentPlanner:
             "btc_price": btc_price,
             "btc_change_24h": btc_change_24h,
             "eth_price": eth_price,
+            "sol_price": sol_price,
+            "gold_price": gold_price,
             "virtual_equity": accounting.get("virtual_equity", 100000.0),
             "open_positions_count": accounting.get("open_positions_count", 0),
             "unrealized_pnl": accounting.get("total_unrealized_pnl", 0.0),
-            "risk_rule": "Half-Kelly (Max 2.5% Equity / Trade), Zero-Lookahead closed bars only",
+            "risk_rule": "Half-Kelly (Max 1.50% Equity / Trade Cap), Zero-Lookahead closed bars only",
             "capital_mode": "REAL_CAPITAL_ENABLED = False (Paper Simulation Locked)",
         }
 

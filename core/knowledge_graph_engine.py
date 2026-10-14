@@ -832,25 +832,26 @@ class KnowledgeGraphEngine:
 
     def discover_cross_domain_links(self) -> list[dict[str, Any]]:
         """
-        Scans all known claims, concepts, and market variables to detect
-        novel cross-domain relationship paths and candidate hypotheses.
+        Scans all known claims, concepts, and market variables across all worldviews to detect
+        novel cross-domain relationship paths and candidate hypotheses for empirical testing.
         """
         discoveries: list[dict[str, Any]] = []
         with db_manager.get_brain_conn() as conn:
             claims = conn.execute(
-                "SELECT * FROM research_claims ORDER BY created_at DESC LIMIT 20;"
+                """
+                SELECT * FROM research_claims 
+                WHERE source_worldview IN ('ASTROLOGICAL', 'GEOPOLITICAL', 'MACROECONOMIC', 'QUANTITATIVE_FINANCE', 'SMC_QUANTITATIVE')
+                ORDER BY created_at DESC LIMIT 60;
+                """
             ).fetchall()
-            conn.execute("SELECT * FROM research_variables LIMIT 10;").fetchall()
 
         for c in claims:
-            # Check if claim connects an unconventional source to financial market variables
             worldview = c["source_worldview"]
             obj_domain = c["object_domain"]
             subj = c["subject_concept"]
             cid = c["claim_id"]
 
-            if worldview in ["ASTROLOGICAL", "GEOPOLITICAL", "TEMPORAL_CYCLE", "MACRO"]:
-                # Candidate 1: Link to Gold Volatility
+            if worldview in ["ASTROLOGICAL", "GEOPOLITICAL", "MACROECONOMIC"]:
                 discoveries.append(
                     {
                         "discovery_id": f"DISC_{cid[-6:]}_GOLD",
@@ -864,7 +865,6 @@ class KnowledgeGraphEngine:
                         "proposed_hypothesis": f"H1: Variations in {subj} correlate with abnormal volatility clusters in Gold (XAU/USD).",
                     }
                 )
-                # Candidate 2: Link to BTC Volatility
                 discoveries.append(
                     {
                         "discovery_id": f"DISC_{cid[-6:]}_BTC",
@@ -878,11 +878,109 @@ class KnowledgeGraphEngine:
                         "proposed_hypothesis": f"H1: Variations in {subj} correlate with structural momentum shifts in BTC/USDT.",
                     }
                 )
+            elif worldview in ["QUANTITATIVE_FINANCE", "SMC_QUANTITATIVE"]:
+                discoveries.append(
+                    {
+                        "discovery_id": f"DISC_{cid[-6:]}_ALPHA",
+                        "source_claim_id": cid,
+                        "source_worldview": worldview,
+                        "premise": f"{worldview} structural pattern '{subj}' predicting price imbalance.",
+                        "cross_domain_candidate": f"'{subj}' ──?──► Cross-Asset Mean Reversion & Order Flow Elasticity",
+                        "target_variable": "VAR_ORDER_FLOW_IMBALANCE",
+                        "target_symbol": "ETH/USDT",
+                        "status": "UNTESTED",
+                        "proposed_hypothesis": f"H1: Structural liquidity sweep at {subj} exhibits statistical edge with Net EV > +0.35R.",
+                    }
+                )
 
         return discoveries
 
+    def seed_initial_hypotheses_if_empty(self) -> None:
+        """Seeds initial testable hypotheses into hypothesis_queue if empty."""
+        with db_manager.get_brain_conn() as conn:
+            cnt = conn.execute("SELECT COUNT(*) FROM hypothesis_queue;").fetchone()[0]
+            if cnt > 0:
+                return
+
+            initial_hypotheses = [
+                (
+                    "H_SMC_FVG_MOMENTUM",
+                    "C-92925C30",
+                    "SMC Fair Value Gap (FVG) Retest & 15m Momentum Continuation",
+                    "FVG retest has no statistically significant directional edge on next 12 bars.",
+                    "FVG retest generates positive drift with Net EV > +0.35R on 15m timeframe.",
+                    "VAR_SMC_IMBALANCE",
+                    "VAR_BTC_REALIZED_VOL",
+                    "BTC/USDT",
+                    "VOLATILITY_EVENT_STUDY",
+                    json.dumps(["FUNDING_RATE", "DXY", "ORDER_FLOW_IMBALANCE"]),
+                ),
+                (
+                    "H_GOLD_HEGEMONY_FLIGHT",
+                    "C-50795E76",
+                    "Geopolitical Hegemony Escalation & Gold Volatility Flight-to-Quality",
+                    "Geopolitical sanctions announcement creates zero abnormal volatility cluster in XAU/USD.",
+                    "Geopolitical sanction shocks increase XAU/USD 4h realized volatility by > 1.8 sigma.",
+                    "VAR_GEOPOLITICAL_SANCTION",
+                    "VAR_GOLD_VOLATILITY",
+                    "XAU/USD",
+                    "VOLATILITY_EVENT_STUDY",
+                    json.dumps(["DXY", "US10Y_YIELD", "FED_RATE_PROBABILITY"]),
+                ),
+                (
+                    "H_OFI_L2_MICROSTRUCTURE",
+                    "C-9294F1A3",
+                    "L2 Order Flow Imbalance (OFI) Toxicity & Sub-Second Price Drift",
+                    "L2 Top-of-Book OFI skew has zero predictive power over 5-second trade direction.",
+                    "OFI slope elasticity predicts micro-drift with R^2 > 0.12 across major liquidity pools.",
+                    "VAR_L2_OFI_TOXICITY",
+                    "VAR_MICRO_PRICE_DRIFT",
+                    "ETH/USDT",
+                    "VOLATILITY_EVENT_STUDY",
+                    json.dumps(["SPREAD_BPS", "MARKET_DEPTH", "TRADE_INTENSITY"]),
+                ),
+                (
+                    "H_MACRO_FOMC_DRIFT",
+                    "C-9295DE74",
+                    "FOMC Rate Expectation Revisions & Multi-Asset Volatility Contagion",
+                    "Rate expectation changes do not induce correlated volatility between BTC and Gold.",
+                    "Hawkish rate surprises trigger immediate inverse correlation between DXY and BTC/XAU.",
+                    "VAR_FED_RATE_EXPECTATION",
+                    "VAR_CROSS_ASSET_VOL",
+                    "BTC/USDT",
+                    "VOLATILITY_EVENT_STUDY",
+                    json.dumps(["CPI_YOY", "NON_FARM_PAYROLLS", "REAL_RATES"]),
+                ),
+                (
+                    "H_SOL_LIQUIDITY_SWEEP",
+                    "C-5980058C",
+                    "Solana High-Velocity Liquidity Pool Sweeps & Mean Reversion Speed",
+                    "Liquidity pool breach on SOL/USDT results in continuous expansion without mean reversion.",
+                    "Liquidity sweeps exceeding 2.0x ATR exhibit 68% probability of mean reversion within 4 bars.",
+                    "VAR_LIQUIDITY_SWEEP_DEPTH",
+                    "VAR_REVERSION_SPEED",
+                    "SOL/USDT",
+                    "VOLATILITY_EVENT_STUDY",
+                    json.dumps(["VOLUME_24H", "BINANCE_OPEN_INTEREST", "CEX_DEX_SPREAD"]),
+                ),
+            ]
+            now = int(time.time() * 1000)
+            for hid, cid, title, null_h, alt_h, indep, dep, sym, method, controls in initial_hypotheses:
+                conn.execute(
+                    """
+                    INSERT INTO hypothesis_queue (
+                        hypothesis_id, claim_id, title, null_hypothesis, alt_hypothesis,
+                        independent_variable, dependent_variable, target_symbol,
+                        test_method, control_variables, validation_status, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'QUEUED', ?);
+                    """,
+                    (hid, cid, title, null_h, alt_h, indep, dep, sym, method, controls, now),
+                )
+            conn.commit()
+
     def get_full_graph_payload(self) -> dict[str, Any]:
         """Returns nodes and edges across the 6 node types for visualization and research."""
+        self.seed_initial_hypotheses_if_empty()
         with db_manager.get_brain_conn() as conn:
             sources = [
                 dict(r)
@@ -945,6 +1043,31 @@ class KnowledgeGraphEngine:
 
             discoveries = self.discover_cross_domain_links()
 
+            # Accurate global scalar counts across the full persistent database
+            counts = {
+                "sources_count": conn.execute(
+                    "SELECT COUNT(*) FROM research_provenance_sources;"
+                ).fetchone()[0],
+                "claims_count": conn.execute(
+                    "SELECT COUNT(*) FROM research_claims;"
+                ).fetchone()[0],
+                "concepts_count": conn.execute(
+                    "SELECT COUNT(*) FROM research_concepts;"
+                ).fetchone()[0],
+                "variables_count": conn.execute(
+                    "SELECT COUNT(*) FROM research_variables;"
+                ).fetchone()[0],
+                "observations_count": conn.execute(
+                    "SELECT COUNT(*) FROM research_observations;"
+                ).fetchone()[0],
+                "edges_count": conn.execute(
+                    "SELECT COUNT(*) FROM knowledge_graph_edges;"
+                ).fetchone()[0],
+                "hypotheses_count": conn.execute(
+                    "SELECT COUNT(*) FROM hypothesis_queue;"
+                ).fetchone()[0],
+            }
+
             return {
                 "nodes": {
                     "sources": sources,
@@ -956,15 +1079,7 @@ class KnowledgeGraphEngine:
                 "edges": edges,
                 "hypotheses": hypotheses,
                 "discoveries": discoveries,
-                "counts": {
-                    "sources_count": len(sources),
-                    "claims_count": len(claims),
-                    "concepts_count": len(concepts),
-                    "variables_count": len(variables),
-                    "observations_count": len(observations),
-                    "edges_count": len(edges),
-                    "hypotheses_count": len(hypotheses),
-                },
+                "counts": counts,
             }
 
 
