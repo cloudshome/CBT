@@ -365,17 +365,24 @@ class AutonomousTrader:
                     )
 
                     # 7. Mirror qualified crypto trade to real Binance Spot Testnet during burn-in
-                    await self._mirror_trade_to_testnet(sym, direction_str)
+                    await self._mirror_trade_to_testnet(sym, direction_str, sl_price=sl, tp_price=tp)
 
             except Exception as e:  # noqa: BLE001 — defensive fallback
                 logger.error(f"AutonomousTrader scan error for {sym}: {e}")
 
         return executed_actions
 
-    async def _mirror_trade_to_testnet(self, symbol: str, direction: str) -> None:
+    async def _mirror_trade_to_testnet(
+        self,
+        symbol: str,
+        direction: str,
+        sl_price: float | None = None,
+        tp_price: float | None = None,
+    ) -> None:
         """
         Mirrors qualified autonomous trades onto real Binance Spot Testnet (https://testnet.binance.vision)
         when BINANCE TESTNET credentials are active and we are not inside a unit test.
+        Automatically attaches resting Stop-Loss on exchange matching engine upon fill.
         """
         import os
 
@@ -388,6 +395,7 @@ class AutonomousTrader:
             return
         try:
             from core.auth.credential_vault import credential_vault
+            from core.execution.connectors.binance_connector import BinanceSpotConnector
             from core.execution.live_canary_runner import CanaryRunRequest, live_canary_runner
 
             cred = credential_vault.get_credential("BINANCE", "TESTNET")
@@ -399,6 +407,7 @@ class AutonomousTrader:
                 symbol=exchange_sym,
                 notional_usd=15.0,
                 side=side,
+                stop_loss_price=sl_price,
                 is_dry_run=False,
                 environment="TESTNET",
             )
@@ -407,6 +416,34 @@ class AutonomousTrader:
                 f"AutonomousTrader mirrored {side} {exchange_sym} to BINANCE TESTNET: "
                 f"status={res.status} order_id={res.exchange_order_id} ack={res.dispatch_to_ack_latency_ms}ms"
             )
+
+            # If entry filled and we have a valid stop loss price, place native resting stop order on exchange
+            if res.status == "LIVE_ORDER_FILLED" and res.executed_qty > 0 and sl_price and sl_price > 0:
+                try:
+                    connector = BinanceSpotConnector(
+                        environment="TESTNET",
+                        api_key=cred.api_key,
+                        api_secret=cred.api_secret,
+                    )
+                    prot_side = "SELL" if side == "BUY" else "BUY"
+                    sl_limit = round(sl_price * 0.999, 2) if prot_side == "SELL" else round(sl_price * 1.001, 2)
+                    stop_params = {
+                        "symbol": exchange_sym,
+                        "side": prot_side,
+                        "type": "STOP_LOSS_LIMIT",
+                        "quantity": f"{res.executed_qty:.6f}".rstrip("0").rstrip("."),
+                        "price": f"{sl_limit:.2f}".rstrip("0").rstrip("."),
+                        "stopPrice": f"{sl_price:.2f}".rstrip("0").rstrip("."),
+                        "timeInForce": "GTC",
+                    }
+                    stop_data, _ = await connector._send_request("POST", "/api/v3/order", params=stop_params)
+                    logger.info(
+                        f"AutonomousTrader resting Stop-Loss placed on BINANCE TESTNET for {exchange_sym}: "
+                        f"Order ID {stop_data.get('orderId')} @ Stop ${sl_price:.2f} (Limit: ${sl_limit:.2f})"
+                    )
+                except Exception as stop_err:
+                    logger.warning(f"Could not place resting stop on testnet: {stop_err}")
+
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"AutonomousTrader Testnet mirror skipped for {symbol}: {exc}")
 
