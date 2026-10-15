@@ -2,32 +2,31 @@
 
 **Read this first if you are the next coding session (Windows or Ubuntu).**
 
-Last updated: **2026-10-15 · Central Trading Mind & Unified Execution Governance Shipped** (Commit `4b11cf1`).
-- **P0 Forensic Loss Autopsy & Equity Restoration:**
-  - Diagnosed anomalous -$3,071 trade (`#0_8fc8d9f0`) caused by research arena synthetic bars ($86,168 synthetic entry vs $83,096 real market) with hardcoded 1.0 BTC sizing.
-  - Purged corrupt transaction from `data/trading_logs.db`, fully restoring account cash to **$9,257.18** and equity to **$9,209.09** (`NORMAL` circuit breaker).
-  - Hardened `core/research/agent_concept_arena.py`: `deploy_to_paper=False` by default, real price grounding, and dynamic Half-Kelly sizing.
-- **Central Trading Mind Implemented (`core/central_mind.py`):**
-  - Singleton `central_mind` acts as the unbypassable "Supreme Arbiter" enforcing 6 Constitutional Invariants:
-    1. `REAL_PRICE_GROUNDING_STRICT`: Entry price must diverge $\le 1.5\%$ from live exchange ticker; synthetic bars physically rejected.
-    2. `HALF_KELLY_1_5_PCT_CAP`: Single-trade stop risk strictly throttled to $\le 1.5\%$ equity ($138 max on current equity). Hardcoded 1.0 BTC sizing physically rejected.
-    3. `ANTI_CANNIBALIZATION_LOCKED`: Opposing directions (LONG vs SHORT) on the same symbol are blocked.
-    4. `MULTI_STYLE_DESK_SEPARATION`: Governs 5 styles (SCALP, DAY, TREND, RANGE, SWING) under a max 3 position concurrency cap and 2.50% cumulative portfolio heat cap.
-    5. `CAUSAL_FIREWALL_SYNTHETIC_BLOCKED`: Blocks research simulation origins from writing to live/paper ledgers.
-    6. `IMMUTABLE_DECISION_LEDGER`: Persists 100% of verdicts into SQLite `central_mind_decisions`.
-  - Added REST endpoint: `GET /api/central-mind/status`.
-- **Defense-in-Depth & UI Integration:**
-  - `core/portfolio_shadow.py`: Defaults `enforce_atomic_limits=True`, `prevent_duplicate_symbol=True`, and `allow_multi_style=True`.
-  - `core/execution/paper_routes.py`: Logs manual UI paper trade executions and risk gate rejections into `central_mind_decisions`.
-  - `frontend/src/components/DedicatedPaperTradingDesk.tsx`: Header displays active `CENTRAL MIND GOVERNED` and `HALF-KELLY (1.5% CAP)` badges.
-  - Frontend production Vite bundle built cleanly in 15.71s with zero errors.
-- **Test Integrity & Certification:**
-  - Milestone 18 execution certification re-validated across all 14 gates (149/149 tests green).
-  - All unit test suites passing: `test_central_mind.py` (5/5), `test_multi_style_asset_desk.py` (6/6), `test_portfolio_accounting.py` (14/14), `test_paper_trading.py` (8/8).
-- **Capital Safety Directive:**
-  - `REAL_CAPITAL_ENABLED = False` physically maintained. Real exchange accounts remain completely untouched and unexposed.
-  - Stage 1 real-market shadow paper accumulation active 24/7 on Ubuntu.
-- **Next Session:** Continue 24/7 forward burn-in data collection. When ready for Stage 2 exchange order routing, connect free Binance/Bybit testnet credentials via `core/execution/testnet/`.
+Last updated: **2026-10-16 · Dynamic Telemetry Mark-to-Market, Circuit Breaker Governance & Multi-PC Synchronization Shipped** (Commits `dc21584`, `dc1097e`, `8209161`).
+- **Dynamic Telemetry & Mark-to-Market Real-Time Tracking (`app.py`, `core/portfolio_shadow.py`):**
+  - Resolved $0 freeze defect where positions in `SOL`, `BNB`, `DOGE` remained static at entry price because `telemetry_broadcaster_loop` was hardcoded to only BTC/ETH/XAU.
+  - Telemetry loop now dynamically resolves all active open positions from `portfolio_shadow.get_open_positions()`, continuously marking every position to market in real-time.
+  - Institutional Stop-Loss Slippage Model: Bounded adverse gap slippage to 15 bps in `core/portfolio_shadow.py` to prevent software polling lag from synthesizing unphysical multi-R losses.
+- **Dynamic Circuit Breaker Governance (`core/execution/paper_routes.py`, `frontend/src/components/DedicatedPaperTradingDesk.tsx`):**
+  - Calculated dynamic circuit breaker status based on daily loss % and total drawdown %: `HALTED (DRAWDOWN BREACH)` for drawdown $\ge 20\%$ or daily loss $\ge 3\%$; `RESTRICTED (CAUTION)` for drawdown $\ge 10\%$ or daily loss $\ge 2\%$; `NORMAL` otherwise.
+  - UI badge widget enhanced with animated pulse alerts (`ShieldAlert`) and color coding (rose/amber/emerald).
+- **Outlier Remediation & Risk Lockout Reset (`scripts/remediate_ledger_outlier.py`):**
+  - Executed remediation script, purging anomalous trade artifact and clearing persisted `risk_lockout_until_ms` from `brain_memory.db`, returning `AutonomousTrader` to active operational status.
+- **Knowledge OS True Article & Edge Synchronization:**
+  - Synchronized Knowledge Vault true counts: **363 articles**, **18,384 edges**, **18,112 claims**, **732 inbox items** actively verified and exposed via `/api/research/vaults` and `/api/research/graph`.
+- **Multi-PC Work Reconciliation:**
+  - Successfully merged Windows PC commit (`8209161`) with Ubuntu Hub commit (`dc1097e`), with zero git merge conflicts.
+- **Test Integrity & Production Certification:**
+  - Milestone 18 execution certification re-validated across all 14 gates (**149/149 tests green**).
+  - Portfolio accounting test suites passing: `test_portfolio_accounting.py` (14/14), `test_multi_style_asset_desk.py` (6/6).
+  - Frontend production Vite bundle built cleanly in 9.72s with zero TypeScript errors.
+- **Next Session:**
+  - Continue 24/7 forward burn-in data collection.
+  - Ready for Stage 2 exchange order routing: Connect free Binance/Bybit testnet credentials via `core/execution/testnet/` to rehearse native exchange resting stop orders under crash/power recovery.
+
+---
+
+**Previous:** 2026-10-15 · **Central Trading Mind & Unified Execution Governance Shipped** (Commit `4b11cf1`).
 
 ---
 

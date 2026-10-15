@@ -1,13 +1,13 @@
 # SKY — Project Status & Agent Handoff Document
 
-> **Last Updated:** 2026-10-15  
+> **Last Updated:** 2026-10-16  
 > **Release Tag:** `v4.0.0` (OPERATOR APPROVED & OFFICIALLY RELEASED 🚀)  
 > **Branch:** `main`  
 > **Remote:** `https://github.com/cloudshome/CBT.git`  
 > **Lead Agent:** Antigravity  
 > **Milestone 18 Status:** PRODUCTION PASS (Certified & Active — 149/149 Tests)  
 > **Milestone 46 Status:** COMPLETED & CERTIFIED (Central Trading Mind & Unified Execution Governance — 6 Invariants Enforced, 100% Green 🧠)  
-> **Account Balance:** $9,257.18 Settled Cash | $9,209.09 Virtual Equity (Circuit Breaker: NORMAL)  
+> **Account Balance:** $9,001.39 Virtual Equity | Dynamic Mark-to-Market Active (Circuit Breaker: NORMAL)  
 > **Milestone 31 & 31-R Status:** COMPLETED & CERTIFIED (Forward Reality League & 5-State Evidence Qualification — 52/52 Tests)  
 > **Milestone 31.5 Status:** COMPLETED & CERTIFIED (Strategy Constitution & Parameter Freeze Registry)  
 > **Milestone 32 Status:** COMPLETED & CERTIFIED (Autonomous 336h Testnet Burn-In & Ensemble Allocator — 32/32 Tests, 🟢 QUALIFIED)  
