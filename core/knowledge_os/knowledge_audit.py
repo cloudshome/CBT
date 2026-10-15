@@ -58,6 +58,10 @@ class KnowledgeAuditReport:
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
         d["checks"] = [c.to_dict() for c in self.checks]
+        d["total_checks"] = len(self.checks)
+        d["passed_checks"] = sum(1 for c in self.checks if c.status == "PASS")
+        d["warning_checks"] = sum(1 for c in self.checks if c.status == "WARN")
+        d["failure_checks"] = sum(1 for c in self.checks if c.status == "FAIL")
         return d
 
 
