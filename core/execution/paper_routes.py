@@ -461,6 +461,16 @@ async def get_paper_desk_overview():
     settled_cash = round(base_balance + total_realized, 2)
     total_unrealized = accounting["total_unrealized_pnl"]
     virtual_equity = round(settled_cash + total_unrealized, 2)
+    daily_realized_loss = abs(min(0.0, float(accounting.get("daily_realized_pnl", 0.0))))
+    daily_loss_pct = (daily_realized_loss / base_balance) * 100.0 if base_balance > 0 else 0.0
+    total_drawdown_pct = max(0.0, ((base_balance - virtual_equity) / base_balance) * 100.0) if base_balance > 0 else 0.0
+
+    if virtual_equity <= 0 or total_drawdown_pct >= 20.0 or daily_loss_pct >= 3.0:
+        circuit_breaker_status = "HALTED (DRAWDOWN BREACH)"
+    elif total_drawdown_pct >= 10.0 or daily_loss_pct >= 2.0:
+        circuit_breaker_status = "RESTRICTED (CAUTION)"
+    else:
+        circuit_breaker_status = "NORMAL"
 
     return {
         "summary": {
@@ -476,7 +486,7 @@ async def get_paper_desk_overview():
             "closedPositionsCount": len(past),
             "activeRiskPct": accounting["active_risk_pct"],
             "maxRiskCapPct": 2.50,
-            "circuitBreakerStatus": "NORMAL",
+            "circuitBreakerStatus": circuit_breaker_status,
             "maxOpenPositions": 3,
             "openSlotsRemaining": max(0, 3 - len(current)),
             "gatingReason": "Portfolio Heat Guard: 1.47% / 2.50% allocated. Adding another setup (~1.5% risk) would breach the 2.50% risk cap. Next trade permitted once current trade hits +1.5R breakeven (reducing risk to 0%) or closes.",

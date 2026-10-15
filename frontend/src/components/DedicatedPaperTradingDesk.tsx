@@ -300,16 +300,28 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
           </div>
 
           {/* Card 6: Circuit Breaker Status */}
-          <div className="bg-[#0d1424] border border-[#1e293b] rounded-lg p-3 flex flex-col justify-between">
-            <span className="text-[11px] font-mono text-slate-400">CIRCUIT BREAKER</span>
-            <div className="text-sm font-mono font-bold text-emerald-400 mt-1 flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>{summary.circuitBreakerStatus}</span>
-            </div>
-            <div className="text-[10px] font-mono text-slate-500 mt-1">
-              Zero-Bypass Governance
-            </div>
-          </div>
+          {(() => {
+            const isHalted = summary.circuitBreakerStatus.includes('HALTED') || summary.circuitBreakerStatus.includes('BREACH');
+            const isRestricted = summary.circuitBreakerStatus.includes('RESTRICTED');
+            const textColor = isHalted ? 'text-rose-400' : isRestricted ? 'text-amber-400' : 'text-emerald-400';
+            const borderColor = isHalted ? 'border-rose-500/40 bg-rose-950/20' : 'border-[#1e293b] bg-[#0d1424]';
+            return (
+              <div className={`border rounded-lg p-3 flex flex-col justify-between ${borderColor}`}>
+                <span className="text-[11px] font-mono text-slate-400">CIRCUIT BREAKER</span>
+                <div className={`text-sm font-mono font-bold mt-1 flex items-center gap-1.5 ${textColor}`}>
+                  {isHalted ? (
+                    <ShieldAlert className="w-4 h-4 text-rose-400 animate-pulse" />
+                  ) : (
+                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  )}
+                  <span>{summary.circuitBreakerStatus}</span>
+                </div>
+                <div className="text-[10px] font-mono text-slate-500 mt-1">
+                  Zero-Bypass Governance
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
 
