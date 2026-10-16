@@ -444,6 +444,51 @@ class AutonomousTrader:
                 except Exception as stop_err:
                     logger.warning(f"Could not place resting stop on testnet: {stop_err}")
 
+            # --- 2. Mirror to Binance Futures Testnet (Derivatives Desk) ---
+            try:
+                cred_fut = credential_vault.get_credential("BINANCE_FUTURES", "TESTNET")
+                if cred_fut and cred_fut.is_active:
+                    import aiohttp
+                    import hashlib
+                    import hmac
+                    import urllib.parse
+
+                    base_fut_url = "https://testnet.binancefuture.com"
+                    ts = int(time.time() * 1000)
+                    fut_qty = (
+                        f"{res.executed_qty:.4f}".rstrip("0").rstrip(".")
+                        if (res.status == "LIVE_ORDER_FILLED" and res.executed_qty > 0)
+                        else "0.002"
+                    )
+                    fut_params = {
+                        "symbol": exchange_sym,
+                        "side": side,
+                        "type": "MARKET",
+                        "quantity": fut_qty,
+                        "timestamp": ts,
+                    }
+                    q_fut = urllib.parse.urlencode(fut_params)
+                    sig_fut = hmac.new(
+                        cred_fut.api_secret.encode(), q_fut.encode(), hashlib.sha256
+                    ).hexdigest()
+                    async with aiohttp.ClientSession() as s:
+                        async with s.post(
+                            f"{base_fut_url}/fapi/v1/order?{q_fut}&signature={sig_fut}",
+                            headers={"X-MBX-APIKEY": cred_fut.api_key},
+                        ) as r:
+                            fut_data = await r.json()
+                            if r.status in (200, 201) and fut_data.get("orderId"):
+                                logger.info(
+                                    f"AutonomousTrader mirrored {side} {exchange_sym} to BINANCE FUTURES TESTNET: "
+                                    f"order_id={fut_data.get('orderId')} status={fut_data.get('status')}"
+                                )
+                            else:
+                                logger.warning(
+                                    f"Binance Futures testnet mirror response: {fut_data}"
+                                )
+            except Exception as fut_err:
+                logger.warning(f"Could not mirror to Binance Futures testnet: {fut_err}")
+
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"AutonomousTrader Testnet mirror skipped for {symbol}: {exc}")
 
