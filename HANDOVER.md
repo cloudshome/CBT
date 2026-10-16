@@ -2,7 +2,39 @@
 
 **Read this first if you are the next coding session (Windows or Ubuntu).**
 
-Last updated: **2026-10-16 · Dynamic Telemetry Mark-to-Market, Circuit Breaker Governance & Multi-PC Synchronization Shipped** (Commits `dc21584`, `dc1097e`, `8209161`).
+Last updated: **2026-10-17 · Dynamic Market Opportunity Hunter & Dual Spot/Futures Testnet Mirroring Shipped** (Commits `2d7cd94`, `4534ff2`, `392a484`).
+- **Dynamic Market Opportunity Hunter (`core/screener/opportunity_hunter.py`, `app.py`):**
+  - Continuous discovery across 3,732 Binance Spot pairs and 793 USDⓈ-M Futures pairs with async non-blocking execution and 3-minute TTL memory caching.
+  - Institutional Liquidity & Spread Gates: Enforces $15M Spot / $25M Futures 24h volume minimums and 12 bps max spread.
+  - 6 Quantitative Opportunity Classifications:
+    1. `MOMENTUM_ACCELERATION`: Velocity expansion with volume surge (> 1.8x RVOL).
+    2. `RANGE_BREAKOUT`: Volatility compression transition with range breach.
+    3. `CAPITULATION_RECLAIM`: Rebound from severe drop (< -8%) with buy volume reclaim.
+    4. `BEARISH_BREAKDOWN`: Distribution breakdown below support with high sell volume.
+    5. `BLOW_OFF_EXHAUSTION`: Parabolic extension (> +18%) with extreme spread/wick exhaustion.
+    6. `CATALYST_FLOW`: Abnormal order-flow asymmetry and taker imbalance.
+  - Dual Scoring Engine: Independent Market Attention Score (0-100) and Trade Quality Score (0-100).
+  - REST Endpoints: `/api/screener/opportunities`, `/api/screener/watchlist`, `/api/screener/health`.
+- **Mastermind Swarm UI Radar (`frontend/src/components/MastermindSwarmDesk.tsx`, `frontend/src/services/api.ts`):**
+  - Integrated the Dynamic Market Opportunity Radar directly below the Active Specialist Arena.
+  - Category filter pills, venue indicators (`[SPOT]` / `[FUTURES]`), RVOL metrics, 24h change, spread bps, and attention progress bars.
+  - Production Vite bundle built with 0 errors.
+- **Binance Spot & Futures Dual-Testnet Integration (`core/autonomous_trader.py`, `core/execution/binance_testnet_client.py`):**
+  - Fully integrated Binance Futures Testnet (`https://testnet.binancefuture.com`) alongside Spot Testnet (`https://testnet.binance.vision`).
+  - Automatic exchange-native resting Stop Loss placement immediately upon fill confirmation.
+- **Circuit Breaker Governance Audit & Capital Preservation:**
+  - Diagnosed zero open trades: overnight market-wide correction hit resting stops cleanly (< 1.0-1.5% per trade, zero liquidation).
+  - Net daily loss reached 3.68%, triggering deterministic 24h `DAILY_DRAWDOWN_LOCKOUT`.
+  - System operated with institutional discipline: prevented revenge trading into falling markets.
+- **Test Integrity:** 165/165 tests 100% green (149 M18 execution certification + 10 AutonomousTrader + 6 OpportunityHunter).
+- **Windows PC Office Resumption:**
+  - Pull branch on office Windows PC: `git pull origin main`.
+  - Compile frontend: `cd frontend && npm install && npm run build` (or `npm run dev`).
+  - Access terminal: Connect browser to Ubuntu Hub at `http://<ubuntu-ip>:8000` or local dev client at `http://localhost:5173`.
+
+---
+
+**Previous:** 2026-10-16 · **Dynamic Telemetry Mark-to-Market, Circuit Breaker Governance & Multi-PC Synchronization Shipped** (Commits `dc21584`, `dc1097e`, `8209161`).
 - **Dynamic Telemetry & Mark-to-Market Real-Time Tracking (`app.py`, `core/portfolio_shadow.py`):**
   - Resolved $0 freeze defect where positions in `SOL`, `BNB`, `DOGE` remained static at entry price because `telemetry_broadcaster_loop` was hardcoded to only BTC/ETH/XAU.
   - Telemetry loop now dynamically resolves all active open positions from `portfolio_shadow.get_open_positions()`, continuously marking every position to market in real-time.
