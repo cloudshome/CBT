@@ -182,3 +182,4 @@ async def test_screener_api_endpoint_contracts():
         resp_wl = await client.get("/api/screener/watchlist")
         assert resp_wl.status_code == 200
         assert "watchlist" in resp_wl.json()
+

@@ -423,3 +423,4 @@ class OpportunityHunter:
 
 
 opportunity_hunter = OpportunityHunter()
+

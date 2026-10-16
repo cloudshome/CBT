@@ -21,3 +21,4 @@ __all__ = [
     "OpportunityHunter",
     "opportunity_hunter",
 ]
+
