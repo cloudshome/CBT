@@ -78,3 +78,4 @@ def test_breakeven_triggers_cleanly_when_open():
     open_pos = portfolio_shadow.get_open_positions()
     assert len(open_pos) == 1
     assert open_pos[0]["breakeven_triggered"] == 1
+
