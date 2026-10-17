@@ -1,0 +1,30 @@
+# =============================================================================
+# SKY / CBT — Windows Work Synchronization Crontab
+# Timezone: Asia/Dhaka (+06:00)
+# Automatically syncs Ubuntu Hub with commits pushed from Windows PC
+# Times: 12:01 PM, 12:30 PM, 1:30 PM, 2:30 PM, 3:30 PM, 4:30 PM, 11:55 PM
+# =============================================================================
+SHELL=/bin/bash
+PATH=/home/cloudslover/CBT/.venv/bin:/usr/local/bin:/usr/bin:/bin
+HOME=/home/cloudslover
+
+# 12:01 PM
+1 12 * * * /home/cloudslover/CBT/scripts/ubuntu_git_sync.sh >> /home/cloudslover/CBT/data/logs/git_sync.log 2>&1
+
+# 12:30 PM
+30 12 * * * /home/cloudslover/CBT/scripts/ubuntu_git_sync.sh >> /home/cloudslover/CBT/data/logs/git_sync.log 2>&1
+
+# 1:30 PM (13:30)
+30 13 * * * /home/cloudslover/CBT/scripts/ubuntu_git_sync.sh >> /home/cloudslover/CBT/data/logs/git_sync.log 2>&1
+
+# 2:30 PM (14:30)
+30 14 * * * /home/cloudslover/CBT/scripts/ubuntu_git_sync.sh >> /home/cloudslover/CBT/data/logs/git_sync.log 2>&1
+
+# 3:30 PM (15:30)
+30 15 * * * /home/cloudslover/CBT/scripts/ubuntu_git_sync.sh >> /home/cloudslover/CBT/data/logs/git_sync.log 2>&1
+
+# 4:30 PM (16:30)
+30 16 * * * /home/cloudslover/CBT/scripts/ubuntu_git_sync.sh >> /home/cloudslover/CBT/data/logs/git_sync.log 2>&1
+
+# 11:55 PM (23:55)
+55 23 * * * /home/cloudslover/CBT/scripts/ubuntu_git_sync.sh >> /home/cloudslover/CBT/data/logs/git_sync.log 2>&1
