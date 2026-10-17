@@ -88,11 +88,12 @@ class MacroTradePlanner:
             btc_macro_score = float(btc_data.get("sentiment_score", 0.0))
 
         plans: list[dict[str, Any]] = []
+        from core.data_streamer import data_streamer
 
         # -------------------------------------------------------------
         # 1. BITCOIN (BTC/USDT) PLAN
         # -------------------------------------------------------------
-        btc_cur = 78450.0
+        btc_cur = float(data_streamer._last_known_prices.get("BTC/USDT", 78450.0))
         btc_pdh = round(btc_cur * 1.025, 2)
         btc_pdl = round(btc_cur * 0.978, 2)
         btc_fvg_low = round(btc_cur * 0.988, 2)
@@ -171,7 +172,7 @@ class MacroTradePlanner:
         # -------------------------------------------------------------
         # 2. ETHEREUM (ETH/USDT) PLAN
         # -------------------------------------------------------------
-        eth_cur = 2415.0
+        eth_cur = float(data_streamer._last_known_prices.get("ETH/USDT", 2415.0))
         eth_pdh = round(eth_cur * 1.032, 2)
         eth_pdl = round(eth_cur * 0.975, 2)
         eth_fvg_low = round(eth_cur * 0.985, 2)
@@ -238,7 +239,7 @@ class MacroTradePlanner:
         # -------------------------------------------------------------
         # 3. SOLANA (SOL/USDT) PLAN
         # -------------------------------------------------------------
-        sol_cur = 194.50
+        sol_cur = float(data_streamer._last_known_prices.get("SOL/USDT", 194.50))
         sol_pdh = round(sol_cur * 1.045, 2)
         sol_pdl = round(sol_cur * 0.968, 2)
         sol_fvg_low = round(sol_cur * 0.982, 2)

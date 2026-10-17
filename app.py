@@ -784,17 +784,20 @@ async def telemetry_broadcaster_loop():
                 events = portfolio_shadow.update_live_price(sym, cur_price)
                 for ev in events:
                     await ws_manager.broadcast({"type": "POSITION_EVENT", "data": ev})
-                    # Dispatch institutional alert to Telegram
-                    alert_details = {
-                        "symbol": sym,
-                        "price": cur_price,
-                        "pnl_usd": ev.get("realized_pnl", 0.0),
-                        "autopsy": ev.get("autopsy"),
-                        "message": ev.get("message", ""),
-                    }
-                    asyncio.create_task(
-                        telegram_bot.send_position_alert(ev.get("event", "FILL"), alert_details)
-                    )
+                    event_type = ev.get("event", "FILL")
+                    # Trade exit alerts are already dispatched directly by portfolio_shadow.notify_trade_exit_sync
+                    # with comprehensive forensic autopsy metadata. Dispatch position updates only for non-exit events.
+                    if event_type not in ("TAKE_PROFIT_HIT", "STOP_LOSS_HIT", "MANUAL_CLOSE"):
+                        alert_details = {
+                            "symbol": sym,
+                            "price": cur_price,
+                            "pnl_usd": ev.get("realized_pnl", 0.0),
+                            "autopsy": ev.get("autopsy"),
+                            "message": ev.get("message", ""),
+                        }
+                        asyncio.create_task(
+                            telegram_bot.send_position_alert(event_type, alert_details)
+                        )
 
                 # Macro snapshot
                 macro = macro_sentinel.get_macro_snapshot()

@@ -150,12 +150,22 @@ async def get_paper_desk_overview():
 
     # Format Current
     current = []
+    from core.data_streamer import data_streamer
     for p in open_pos:
         side = "BUY" if p.get("direction") == "LONG" else "SELL"
-        pnl = float(p.get("unrealized_pnl", 0.0))
+        sym = p.get("symbol", "")
         entry = float(p.get("entry_price", 0.0))
-        cur = float(p.get("current_price", entry))
         size = float(p.get("size", 1.0))
+        cur = float(p.get("current_price", entry))
+
+        # Dynamic Mark-to-Market from Live Ticker Stream
+        live_ticker_p = data_streamer._last_known_prices.get(sym)
+        if live_ticker_p and live_ticker_p > 0:
+            cur = float(live_ticker_p)
+            pnl = (cur - entry) * size if side == "BUY" else (entry - cur) * size
+        else:
+            pnl = float(p.get("unrealized_pnl", 0.0))
+
         pnl_pct = ((cur - entry) / entry * 100.0) if entry > 0 else 0.0
         if side == "SELL":
             pnl_pct = -pnl_pct
@@ -170,8 +180,6 @@ async def get_paper_desk_overview():
         risk_pct = round((capital_at_risk / max(1.0, virtual_equity)) * 100.0, 2)
         tp_dist = abs(tp_val - entry) if tp_val > 0 else 0.0
         rr_ratio = round(tp_dist / max(1e-4, sl_dist), 2)
-
-        sym = p.get("symbol", "")
         entry_reason_val = p.get("entry_reason") or ""
         style_match = re.search(r"\[([A-Z0-9]+)_([A-Z0-9]+)\]", entry_reason_val)
         if style_match:
@@ -332,114 +340,61 @@ async def get_paper_desk_overview():
             }
         )
 
-    if len(past) == 0:
-        demo_past = [
-            {
-                "id": "DEMO_BTC_HIST_01",
-                "symbol": "BTC/USDT",
-                "side": "BUY",
-                "size": 0.025,
-                "entryPrice": 76500.0,
-                "exitPrice": 78200.0,
-                "sl": 75800.0,
-                "tp": 78200.0,
-                "realizedPnlUsd": 42.50,
-                "realizedPnlPct": 2.22,
-                "openedAt": int(time.time() * 1000) - 86400000,
-                "closedAt": int(time.time() * 1000) - 43200000,
-                "openedAtFormatted": "2026-10-05 12:00:00 UTC",
-                "closedAtFormatted": "2026-10-05 23:59:00 UTC",
-                "entryReason": "Fair Value Gap fill with continuous bullish CVD delta",
-                "exitReason": "TAKE_PROFIT_HIT",
-                "autopsyCategory": "VALIDATED_PROFIT",
-                "autopsyCause": "Fair Value Gap fill with continuous bullish CVD delta.",
-                "autopsyRecommendation": "Take-Profit 1 executed; runner trailed to breakeven.",
-                "isDemo": True,
-            },
-            {
-                "id": "DEMO_ETH_HIST_02",
-                "symbol": "ETH/USDT",
-                "side": "BUY",
-                "size": 0.85,
-                "entryPrice": 2420.0,
-                "exitPrice": 2385.0,
-                "sl": 2385.0,
-                "tp": 2490.0,
-                "realizedPnlUsd": -29.75,
-                "realizedPnlPct": -1.45,
-                "openedAt": int(time.time() * 1000) - 172800000,
-                "closedAt": int(time.time() * 1000) - 129600000,
-                "openedAtFormatted": "2026-10-04 12:00:00 UTC",
-                "closedAtFormatted": "2026-10-04 23:59:00 UTC",
-                "entryReason": "Asian session range expansion attempt",
-                "exitReason": "STOP_LOSS_HIT",
-                "autopsyCategory": "LIQUIDITY_FAILURE",
-                "autopsyCause": "Asian session high sweep triggered sudden mean-reversion selloff.",
-                "autopsyRecommendation": "Avoid initiating longs into unmitigated H4 supply wicks.",
-                "isDemo": True,
-            },
-        ]
-        # Include demo trades for UI display preview but strictly isolate them from actual accounting metrics
-        past.extend(demo_past)
-
-    future_queue = [
-        {
-            "queueId": "Q_BTC_01",
-            "symbol": "BTC/USDT",
-            "direction": "LONG",
-            "setupName": "Judas Swing Sweep + 15m Fair Value Gap",
-            "archetype": "SMC_LIQUIDITY_RUN",
-            "triggerCondition": "15m candle displacement close above $78,100",
-            "plannedEntry": 77850.0,
-            "stopLoss": 76950.0,
-            "tp1": 79450.0,
-            "tp2": 80800.0,
-            "tp3": 82500.0,
-            "riskReward": "1:3.4",
-            "confluenceScore": 91,
-            "kellyPct": 2.15,
-            "queueStatus": "READY_TO_DEPLOY",
-            "statusNote": "Order book slope elasticity confirms bid wall backing.",
-        },
-        {
-            "queueId": "Q_ETH_02",
-            "symbol": "ETH/USDT",
-            "direction": "LONG",
-            "setupName": "4H Order Block Rejection + CVD Absorption",
-            "archetype": "INSTITUTIONAL_ABSORPTION",
-            "triggerCondition": "CVD delta flips > +$10M at support block",
-            "plannedEntry": 2380.0,
-            "stopLoss": 2345.0,
-            "tp1": 2445.0,
-            "tp2": 2510.0,
-            "tp3": 2580.0,
-            "riskReward": "1:2.9",
-            "confluenceScore": 88,
-            "kellyPct": 1.85,
-            "queueStatus": "PENDING_CONFIRMATION",
-            "statusNote": "Awaiting volume expansion confirmation on 15m.",
-        },
-        {
-            "queueId": "Q_SOL_03",
-            "symbol": "SOL/USDT",
-            "direction": "LONG",
-            "setupName": "Liquidity Hunt + Range Breakout",
-            "archetype": "MOMENTUM_EXPANSION",
-            "triggerCondition": "Sweep of Previous Day Low at $192.50 with quick reclaim",
-            "plannedEntry": 193.50,
-            "stopLoss": 189.20,
-            "tp1": 201.00,
-            "tp2": 208.50,
-            "tp3": 215.00,
-            "riskReward": "1:3.2",
-            "confluenceScore": 85,
-            "kellyPct": 1.70,
-            "queueStatus": "AWAITING_SWEEP",
-            "statusNote": "Open interest compressing; volatility breakout expected.",
-        },
-    ]
-
     trading_plans = macro_trade_planner.generate_live_trading_plans()
+
+    future_queue = []
+    for idx, plan in enumerate(trading_plans, start=1):
+        sym = plan.get("symbol", "BTC/USDT")
+        bias = plan.get("bias", "NEUTRAL")
+        cur_p = float(plan.get("currentPrice", 0.0))
+        if cur_p <= 0:
+            continue
+
+        is_long = "BULL" in bias or bias in ("ACCUMULATION_RANGE", "CONSOLIDATION", "NEUTRAL")
+        direction = "LONG" if is_long else "SHORT"
+        clean_sym = sym.replace("/", "_")
+
+        # Ground planned entry, stop loss, and targets dynamically in current live price
+        if is_long:
+            planned_entry = round(cur_p * 0.995, 2)
+            stop_loss = round(cur_p * 0.985, 2)
+            tp1 = round(cur_p * 1.020, 2)
+            tp2 = round(cur_p * 1.040, 2)
+            tp3 = round(cur_p * 1.065, 2)
+        else:
+            planned_entry = round(cur_p * 1.005, 2)
+            stop_loss = round(cur_p * 1.015, 2)
+            tp1 = round(cur_p * 0.980, 2)
+            tp2 = round(cur_p * 0.960, 2)
+            tp3 = round(cur_p * 0.935, 2)
+
+        risk_dist = abs(planned_entry - stop_loss)
+        reward_dist = abs(tp1 - planned_entry)
+        rr_ratio = round(reward_dist / max(1e-4, risk_dist), 1)
+
+        is_ready = plan.get("macroAlignment") == "CONFLUENT"
+        q_status = "READY_TO_DEPLOY" if is_ready else "AWAITING_SWEEP"
+
+        future_queue.append(
+            {
+                "queueId": f"Q_{clean_sym}_{idx:02d}",
+                "symbol": sym,
+                "direction": direction,
+                "setupName": f"{sym.split('/')[0]} {bias.replace('_', ' ').title()}",
+                "archetype": "SMC_LIQUIDITY_RUN" if is_long else "INSTITUTIONAL_DISTRIBUTION",
+                "triggerCondition": f"15m candle displacement close {'above' if is_long else 'below'} structural pivot at ${planned_entry:,.2f}",
+                "plannedEntry": planned_entry,
+                "stopLoss": stop_loss,
+                "tp1": tp1,
+                "tp2": tp2,
+                "tp3": tp3,
+                "riskReward": f"1:{rr_ratio}",
+                "confluenceScore": 90 if is_ready else 82,
+                "kellyPct": round(min(1.50, 1.50 * float(plan.get("riskMultiplier", 1.0))), 2),
+                "queueStatus": q_status,
+                "statusNote": plan.get("note", "Live market structure and order flow aligned."),
+            }
+        )
 
     base_balance = float(os.getenv("MAX_PAPER_ACCOUNT_BALANCE", "10000.0"))
     accounting = portfolio_shadow.get_portfolio_accounting(starting_capital=base_balance)
@@ -472,6 +427,19 @@ async def get_paper_desk_overview():
     else:
         circuit_breaker_status = "NORMAL"
 
+    active_risk_val = float(accounting.get("active_risk_pct", 0.0))
+    if active_risk_val >= 2.50:
+        gating_reason_str = (
+            f"Portfolio Heat Guard: {active_risk_val:.2f}% / 2.50% allocated. Adding another setup would breach "
+            f"the 2.50% risk cap. Next trade permitted once current trade hits +1.0R breakeven (reducing risk to 0%) or closes."
+        )
+    else:
+        remaining_cap = max(0.0, 2.50 - active_risk_val)
+        gating_reason_str = (
+            f"Risk Primacy Cleared: {active_risk_val:.2f}% / 2.50% allocated ({remaining_cap:.2f}% capacity remaining). "
+            f"Half-Kelly execution authorized."
+        )
+
     return {
         "summary": {
             "startingCapital": round(base_balance, 2),
@@ -489,7 +457,7 @@ async def get_paper_desk_overview():
             "circuitBreakerStatus": circuit_breaker_status,
             "maxOpenPositions": 3,
             "openSlotsRemaining": max(0, 3 - len(current)),
-            "gatingReason": "Portfolio Heat Guard: 1.47% / 2.50% allocated. Adding another setup (~1.5% risk) would breach the 2.50% risk cap. Next trade permitted once current trade hits +1.5R breakeven (reducing risk to 0%) or closes.",
+            "gatingReason": gating_reason_str,
         },
         "current": current,
         "past": past,
@@ -505,9 +473,22 @@ async def get_paper_positions():
     """
     open_pos = portfolio_shadow.get_open_positions()
     mapped = []
+    from core.data_streamer import data_streamer
     for p in open_pos:
         side = "BUY" if p.get("direction") == "LONG" else "SELL"
-        pnl = float(p.get("unrealized_pnl", 0.0))
+        sym = p.get("symbol", "")
+        entry = float(p.get("entry_price", 0.0))
+        size = float(p.get("size", 1.0))
+        cur = float(p.get("current_price", entry))
+
+        # Dynamic Mark-to-Market
+        live_ticker_p = data_streamer._last_known_prices.get(sym)
+        if live_ticker_p and live_ticker_p > 0:
+            cur = float(live_ticker_p)
+            pnl = (cur - entry) * size if side == "BUY" else (entry - cur) * size
+        else:
+            pnl = float(p.get("unrealized_pnl", 0.0))
+
         entry_reason_val = p.get("entry_reason") or ""
         style_match = re.search(r"\[([A-Z0-9]+)_([A-Z0-9]+)\]", entry_reason_val)
         if style_match:
@@ -533,8 +514,8 @@ async def get_paper_positions():
                 "id": p.get("position_id", ""),
                 "symbol": p.get("symbol", ""),
                 "side": side,
-                "entryPrice": p.get("entry_price", 0.0),
-                "currentPrice": p.get("current_price", p.get("entry_price", 0.0)),
+                "entryPrice": entry,
+                "currentPrice": cur,
                 "sl": p.get("stop_loss", 0.0),
                 "tp": p.get("take_profit", 0.0),
                 "size": p.get("size", 1.0),

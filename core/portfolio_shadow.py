@@ -265,7 +265,7 @@ class PortfolioShadowManager:
                 (current_price - entry_p) * size if is_long else (entry_p - current_price) * size
             )
 
-            # 2. Check Breakeven Trigger (+1.5R)
+            # 2. Check Breakeven Trigger (+1.5R Milestone)
             if not be_trig and risk_dist > 0:
                 current_r = (
                     ((current_price - entry_p) / risk_dist)
@@ -283,7 +283,7 @@ class PortfolioShadowManager:
                             "event": "BREAKEVEN_TRIGGERED",
                             "position_id": pos_id,
                             "new_stop_loss": sl_p,
-                            "message": f"🎉 {symbol} reached +1.5R! Stop Loss automatically adjusted to Breakeven (${sl_p:,.2f}).",
+                            "message": f"🛡️ {symbol} reached +1.5R! Stop Loss automatically adjusted to Breakeven (${sl_p:,.2f}).",
                         }
                     )
 
@@ -413,6 +413,15 @@ class PortfolioShadowManager:
                         },
                     )
 
+                    # If position closed in this tick, remove any conflicting BREAKEVEN_TRIGGERED for this position
+                    events = [
+                        ev
+                        for ev in events
+                        if not (
+                            ev.get("position_id") == pos_id
+                            and ev.get("event") == "BREAKEVEN_TRIGGERED"
+                        )
+                    ]
                     events.append(
                         {
                             "event": close_reason,
