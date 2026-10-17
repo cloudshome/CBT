@@ -20,6 +20,7 @@ import { api } from '../../services/api';
 interface InstitutionalMasterTerminalProps {
   initialSymbol?: string;
   initialTimeframe?: SupportedTimeframe;
+  onSymbolChange?: (sym: string) => void;
   onDeployToOrderDesk?: (setup: any) => void;
   addToast: (type: 'success' | 'error' | 'info' | 'warning', title: string, message: string) => void;
 }
@@ -27,6 +28,7 @@ interface InstitutionalMasterTerminalProps {
 export const InstitutionalMasterTerminal: React.FC<InstitutionalMasterTerminalProps> = ({
   initialSymbol = 'BTCUSDT',
   initialTimeframe = '15m',
+  onSymbolChange,
   onDeployToOrderDesk,
   addToast,
 }) => {
@@ -35,6 +37,20 @@ export const InstitutionalMasterTerminal: React.FC<InstitutionalMasterTerminalPr
   const [timeframe, setTimeframe] = useState<SupportedTimeframe>(initialTimeframe);
   const [densityMode, setDensityMode] = useState<TerminalDensityMode>('COMMAND');
   const [selectedStyle, setSelectedStyle] = useState<StyleSignalPlan['style']>('SWING');
+
+  // Synchronize internal symbol state with parent initialSymbol prop changes
+  useEffect(() => {
+    if (initialSymbol && initialSymbol !== symbol) {
+      setSymbol(initialSymbol);
+    }
+  }, [initialSymbol]);
+
+  const handleSelectSymbol = (newSym: string) => {
+    setSymbol(newSym);
+    if (onSymbolChange) {
+      onSymbolChange(newSym);
+    }
+  };
 
   // Master Telemetry State
   const [telemetry, setTelemetry] = useState<MasterTerminalTelemetry | null>(null);
@@ -138,7 +154,7 @@ export const InstitutionalMasterTerminal: React.FC<InstitutionalMasterTerminalPr
         densityMode={densityMode}
         onDensityModeChange={setDensityMode}
         selectedSymbol={symbol}
-        onSelectSymbol={(sym) => setSymbol(sym)}
+        onSelectSymbol={handleSelectSymbol}
         onRefresh={fetchInitialData}
         loading={loading}
       />

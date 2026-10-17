@@ -579,6 +579,7 @@ export const App: React.FC = () => {
         <InstitutionalMasterTerminal
           initialSymbol={symbol}
           initialTimeframe={timeframe}
+          onSymbolChange={setSymbol}
           onDeployToOrderDesk={(setup) => {
             setSelectedSetup(setup);
             addToast('info', 'Setup Loaded', `Transferred ${setup.type} order to Order Desk.`);
