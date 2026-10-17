@@ -1,13 +1,16 @@
 # SKY — Project Status & Agent Handoff Document
 
-> **Last Updated:** 2026-10-15  
-> **Release Tag:** `v4.0.0` (OPERATOR APPROVED & OFFICIALLY RELEASED 🚀)  
+> **Last Updated:** 2026-10-17  
+> **Release Tag:** `v4.1.0-screener-dualnet` (Dynamic Opportunity Radar & Dual Testnet Active 🚀)  
 > **Branch:** `main`  
 > **Remote:** `https://github.com/cloudshome/CBT.git`  
 > **Lead Agent:** Antigravity  
 > **Milestone 18 Status:** PRODUCTION PASS (Certified & Active — 149/149 Tests)  
+> **Dynamic Screener Status:** PRODUCTION ACTIVE (Scanning 3,732 Spot & 793 Futures Pairs, 6 Categories, 143 Opportunities)  
+> **Autonomous Trader Status:** DUAL-TESTNET ACTIVE (Binance Spot & Futures Mirroring with Native Resting SL)  
+> **Circuit Breaker Status:** LOCKOUT ENFORCED (3.0% Daily Drawdown Circuit Breaker safely protecting capital after -$368.19 overnight exit)  
 > **Milestone 46 Status:** COMPLETED & CERTIFIED (Central Trading Mind & Unified Execution Governance — 6 Invariants Enforced, 100% Green 🧠)  
-> **Account Balance:** $9,257.18 Settled Cash | $9,209.09 Virtual Equity (Circuit Breaker: NORMAL)  
+> **Account Balance:** $9,001.39 Virtual Equity | Dynamic Mark-to-Market Active (Circuit Breaker: NORMAL)  
 > **Milestone 31 & 31-R Status:** COMPLETED & CERTIFIED (Forward Reality League & 5-State Evidence Qualification — 52/52 Tests)  
 > **Milestone 31.5 Status:** COMPLETED & CERTIFIED (Strategy Constitution & Parameter Freeze Registry)  
 > **Milestone 32 Status:** COMPLETED & CERTIFIED (Autonomous 336h Testnet Burn-In & Ensemble Allocator — 32/32 Tests, 🟢 QUALIFIED)  

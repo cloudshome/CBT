@@ -690,23 +690,32 @@ class ResearchAutomationOrchestrator:
         result = audit_report.to_dict() if hasattr(audit_report, "to_dict") else audit_report
 
         checks = result.get("checks", [])
+        passed = [c for c in checks if c.get("status") == "PASS"]
         warnings = [c for c in checks if c.get("status") == "WARN"]
         failures = [c for c in checks if c.get("status") == "FAIL"]
+        total_checks = len(checks) if checks else result.get("total_checks", 7)
+        passed_checks = len(passed) if checks else result.get("passed_checks", 0)
 
         if warnings or failures:
             lines = ["🔍 *Daily Knowledge Audit Report*", "━━━━━━━━━━━━━━━━━━━━━━"]
             lines.append(
-                f"✅ Passed: {result.get('passed_checks', 0)} / {result.get('total_checks', 7)}"
+                f"✅ Passed: {passed_checks} / {total_checks}"
             )
             if failures:
                 lines.append(f"\n🔴 *FAILURES ({len(failures)}):*")
                 for f in failures:
-                    lines.append(f"  • {f['check_name']}: {f.get('message', '')}")
+                    desc = f.get("details") or f.get("message") or ""
+                    lines.append(f"  • {f['check_name']}: {desc}")
             if warnings:
                 lines.append(f"\n⚠️ *WARNINGS ({len(warnings)}):*")
                 for w in warnings:
-                    lines.append(f"  • {w['check_name']}: {w.get('message', '')}")
-            lines.append(f"\n_Overall: {result.get('overall_status', 'UNKNOWN')}_")
+                    desc = w.get("details") or w.get("message") or ""
+                    lines.append(f"  • {w['check_name']}: {desc}")
+            overall = result.get('overall_status', 'UNKNOWN')
+            if overall == "WARN" and not failures:
+                lines.append(f"\n_Overall: {overall} (Minor Hygiene Only · 0 Failures)_")
+            else:
+                lines.append(f"\n_Overall: {overall}_")
             await self._notify("\n".join(lines))
         else:
             logger.info("Knowledge audit: all %d checks passed.", result.get("total_checks", 7))

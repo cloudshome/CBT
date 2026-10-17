@@ -213,6 +213,18 @@ export const api = {
     return getMastermindDecisions(limit);
   },
 
+  async getMarketOpportunities(category?: string, forceRefresh = false): Promise<any> {
+    return getMarketOpportunities(category, forceRefresh);
+  },
+
+  async getDynamicWatchlist(): Promise<any> {
+    return getDynamicWatchlist();
+  },
+
+  async getScreenerHealth(): Promise<any> {
+    return getScreenerHealth();
+  },
+
   /**
    * GET /api/testnet/burnin/report - Gate 5 Extended Testnet Burn-In telemetry
    */
@@ -5626,6 +5638,24 @@ export async function getMastermindStatus(): Promise<any> {
 
 export async function getMastermindDecisions(limit: number = 30): Promise<any> {
   const res = await authFetch(`/api/mastermind/decisions?limit=${limit}`);
+  return await handleResponse<any>(res);
+}
+
+export async function getMarketOpportunities(category?: string, forceRefresh: boolean = false): Promise<any> {
+  const q = new URLSearchParams();
+  if (category && category !== 'ALL') q.append('category', category);
+  if (forceRefresh) q.append('force_refresh', 'true');
+  const res = await authFetch(`/api/screener/opportunities?${q.toString()}`);
+  return await handleResponse<any>(res);
+}
+
+export async function getDynamicWatchlist(): Promise<any> {
+  const res = await authFetch('/api/screener/watchlist');
+  return await handleResponse<any>(res);
+}
+
+export async function getScreenerHealth(): Promise<any> {
+  const res = await authFetch('/api/screener/health');
   return await handleResponse<any>(res);
 }
 

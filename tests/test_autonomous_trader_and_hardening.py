@@ -299,8 +299,9 @@ async def test_autonomous_trader_rejects_synthetic_candles_and_duplicate_symbols
         assert trades == []
 
     # Verify atomic duplicate-symbol prevention in PortfolioShadowManager.open_position
+    test_sym = "TEST_DUP/USDT"
     pos1 = portfolio_shadow.open_position(
-        symbol="SOL/USDT",
+        symbol=test_sym,
         direction="LONG",
         size=1.0,
         entry_price=150.0,
@@ -308,15 +309,20 @@ async def test_autonomous_trader_rejects_synthetic_candles_and_duplicate_symbols
         take_profit=160.0,
         prevent_duplicate_symbol=True,
     )
-    assert pos1.startswith("POS_SOL_USDT")
+    assert pos1.startswith("POS_TEST_DUP_USDT")
 
-    with pytest.raises(ValueError, match="already exists"):
-        portfolio_shadow.open_position(
-            symbol="SOL/USDT",
-            direction="LONG",
-            size=1.0,
-            entry_price=150.0,
-            stop_loss=145.0,
-            take_profit=160.0,
-            prevent_duplicate_symbol=True,
-        )
+    try:
+        with pytest.raises(ValueError, match="already exists"):
+            portfolio_shadow.open_position(
+                symbol=test_sym,
+                direction="LONG",
+                size=1.0,
+                entry_price=150.0,
+                stop_loss=145.0,
+                take_profit=160.0,
+                prevent_duplicate_symbol=True,
+            )
+    finally:
+        with db_manager.get_trading_conn() as conn:
+            conn.execute("DELETE FROM shadow_positions WHERE position_id = ?", (pos1,))
+            conn.commit()

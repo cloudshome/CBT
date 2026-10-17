@@ -20,7 +20,7 @@ class QuantMentor:
 
     def __init__(self):
         self.api_key = os.getenv("GEMINI_API_KEY", "")
-        self.model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+        self.model_name = os.getenv("GEMINI_MODEL", "gemini-3.7-flash")
         self._client = None
         self._init_client()
 
@@ -48,7 +48,13 @@ class QuantMentor:
 
         # If Gemini client is active, generate grounded response
         if self._client:
-            for candidate_model in (self.model_name, "gemini-2.0-flash", "gemini-1.5-flash"):
+            for candidate_model in (
+                self.model_name,
+                "gemini-3.7-flash",
+                "gemini-3.8-flash",
+                "gemini-flash-latest",
+                "gemini-3.1-flash-lite",
+            ):
                 try:
                     system_prompt = (
                         "You are the Lead Quantitative Financial Engineer and AI Risk Mentor of Crypto Brain Terminal (CBT). "

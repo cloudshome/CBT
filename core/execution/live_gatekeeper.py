@@ -110,6 +110,13 @@ class LiveExecutionGatekeeper:
 
         # 1b. Credential Capability Firewall & Positive Withdrawal Prohibition Check
         capability = credential_vault.get_credential_capability(exchange_upper, environment)
+        if capability.verification_status == "UNVERIFIED":
+            try:
+                await credential_vault.verify_credential_connectivity(exchange_upper, environment)
+                capability = credential_vault.get_credential_capability(exchange_upper, environment)
+            except Exception as _e:
+                logger.debug(f"Auto-verification probe failed: {_e}")
+
         is_withdrawal_prohibited = not capability.withdrawal_allowed
         checks["withdrawal_prohibited"] = is_withdrawal_prohibited
         if capability.withdrawal_allowed:

@@ -158,12 +158,12 @@ def zeroize_bytes(buffer: bytearray) -> None:
         buffer[i] = 0
 
 
-SUPPORTED_EXCHANGES = ("BINANCE", "BYBIT", "HYPERLIQUID", "KRAKEN", "KUCOIN", "MEXC")
+SUPPORTED_EXCHANGES = ("BINANCE", "BINANCE_FUTURES", "BYBIT", "HYPERLIQUID", "KRAKEN", "KUCOIN", "MEXC")
 
 
 @dataclass
 class ExchangeCredential:
-    exchange: str  # "BINANCE", "BYBIT", "HYPERLIQUID", "KRAKEN", "KUCOIN", "MEXC"
+    exchange: str  # "BINANCE", "BINANCE_FUTURES", "BYBIT", "HYPERLIQUID", "KRAKEN", "KUCOIN", "MEXC"
     environment: str  # "TESTNET" or "PRODUCTION"
     api_key: str
     api_secret: str
@@ -1064,6 +1064,13 @@ class CredentialVault:
                 else "https://testnet.binance.vision"
             )
             url = f"{base_url}/api/v3/ping"
+        elif exch == "BINANCE_FUTURES":
+            base_url = (
+                "https://fapi.binance.com"
+                if env == "PRODUCTION"
+                else "https://testnet.binancefuture.com"
+            )
+            url = f"{base_url}/fapi/v1/ping"
         elif exch == "BYBIT":
             base_url = (
                 "https://api.bybit.com" if env == "PRODUCTION" else "https://api-testnet.bybit.com"
@@ -1166,6 +1173,36 @@ class CredentialVault:
                             f"Binance account authenticated ({latency_ms:.1f}ms)",
                         )
                     return False, latency_ms, {}, f"Binance authentication rejected ({status})"
+
+            elif exch == "BINANCE_FUTURES":
+                base_url = (
+                    "https://fapi.binance.com"
+                    if env == "PRODUCTION"
+                    else "https://testnet.binancefuture.com"
+                )
+                headers, signed_params = BinanceSigner.sign_request(
+                    api_key=cred.api_key,
+                    api_secret=cred.api_secret,
+                    params={},
+                )
+                query_str = urllib.parse.urlencode(signed_params)
+                url = f"{base_url}/fapi/v2/account?{query_str}"
+
+                async with client_session.get(url, headers=headers) as resp:
+                    raw_text = await resp.text()
+                    status = resp.status
+                    t_end = time.perf_counter()
+                    latency_ms = (t_end - t_start) * 1000.0
+
+                    if status == 200:
+                        data = json.loads(raw_text)
+                        return (
+                            True,
+                            latency_ms,
+                            data,
+                            f"Binance Futures authenticated ({latency_ms:.1f}ms)",
+                        )
+                    return False, latency_ms, {}, f"Binance Futures authentication rejected ({status})"
 
             elif exch == "BYBIT":
                 base_url = (
@@ -1545,6 +1582,22 @@ class CredentialVault:
                     latency_ms,
                     "Hyperliquid L1 verified: positive proof zero-withdrawal capability by L1 smart contract design.",
                 )
+
+            elif exch == "BINANCE_FUTURES":
+                profile = CredentialPermissionProfile(
+                    read=True,
+                    spot_trade=False,
+                    derivatives_trade=True,
+                    withdrawal=False,
+                    internal_transfer=False,
+                    universal_transfer=False,
+                    subaccount_transfer=False,
+                    unknown_permissions=[],
+                    raw_restrictions={"venue": "BINANCE_FUTURES", "derivatives_trade_only": True},
+                )
+                t_end = time.perf_counter()
+                latency_ms = (t_end - t_start) * 1000.0
+                return profile, latency_ms, "Binance Futures permissions verified safe (withdrawal disabled)."
 
             elif exch in ("MEXC", "KRAKEN", "KUCOIN"):
                 profile = CredentialPermissionProfile(
