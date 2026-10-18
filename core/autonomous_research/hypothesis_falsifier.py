@@ -23,9 +23,8 @@ import json
 import logging
 import time
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
 
 from core.autonomous_research.empirical_tester import EmpiricalTester
@@ -196,9 +195,7 @@ class HypothesisFalsificationEngine:
                 dsr = 0.42
                 reasons = [f"Empirical evaluation exception: {e!s}"]
 
-            new_status = (
-                "EMPIRICALLY_VERIFIED_FACT" if passed else "FALSIFIED_REJECTED"
-            )
+            new_status = "EMPIRICALLY_VERIFIED_FACT" if passed else "FALSIFIED_REJECTED"
             if passed:
                 verified_count += 1
             else:
@@ -224,11 +221,17 @@ class HypothesisFalsificationEngine:
                         target_symbol=symbol,
                         timeframe=timeframe,
                         parameters={"net_r": net_r, "win_rate": win_rate},
-                        failure_reason="; ".join(reasons) or "Failed 3-tier friction or DSR hurdle.",
-                        metrics={"net_r": net_r, "win_rate": win_rate, "sharpe": sharpe, "dsr": dsr},
+                        failure_reason="; ".join(reasons)
+                        or "Failed 3-tier friction or DSR hurdle.",
+                        metrics={
+                            "net_r": net_r,
+                            "win_rate": win_rate,
+                            "sharpe": sharpe,
+                            "dsr": dsr,
+                        },
                         autopsy_text=f"Falsification of claim: {claim_text}. Net R: {net_r:+.2f}R.",
                     )
-                except Exception as fm_err:  # noqa: BLE001
+                except Exception as fm_err:
                     logger.debug("Failure memory record note for %s: %s", claim_id, fm_err)
 
             results.append(
@@ -316,7 +319,11 @@ class HypothesisFalsificationEngine:
             art = self.wiki_engine.get_article(wiki_article_id)
             if art:
                 # Re-calculate verification score
-                new_score = min(98.0, art.verification_score + 5.0) if new_status == "EMPIRICALLY_VERIFIED_FACT" else max(30.0, art.verification_score - 10.0)
+                new_score = (
+                    min(98.0, art.verification_score + 5.0)
+                    if new_status == "EMPIRICALLY_VERIFIED_FACT"
+                    else max(30.0, art.verification_score - 10.0)
+                )
                 conn.execute(
                     "UPDATE wiki_articles SET verification_score = ?, updated_at = ? WHERE article_id = ?;",
                     (new_score, now_ts, wiki_article_id),

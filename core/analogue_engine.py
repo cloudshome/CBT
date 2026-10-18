@@ -289,7 +289,7 @@ class HierarchicalAnalogueEngine:
                         "forward_outcomes": json.loads(r["forward_outcomes_json"] or "{}"),
                     }
                 )
-            except Exception:  # noqa: BLE001 — defensive fallback
+            except Exception:
                 continue
         return results
 

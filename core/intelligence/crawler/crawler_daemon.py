@@ -18,17 +18,16 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import re
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from core.intelligence.crawler.event_identity import CanonicalEvent
 from core.intelligence.crawler.raw_evidence_vault import RawEvidenceRecord
-from core.intelligence.crawler.scout_controller import CrawlRunRecord, ScoutController, ScoutStatus
+from core.intelligence.crawler.scout_controller import CrawlRunRecord, ScoutController
 from core.knowledge_os.research_wikipedia import (
     EpistemicClaim,
     ResearchWikipediaEngine,
@@ -199,10 +198,7 @@ class CrawlerDaemon:
 
         # Epistemic claim formatted per Rule 4
         entities_str = ", ".join(event.affected_entities) or "BROAD_MARKET"
-        claim_text = (
-            f"Autonomous Crawler harvested {title}. "
-            f"Entities affected: {entities_str}."
-        )
+        claim_text = f"Autonomous Crawler harvested {title}. Entities affected: {entities_str}."
         claims = [
             EpistemicClaim(
                 claim_id=f"CLM-{event.event_id[-8:]}",

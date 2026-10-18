@@ -84,7 +84,7 @@ class AccountReadinessProbe:
 
         try:
             cred = credential_vault.get_credential(exchange_upper, environment=environment)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             return ExchangeAccountStatus(
                 exchange=exchange_upper,
                 environment=environment,
@@ -156,7 +156,7 @@ class AccountReadinessProbe:
                 locked_margin_usd=round(locked_usd, 2),
                 balances=balances,
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             latency_ms = (time.perf_counter() - t_start) * 1000.0
             logger.warning(f"Error querying live balance for {exchange_upper}: {e}")
             return ExchangeAccountStatus(

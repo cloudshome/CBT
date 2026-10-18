@@ -99,9 +99,7 @@ def test_discord_webhook_is_preferred_over_token(monkeypatch):
     """Webhook (safe outbound) is the first Discord backend."""
     from brain import channels
 
-    monkeypatch.setattr(
-        channels, "DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/x/y"
-    )
+    monkeypatch.setattr(channels, "DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/x/y")
     monkeypatch.setattr(channels, "DISCORD_ANNOUNCE_WEBHOOK", "")
     monkeypatch.setattr(channels, "DISCORD_TOKEN", "")
     monkeypatch.setattr(channels, "DISCORD_CHANNEL_IDS", [])
@@ -180,9 +178,7 @@ def test_skill_md_is_brief():
     skill = ROOT / "SKILL.md"
     text = skill.read_text(encoding="utf-8")
     n_lines = len(text.splitlines())
-    assert n_lines < 300, (
-        f"SKILL.md is {n_lines} lines; keep it short (Agent-Reach pattern)"
-    )
+    assert n_lines < 300, f"SKILL.md is {n_lines} lines; keep it short (Agent-Reach pattern)"
 
 
 def test_skill_md_lists_the_core_tools():
@@ -207,9 +203,7 @@ def test_skill_md_states_safety_guarantee():
     skill = ROOT / "SKILL.md"
     text = skill.read_text(encoding="utf-8").lower()
     # Must include a "never place an order" or equivalent safety statement
-    assert "never" in text and (
-        "order" in text or "execution" in text or "trade" in text
-    )
+    assert "never" in text and ("order" in text or "execution" in text or "trade" in text)
 
 
 def test_skill_md_requires_citations_for_ask():

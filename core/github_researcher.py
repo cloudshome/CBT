@@ -56,7 +56,7 @@ class GitHubResearcher:
                     "risk" in f.lower() or "stop" in f.lower() for f in functions
                 ),
             }
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             return {"language": "Python", "error": str(e), "extracted_parameters": {}}
 
     def parse_pine_script(self, pine_code: str) -> dict[str, Any]:

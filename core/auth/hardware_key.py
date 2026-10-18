@@ -160,7 +160,7 @@ class HardwareKeyManager:
                 severity="INFO",
                 details={"challenge_id": challenge_id, "user_id": user_id, "rp_id": self.rp_id},
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug(f"Audit bus logging error: {exc}")
 
         return {
@@ -201,7 +201,7 @@ class HardwareKeyManager:
                     severity="WARNING",
                     details={"challenge_id": challenge_id, "user_id": user_id},
                 )
-            except Exception as log_err:  # noqa: BLE001
+            except Exception as log_err:
                 logger.debug("Failed to record incident: %s", log_err)
             raise HardwareKeyAssertionError(f"HARDWARE_KEY_REGISTRATION_INVALID: {exc}") from exc
 
@@ -232,7 +232,7 @@ class HardwareKeyManager:
                     "sign_count": verified_reg.sign_count,
                 },
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug(f"Audit bus logging error: {exc}")
 
         return stored_cred
@@ -274,7 +274,7 @@ class HardwareKeyManager:
                 severity="INFO",
                 details={"challenge_id": challenge_id, "rp_id": self.rp_id},
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug(f"Audit bus logging error: {exc}")
 
         return {
@@ -353,7 +353,7 @@ class HardwareKeyManager:
                             "stored_counter": stored_cred.sign_counter,
                         },
                     )
-                except Exception as log_err:  # noqa: BLE001
+                except Exception as log_err:
                     logger.debug("Failed to record incident: %s", log_err)
                 raise HardwareKeyCounterAnomalyError(
                     f"HARDWARE_KEY_COUNTER_ANOMALY: {err_msg}"
@@ -370,7 +370,7 @@ class HardwareKeyManager:
                         "challenge_id": challenge_id,
                     },
                 )
-            except Exception as log_err:  # noqa: BLE001
+            except Exception as log_err:
                 logger.debug("Failed to record incident: %s", log_err)
             raise HardwareKeyAssertionError(f"HARDWARE_KEY_ASSERTION_INVALID: {err_msg}") from exc
 
@@ -408,7 +408,7 @@ class HardwareKeyManager:
                     "user_verified": verified_auth.user_verified,
                 },
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug(f"Audit bus logging error: {exc}")
 
         return clearance
@@ -457,7 +457,7 @@ class HardwareKeyManager:
                 severity="WARNING",
                 details={"session_id": session_id, "reason": reason},
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug(f"Audit bus logging error: {exc}")
         return count
 
@@ -477,7 +477,7 @@ class HardwareKeyManager:
                     severity="CRITICAL",
                     details={"credential_id_masked": masked, "reason": reason},
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.debug(f"Audit bus logging error: {exc}")
         return success
 

@@ -125,7 +125,7 @@ class StrategyGatewayRouter:
                     ON strategy_gateway_dispatches(strategy_id);
                     """
                 )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error(f"[GatewayRouter] Failed to initialize SQLite schema: {exc}")
 
     def create_flight_manifest(
@@ -256,7 +256,7 @@ class StrategyGatewayRouter:
             self._update_dispatch_status(dispatch_id, "COMPLETED")
             return completed_receipt, tca_record
 
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error(
                 f"[GatewayRouter] Execution failed for flight '{manifest.flight_id}': {exc}"
             )
@@ -299,7 +299,7 @@ class StrategyGatewayRouter:
                         receipt.status,
                     ),
                 )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error(
                 f"[GatewayRouter] Failed to persist dispatch '{receipt.dispatch_id}': {exc}"
             )
@@ -312,5 +312,5 @@ class StrategyGatewayRouter:
                     "UPDATE strategy_gateway_dispatches SET status = ? WHERE dispatch_id = ?",
                     (status, dispatch_id),
                 )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error(f"[GatewayRouter] Failed to update dispatch status: {exc}")

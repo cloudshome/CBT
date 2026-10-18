@@ -98,8 +98,12 @@ class TelegramAuditLogger:
         details: dict[str, Any] | None = None,
     ) -> AuditEvent:
         """Records an interactive callback button event."""
-        uid = getattr(identity, "user_id", None) or (identity.get("user_id", "") if isinstance(identity, dict) else "")
-        cid = getattr(identity, "chat_id", None) or (identity.get("chat_id", "") if isinstance(identity, dict) else "")
+        uid = getattr(identity, "user_id", None) or (
+            identity.get("user_id", "") if isinstance(identity, dict) else ""
+        )
+        cid = getattr(identity, "chat_id", None) or (
+            identity.get("chat_id", "") if isinstance(identity, dict) else ""
+        )
         role_val = getattr(getattr(identity, "role", None), "value", None) or (
             identity.get("role", "TRADER") if isinstance(identity, dict) else "TRADER"
         )

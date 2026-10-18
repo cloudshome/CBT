@@ -94,9 +94,7 @@ def test_collect_degrades_without_network(monkeypatch):
         "macro_events",
         lambda: {"available": True, "events": [], "high_impact_imminent": False},
     )
-    monkeypatch.setattr(
-        ctx_mod, "cycle", lambda *a, **k: {"available": True, "phase": "expansion"}
-    )
+    monkeypatch.setattr(ctx_mod, "cycle", lambda *a, **k: {"available": True, "phase": "expansion"})
     monkeypatch.setattr(ctx_mod, "fetch_news", lambda limit=15: {"headlines": []})
     c = ctx_mod.collect()
     assert c["fear_greed"]["available"] is False

@@ -20,6 +20,7 @@ interface HeaderProps {
   onViewChange?: (view: 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM') => void;
   openPositionsCount?: number;
   wsState?: 'CONNECTING' | 'CONNECTED' | 'RECONNECTING' | 'DISCONNECTED' | 'ERROR' | 'IDLE';
+  latencyMs?: number;
 }
 
 const POPULAR_SYMBOLS = [
@@ -28,7 +29,7 @@ const POPULAR_SYMBOLS = [
   { symbol: 'PAXGUSDT', label: 'GOLD (PAXG)' },
   { symbol: 'XAUUSDT', label: 'GOLD (XAU)' },
 ];
-const TIMEFRAMES: SupportedTimeframe[] = ['5m', '15m', '1h', '4h', '1d'];
+const TIMEFRAMES: SupportedTimeframe[] = ['1m', '3m', '5m', '15m', '1h', '4h', '1d'];
 
 export const Header: React.FC<HeaderProps> = ({
   symbol,
@@ -47,6 +48,7 @@ export const Header: React.FC<HeaderProps> = ({
   onViewChange,
   openPositionsCount = 0,
   wsState = 'CONNECTED',
+  latencyMs,
 }) => {
   const safeTrend = String(trend || 'Consolidation');
   const isBullish = safeTrend.toLowerCase().includes('bullish');
@@ -85,7 +87,13 @@ export const Header: React.FC<HeaderProps> = ({
           }`}>
             <Activity className={`w-3.5 h-3.5 ${wsState === 'CONNECTED' ? 'animate-pulse text-emerald-400' : 'text-current'}`} />
             <span>
-              {wsState === 'CONNECTED' ? 'DESK STREAM ACTIVE' : wsState === 'RECONNECTING' ? 'RECONNECTING STREAM...' : wsState === 'CONNECTING' ? 'CONNECTING...' : 'STREAM OFFLINE'}
+              {wsState === 'CONNECTED'
+                ? `DESK STREAM ACTIVE${latencyMs !== undefined && latencyMs > 0 ? ` (${latencyMs}ms)` : ''}`
+                : wsState === 'RECONNECTING'
+                ? 'RECONNECTING STREAM...'
+                : wsState === 'CONNECTING'
+                ? 'CONNECTING...'
+                : 'STREAM OFFLINE'}
             </span>
           </div>
         </div>

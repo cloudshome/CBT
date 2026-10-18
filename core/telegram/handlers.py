@@ -81,7 +81,7 @@ async def handle_signal(
             tp1=sig["tp1"],
             symbol=sym,
         )
-    except Exception as e:  # noqa: BLE001 — chart failure is non-fatal
+    except Exception as e:
         logger.warning(f"Failed to generate signal chart for {sym}: {e}")
 
     # 3. Format Signal Text
@@ -434,8 +434,14 @@ async def handle_wiki(
             options={"author": str(user_name)},
         )
         if result.wiki_article:
-            status_prefix = "🟢 **SUCCESS**" if result.status == "SUCCESS" else (
-                "🟡 **PARTIAL EXTRACTION**" if result.status == "PARTIAL" else "⚠️ **ACCESS BLOCKED**"
+            status_prefix = (
+                "🟢 **SUCCESS**"
+                if result.status == "SUCCESS"
+                else (
+                    "🟡 **PARTIAL EXTRACTION**"
+                    if result.status == "PARTIAL"
+                    else "⚠️ **ACCESS BLOCKED**"
+                )
             )
             msg = (
                 f"{status_prefix} | Source: `{result.source.source_id}`\n"
@@ -524,7 +530,9 @@ async def handle_swarm(
     from core.portfolio_shadow import portfolio_shadow
     from core.telegram_bot import telegram_bot
 
-    accounting = portfolio_shadow.get_portfolio_accounting(starting_capital=mastermind_arbiter.account_equity_usd)
+    accounting = portfolio_shadow.get_portfolio_accounting(
+        starting_capital=mastermind_arbiter.account_equity_usd
+    )
     current_eq = float(accounting.get("virtual_equity", mastermind_arbiter.account_equity_usd))
     open_pos = portfolio_shadow.get_open_positions()
     recent_decisions = mastermind_arbiter.get_recent_decisions(limit=10)
@@ -591,7 +599,9 @@ async def handle_collector(
 
     for s in sources:
         items = s.get("total_items_ingested", 0)
-        lines.append(f"• **{s.get('name')}** (`{s.get('source_type')}`)\n  Category: `{s.get('category')}` | Ingested: `{items}` items")
+        lines.append(
+            f"• **{s.get('name')}** (`{s.get('source_type')}`)\n  Category: `{s.get('category')}` | Ingested: `{items}` items"
+        )
 
     lines.append("━━━━━━━━━━━━━━━━━━━━━━")
     if articles:
@@ -615,7 +625,9 @@ async def handle_crawl(
     from core.telegram_bot import telegram_bot
 
     if chat_id:
-        await telegram_bot.send_message("🔄 **Autonomous Data Collector activated!** Crawling online feeds...", chat_id=chat_id)
+        await telegram_bot.send_message(
+            "🔄 **Autonomous Data Collector activated!** Crawling online feeds...", chat_id=chat_id
+        )
 
     res = await research_automation_orchestrator.trigger_pipeline("research_feed_crawler")
     details = res.get("result", {})

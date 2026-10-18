@@ -225,9 +225,7 @@ def test_legacy_endpoints_keep_their_old_shape(open_client):
 # ══════════════════════════════════════════════════════════════════════════
 def test_legacy_400_becomes_typed_code(open_client):
     scan_id = _insert_scan("BAD")
-    r = open_client.post(
-        "/api/v1/review", json={"scan_id": scan_id, "decision": "NONSENSE"}
-    )
+    r = open_client.post("/api/v1/review", json={"scan_id": scan_id, "decision": "NONSENSE"})
     assert r.status_code == 400
     body = r.get_json()
     _assert_envelope(body)
@@ -235,9 +233,7 @@ def test_legacy_400_becomes_typed_code(open_client):
 
 
 def test_missing_scan_is_not_found(open_client):
-    r = open_client.post(
-        "/api/v1/review", json={"scan_id": 999999, "decision": "REJECTED"}
-    )
+    r = open_client.post("/api/v1/review", json={"scan_id": 999999, "decision": "REJECTED"})
     assert r.status_code == 404
     assert r.get_json()["error"]["code"] == apiv1.ErrorCode.NOT_FOUND
 
@@ -251,9 +247,7 @@ def test_illegal_lifecycle_transition_has_its_own_code(open_client):
         ).status_code
         == 200
     )
-    r = open_client.post(
-        "/api/v1/review", json={"scan_id": scan_id, "decision": "REJECTED"}
-    )
+    r = open_client.post("/api/v1/review", json={"scan_id": scan_id, "decision": "REJECTED"})
     assert r.status_code == 400
     assert r.get_json()["error"]["code"] == apiv1.ErrorCode.LIFECYCLE_INVALID
 
@@ -266,9 +260,7 @@ def test_risk_gate_refusal_is_typed_and_structured(open_client):
     with SignalDB() as db:
         db.set_trader_state(angry=True, note="tilted")
     scan_id = _insert_scan("GATE")
-    r = open_client.post(
-        "/api/v1/review", json={"scan_id": scan_id, "decision": "APPROVED"}
-    )
+    r = open_client.post("/api/v1/review", json={"scan_id": scan_id, "decision": "APPROVED"})
     assert r.status_code == 409
     body = r.get_json()
     _assert_envelope(body)
@@ -319,9 +311,7 @@ def test_version_check_precedes_authentication(client):
 
 
 def test_garbage_client_version_is_rejected(open_client):
-    r = open_client.get(
-        "/api/v1/risk", headers={apiv1.CLIENT_VERSION_HEADER: "not-a-number"}
-    )
+    r = open_client.get("/api/v1/risk", headers={apiv1.CLIENT_VERSION_HEADER: "not-a-number"})
     assert r.status_code == 400
     assert r.get_json()["error"]["code"] == apiv1.ErrorCode.BAD_REQUEST
 
@@ -378,10 +368,7 @@ def test_only_one_decision_is_recorded_for_a_replayed_key(open_client):
     key = {apiv1.IDEMPOTENCY_HEADER: str(uuid.uuid4())}
     body = {"scan_id": scan_id, "decision": "REJECTED", "note": "only once"}
     for _ in range(4):
-        assert (
-            open_client.post("/api/v1/review", json=body, headers=key).status_code
-            == 200
-        )
+        assert open_client.post("/api/v1/review", json=body, headers=key).status_code == 200
     with SignalDB() as db:
         n = db.conn.execute(
             "SELECT COUNT(*) n FROM decisions WHERE scan_id=?", (scan_id,)
@@ -598,9 +585,7 @@ def test_viewer_token_cannot_mint_or_revoke_devices(client):
         headers=_bearer(viewer),
     )
     assert r.status_code == 403
-    r = anon.post(
-        "/api/v1/devices/revoke", json={"id": "whatever"}, headers=_bearer(viewer)
-    )
+    r = anon.post("/api/v1/devices/revoke", json={"id": "whatever"}, headers=_bearer(viewer))
     assert r.status_code == 403
 
 
@@ -666,27 +651,21 @@ def test_revoked_device_token_is_refused(client):
     assert anon.get("/api/v1/risk", headers=_bearer(operator)).status_code == 200
     devices = client.get("/api/v1/devices").get_json()["data"]["devices"]
     handle = next(d["id"] for d in devices if d["name"] == "laptop")
-    r = client.post(
-        "/api/v1/devices/revoke", json={"id": handle}, headers={"X-CSRF-Token": csrf}
-    )
+    r = client.post("/api/v1/devices/revoke", json={"id": handle}, headers={"X-CSRF-Token": csrf})
     assert r.status_code == 200
     assert anon.get("/api/v1/risk", headers=_bearer(operator)).status_code == 401
 
 
 def test_revoking_an_unknown_device_is_not_found(client):
     csrf = _setup_owner(client)
-    r = client.post(
-        "/api/v1/devices/revoke", json={"id": "nope"}, headers={"X-CSRF-Token": csrf}
-    )
+    r = client.post("/api/v1/devices/revoke", json={"id": "nope"}, headers={"X-CSRF-Token": csrf})
     assert r.status_code == 404
     assert r.get_json()["error"]["code"] == apiv1.ErrorCode.NOT_FOUND
 
 
 def test_device_registration_requires_a_name(client):
     csrf = _setup_owner(client)
-    r = client.post(
-        "/api/v1/devices", json={"scope": "viewer"}, headers={"X-CSRF-Token": csrf}
-    )
+    r = client.post("/api/v1/devices", json={"scope": "viewer"}, headers={"X-CSRF-Token": csrf})
     assert r.status_code == 400
     assert r.get_json()["error"]["code"] == apiv1.ErrorCode.VALIDATION_FAILED
 

@@ -341,7 +341,9 @@ def _run(api: dict, body: str) -> dict:
         f.write(harness)
         path = f.name
     try:
-        r = subprocess.run([NODE, path], capture_output=True, text=True, encoding="utf-8", timeout=90)
+        r = subprocess.run(
+            [NODE, path], capture_output=True, text=True, encoding="utf-8", timeout=90
+        )
         assert r.returncode == 0, f"harness failed:\n{r.stdout}\n{r.stderr}"
         return json.loads(r.stdout.strip().splitlines()[-1])
     finally:

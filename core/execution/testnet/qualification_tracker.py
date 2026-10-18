@@ -20,13 +20,13 @@ import sqlite3
 import time
 from dataclasses import asdict, dataclass
 from decimal import Decimal
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 logger = logging.getLogger("sky.execution.testnet.qualification")
 
 
-class QualificationEventClass(str, Enum):
+class QualificationEventClass(StrEnum):
     EXPECTED_OPERATION = "EXPECTED_OPERATION"
     RECOVERABLE_DEGRADATION = "RECOVERABLE_DEGRADATION"
     EXTERNAL_VENUE_FAULT = "EXTERNAL_VENUE_FAULT"
@@ -36,7 +36,7 @@ class QualificationEventClass(str, Enum):
     ACCOUNTING_FAILURE = "ACCOUNTING_FAILURE"
 
 
-class CampaignQualificationState(str, Enum):
+class CampaignQualificationState(StrEnum):
     NOT_STARTED = "NOT_STARTED"
     QUALIFYING = "QUALIFYING"
     TEMPORARILY_DISQUALIFIED = "TEMPORARILY_DISQUALIFIED"

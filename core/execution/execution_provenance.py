@@ -85,7 +85,7 @@ class ExecutionProvenanceTracker:
                     "CREATE INDEX IF NOT EXISTS idx_exec_prov_sig ON execution_provenance(signal_id)"
                 )
                 conn.commit()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning(f"Could not initialize execution_provenance table: {exc}")
 
     def compute_hash(
@@ -193,7 +193,7 @@ class ExecutionProvenanceTracker:
                 )
                 conn.commit()
             logger.info(f"[Provenance] Recorded lineage for {execution_id}: hash={p_hash[:12]}...")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error(f"[Provenance] Failed to store record for {execution_id}: {exc}")
 
         return record
@@ -225,7 +225,7 @@ class ExecutionProvenanceTracker:
                         provenance_hash=row["provenance_hash"],
                         created_at_ms=row["created_at_ms"],
                     )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error(f"[Provenance] Query error for {execution_id}: {exc}")
         return None
 

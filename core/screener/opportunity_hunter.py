@@ -19,7 +19,7 @@ import asyncio
 import logging
 import time
 from dataclasses import asdict, dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 import aiohttp
@@ -27,7 +27,7 @@ import aiohttp
 logger = logging.getLogger("sky.screener.opportunity_hunter")
 
 
-class OpportunityCategory(str, Enum):
+class OpportunityCategory(StrEnum):
     EMERGING_MOMENTUM = "EMERGING_MOMENTUM"
     CONFIRMED_BREAKOUT = "CONFIRMED_BREAKOUT"
     CAPITULATION_RECOVERY = "CAPITULATION_RECOVERY"
@@ -36,7 +36,7 @@ class OpportunityCategory(str, Enum):
     CATALYST_OPPORTUNITY = "CATALYST_OPPORTUNITY"
 
 
-class AttentionState(str, Enum):
+class AttentionState(StrEnum):
     NORMAL = "NORMAL"
     WATCH = "WATCH"
     ELEVATED = "ELEVATED"
@@ -46,7 +46,7 @@ class AttentionState(str, Enum):
     REJECTED = "REJECTED"
 
 
-class WatchlistState(str, Enum):
+class WatchlistState(StrEnum):
     DISCOVERED = "DISCOVERED"
     QUALIFIED = "QUALIFIED"
     ACTIVE = "ACTIVE"
@@ -119,11 +119,19 @@ class OpportunityHunter:
         Liquidity Gate, and scores candidates across the 6 opportunity categories.
         """
         now = time.time()
-        if not force_refresh and self._cached_opportunities and (now - self._last_scan_time) < self.cache_ttl_sec:
+        if (
+            not force_refresh
+            and self._cached_opportunities
+            and (now - self._last_scan_time) < self.cache_ttl_sec
+        ):
             return self._cached_opportunities
 
         async with self._scan_lock:
-            if not force_refresh and self._cached_opportunities and (time.time() - self._last_scan_time) < self.cache_ttl_sec:
+            if (
+                not force_refresh
+                and self._cached_opportunities
+                and (time.time() - self._last_scan_time) < self.cache_ttl_sec
+            ):
                 return self._cached_opportunities
 
             self._is_scanning = True
@@ -151,7 +159,9 @@ class OpportunityHunter:
         async with aiohttp.ClientSession(timeout=timeout) as session:
             spot_task = self._fetch_json(session, spot_url)
             futures_task = self._fetch_json(session, futures_url)
-            spot_data, futures_data = await asyncio.gather(spot_task, futures_task, return_exceptions=True)
+            spot_data, futures_data = await asyncio.gather(
+                spot_task, futures_task, return_exceptions=True
+            )
 
             spot_list = spot_data if isinstance(spot_data, list) else []
             futures_list = futures_data if isinstance(futures_data, list) else []
@@ -253,18 +263,20 @@ class OpportunityHunter:
             attention_score = round(norm_vol + norm_change + norm_trades, 1)
 
             # Classify into 6 Quantitative Categories
-            category, state, venue, direction, rationale, quality, inv_lvl = self._classify_opportunity(
-                symbol=symbol_slash,
-                price=price,
-                price_change=price_change,
-                quote_vol=quote_vol,
-                rvol=rvol,
-                spread_bps=spread_bps,
-                high_24h=high_24h,
-                low_24h=low_24h,
-                spot_eligible=spot_eligible,
-                futures_eligible=futures_eligible,
-                attention_score=attention_score,
+            category, state, venue, direction, rationale, quality, inv_lvl = (
+                self._classify_opportunity(
+                    symbol=symbol_slash,
+                    price=price,
+                    price_change=price_change,
+                    quote_vol=quote_vol,
+                    rvol=rvol,
+                    spread_bps=spread_bps,
+                    high_24h=high_24h,
+                    low_24h=low_24h,
+                    spot_eligible=spot_eligible,
+                    futures_eligible=futures_eligible,
+                    attention_score=attention_score,
+                )
             )
 
             rec = OpportunityRecord(
@@ -326,7 +338,11 @@ class OpportunityHunter:
         if price_change >= 10.0 and (price >= high_24h * 0.96):
             category = OpportunityCategory.CONFIRMED_BREAKOUT
             state = AttentionState.BREAKOUT_CANDIDATE
-            venue = "SPOT_OR_FUTURES" if (spot_eligible and futures_eligible) else ("FUTURES" if futures_eligible else "SPOT")
+            venue = (
+                "SPOT_OR_FUTURES"
+                if (spot_eligible and futures_eligible)
+                else ("FUTURES" if futures_eligible else "SPOT")
+            )
             direction = "LONG"
             rationale = f"High-volume breakout near 24h highs (+{price_change:.1f}%). Bullish structure expansion."
             quality = 82.0
@@ -337,7 +353,11 @@ class OpportunityHunter:
         if price_change >= 5.0 and rvol >= 1.5:
             category = OpportunityCategory.EMERGING_MOMENTUM
             state = AttentionState.ELEVATED
-            venue = "SPOT_OR_FUTURES" if (spot_eligible and futures_eligible) else ("FUTURES" if futures_eligible else "SPOT")
+            venue = (
+                "SPOT_OR_FUTURES"
+                if (spot_eligible and futures_eligible)
+                else ("FUTURES" if futures_eligible else "SPOT")
+            )
             direction = "LONG"
             rationale = f"Early momentum acceleration (+{price_change:.1f}%) with volume inflow ({rvol:.1f}x RVOL)."
             quality = 78.0
@@ -348,7 +368,11 @@ class OpportunityHunter:
         if price_change <= -8.0 and (price <= low_24h * 1.05):
             category = OpportunityCategory.CAPITULATION_RECOVERY
             state = AttentionState.ELEVATED
-            venue = "SPOT_OR_FUTURES" if (spot_eligible and futures_eligible) else ("FUTURES" if futures_eligible else "SPOT")
+            venue = (
+                "SPOT_OR_FUTURES"
+                if (spot_eligible and futures_eligible)
+                else ("FUTURES" if futures_eligible else "SPOT")
+            )
             direction = "LONG"
             rationale = f"Heavy multi-day capitulation ({price_change:.1f}%) probing 24h lows. Watch for liquidity sweep reclaim."
             quality = 80.0
@@ -369,7 +393,11 @@ class OpportunityHunter:
         # 6. Default Catalyst / Active Monitoring
         category = OpportunityCategory.CATALYST_OPPORTUNITY
         state = AttentionState.NORMAL if attention_score < 40 else AttentionState.ELEVATED
-        venue = "SPOT_OR_FUTURES" if (spot_eligible and futures_eligible) else ("FUTURES" if futures_eligible else "SPOT")
+        venue = (
+            "SPOT_OR_FUTURES"
+            if (spot_eligible and futures_eligible)
+            else ("FUTURES" if futures_eligible else "SPOT")
+        )
         direction = "WATCH"
         rationale = f"Normal market structure. Continuous 24h monitoring active (Attention: {attention_score})."
         quality = 65.0
@@ -413,7 +441,9 @@ class OpportunityHunter:
             "status": "HEALTHY" if self._last_error is None else "DEGRADED",
             "is_scanning": self._is_scanning,
             "last_scan_time": self._last_scan_time,
-            "seconds_since_last_scan": round(time.time() - self._last_scan_time, 1) if self._last_scan_time > 0 else None,
+            "seconds_since_last_scan": round(time.time() - self._last_scan_time, 1)
+            if self._last_scan_time > 0
+            else None,
             "total_spot_pairs_scanned": self._total_spot_scanned,
             "total_futures_pairs_scanned": self._total_futures_scanned,
             "total_opportunities_ranked": len(self._cached_opportunities),
@@ -423,4 +453,3 @@ class OpportunityHunter:
 
 
 opportunity_hunter = OpportunityHunter()
-

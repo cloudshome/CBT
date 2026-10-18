@@ -20,7 +20,7 @@ import logging
 import math
 import time
 import uuid
-from enum import Enum
+from enum import StrEnum
 from typing import Final, Literal
 
 from pydantic import BaseModel, Field
@@ -48,12 +48,12 @@ QUEUE_MODEL_ASSUMPTIONS: Final[tuple[str, ...]] = (
 )
 
 
-class OrderSide(str, Enum):
+class OrderSide(StrEnum):
     BUY = "BUY"
     SELL = "SELL"
 
 
-class OrderType(str, Enum):
+class OrderType(StrEnum):
     MARKET = "MARKET"
     LIMIT = "LIMIT"
 

@@ -58,7 +58,7 @@ class ForexLotCalculator:
         self,
         specs: dict[str, ForexSymbolSpec] | None = None,
         max_notional_leverage: float = 3.0,  # Max 3x account equity notional
-        max_risk_pct: float = 0.015,         # Conservative Half-Kelly cap: 1.5%
+        max_risk_pct: float = 0.015,  # Conservative Half-Kelly cap: 1.5%
     ):
         self.specs = specs or DEFAULT_SPECS
         self.max_notional_leverage = max_notional_leverage
@@ -162,10 +162,10 @@ class ForexLotCalculator:
                 max_lots = max_allowed_notional / spec.standard_lot_units
             else:
                 max_lots = max_allowed_notional / (spec.standard_lot_units * entry_price)
-            
+
             allowed_steps = math.floor(max_lots / spec.lot_step)
             clipped_lots = max(spec.min_lot, round(allowed_steps * spec.lot_step, 4))
-            
+
             # Recalculate actual notional and leverage after cap
             if spec.base_currency == "USD":
                 notional_usd = clipped_lots * spec.standard_lot_units

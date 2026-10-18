@@ -34,20 +34,20 @@ logger = logging.getLogger("sky.orderbook_heatmap")
 # ===========================================================================
 
 
-class MarketType(str, enum.Enum):
+class MarketType(enum.StrEnum):
     SPOT = "SPOT"
     PERPETUAL = "PERPETUAL"
     FUTURES = "FUTURES"
     UNKNOWN = "UNKNOWN"
 
 
-class FeedType(str, enum.Enum):
+class FeedType(enum.StrEnum):
     L2_BOOK = "L2_BOOK"  # Aggregated price-level depth (honest L2)
     L3_MBO = "L3_MBO"  # Discrete order-by-order (only if verified)
     AGGREGATED_TICK = "AGGREGATED_TICK"
 
 
-class DataSourceType(str, enum.Enum):
+class DataSourceType(enum.StrEnum):
     BINANCE_REST = "BINANCE_REST"
     BINANCE_WS = "BINANCE_WS"
     BYBIT_V5 = "BYBIT_V5"
@@ -55,14 +55,14 @@ class DataSourceType(str, enum.Enum):
     HISTORICAL_REPLAY = "HISTORICAL_REPLAY"
 
 
-class WallStatus(str, enum.Enum):
+class WallStatus(enum.StrEnum):
     ACTIVE = "ACTIVE"
     SWEPT = "SWEPT"
     PULLED = "PULLED"
     RELOAD_SUSPECTED = "RELOAD_SUSPECTED"
 
 
-class LiquidationSide(str, enum.Enum):
+class LiquidationSide(enum.StrEnum):
     LONG_LIQUIDATION = "LONG_LIQUIDATION"
     SHORT_LIQUIDATION = "SHORT_LIQUIDATION"
 
@@ -517,7 +517,7 @@ class OrderBookHeatmapEngine:
 
         for row in raw_grid:
             density_row = [
-                min(100, int(round((math.log1p(v) / log_q95) * 100.0))) if v > 0 else 0 for v in row
+                min(100, round((math.log1p(v) / log_q95) * 100.0)) if v > 0 else 0 for v in row
             ]
             density_matrix.append(density_row)
 

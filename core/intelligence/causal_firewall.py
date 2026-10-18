@@ -205,7 +205,7 @@ class CausalFirewallValidator:
     def _check_gate_5_failure_memory(self, hypo: CausalHypothesis) -> tuple[bool, str]:
         # Formulate search text combining thesis and alternative hypothesis
         search_text = f"{hypo.mechanism_id} {hypo.null_hypothesis} {hypo.alternative_hypothesis}"
-        is_dup, fail_rec, reason = self.failure_memory.check_prior_failures(
+        is_dup, _fail_rec, reason = self.failure_memory.check_prior_failures(
             hypothesis_text=search_text,
             target_symbol=hypo.target_asset,
             timeframe=hypo.timeframe,

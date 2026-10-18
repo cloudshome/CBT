@@ -305,7 +305,7 @@ class TestnetBurnInOrchestrator:
 
                     # 3. Process economic fill reconciliation
                     trans_id = f"TR_{uuid.uuid4().hex[:6]}"
-                    is_new, econ_rec = self.reconciliation.process_execution_report(
+                    _is_new, _econ_rec = self.reconciliation.process_execution_report(
                         transport_event_id=trans_id,
                         venue=self.adapter.venue_id,
                         execution_id=fill_res["execution_id"],

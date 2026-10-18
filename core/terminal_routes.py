@@ -154,7 +154,11 @@ def calibrate_blotter_for_price(symbol: str, cur_p: float) -> None:
         scale = cur_p / max(btc_item["entryPrice"], 1e-4)
         for item in signal_blotter:
             # INVARIANT: Frozen, Approved, Executed, or Closed signals must NEVER drift with price!
-            if item.get("isFrozen", False) or item.get("state") in ("APPROVED", "EXECUTED", "CLOSED"):
+            if item.get("isFrozen", False) or item.get("state") in (
+                "APPROVED",
+                "EXECUTED",
+                "CLOSED",
+            ):
                 continue
             item["entryPrice"] = round(item["entryPrice"] * scale, 2)
             item["entryZone"] = [
@@ -511,23 +515,27 @@ async def get_master_terminal_telemetry(
     if candles:
         for c in candles:
             if isinstance(c, list | tuple):
-                dict_candles.append({
-                    "timestamp": int(c[0]),
-                    "open": float(c[1]),
-                    "high": float(c[2]),
-                    "low": float(c[3]),
-                    "close": float(c[4]),
-                    "volume": float(c[5]) if len(c) > 5 else 1.0,
-                })
+                dict_candles.append(
+                    {
+                        "timestamp": int(c[0]),
+                        "open": float(c[1]),
+                        "high": float(c[2]),
+                        "low": float(c[3]),
+                        "close": float(c[4]),
+                        "volume": float(c[5]) if len(c) > 5 else 1.0,
+                    }
+                )
             elif isinstance(c, dict):
-                dict_candles.append({
-                    "timestamp": int(c.get("timestamp", c.get("time", 0))),
-                    "open": float(c.get("open", cur_p)),
-                    "high": float(c.get("high", cur_p)),
-                    "low": float(c.get("low", cur_p)),
-                    "close": float(c.get("close", cur_p)),
-                    "volume": float(c.get("volume", 1.0)),
-                })
+                dict_candles.append(
+                    {
+                        "timestamp": int(c.get("timestamp", c.get("time", 0))),
+                        "open": float(c.get("open", cur_p)),
+                        "high": float(c.get("high", cur_p)),
+                        "low": float(c.get("low", cur_p)),
+                        "close": float(c.get("close", cur_p)),
+                        "volume": float(c.get("volume", 1.0)),
+                    }
+                )
 
     detected_patterns = []
     if smc_engine and len(dict_candles) >= 5:
@@ -542,12 +550,16 @@ async def get_master_terminal_telemetry(
             detected_patterns = []
 
     real_fvgs = [
-        p for p in detected_patterns
-        if SMCPatternType and p.pattern_type in (SMCPatternType.BULLISH_FVG, SMCPatternType.BEARISH_FVG)
+        p
+        for p in detected_patterns
+        if SMCPatternType
+        and p.pattern_type in (SMCPatternType.BULLISH_FVG, SMCPatternType.BEARISH_FVG)
     ]
     real_obs = [
-        p for p in detected_patterns
-        if SMCPatternType and p.pattern_type in (SMCPatternType.BULLISH_OB, SMCPatternType.BEARISH_OB)
+        p
+        for p in detected_patterns
+        if SMCPatternType
+        and p.pattern_type in (SMCPatternType.BULLISH_OB, SMCPatternType.BEARISH_OB)
     ]
 
     range_50 = max(high_50 - low_50, cur_p * 0.02)
@@ -1419,7 +1431,11 @@ async def update_signal_approval(req: SignalApprovalRequest):
     if not signal:
         req_clean = req.signalId.upper().replace("SIG-", "").replace("BTC-", "")
         signal = next(
-            (s for s in signal_blotter if s.get("style", "").upper() == req_clean or req_clean in s["id"].upper()),
+            (
+                s
+                for s in signal_blotter
+                if s.get("style", "").upper() == req_clean or req_clean in s["id"].upper()
+            ),
             None,
         )
     if not signal:

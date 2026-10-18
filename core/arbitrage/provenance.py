@@ -76,7 +76,7 @@ class ProvenanceEngine:
                     "CREATE INDEX IF NOT EXISTS idx_arb_prov_decision ON arbitrage_provenance_records(decision);"
                 )
                 conn.commit()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(f"Could not initialize arbitrage_provenance_records schema: {e}")
 
     def create_envelope(
@@ -237,7 +237,7 @@ class ProvenanceEngine:
                     ),
                 )
                 conn.commit()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.debug(f"Failed to persist provenance record: {e}")
 
     def get_provenance_by_id(self, opportunity_id: str) -> dict[str, Any] | None:
@@ -256,7 +256,7 @@ class ProvenanceEngine:
                 row = cursor.fetchone()
                 if row:
                     return json.loads(row["envelope_json"])
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(f"Error querying provenance record {opportunity_id}: {e}")
         return None
 

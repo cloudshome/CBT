@@ -143,6 +143,7 @@ def test_kelly_ultra_tight_stop_loss_leverage_ceiling():
 
     # Also verify HalfKellyPositionSizer directly
     from core.half_kelly_sizer import half_kelly_position_sizer
+
     res = half_kelly_position_sizer.calculate_sizing(
         account_equity=100000.0,
         entry_price=88000.0,
@@ -150,4 +151,3 @@ def test_kelly_ultra_tight_stop_loss_leverage_ceiling():
         take_profit=90000.0,
     )
     assert res.position_size_usd <= 100000.0 * half_kelly_position_sizer.max_notional_pct
-

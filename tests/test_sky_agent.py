@@ -176,9 +176,7 @@ def test_hypothesis_propose_and_run():
         with SignalDB(path=db_path) as db:
             hyps = propose_hypotheses(db=db)
             assert len(hyps) == 3
-            cnt = db.conn.execute(
-                "SELECT COUNT(*) FROM research_hypotheses"
-            ).fetchone()[0]
+            cnt = db.conn.execute("SELECT COUNT(*) FROM research_hypotheses").fetchone()[0]
             assert cnt == 3
         result = run_hypothesis_backtest("H-001", symbol="BTCUSDT", timeframe="15m")
         assert result["ok"] is True

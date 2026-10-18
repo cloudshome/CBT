@@ -89,7 +89,7 @@ def _series(frame, column: str, times: list[int]) -> list[dict]:
     if column not in frame.columns:
         return []
     out = []
-    for t, raw in zip(times, frame[column].tolist()):
+    for t, raw in zip(times, frame[column].tolist(), strict=False):
         val = _num(raw)
         if t is None or val is None:
             continue
@@ -241,9 +241,7 @@ def _levels(payload: dict | None) -> list[dict]:
             )
     pivot = _num(mtf.get("pivot"))
     if pivot is not None:
-        out.append(
-            {"price": pivot, "kind": "pivot", "label": "Pivot", "color": "#f59e0b"}
-        )
+        out.append({"price": pivot, "kind": "pivot", "label": "Pivot", "color": "#f59e0b"})
     return out
 
 
@@ -285,9 +283,7 @@ def _zones(payload: dict | None) -> dict:
     for f in (structure.get("fvgs") or [])[-6:]:
         band = _band(f.get("top"), f.get("bottom"))
         if band:
-            band.update(
-                {"side": f.get("side"), "filled": bool(f.get("filled")), "kind": "fvg"}
-            )
+            band.update({"side": f.get("side"), "filled": bool(f.get("filled")), "kind": "fvg"})
             fvgs.append(band)
 
     liquidity = []

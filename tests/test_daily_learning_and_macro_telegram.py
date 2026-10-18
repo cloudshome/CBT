@@ -25,6 +25,8 @@ from core.telegram_bot import BD_TZ, SmartBrainNotificationEngine
 @pytest.fixture(autouse=True)
 def setup_commands():
     register_all_v5_commands()
+    macro_event_reporter._ensure_table_exists()
+    macro_event_reporter._seed_default_macro_releases()
 
 
 # ==============================================================================
@@ -168,8 +170,8 @@ async def test_smart_notifier_bd_time_briefings():
     # 1. Simulate 08:00 AM BD Time (02:00 UTC)
     mock_0800_bd = datetime.datetime(2026, 9, 13, 8, 5, 0, tzinfo=BD_TZ)
     with patch("datetime.datetime") as mock_dt:
-        mock_dt.now.side_effect = (
-            lambda tz=None: mock_0800_bd if tz == BD_TZ else mock_0800_bd.astimezone(datetime.UTC)
+        mock_dt.now.side_effect = lambda tz=None: (
+            mock_0800_bd if tz == BD_TZ else mock_0800_bd.astimezone(datetime.UTC)
         )
         await notifier.check_scheduled_briefings()
         notifier.bot.send_morning_briefing.assert_called_once()
@@ -178,8 +180,8 @@ async def test_smart_notifier_bd_time_briefings():
     # 2. Simulate 02:00 PM BD Time (08:00 UTC)
     mock_1400_bd = datetime.datetime(2026, 9, 13, 14, 2, 0, tzinfo=BD_TZ)
     with patch("datetime.datetime") as mock_dt:
-        mock_dt.now.side_effect = (
-            lambda tz=None: mock_1400_bd if tz == BD_TZ else mock_1400_bd.astimezone(datetime.UTC)
+        mock_dt.now.side_effect = lambda tz=None: (
+            mock_1400_bd if tz == BD_TZ else mock_1400_bd.astimezone(datetime.UTC)
         )
         await notifier.check_scheduled_briefings()
         notifier.bot.send_midday_pulse.assert_called_once()
@@ -188,8 +190,8 @@ async def test_smart_notifier_bd_time_briefings():
     # 3. Simulate 08:00 PM BD Time (14:00 UTC)
     mock_2000_bd = datetime.datetime(2026, 9, 13, 20, 10, 0, tzinfo=BD_TZ)
     with patch("datetime.datetime") as mock_dt:
-        mock_dt.now.side_effect = (
-            lambda tz=None: mock_2000_bd if tz == BD_TZ else mock_2000_bd.astimezone(datetime.UTC)
+        mock_dt.now.side_effect = lambda tz=None: (
+            mock_2000_bd if tz == BD_TZ else mock_2000_bd.astimezone(datetime.UTC)
         )
         await notifier.check_scheduled_briefings()
         notifier.bot.send_us_session_watch.assert_called_once()
@@ -198,8 +200,8 @@ async def test_smart_notifier_bd_time_briefings():
     # 4. Simulate 10:00 PM BD Time (16:00 UTC)
     mock_2200_bd = datetime.datetime(2026, 9, 13, 22, 1, 0, tzinfo=BD_TZ)
     with patch("datetime.datetime") as mock_dt:
-        mock_dt.now.side_effect = (
-            lambda tz=None: mock_2200_bd if tz == BD_TZ else mock_2200_bd.astimezone(datetime.UTC)
+        mock_dt.now.side_effect = lambda tz=None: (
+            mock_2200_bd if tz == BD_TZ else mock_2200_bd.astimezone(datetime.UTC)
         )
         await notifier.check_scheduled_briefings()
         notifier.bot.send_what_ai_learned_today.assert_called_once()
@@ -282,8 +284,9 @@ def test_unreleased_pending_event_never_dispatched_and_no_mock_prices():
     maintain released_timestamp_ms=None, zero price displacements,
     and are NEVER dispatched by check_and_generate_pending_releases.
     """
-    from core.macro_event_reporter import MacroReleaseRecord, macro_event_reporter
     import time
+
+    from core.macro_event_reporter import MacroReleaseRecord, macro_event_reporter
 
     pending_rec = MacroReleaseRecord(
         event_id="TEST_PENDING_CATALYST_ISOLATION",
@@ -315,4 +318,3 @@ def test_unreleased_pending_event_never_dispatched_and_no_mock_prices():
     pending_list = macro_event_reporter.check_and_generate_pending_releases()
     matching = [p for p in pending_list if p.get("event_id") == "TEST_PENDING_CATALYST_ISOLATION"]
     assert len(matching) == 0
-

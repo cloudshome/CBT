@@ -108,7 +108,9 @@ class EvidenceTimelineEngine:
                 conditions.append("source_id = ?")
                 params.append(source_id)
             if filter_str:
-                conditions.append("(LOWER(speaker_claim) LIKE ? OR LOWER(empirical_dataset_reference) LIKE ?)")
+                conditions.append(
+                    "(LOWER(speaker_claim) LIKE ? OR LOWER(empirical_dataset_reference) LIKE ?)"
+                )
                 params.extend([f"%{filter_str}%", f"%{filter_str}%"])
 
             if conditions:
@@ -133,15 +135,18 @@ class EvidenceTimelineEngine:
         macro_releases: list[dict[str, Any]] = []
         try:
             from core.macro_event_reporter import macro_event_reporter
+
             recs = macro_event_reporter.list_recent_releases(limit=limit)
             macro_releases = [r.to_dict() for r in recs]
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug(f"Macro releases query fallback in timeline: {exc}")
 
         # Assemble Claim events
         for r in claim_rows:
             ts = r["created_at"]
-            dt_str = datetime.datetime.fromtimestamp(ts / 1000, tz=datetime.UTC).strftime("%Y-%m-%d %H:%M")
+            dt_str = datetime.datetime.fromtimestamp(ts / 1000, tz=datetime.UTC).strftime(
+                "%Y-%m-%d %H:%M"
+            )
             events.append(
                 TimelineEvent(
                     timestamp_ms=ts,
@@ -159,11 +164,21 @@ class EvidenceTimelineEngine:
 
         # Assemble Evidence events
         for ev in evidence_rows:
-            if filter_str and filter_str not in ev["citation_text"].lower() and filter_str not in (ev["speaker_claim"] or "").lower():
+            if (
+                filter_str
+                and filter_str not in ev["citation_text"].lower()
+                and filter_str not in (ev["speaker_claim"] or "").lower()
+            ):
                 continue
             ts = ev["created_at"]
-            dt_str = datetime.datetime.fromtimestamp(ts / 1000, tz=datetime.UTC).strftime("%Y-%m-%d %H:%M")
-            ev_type = "CONTRADICTION_FLAGGED" if ev["evidence_type"] == "CONTRADICTION" else "EVIDENCE_CORROBORATED"
+            dt_str = datetime.datetime.fromtimestamp(ts / 1000, tz=datetime.UTC).strftime(
+                "%Y-%m-%d %H:%M"
+            )
+            ev_type = (
+                "CONTRADICTION_FLAGGED"
+                if ev["evidence_type"] == "CONTRADICTION"
+                else "EVIDENCE_CORROBORATED"
+            )
             events.append(
                 TimelineEvent(
                     timestamp_ms=ts,
@@ -181,10 +196,16 @@ class EvidenceTimelineEngine:
 
         # Assemble Macro Catalyst events
         for mr in macro_releases:
-            if filter_str and filter_str not in mr["title"].lower() and filter_str not in mr["category"].lower():
+            if (
+                filter_str
+                and filter_str not in mr["title"].lower()
+                and filter_str not in mr["category"].lower()
+            ):
                 continue
             ts = mr["scheduled_timestamp_ms"]
-            dt_str = datetime.datetime.fromtimestamp(ts / 1000, tz=datetime.UTC).strftime("%Y-%m-%d %H:%M")
+            dt_str = datetime.datetime.fromtimestamp(ts / 1000, tz=datetime.UTC).strftime(
+                "%Y-%m-%d %H:%M"
+            )
             events.append(
                 TimelineEvent(
                     timestamp_ms=ts,
@@ -206,11 +227,7 @@ class EvidenceTimelineEngine:
         # Calculate statistics
         supporting_count = sum(1 for e in events if e.event_type == "EVIDENCE_CORROBORATED")
         contradiction_count = sum(1 for e in events if e.event_type == "CONTRADICTION_FLAGGED")
-        avg_conf = (
-            sum(e.confidence_score for e in events) / len(events)
-            if events
-            else 0.5
-        )
+        avg_conf = sum(e.confidence_score for e in events) / len(events) if events else 0.5
 
         trend = self._analyze_narrative_trend(events, supporting_count, contradiction_count)
 
@@ -239,7 +256,9 @@ class EvidenceTimelineEngine:
 
         # Look at the most recent events
         recent_events = events[-5:] if len(events) >= 5 else events
-        recent_contradictions = sum(1 for e in recent_events if e.event_type == "CONTRADICTION_FLAGGED")
+        recent_contradictions = sum(
+            1 for e in recent_events if e.event_type == "CONTRADICTION_FLAGGED"
+        )
         recent_supporting = sum(1 for e in recent_events if e.event_type == "EVIDENCE_CORROBORATED")
 
         if recent_contradictions > recent_supporting:

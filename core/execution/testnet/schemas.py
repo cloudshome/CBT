@@ -11,11 +11,11 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from decimal import Decimal
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class BurnInState(str, Enum):
+class BurnInState(StrEnum):
     """
     Durable FSM states for Milestone 20 testnet burn-in rehearsal.
     Includes explicit RECOVERY_RECONCILIATION and INVALIDATED states.
@@ -31,7 +31,7 @@ class BurnInState(str, Enum):
     INVALIDATED = "INVALIDATED"
 
 
-class FaultSeverity(str, Enum):
+class FaultSeverity(StrEnum):
     """Severity classification for injected faults and operational anomalies."""
 
     INFORMATIONAL = "INFORMATIONAL"
@@ -40,7 +40,7 @@ class FaultSeverity(str, Enum):
     SESSION_INVALIDATING = "SESSION_INVALIDATING"
 
 
-class FaultType(str, Enum):
+class FaultType(StrEnum):
     """Controlled 13-point testnet fault matrix scenarios."""
 
     REQUEST_DELAY = "REQUEST_DELAY"

@@ -180,7 +180,7 @@ class QualificationCampaignRunner:
                     )
                     """
                 )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error(f"[QualificationCampaign] Failed to initialize SQLite schema: {exc}")
 
     async def execute_campaign(
@@ -240,7 +240,7 @@ class QualificationCampaignRunner:
                     stage=deployment_stage,
                 )
                 stage1_count += 1
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 reason = f"GATE1_ELIGIBILITY: {type(exc).__name__}"
                 rejection_breakdown[reason] = rejection_breakdown.get(reason, 0) + 1
                 continue
@@ -261,7 +261,7 @@ class QualificationCampaignRunner:
                     )
                     continue
                 stage2_count += 1
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 reason = f"GATE2_COMPILATION: {type(exc).__name__}"
                 rejection_breakdown[reason] = rejection_breakdown.get(reason, 0) + 1
                 continue
@@ -450,5 +450,5 @@ class QualificationCampaignRunner:
                         now_ms,
                     ),
                 )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error(f"[QualificationCampaign] Failed to persist report: {exc}")

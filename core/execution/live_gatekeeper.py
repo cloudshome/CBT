@@ -55,7 +55,7 @@ class LiveExecutionGatekeeper:
         self._revocation_log: list[tuple[str, str, int]] = []
         try:
             credential_vault.register_revocation_listener(self._handle_credential_revocation)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug("Could not register revocation listener: %s", exc)
 
     def _handle_credential_revocation(self, exchange: str, environment: str) -> None:
@@ -214,7 +214,7 @@ class LiveExecutionGatekeeper:
         else:
             from core.auth.hardware_key import hardware_key_manager
 
-            is_cleared, clearance, reason_code = hardware_key_manager.check_live_clearance(
+            is_cleared, _clearance, reason_code = hardware_key_manager.check_live_clearance(
                 session_id=session_id
             )
             checks["hardware_clearance_active"] = is_cleared
@@ -240,7 +240,7 @@ class LiveExecutionGatekeeper:
                     "reasons": reasons,
                 },
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.debug(f"Audit bus logging error: {e}")
 
         return GatekeeperVerdict(

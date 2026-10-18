@@ -42,8 +42,7 @@ def klines12_csv(n: int = 30, start: int = T0) -> str:
         t = start + i * STEP
         p = 93_500.0 + i * 2.5
         lines.append(
-            f"{t},{p},{p + 6},{p - 4},{p + 3},8.21,"
-            f"{t + STEP - 1},770000.0,12,4.1,380000.0,0"
+            f"{t},{p},{p + 6},{p - 4},{p + 3},8.21,{t + STEP - 1},770000.0,12,4.1,380000.0,0"
         )
     return "\n".join(lines) + "\n"
 
@@ -299,9 +298,7 @@ def test_store_client_serves_tail_cursors_and_attrs(store, tmp_path):
     tail = client.klines(SYMBOL, TF, limit=7)
     assert len(tail) == 7 and int(tail["ts"].iloc[0]) == T0 + 33 * STEP
 
-    cur = client.klines(
-        SYMBOL, TF, limit=500, start_time=T0 + 10 * STEP, end_time=T0 + 19 * STEP
-    )
+    cur = client.klines(SYMBOL, TF, limit=500, start_time=T0 + 10 * STEP, end_time=T0 + 19 * STEP)
     assert len(cur) == 10 and int(cur["ts"].iloc[0]) == T0 + 10 * STEP
 
     empty = client.klines("ETHUSDT", TF, limit=500)

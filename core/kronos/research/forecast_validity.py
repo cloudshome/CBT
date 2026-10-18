@@ -223,7 +223,7 @@ class ForecastValidityEngine:
             se_beta = max(1e-6, math.sqrt(max(0.0, float(v_mat[1, 1]))))
             t_stat = beta / se_beta
             return alpha, beta, se_alpha, se_beta, t_stat
-        except Exception:  # noqa: BLE001
+        except Exception:
             return 0.0, 1.0, 0.1, 0.1, 10.0
 
     def evaluate_predictions(

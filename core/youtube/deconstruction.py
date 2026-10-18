@@ -60,7 +60,7 @@ RULE_PATTERNS = [
 
 def format_tc(seconds: float) -> str:
     """Formats float seconds into standard MM:SS string."""
-    tot = max(0, int(round(seconds)))
+    tot = max(0, round(seconds))
     m = tot // 60
     s = tot % 60
     return f"{m:02d}:{s:02d}"
@@ -87,7 +87,7 @@ class YouTubeDeconstructor:
             raw = fetched.to_raw_data()
             if raw:
                 return raw, "MANUAL_CAPTION"
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.debug(f"Direct transcript fetch failed for {video_id}: {e}")
 
         # 2. Transcript list discovery
@@ -96,22 +96,22 @@ class YouTubeDeconstructor:
             try:
                 t_manual = t_list.find_manually_created_transcript(["en", "en-US", "en-GB"])
                 return t_manual.fetch().to_raw_data(), "MANUAL_CAPTION"
-            except Exception:  # noqa: S110,BLE001 — defensive fallback
+            except Exception:
                 pass
 
             try:
                 t_auto = t_list.find_generated_transcript(["en", "en-US", "en-GB"])
                 return t_auto.fetch().to_raw_data(), "AUTO_CAPTION"
-            except Exception:  # noqa: S110,BLE001 — defensive fallback
+            except Exception:
                 pass
 
             # Any available language
             for t in t_list:
                 try:
                     return t.fetch().to_raw_data(), "AUTO_CAPTION"
-                except Exception:  # noqa: BLE001 — defensive fallback
+                except Exception:
                     continue
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.warning(f"Transcript list discovery failed for {video_id}: {e}")
 
         # 3. ASR Fallback placeholder (labels as ASR if external audio pipeline used)

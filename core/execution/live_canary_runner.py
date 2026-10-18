@@ -138,7 +138,7 @@ class LiveCanaryRunner:
                     """
                 )
                 conn.commit()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error(f"Could not initialize canary_execution_ledger table: {exc}")
 
     def _record_canary_ledger_entry(
@@ -186,7 +186,7 @@ class LiveCanaryRunner:
                     ),
                 )
                 conn.commit()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error(f"Failed writing to canary_execution_ledger: {exc}")
 
     async def reconcile_timed_out_canary(
@@ -212,7 +212,7 @@ class LiveCanaryRunner:
                     "action": "HALT_RETRY_PENDING_FORENSIC_RECONCILIATION",
                 },
             )
-        except Exception as _e:  # noqa: BLE001
+        except Exception as _e:
             logger.debug(f"Audit event error: {_e}")
 
         return {
@@ -332,7 +332,7 @@ class LiveCanaryRunner:
                         "feasibility": feasibility.to_dict(),
                     },
                 )
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.debug(f"Audit bus logging error: {e}")
 
             msg = (
@@ -511,7 +511,7 @@ class LiveCanaryRunner:
                             "sla_limit_ms": self.ack_sla_limit_ms,
                         },
                     )
-                except Exception as _e:  # noqa: BLE001
+                except Exception as _e:
                     logger.debug(f"Audit event error: {_e}")
 
             if hasattr(resp, "exchange_order_id"):
@@ -563,7 +563,7 @@ class LiveCanaryRunner:
                     status=getattr(resp, "status", "FILLED"),
                     exchange_order_id=str(exchange_order_id),
                 )
-            except Exception as _e:  # noqa: BLE001
+            except Exception as _e:
                 logger.debug(f"Idempotency mark_final error: {_e}")
 
             audit_id = None
@@ -581,7 +581,7 @@ class LiveCanaryRunner:
                         "total_latency_ms": total_latency_ms,
                     },
                 )
-            except Exception as _e:  # noqa: BLE001
+            except Exception as _e:
                 logger.debug(f"Audit event error: {_e}")
 
             res = CanaryRunResult(
@@ -617,7 +617,7 @@ class LiveCanaryRunner:
             self._record_canary_ledger_entry(res, req.environment, req.side, req.order_type)
             return res
 
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             t_err_mono = time.monotonic_ns()
             t_err_utc = datetime.now(UTC).isoformat()
             tot_ms = (t_err_mono - t_disp_mono) / 1_000_000.0

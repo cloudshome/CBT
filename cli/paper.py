@@ -97,8 +97,7 @@ def cmd_approve(args) -> int:
     if journal_gate["missing"] and not getattr(args, "acknowledge_journal", False):
         print("[!] Approve held — journal-first discipline (W3.3).", file=sys.stderr)
         print(
-            f"    {journal_gate['missing']} decided real trade(s) still have no "
-            f"journal answer:",
+            f"    {journal_gate['missing']} decided real trade(s) still have no journal answer:",
             file=sys.stderr,
         )
         for t in journal_gate["trades"]:
@@ -183,9 +182,7 @@ def cmd_paper(args) -> int:
         # the operator explicitly labels the run as a rehearsal.
         from brain.preflight import format_preflight, preflight_report
 
-        preflight = preflight_report(
-            allow_demo=bool(getattr(args, "allow_demo", False))
-        )
+        preflight = preflight_report(allow_demo=bool(getattr(args, "allow_demo", False)))
         if args.json:
             print(json.dumps({"event": "preflight", **preflight}, default=str))
         else:

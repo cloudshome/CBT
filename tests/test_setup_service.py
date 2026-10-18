@@ -174,5 +174,3 @@ def test_verify_master_password(client, monkeypatch):
     )
     assert good_resp.status_code == 200
     assert good_resp.json()["valid"] is True
-
-

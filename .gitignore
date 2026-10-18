@@ -16,6 +16,7 @@ bin/
 !/data/research/vault/**
 /data/research/vault/documents/
 .venv/
+.vscode/
 .env
 .DS_Store
 coverage/

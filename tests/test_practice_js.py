@@ -105,8 +105,7 @@ def _submit_payload(duplicate: bool = False) -> dict:
             "disclaimer": "Practice score = agreement with the desk's "
             "current read. Study metric only.",
         },
-        "disclaimer": "Practice score = agreement with the desk's current "
-        "read. Study metric only.",
+        "disclaimer": "Practice score = agreement with the desk's current read. Study metric only.",
     }
 
 
@@ -309,9 +308,7 @@ def test_rejected_read_shows_the_server_reason():
             "/api/practice": [
                 (
                     400,
-                    {
-                        "error": "unknown bias 'moonish' — allowed: bullish, bearish, neutral"
-                    },
+                    {"error": "unknown bias 'moonish' — allowed: bullish, bearish, neutral"},
                 )
             ]
         },
@@ -349,9 +346,7 @@ def test_scorecard_empty_state_is_honest():
             "recent": [],
         }
     )
-    out = _run(
-        {"/api/practice": [(200, empty)]}, "await loadPracticeScorecard();\n" + _OUT
-    )
+    out = _run({"/api/practice": [(200, empty)]}, "await loadPracticeScorecard();\n" + _OUT)
     assert "No practice attempts yet" in out["wkPractice"]
     assert "no committed reads yet" in out["pracMini"]
 
@@ -430,11 +425,9 @@ def _tape_payload() -> dict:
                     "detail": "target hit in 4 bars (+2.50R)",
                 }
             ],
-            "disclaimer": "Tape score = what the hidden future bars did. "
-            "Historical playback only.",
+            "disclaimer": "Tape score = what the hidden future bars did. Historical playback only.",
         },
-        "disclaimer": "Tape score = what the hidden future bars did. "
-        "Historical playback only.",
+        "disclaimer": "Tape score = what the hidden future bars did. Historical playback only.",
     }
 
 
@@ -464,9 +457,7 @@ def test_tape_posts_commit_time_and_paints_outcome():
         setup + _FILL + "\n await submitTapePractice();\n" + _OUT,
     )
     assert any(p["url"].endswith("/api/practice/tape") for p in out["posts"])
-    body = next(
-        p["body"] for p in out["posts"] if p["url"].endswith("/api/practice/tape")
-    )
+    body = next(p["body"] for p in out["posts"] if p["url"].endswith("/api/practice/tape"))
     assert body["commit_time"] == 1780009900
     assert body["horizon_bars"] == 16
     assert body["decision"] == "buy"
@@ -497,9 +488,7 @@ def test_scorecard_paints_tape_sibling():
         "coaching": "Tape scores measure the hidden bars.",
         "disclaimer": "Historical playback only.",
     }
-    out = _run(
-        {"/api/practice": [(200, card)]}, "await loadPracticeScorecard();\n" + _OUT
-    )
+    out = _run({"/api/practice": [(200, card)]}, "await loadPracticeScorecard();\n" + _OUT)
     w = out["wkPractice"]
     assert "TAPE — replay outcomes" in w
     assert "Ladder win rate" in w and "50.0%" in w

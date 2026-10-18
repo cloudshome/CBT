@@ -38,7 +38,7 @@ import math
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from core.audit_bus import audit_bus
@@ -50,7 +50,7 @@ logger = logging.getLogger("sky.execution.capital_governor")
 # ---------------------------------------------------------------------------
 # Capital Tier 8-State Enum
 # ---------------------------------------------------------------------------
-class CapitalTier(str, Enum):
+class CapitalTier(StrEnum):
     TIER_0_PAPER = "TIER_0_PAPER"
     TIER_1_CANARY_ELIGIBLE = "TIER_1_CANARY_ELIGIBLE"
     TIER_1_CANARY = "TIER_1_CANARY"
@@ -346,7 +346,7 @@ class CapitalGovernor:
                     "CREATE INDEX IF NOT EXISTS idx_esc_strat_ts ON capital_escalation_decisions(strategy_id, timestamp_ms DESC);"
                 )
                 conn.commit()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning(f"Notice initializing capital_escalation schema: {exc}")
 
     # -----------------------------------------------------------------------
@@ -375,7 +375,7 @@ class CapitalGovernor:
                         "demotion": demotion_dict,
                         "updated_at_ms": row["updated_at_ms"],
                     }
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning(f"Notice fetching capital state for {sid}: {exc}")
 
         # Default initialization: Paper shadow
@@ -437,7 +437,7 @@ class CapitalGovernor:
                     ),
                 )
                 conn.commit()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning(f"Notice saving capital state for {sid}: {exc}")
 
     def record_decision(
@@ -523,7 +523,7 @@ class CapitalGovernor:
                     "trials_count": trials_count,
                 },
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning(f"Notice recording capital decision {decision_id}: {exc}")
 
         return decision_id
@@ -1060,7 +1060,7 @@ class CapitalGovernor:
                     (sid,),
                 ).fetchall()
                 recent_decisions = [dict(r) for r in rows]
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning(f"Notice fetching decisions: {exc}")
 
         return {

@@ -333,7 +333,7 @@ class DatasetFreezeManager:
         try:
             with open(self.manifest_path, encoding="utf-8") as f:
                 return json.load(f)
-        except Exception:  # noqa: BLE001
+        except Exception:
             return {}
 
     def _update_manifest(self, entry: DatasetManifestEntry) -> None:

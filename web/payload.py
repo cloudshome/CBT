@@ -30,9 +30,7 @@ from engine.signal_engine import analyze_frame
 from output.signal_schema import validate_output
 
 _CACHE: dict = {"payload": None, "ts": 0, "ttl": 40}
-_LAST_GOOD: dict[
-    tuple[str, str], dict
-] = {}  # last successful payload by (symbol, timeframe)
+_LAST_GOOD: dict[tuple[str, str], dict] = {}  # last successful payload by (symbol, timeframe)
 
 _SCAN_TIMEOUT = 45  # seconds — hard cap on a full analysis; fall back below
 
@@ -213,9 +211,7 @@ def _basic_scan(symbol: str, tf: str, save: bool) -> dict:
             )
             payload = out.as_json()
             payload["market_context"] = client.market_context(symbol)
-            payload["market_context"]["fallback_note"] = (
-                "futures not fully checked (fallback mode)"
-            )
+            payload["market_context"]["fallback_note"] = "futures not fully checked (fallback mode)"
             try:
                 from brain.trading_intelligence import build_intelligence
 
@@ -224,9 +220,7 @@ def _basic_scan(symbol: str, tf: str, save: bool) -> dict:
                 pass
             payload["validation"] = validate_output(payload)
             payload["degraded"] = True
-            payload["degraded_reason"] = (
-                "full analysis timed out — showing engine-only signal"
-            )
+            payload["degraded_reason"] = "full analysis timed out — showing engine-only signal"
             _attach_management(payload)
             result["payload"] = payload
         except Exception as exc:  # pragma: no cover
@@ -270,9 +264,7 @@ def _attach_sentiment(payload: dict, symbol: str, tf: str) -> dict:
     return payload
 
 
-def compute_payload(
-    symbol: str, tf: str, save: bool = True, use_cache: bool = True
-) -> dict:
+def compute_payload(symbol: str, tf: str, save: bool = True, use_cache: bool = True) -> dict:
     symbol = _sym(symbol)
     if (
         use_cache

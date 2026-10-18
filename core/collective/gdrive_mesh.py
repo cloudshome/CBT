@@ -104,7 +104,7 @@ class GDriveClusterMesh:
                 filename=f"{ident.node_id}.json",
             )
             logger.info("Published PC profile for '%s' to Google Drive mesh.", ident.node_id)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning("Could not upload PC profile to Drive: %s", exc)
 
         return profile_data
@@ -125,7 +125,7 @@ class GDriveClusterMesh:
                             if isinstance(p_data, dict) and "node_id" in p_data:
                                 p_data["status"] = p_data.get("status", "CACHED_PEER")
                                 nodes[p_data["node_id"]] = p_data
-                    except Exception as err:  # noqa: BLE001
+                    except Exception as err:
                         logger.debug("Error reading cached peer profile %s: %s", p_file.name, err)
 
         # 2. If Google Drive is live, query remote SKY/09_CLUSTER_MESH/nodes/
@@ -171,13 +171,13 @@ class GDriveClusterMesh:
                                         cache_f = self.profiles_dir / f"{peer_id}.json"
                                         with open(cache_f, "w", encoding="utf-8") as f:
                                             json.dump(parsed, f, indent=2)
-                                except Exception as dl_err:  # noqa: BLE001
+                                except Exception as dl_err:
                                     logger.debug(
                                         "Error reading peer %s profile: %s", peer_id, dl_err
                                     )
 
                                 nodes[peer_id] = peer_node
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.debug("Listing cloud nodes fallback: %s", exc)
 
         return list(nodes.values())
@@ -308,7 +308,7 @@ class GDriveClusterMesh:
                 if manifest_file.exists():
                     shutil.move(str(manifest_file), str(self.archive_dir / manifest_file.name))
 
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.error("Failed to process peer package %s: %s", pkg_file.name, exc)
 
         # Rebuild local projection if new events arrived

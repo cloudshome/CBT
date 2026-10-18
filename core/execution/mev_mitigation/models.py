@@ -14,7 +14,7 @@ import enum
 from dataclasses import dataclass
 
 
-class MempoolRouteType(str, enum.Enum):
+class MempoolRouteType(enum.StrEnum):
     """Mempool submission channel."""
 
     PUBLIC_MEMPOOL = (
@@ -27,7 +27,7 @@ class MempoolRouteType(str, enum.Enum):
     FAIR_SEQUENCING = "FAIR_SEQUENCING"  # Order-fairness consensus (Aequitas / batch auction)
 
 
-class MEVRiskLevel(str, enum.Enum):
+class MEVRiskLevel(enum.StrEnum):
     """Classified risk of predatory searcher extraction."""
 
     NEGLIGIBLE = "NEGLIGIBLE"  # Searcher profit < gas cost (immune to sandwiching)

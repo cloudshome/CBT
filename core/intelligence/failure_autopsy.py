@@ -23,7 +23,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import time
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -45,7 +45,7 @@ from core.intelligence.validation_result import (
 logger = logging.getLogger("ai_quant_sentinel.intelligence.failure_autopsy")
 
 
-class CausalFailureCategory(str, Enum):
+class CausalFailureCategory(StrEnum):
     COST_EROSION = "COST_EROSION"
     REGIME_FRAGILITY = "REGIME_FRAGILITY"
     SAMPLE_INSUFFICIENCY = "SAMPLE_INSUFFICIENCY"
@@ -263,7 +263,7 @@ class FailureAutopsyCompiler:
             logger.info(
                 f"Committed autopsy {autopsy_id} to Failure Memory for hypothesis {contract.hypothesis_id}"
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.error(f"Failed to commit autopsy to Failure Memory: {e}")
 
         # Update hypothesis status in ledger

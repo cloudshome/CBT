@@ -7,9 +7,10 @@ Unit tests for CrawlerDaemon:
 3. Tests status serialization.
 """
 
-import pytest
 from pathlib import Path
-import tempfile
+
+import pytest
+
 from core.intelligence.crawler.crawler_daemon import CrawlerDaemon
 from core.knowledge_os.research_wikipedia import ResearchWikipediaEngine
 
@@ -45,4 +46,3 @@ async def test_crawler_daemon_harvest_and_status(temp_crawler_env):
     new_status = daemon.get_status()
     assert new_status.total_cycles_completed == 1
     assert new_status.last_run_at is not None
-

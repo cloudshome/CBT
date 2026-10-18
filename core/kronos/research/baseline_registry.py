@@ -180,7 +180,7 @@ class AutoregressiveDriftBaseline(AbstractBaselineModel):
             self.phi_1 = float(beta[1])
             resids = y - (x_mat @ beta)
             self.resid_std = max(0.001, float(np.std(resids)))
-        except Exception:  # noqa: BLE001
+        except Exception:
             self.phi_0 = 0.0
             self.phi_1 = 0.0
             self.resid_std = 0.01

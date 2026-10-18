@@ -24,7 +24,7 @@ import math
 import time
 import uuid
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from core.audit_bus import audit_bus
@@ -76,7 +76,7 @@ class OverfillHaltedError(SmartOrderRouterError):
 # ---------------------------------------------------------------------------
 
 
-class ParentOrderState(str, Enum):
+class ParentOrderState(StrEnum):
     """Authoritative state machine for multi-venue parent orders."""
 
     PLANNED = "PLANNED"
@@ -411,7 +411,7 @@ class SmartOrderRouter:
                     ),
                 )
                 conn.commit()
-        except Exception as e:  # noqa: BLE001 — best-effort parent order persistence
+        except Exception as e:
             logger.error(f"Failed to persist parent order {record.parent_order_id}: {e}")
 
     def _load_parent_order(self, parent_order_id: str) -> ParentOrderExecutionRecord | None:
@@ -433,7 +433,7 @@ class SmartOrderRouter:
                 rec = ParentOrderExecutionRecord.from_dict(data)
                 self.parent_orders[parent_order_id] = rec
                 return rec
-        except Exception as e:  # noqa: BLE001 — best-effort parent order load
+        except Exception as e:
             logger.error(f"Failed to load parent order {parent_order_id}: {e}")
             return None
 
@@ -487,7 +487,7 @@ class SmartOrderRouter:
                         reason=f"Recovered active parent order {pid} in state {rec.state.value} after restart.",
                         details=rec.to_dict(),
                     )
-        except Exception as e:  # noqa: BLE001 — best-effort active order recovery
+        except Exception as e:
             logger.error(f"Failed to recover active parent orders: {e}")
 
         return recovered

@@ -78,9 +78,7 @@ def test_glossary_has_core_terms():
 
 
 def test_expand_annotates_terms():
-    out = _expand(
-        "IF price pulls back to bullish Order Block near 61000 AND shows rejection"
-    )
+    out = _expand("IF price pulls back to bullish Order Block near 61000 AND shows rejection")
     assert "Order Block" in out and "footprint" in out
 
 
@@ -181,9 +179,7 @@ def test_five_levels_no_plans_teaches_waiting():
     payload = {
         "signal": {"action": "NO TRADE"},
         "plans": [],
-        "snapshot": {
-            "features": {"trend": "mixed", "price": 60000.0, "trend_bias": "neutral"}
-        },
+        "snapshot": {"features": {"trend": "mixed", "price": 60000.0, "trend_bias": "neutral"}},
     }
     joined = "\n".join(five_levels(payload))
     assert "No plan above the confidence threshold" in joined

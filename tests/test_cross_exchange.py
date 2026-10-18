@@ -138,9 +138,7 @@ def collect(
         snapshot=snapshot,
         dry_run=dry_run,
         binance_last=binance_last if binance_last is not None else {SYMBOL: 60_000.0},
-        binance_funding=binance_funding
-        if binance_funding is not None
-        else {SYMBOL: 0.0001},
+        binance_funding=binance_funding if binance_funding is not None else {SYMBOL: 0.0001},
     )
 
 
@@ -396,10 +394,7 @@ def test_cli_cross_demo_is_offline_and_queryable(tmp_path, monkeypatch):
     store = CrossExchangeStore(root=root)
     # DEMO snapshot wrote premium for the three venues
     assert store.count("bybit", "spot", SYMBOL, PREMIUM_PCT) == 1
-    assert (
-        main(["cross", "status", "--symbol", "BTCUSDT", "--root", str(root), "--json"])
-        == 0
-    )
+    assert main(["cross", "status", "--symbol", "BTCUSDT", "--root", str(root), "--json"]) == 0
 
 
 def test_bybit_funding_history_parses_v5(monkeypatch):

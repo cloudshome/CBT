@@ -95,8 +95,7 @@ def calculate(
 
     if balance <= 0:
         result["error"] = (
-            "Set your account balance (or ACCOUNT_BALANCE in "
-            ".env) before sizing a trade."
+            "Set your account balance (or ACCOUNT_BALANCE in .env) before sizing a trade."
         )
         return result
     if entry is None or stop is None:
@@ -104,9 +103,7 @@ def calculate(
         return result
     stop_distance = abs(entry - stop)
     if stop_distance <= 0:
-        result["error"] = (
-            "Stop-loss must differ from entry — a zero stop is not a trade."
-        )
+        result["error"] = "Stop-loss must differ from entry — a zero stop is not a trade."
         return result
 
     risk_amount = balance * (applied / 100.0)
@@ -134,9 +131,7 @@ def calculate(
             "notional": round(notional, 2),
             "notional_pct_of_balance": round(notional / balance * 100.0, 2),
             "margin_required": round(notional / leverage, 2) if leverage else None,
-            "reward_amount": round(reward_amount, 2)
-            if reward_amount is not None
-            else None,
+            "reward_amount": round(reward_amount, 2) if reward_amount is not None else None,
             "risk_reward": round(rr, 3) if rr is not None else None,
             "losses_to_daily_limit": int(daily_pct // applied) if applied else None,
             "losses_to_weekly_limit": int(weekly_pct // applied) if applied else None,
@@ -145,9 +140,7 @@ def calculate(
 
     if not gate_open:
         result["recommended_units"] = 0.0
-        result["verdict"] = "Risk gate CLOSED — the correct size is ZERO. " + "; ".join(
-            blocked_by
-        )
+        result["verdict"] = "Risk gate CLOSED — the correct size is ZERO. " + "; ".join(blocked_by)
     else:
         result["recommended_units"] = result["units"]
         result["verdict"] = (

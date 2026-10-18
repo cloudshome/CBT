@@ -408,7 +408,7 @@ class IncidentEscalationEngine:
             self._background_tasks.add(alert_task)
             alert_task.add_done_callback(self._background_tasks.discard)
             return True
-        except Exception as ex:  # noqa: BLE001 — alert delivery must never break safety actions
+        except Exception as ex:
             logger.debug(f"Telegram alert delivery skipped (safe degradation): {ex}")
             return False
 
@@ -454,7 +454,7 @@ class IncidentEscalationEngine:
                     ),
                 )
                 conn.commit()
-        except Exception as ex:  # noqa: BLE001 — best-effort incident persistence
+        except Exception as ex:
             logger.error(f"Failed to persist incident {rec.incident_id}: {ex}")
 
     def resolve_incident(self, incident_id: str, operator_id: str, notes: str = "") -> bool:
@@ -490,7 +490,7 @@ class IncidentEscalationEngine:
                 details={"incident_id": incident_id, "resolved_by": operator_id},
             )
             return True
-        except Exception as ex:  # noqa: BLE001 — resolution status must not crash the caller
+        except Exception as ex:
             logger.error(f"Failed to resolve incident {incident_id}: {ex}")
             return False
 

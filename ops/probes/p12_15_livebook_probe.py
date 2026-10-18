@@ -200,7 +200,7 @@ def case_kelly(db: SignalDB) -> dict:
         from engine.hidden_alpha import kelly_from_progress
 
         kelly_from_progress(db.decided_paper_rows(exclude_sim=True))
-    except Exception as exc:  # noqa: BLE001 - recording the defect
+    except Exception as exc:
         legacy_error = f"{type(exc).__name__}: {exc}"
     k = kelly_from_rows(db.live_book_rows())
     return {
@@ -273,11 +273,7 @@ def main() -> int:
         )
     ok = all(r["fixed"] for r in results)
     print("-" * 78)
-    print(
-        "ALL CASES BEHAVE AS SPECIFIED"
-        if ok
-        else "SOME LIVE CONTROLS STILL POOL SOURCES"
-    )
+    print("ALL CASES BEHAVE AS SPECIFIED" if ok else "SOME LIVE CONTROLS STILL POOL SOURCES")
     return 0 if ok else 1
 
 

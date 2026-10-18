@@ -144,11 +144,7 @@ def test_architecture_invariant_thirteen_rejects_trading_bots():
 
 
 def test_data_roadmap_rejects_freqtrade_as_backtester():
-    text = (
-        (ROOT / "docs" / "DATA_INFRASTRUCTURE_ROADMAP.md")
-        .read_text(encoding="utf-8")
-        .lower()
-    )
+    text = (ROOT / "docs" / "DATA_INFRASTRUCTURE_ROADMAP.md").read_text(encoding="utf-8").lower()
     assert "freqtrade" in text
     assert "p10.11" in text
 
@@ -180,9 +176,7 @@ def test_todo_forbids_backtrader_and_names_p12():
 def test_architecture_and_layers_reject_backtrader():
     arch = (ROOT / "ARCHITECTURE.md").read_text(encoding="utf-8").lower()
     assert "backtrader" in arch
-    layers = (
-        (ROOT / "docs" / "INFRASTRUCTURE_LAYERS.md").read_text(encoding="utf-8").lower()
-    )
+    layers = (ROOT / "docs" / "INFRASTRUCTURE_LAYERS.md").read_text(encoding="utf-8").lower()
     assert "backtrader" in layers
 
 
@@ -210,9 +204,7 @@ def test_needle_review_keeps_router_outside_the_authority_boundary():
 def test_todo_and_architecture_park_needle_without_installing_it():
     todo = (ROOT / "TODO.md").read_text(encoding="utf-8").lower()
     arch = (ROOT / "ARCHITECTURE.md").read_text(encoding="utf-8").lower()
-    layers = (
-        (ROOT / "docs" / "INFRASTRUCTURE_LAYERS.md").read_text(encoding="utf-8").lower()
-    )
+    layers = (ROOT / "docs" / "INFRASTRUCTURE_LAYERS.md").read_text(encoding="utf-8").lower()
     assert "needle_review.md" in todo and "parked" in todo
     assert "cactus-needle" in todo and "do not install" in todo
     assert "needle_review.md" in arch and "tool router is a client" in arch
@@ -279,9 +271,7 @@ def test_product_surfaces_state_installers_are_planned_not_shipped():
 
 
 def test_product_decisions_keep_one_authority_and_server_side_gate():
-    decisions = (
-        (ROOT / "PROFESSIONAL_PLAN_DECISIONS.md").read_text(encoding="utf-8").lower()
-    )
+    decisions = (ROOT / "PROFESSIONAL_PLAN_DECISIONS.md").read_text(encoding="utf-8").lower()
     blueprint = (ROOT / "BLUEPRINT.md").read_text(encoding="utf-8").lower()
     assert all(f"pd{i}" in decisions for i in range(1, 9))
     assert "companion clients" in decisions

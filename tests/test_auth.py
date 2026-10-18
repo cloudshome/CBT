@@ -49,17 +49,13 @@ PASSWORD = "correct horse battery staple"
 
 
 def _setup(client, username=OWNER, password=PASSWORD):
-    r = client.post(
-        "/api/auth/setup", json={"username": username, "password": password}
-    )
+    r = client.post("/api/auth/setup", json={"username": username, "password": password})
     assert r.status_code == 200, r.get_data(as_text=True)
     return r.get_json()
 
 
 def _login(client, username=OWNER, password=PASSWORD):
-    r = client.post(
-        "/api/auth/login", json={"username": username, "password": password}
-    )
+    r = client.post("/api/auth/login", json={"username": username, "password": password})
     assert r.status_code == 200, r.get_data(as_text=True)
     return r.get_json()
 
@@ -139,18 +135,11 @@ def test_unauthenticated_cannot_read_or_mutate(client):
     assert anon.get("/api/scan?symbol=BTCUSDT&tf=15m").status_code == 401
     assert anon.get("/api/pending").status_code == 401
     assert anon.get("/api/health").status_code == 401
-    assert (
-        anon.post(
-            "/api/review", json={"scan_id": 1, "decision": "APPROVED"}
-        ).status_code
-        == 401
-    )
+    assert anon.post("/api/review", json={"scan_id": 1, "decision": "APPROVED"}).status_code == 401
     assert anon.post("/api/trader-state", json={"angry": True}).status_code == 401
     assert anon.post("/api/journal", json={"scan_id": 1}).status_code == 401
     assert anon.post("/api/commands/run", json={"id": "mcp"}).status_code == 401
-    assert (
-        anon.post("/api/alerts/test", json={"channel": "telegram"}).status_code == 401
-    )
+    assert anon.post("/api/alerts/test", json={"channel": "telegram"}).status_code == 401
     assert anon.post("/api/learn").status_code == 401
     assert anon.post("/api/backtest", json={}).status_code == 401
     assert anon.post("/api/paper/run", json={}).status_code == 401
@@ -180,9 +169,7 @@ def test_login_wrong_password_and_throttle(client):
     _setup(client)
     anon = _fresh_client(client)
     for _ in range(config.SKY_LOGIN_MAX_ATTEMPTS):
-        r = anon.post(
-            "/api/auth/login", json={"username": OWNER, "password": "wrong-password"}
-        )
+        r = anon.post("/api/auth/login", json={"username": OWNER, "password": "wrong-password"})
         assert r.status_code == 401
     # now locked out — even the correct password is refused
     r = anon.post("/api/auth/login", json={"username": OWNER, "password": PASSWORD})
@@ -265,9 +252,7 @@ def test_csrf_required_for_cookie_mutations(client):
     assert r.status_code == 403
     assert r.get_json()["code"] == "CSRF"
     # with the token: accepted
-    r = client.post(
-        "/api/trader-state", json={"angry": True}, headers={"X-CSRF-Token": csrf}
-    )
+    r = client.post("/api/trader-state", json={"angry": True}, headers={"X-CSRF-Token": csrf})
     assert r.status_code == 200
     # GETs never need CSRF
     assert client.get("/api/risk").status_code == 200
@@ -374,9 +359,7 @@ def test_sensitive_actions_are_audited(client):
         json={"scan_id": scan_id, "decision": "REJECTED"},
         headers={"X-CSRF-Token": csrf},
     )
-    client.post(
-        "/api/trader-state", json={"angry": True}, headers={"X-CSRF-Token": csrf}
-    )
+    client.post("/api/trader-state", json={"angry": True}, headers={"X-CSRF-Token": csrf})
     rows = client.get("/api/auth/audit").get_json()["rows"]
     actions = {r["action"] for r in rows}
     assert {"login", "review", "trader_state"} <= actions

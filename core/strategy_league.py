@@ -176,11 +176,7 @@ class StrategyLeagueManager:
             # Enforce Selection-Bias Guard (Deflated Sharpe Ratio DSR >= 0.95)
             from core.strategy_selection_guard import strategy_selection_guard
 
-            obs_returns = (
-                returns
-                if returns is not None
-                else getattr(strat, "observed_returns", [])
-            )
+            obs_returns = returns if returns is not None else getattr(strat, "observed_returns", [])
             if not obs_returns:
                 obs_returns = self._fetch_strategy_returns(dna_id)
 

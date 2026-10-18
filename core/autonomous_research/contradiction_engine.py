@@ -80,7 +80,7 @@ class ContradictionEngine:
             try:
                 graph_data = knowledge_graph_engine.get_full_graph_payload()
                 existing_claims = graph_data.get("claims", [])
-            except Exception:  # noqa: BLE001
+            except Exception:
                 existing_claims = []
 
         for new_c in new_claims:

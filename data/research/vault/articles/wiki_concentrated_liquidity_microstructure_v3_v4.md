@@ -5,7 +5,7 @@
 > **Category:** `Quantitative Market Structure` | **Source Type:** `RESEARCH_DOCUMENT`  
 > **Original Source:** [internal://core/execution/concentrated_amm](internal://core/execution/concentrated_amm)  
 > **Analyst / Speaker Attribution:** `SKY Microstructure Architecture Team`  
-> **Last Cross-Verified:** `2026-09-27 12:37:44 UTC` | **Epistemic Rigor Score:** `97.0%`
+> **Last Cross-Verified:** `2026-10-01 17:31:19 UTC` | **Epistemic Rigor Score:** `97.0%`
 
 ---
 

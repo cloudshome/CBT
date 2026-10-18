@@ -53,9 +53,7 @@ def gp(
 def _strong_book(n: int = 60) -> list:
     """Net-positive book (50% wins at 2R, 50% losses at -1R, E = +0.50R)."""
     wins = [gp(i, rr=2.0, rr_net=2.0) for i in range(n // 2)]
-    losses = [
-        gp(10000 + i, outcome="LOSS", rr=-1.0, rr_net=-1.0) for i in range(n - n // 2)
-    ]
+    losses = [gp(10000 + i, outcome="LOSS", rr=-1.0, rr_net=-1.0) for i in range(n - n // 2)]
     return wins + losses
 
 
@@ -64,19 +62,14 @@ def _fragile_book(n: int = 60) -> list:
     70% wins at +0.5R, 30% losses at -1R → E = +0.05R.  Small edge with
     asymmetric outcomes → bootstrap resamples will often have E <= 0."""
     wins = [gp(i, rr=0.5, rr_net=0.5) for i in range(int(n * 0.7))]
-    losses = [
-        gp(10000 + i, outcome="LOSS", rr=-1.0, rr_net=-1.0)
-        for i in range(n - int(n * 0.7))
-    ]
+    losses = [gp(10000 + i, outcome="LOSS", rr=-1.0, rr_net=-1.0) for i in range(n - int(n * 0.7))]
     return wins + losses
 
 
 def _losing_book(n: int = 60) -> list:
     """Net-negative book (E < 0)."""
     wins = [gp(i, rr=1.0, rr_net=1.0) for i in range(n // 4)]
-    losses = [
-        gp(10000 + i, outcome="LOSS", rr=-1.0, rr_net=-1.0) for i in range(n - n // 4)
-    ]
+    losses = [gp(10000 + i, outcome="LOSS", rr=-1.0, rr_net=-1.0) for i in range(n - n // 4)]
     return wins + losses
 
 
@@ -100,11 +93,7 @@ def test_monte_carlo_decisive_structure_and_seed_determinism():
     assert a["expectancy"]["p50"] == b["expectancy"]["p50"]
     assert a["ruin_prob"] == b["ruin_prob"]
     # Structure
-    assert (
-        "p5" in a["expectancy"]
-        and "p50" in a["expectancy"]
-        and "p95" in a["expectancy"]
-    )
+    assert "p5" in a["expectancy"] and "p50" in a["expectancy"] and "p95" in a["expectancy"]
     assert "median_pct" in a["drawdown"] and "p95_pct" in a["drawdown"]
     assert "p5" in a["equity"] and "p50" in a["equity"] and "p95" in a["equity"]
 

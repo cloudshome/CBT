@@ -200,7 +200,7 @@ class ArchiveManager:
                 filename=f"{sid}_{path.name}",
                 resumable=True,
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.error(
                 f"Upload failed for {sid}: {e}. Local copy strictly PRESERVED (Invariant 4)."
             )
@@ -317,7 +317,7 @@ class ArchiveManager:
             )
             logger.info(f"Local copy evicted for verified source: {source_id}")
             return True
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.error(f"Failed to evict local file {local_path}: {e}")
             return False
 

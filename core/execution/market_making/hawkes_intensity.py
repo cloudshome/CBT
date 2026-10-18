@@ -26,12 +26,12 @@ import logging
 import math
 import time
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 logger = logging.getLogger("ai_quant_sentinel.market_making.hawkes")
 
 
-class FlowToxicityTier(str, Enum):
+class FlowToxicityTier(StrEnum):
     """Categorical classification of incoming order flow toxicity."""
 
     BENIGN = "BENIGN"

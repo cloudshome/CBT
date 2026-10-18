@@ -113,7 +113,7 @@ class HyperliquidConnector(BaseExchangeConnector):
                 acct = Account.from_key(pk_clean)
                 self.agent_address = acct.address
                 self._agent_account = acct
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.warning("Could not derive agent address from private key: %s", exc)
 
     def sign_l1_action(self, action: dict[str, Any], nonce: int) -> dict[str, Any]:
@@ -606,7 +606,7 @@ class HyperliquidConnector(BaseExchangeConnector):
                 "withdrawal_allowed": False,  # POSITIVE INVARIANT: Hyperliquid Agent keys cannot withdraw funds on L1
                 "status": "PASS",
             }
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return {
                 "verified": False,
                 "reason": f"Hyperliquid L1 verification failed: {sanitize_text(str(exc))}",

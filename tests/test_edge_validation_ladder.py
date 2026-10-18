@@ -19,9 +19,7 @@ from engine.edge_validation import (
 from tests.conftest import make_ohlcv
 
 
-def _paper(
-    outcome: str, rr_net: float | None, rr_achieved: float | None = None
-) -> dict:
+def _paper(outcome: str, rr_net: float | None, rr_achieved: float | None = None) -> dict:
     return {"outcome": outcome, "rr_net": rr_net, "rr_achieved": rr_achieved}
 
 

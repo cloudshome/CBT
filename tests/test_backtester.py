@@ -225,9 +225,7 @@ def test_run_backtest_shape(df):
     # every graded outcome is one of the allowed set
     for g in result["graded"]:
         assert g.outcome in OUTCOMES
-    assert (
-        report["summary"]["win_rate"] is None or 0 <= report["summary"]["win_rate"] <= 1
-    )
+    assert report["summary"]["win_rate"] is None or 0 <= report["summary"]["win_rate"] <= 1
 
 
 def test_graded_plans_carry_holding_time():
@@ -235,9 +233,7 @@ def test_graded_plans_carry_holding_time():
     from tests.conftest import make_ohlcv
 
     df = make_ohlcv(n=300, seed=11)
-    out = run_backtest(
-        df, symbol="BTCUSDT", timeframe="15m", horizons=[4.0], min_bars=150, step=5
-    )
+    out = run_backtest(df, symbol="BTCUSDT", timeframe="15m", horizons=[4.0], min_bars=150, step=5)
     graded = out["graded"]
     decided = [g for g in graded if g.outcome in WIN_SET or g.outcome == "LOSS"]
     assert decided, "expected some decided plans"
@@ -260,9 +256,7 @@ def test_backtest_tags_regime(tmp_path):
     from tests.conftest import make_ohlcv
 
     df = make_ohlcv(n=300, seed=11)
-    out = run_backtest(
-        df, symbol="BTCUSDT", timeframe="15m", horizons=[1.0], min_bars=150, step=5
-    )
+    out = run_backtest(df, symbol="BTCUSDT", timeframe="15m", horizons=[1.0], min_bars=150, step=5)
     graded = out["graded"]
     assert graded, "expected some graded plans"
     assert any(g.regime for g in graded)

@@ -66,7 +66,7 @@ class RetentionManager:
                         r.source_id, archive_status="PRUNED", local_path=None
                     )
                     pruned_count += 1
-                except Exception as e:  # noqa: BLE001
+                except Exception as e:
                     logger.warning(f"Could not prune disposable file {r.local_path}: {e}")
 
         logger.info(f"Retention manager pruned {pruned_count} disposable cache files.")

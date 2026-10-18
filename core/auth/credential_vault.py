@@ -158,12 +158,22 @@ def zeroize_bytes(buffer: bytearray) -> None:
         buffer[i] = 0
 
 
-SUPPORTED_EXCHANGES = ("BINANCE", "BINANCE_FUTURES", "BYBIT", "HYPERLIQUID", "KRAKEN", "KUCOIN", "MEXC")
+SUPPORTED_EXCHANGES = (
+    "BINANCE",
+    "BINANCE_FUTURES",
+    "BYBIT",
+    "HYPERLIQUID",
+    "KRAKEN",
+    "KUCOIN",
+    "MEXC",
+)
 
 
 @dataclass
 class ExchangeCredential:
-    exchange: str  # "BINANCE", "BINANCE_FUTURES", "BYBIT", "HYPERLIQUID", "KRAKEN", "KUCOIN", "MEXC"
+    exchange: (
+        str  # "BINANCE", "BINANCE_FUTURES", "BYBIT", "HYPERLIQUID", "KRAKEN", "KUCOIN", "MEXC"
+    )
     environment: str  # "TESTNET" or "PRODUCTION"
     api_key: str
     api_secret: str
@@ -550,7 +560,7 @@ class CredentialVault:
                 from core.auth.kms_enclave import create_kms_enclave
 
                 self.kms_enclave = create_kms_enclave()
-            except Exception:  # noqa: BLE001
+            except Exception:
                 self.kms_enclave = None
         self._ensure_schema()
 
@@ -584,7 +594,7 @@ class CredentialVault:
                     """
                 )
                 conn.commit()
-        except Exception as e:  # noqa: BLE001 — best-effort schema init
+        except Exception as e:
             logger.error(f"Could not initialize vault_credentials table: {e}")
 
     def is_unlocked(self) -> bool:
@@ -1024,7 +1034,7 @@ class CredentialVault:
         for listener in self._revocation_listeners:
             try:
                 listener(exch, env)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.warning(f"Error notifying revocation listener for {exch} [{env}]: {exc}")
 
         try:
@@ -1037,7 +1047,7 @@ class CredentialVault:
                 reason=f"Credential revoked for {exch} [{env}]. Connector sessions and capabilities invalidated.",
                 details={"exchange": exch, "environment": env},
             )
-        except Exception as _e:  # noqa: BLE001
+        except Exception as _e:
             logger.debug(f"Audit bus logging error on revocation: {_e}")
 
         logger.info(f"Credential revoked and caches invalidated for {exch} [{env}]")
@@ -1113,7 +1123,7 @@ class CredentialVault:
                     if status == 200:
                         return True, latency_ms, f"Network reachable ({latency_ms:.1f}ms)"
                     return False, latency_ms, f"Exchange returned HTTP {status}"
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             t_end = time.perf_counter()
             latency_ms = (t_end - t_start) * 1000.0
             return False, latency_ms, f"Connectivity failed: {e!s}"
@@ -1202,7 +1212,12 @@ class CredentialVault:
                             data,
                             f"Binance Futures authenticated ({latency_ms:.1f}ms)",
                         )
-                    return False, latency_ms, {}, f"Binance Futures authentication rejected ({status})"
+                    return (
+                        False,
+                        latency_ms,
+                        {},
+                        f"Binance Futures authentication rejected ({status})",
+                    )
 
             elif exch == "BYBIT":
                 base_url = (
@@ -1257,7 +1272,7 @@ class CredentialVault:
                             else f"0x{cred.api_secret}"
                         )
                         Account.from_key(key)
-                    except Exception as err:  # noqa: BLE001
+                    except Exception as err:
                         return False, 0.0, {}, f"Invalid Hyperliquid Agent Private Key: {err}"
 
                 user_address = cred.api_key
@@ -1323,7 +1338,7 @@ class CredentialVault:
                     sig = base64.b64encode(
                         hmac.new(secret_bytes, message, hashlib.sha512).digest()
                     ).decode("utf-8")
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:
                     return False, 0.0, {}, f"Invalid Kraken secret encoding: {exc}"
                 headers = {
                     "API-Key": cred.api_key,
@@ -1404,7 +1419,7 @@ class CredentialVault:
             else:
                 return False, 0.0, {}, f"Unsupported exchange: {exch}"
 
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             t_end = time.perf_counter()
             latency_ms = (t_end - t_start) * 1000.0
             return False, latency_ms, {}, f"Authentication probe error: {e!s}"
@@ -1597,7 +1612,11 @@ class CredentialVault:
                 )
                 t_end = time.perf_counter()
                 latency_ms = (t_end - t_start) * 1000.0
-                return profile, latency_ms, "Binance Futures permissions verified safe (withdrawal disabled)."
+                return (
+                    profile,
+                    latency_ms,
+                    "Binance Futures permissions verified safe (withdrawal disabled).",
+                )
 
             elif exch in ("MEXC", "KRAKEN", "KUCOIN"):
                 profile = CredentialPermissionProfile(
@@ -1628,7 +1647,7 @@ class CredentialVault:
                 )
                 return fail_profile, 0.0, f"Unsupported exchange: {exch}"
 
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             t_end = time.perf_counter()
             latency_ms = (t_end - t_start) * 1000.0
             fail_profile = CredentialPermissionProfile(
@@ -1668,7 +1687,7 @@ class CredentialVault:
 
         try:
             cred = credential or self.get_credential(exch, env)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error(f"Failed to decrypt credential for {exch} [{env}]: {exc}")
             return CredentialVerificationResult(
                 exchange=exch,
@@ -1778,7 +1797,7 @@ class CredentialVault:
                 return res
 
             # 3. Permission Restrictions Probe
-            profile, perm_ms, perm_msg = await self.permission_probe(
+            profile, perm_ms, _perm_msg = await self.permission_probe(
                 exch, env, credential=cred, session=session
             )
             total_lat = conn_ms + acc_ms + perm_ms
@@ -1868,7 +1887,7 @@ class CredentialVault:
                         "total_latency_ms": round(total_lat, 2),
                     },
                 )
-            except Exception as _e:  # noqa: BLE001
+            except Exception as _e:
                 logger.debug(f"Audit logging error on verification: {_e}")
 
             return res
@@ -1904,7 +1923,7 @@ class CredentialVault:
                         "updated_at": r["updated_at"],
                     }
                 )
-            except Exception as e:  # noqa: BLE001 — per-credential corruption guard
+            except Exception as e:
                 results.append(
                     {
                         "exchange": r["exchange"],

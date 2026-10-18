@@ -23,25 +23,24 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import time
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import numpy as np
-
 import pandas as pd
+
 from core.portfolio_shadow import portfolio_shadow
 from core.research.concept_evaluation import (
     ConceptEvaluationEngine,
     CostTierAssumptions,
 )
 from core.research.concept_registry import (
-    ConceptLifecycleStatus,
     REAL_CAPITAL_ENABLED,
+    ConceptLifecycleStatus,
     concept_registry,
 )
 
@@ -99,6 +98,7 @@ def generate_regime_ohlcv(n_bars: int = 320, seed: int = 42) -> pd.DataFrame:
             "funding_rate": funding,
         }
     )
+
 
 logger = logging.getLogger("sky.research.agent_concept_arena")
 
@@ -213,7 +213,9 @@ class AgentConceptArena:
         evaluator: ConceptEvaluationEngine | None = None,
     ) -> None:
         self.state_path = Path(state_path or DEFAULT_ARENA_STATE_PATH)
-        self.evaluator = evaluator or ConceptEvaluationEngine(base_costs=CostTierAssumptions("base_realistic"))
+        self.evaluator = evaluator or ConceptEvaluationEngine(
+            base_costs=CostTierAssumptions("base_realistic")
+        )
         self.profiles: dict[str, AgentProfile] = {p.agent_id: p for p in self.DEFAULT_PROFILES}
         self.latest_round: TournamentRound | None = None
         self._history: list[dict[str, Any]] = []
@@ -227,8 +229,7 @@ class AgentConceptArena:
                 raw_round = data.get("latest_round")
                 if raw_round:
                     lb_entries = [
-                        AgentLeaderboardEntry(**entry)
-                        for entry in raw_round.get("leaderboard", [])
+                        AgentLeaderboardEntry(**entry) for entry in raw_round.get("leaderboard", [])
                     ]
                     self.latest_round = TournamentRound(
                         round_id=raw_round["round_id"],
@@ -244,7 +245,9 @@ class AgentConceptArena:
                     )
                 self._history = data.get("history", [])
             except Exception as exc:
-                logger.warning("Could not load agent concept arena state (%s); starting fresh.", exc)
+                logger.warning(
+                    "Could not load agent concept arena state (%s); starting fresh.", exc
+                )
 
     def _save_state(self) -> None:
         self.state_path.parent.mkdir(parents=True, exist_ok=True)
@@ -293,7 +296,9 @@ class AgentConceptArena:
         }
 
         # Run candidate evaluations
-        eval_results = self.evaluator.evaluate_all_baseline_candidates(df_bars, symbol=symbol, record_to_registry=True)
+        eval_results = self.evaluator.evaluate_all_baseline_candidates(
+            df_bars, symbol=symbol, record_to_registry=True
+        )
 
         leaderboard_raw: list[dict[str, Any]] = []
         promoted: list[str] = []
@@ -307,7 +312,11 @@ class AgentConceptArena:
             for cand_key, c_id in candidate_mapping.items():
                 if c_id in agent.concept_ids and cand_key in eval_results:
                     res = eval_results[cand_key]
-                    if best_eval is None or res.overall_metrics.net_expectancy_r_base > best_eval.overall_metrics.net_expectancy_r_base:
+                    if (
+                        best_eval is None
+                        or res.overall_metrics.net_expectancy_r_base
+                        > best_eval.overall_metrics.net_expectancy_r_base
+                    ):
                         best_eval = res
                         best_concept_id = c_id
 
@@ -361,11 +370,14 @@ class AgentConceptArena:
                     evidence=evidence_data,
                 )
                 status_str = verdict.final_status
-                if verdict.approved and target_status == ConceptLifecycleStatus.PAPER_QUALIFIED.value:
+                if (
+                    verdict.approved
+                    and target_status == ConceptLifecycleStatus.PAPER_QUALIFIED.value
+                ):
                     promoted.append(best_concept_id)
                 else:
                     demoted.append(best_concept_id)
-            except Exception as tr_err:  # noqa: BLE001
+            except Exception as tr_err:
                 logger.debug("Transition check for %s: %s", best_concept_id, tr_err)
                 status_str = target_status
                 if target_status == ConceptLifecycleStatus.PAPER_QUALIFIED.value:
@@ -410,15 +422,24 @@ class AgentConceptArena:
                 # Anti-Fabrication Invariant: Ground entry in authoritative live market price,
                 # NEVER in synthetic simulation bars!
                 from core.data_streamer import data_streamer
+
                 live_candles = data_streamer.get_candles(symbol, "15m", limit=10)
                 real_live_price: float = 0.0
                 atr_est: float = 0.0
 
-                if live_candles and len(live_candles) > 0 and int(live_candles[-1].get("is_synthetic", 0) or 0) == 0:
+                if (
+                    live_candles
+                    and len(live_candles) > 0
+                    and int(live_candles[-1].get("is_synthetic", 0) or 0) == 0
+                ):
                     real_live_price = float(live_candles[-1]["close"])
                     atr_est = max(
                         real_live_price * 0.008,
-                        float(max(c["high"] for c in live_candles) - min(c["low"] for c in live_candles)) * 0.2,
+                        float(
+                            max(c["high"] for c in live_candles)
+                            - min(c["low"] for c in live_candles)
+                        )
+                        * 0.2,
                     )
                 else:
                     real_live_price = float(data_streamer._last_known_prices.get(symbol, 0.0))
@@ -459,7 +480,9 @@ class AgentConceptArena:
                             entry_p,
                         )
                 else:
-                    logger.warning("Arena skipping paper deployment: live price for %s is unavailable.", symbol)
+                    logger.warning(
+                        "Arena skipping paper deployment: live price for %s is unavailable.", symbol
+                    )
             except Exception as e:
                 logger.error("Failed to deploy arena paper trade: %s", e)
 
@@ -501,11 +524,15 @@ class AgentConceptArena:
             "last_updated": self.latest_round.timestamp if self.latest_round else None,
             "market_regime": self.latest_round.market_regime if self.latest_round else "UNKNOWN",
             "total_agents": len(self.DEFAULT_PROFILES),
-            "leaderboard": [asdict(e) for e in (self.latest_round.leaderboard if self.latest_round else [])],
+            "leaderboard": [
+                asdict(e) for e in (self.latest_round.leaderboard if self.latest_round else [])
+            ],
             "winning_agent": self.latest_round.winning_agent_id if self.latest_round else None,
             "promoted_concepts": self.latest_round.promoted_concepts if self.latest_round else [],
             "demoted_concepts": self.latest_round.demoted_concepts if self.latest_round else [],
-            "paper_trades_deployed": self.latest_round.paper_trades_deployed if self.latest_round else 0,
+            "paper_trades_deployed": self.latest_round.paper_trades_deployed
+            if self.latest_round
+            else 0,
             "profiles": [asdict(p) for p in self.DEFAULT_PROFILES],
         }
 

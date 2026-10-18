@@ -62,21 +62,27 @@ def export_to_git_vault(
         # 1. Fetch articles
         articles_rows = []
         try:
-            articles_rows = [dict(r) for r in conn.execute("SELECT * FROM wiki_articles").fetchall()]
+            articles_rows = [
+                dict(r) for r in conn.execute("SELECT * FROM wiki_articles").fetchall()
+            ]
         except sqlite3.OperationalError:
             pass
 
         # 2. Fetch sources
         sources_rows = []
         try:
-            sources_rows = [dict(r) for r in conn.execute("SELECT * FROM research_sources").fetchall()]
+            sources_rows = [
+                dict(r) for r in conn.execute("SELECT * FROM research_sources").fetchall()
+            ]
         except sqlite3.OperationalError:
             pass
 
         # 3. Fetch claims
         claims_rows = []
         try:
-            claims_rows = [dict(r) for r in conn.execute("SELECT * FROM research_claims").fetchall()]
+            claims_rows = [
+                dict(r) for r in conn.execute("SELECT * FROM research_claims").fetchall()
+            ]
         except sqlite3.OperationalError:
             pass
 
@@ -154,7 +160,7 @@ def auto_rehydrate_from_git_vault(
     dest_uploads.mkdir(parents=True, exist_ok=True)
 
     try:
-        with open(VAULT_MANIFEST, "r", encoding="utf-8") as f:
+        with open(VAULT_MANIFEST, encoding="utf-8") as f:
             manifest = json.load(f)
 
         conn = sqlite3.connect(str(wiki_db), timeout=10.0)

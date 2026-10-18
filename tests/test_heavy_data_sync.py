@@ -8,13 +8,12 @@ Enforces:
 3. Bidirectional rehydration (download) validation without real external network calls.
 """
 
-import json
 from pathlib import Path
-import tempfile
+
 import pytest
 
-from core.storage.heavy_data_sync import HeavyDataSyncManager
 from core.autonomous_research.storage.drive_backend import SimulatedDriveBackend
+from core.storage.heavy_data_sync import HeavyDataSyncManager
 
 
 @pytest.fixture
@@ -79,4 +78,3 @@ def test_heavy_sync_download_rehydration(temp_sync_env):
     assert download_report.synced_count == 1
     assert dummy_file.exists()
     assert dummy_file.read_bytes() == b"PARQUET_MAGIC_HEADER_TEST_BYTES"
-

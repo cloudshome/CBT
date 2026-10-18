@@ -161,7 +161,6 @@ def case_daily_limit(db: SignalDB) -> dict:
 # ── B. the weekly loss limit ──────────────────────────────────────────────
 def case_weekly_limit(db: SignalDB) -> dict:
     # Spread across this week but before today, so only the weekly limit is in play.
-    now = int(time.time() * 1000)
     monday = risk_gate._week_start_utc()
     ts = monday + 3_600_000
     day_start = risk_gate._day_start_utc()
@@ -172,8 +171,7 @@ def case_weekly_limit(db: SignalDB) -> dict:
     gross, net = _sums(db)
     dw = daily_weekly(db)
     return {
-        "canonical_reality": f"16 live losses this week: {gross:+.3f}R gross "
-        f"vs {net:+.3f}R net",
+        "canonical_reality": f"16 live losses this week: {gross:+.3f}R gross vs {net:+.3f}R net",
         "net_breaches_limit": round(net * RISK_PCT, 3) <= -WEEKLY_LIMIT,
         "observed": {
             "weekly_blocked": dw["weekly_blocked"],
@@ -232,11 +230,9 @@ def case_scorecard(db: SignalDB) -> dict:
     gross, net = _sums(db)
     overall = business_metrics(db)["overall"]
     return {
-        "canonical_reality": f"6 wins / 8 losses: {gross:+.3f}R gross vs "
-        f"{net:+.3f}R net",
+        "canonical_reality": f"6 wins / 8 losses: {gross:+.3f}R gross vs {net:+.3f}R net",
         "observed": {
-            "expectancy_is_net": abs(overall["expectancy_r"] - round(net / 14.0, 3))
-            < 5e-4
+            "expectancy_is_net": abs(overall["expectancy_r"] - round(net / 14.0, 3)) < 5e-4
         },
         "reported_expectancy_r": overall["expectancy_r"],
         "gross_expectancy_r": round(gross / 14.0, 3),
@@ -255,8 +251,7 @@ def case_live_rows_have_no_net(db: SignalDB) -> dict:
         "so costs must be computed on read",
         "observed": {
             "rr_net_is_null": row["rr_net"] is None,
-            "net_differs_from_gross": abs(_net_outcome(row) - float(row["rr_achieved"]))
-            > 1e-9,
+            "net_differs_from_gross": abs(_net_outcome(row) - float(row["rr_achieved"])) > 1e-9,
         },
         "expected_after_P12_18": {
             "rr_net_is_null": True,

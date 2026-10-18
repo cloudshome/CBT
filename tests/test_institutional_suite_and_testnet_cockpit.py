@@ -196,4 +196,3 @@ def test_system_setup_and_vault_verification(client):
     )
     # Either 200 (if no vault password set) or 401 (if password set and incorrect)
     assert res_pwd.status_code in (200, 401)
-

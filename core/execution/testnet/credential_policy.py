@@ -82,7 +82,9 @@ class CredentialPolicy:
         # Binance Spot account response check
         if venue.upper().startswith("BINANCE"):
             permissions = account_info.get("permissions", [])
-            perms_upper = [str(p).upper() for p in permissions] if isinstance(permissions, list) else []
+            perms_upper = (
+                [str(p).upper() for p in permissions] if isinstance(permissions, list) else []
+            )
             is_testnet_spot_scoped = (
                 "TESTNET" in venue.upper()
                 and bool(perms_upper)

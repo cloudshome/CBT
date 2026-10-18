@@ -86,7 +86,10 @@ def test_bidirectional_wikilinks_indexing(temp_wiki_engine: ResearchWikipediaEng
         author_or_speaker="Easley et al.",
         executive_summary="Volume-synchronized Probability of Toxicity identifies adverse selection.",
         key_claims=[],
-        wikilinks=["[[Volume-Synchronized Probability of Toxicity]]", "[[Bid-Ask Spread Asymmetry|Adverse Selection]]"],
+        wikilinks=[
+            "[[Volume-Synchronized Probability of Toxicity]]",
+            "[[Bid-Ask Spread Asymmetry|Adverse Selection]]",
+        ],
         tags=["microstructure", "vpin"],
         contradictions_detected=[],
         macro_regime_implications="Microstructure toxicity spikes precede violent liquidations.",

@@ -113,10 +113,7 @@ def test_primary_narrowing(df):
     best = out_narrow.best_signal
     if best["action"] in ("BUY", "SELL") and best.get("entry"):
         primaries = [p for p in out_narrow.plans if p["primary"]]
-        assert any(
-            abs(float(p.get("entry") or 0) - float(best["entry"])) < 1e-6
-            for p in primaries
-        )
+        assert any(abs(float(p.get("entry") or 0) - float(best["entry"])) < 1e-6 for p in primaries)
 
 
 def test_tp_rr_by_type(df):

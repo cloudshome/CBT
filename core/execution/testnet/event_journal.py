@@ -20,7 +20,7 @@ import sqlite3
 import time
 from dataclasses import asdict, dataclass
 from decimal import Decimal
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 logger = logging.getLogger("sky.execution.testnet.journal")
@@ -30,7 +30,7 @@ class ConflictingEventAnomalyError(Exception):
     """Raised when an incoming event conflicts with a previously journaled event."""
 
 
-class EventProcessingStatus(str, Enum):
+class EventProcessingStatus(StrEnum):
     """Processing status for journaled raw events."""
 
     RECEIVED = "RECEIVED"

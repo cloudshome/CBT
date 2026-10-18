@@ -85,9 +85,7 @@ def test_token_store_private_file(tmp_path, monkeypatch):
         assert not (mode & stat.S_IROTH)
     loaded = store.load()
     assert loaded["token"] == "secret-token-value"
-    assert "secret-token-value" not in json.dumps(
-        {k: v for k, v in rec.items() if k != "token"}
-    )
+    assert "secret-token-value" not in json.dumps({k: v for k, v in rec.items() if k != "token"})
 
 
 def test_pair_round_trip(tmp_path, monkeypatch):
@@ -133,9 +131,7 @@ def test_flask_pair_endpoints(tmp_path, monkeypatch):
 
     app = make_app(job_manager=JobManager(db_path=str(tmp_path / "web.db")))
     client = app.test_client()
-    setup = client.post(
-        "/api/auth/setup", json={"username": "azim", "password": "password12"}
-    )
+    setup = client.post("/api/auth/setup", json={"username": "azim", "password": "password12"})
     assert setup.status_code == 200
     csrf = setup.get_json().get("csrf") or ""
     minted = client.post(
@@ -146,15 +142,11 @@ def test_flask_pair_endpoints(tmp_path, monkeypatch):
     assert minted.status_code == 201
     body = minted.get_json()
     assert body["ok"] and body["data"]["code"]
-    redeem = client.post(
-        "/api/v1/pair", json={"code": body["data"]["code"], "name": "win-pc"}
-    )
+    redeem = client.post("/api/v1/pair", json={"code": body["data"]["code"], "name": "win-pc"})
     assert redeem.status_code == 201
     token = redeem.get_json()["data"]["token"]
     assert token
-    again = client.post(
-        "/api/v1/pair", json={"code": body["data"]["code"], "name": "win-pc"}
-    )
+    again = client.post("/api/v1/pair", json={"code": body["data"]["code"], "name": "win-pc"})
     assert again.status_code == 403
 
 
@@ -178,12 +170,7 @@ def test_spec_is_unsigned():
 
 
 def test_no_order_path_in_companion():
-    src = (
-        Path(__file__)
-        .resolve()
-        .parent.parent.joinpath("ops/windows_companion.py")
-        .read_text()
-    )
+    src = Path(__file__).resolve().parent.parent.joinpath("ops/windows_companion.py").read_text()
     for banned in ("create_order", "newOrder", "/api/v3/order", "place_order"):
         assert banned not in src
 

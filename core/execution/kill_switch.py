@@ -83,7 +83,7 @@ class LiveKillSwitch:
                     """
                 )
                 conn.commit()
-        except Exception as e:  # noqa: BLE001 — best-effort schema init
+        except Exception as e:
             logger.error(f"Failed to initialize live_kill_switch_state schema: {e}")
 
     def is_active(self) -> tuple[bool, KillSwitchState]:
@@ -138,7 +138,7 @@ class LiveKillSwitch:
                         activated_at=int(row["activated_at"]),
                         source="PERSISTENT_DB",
                     )
-        except Exception as e:  # noqa: BLE001 — must fail closed on any DB error
+        except Exception as e:
             # FAIL CLOSED: If DB read fails, treat kill switch as ACTIVE
             logger.critical(
                 f"FAIL CLOSED: Kill switch DB inspection error: {e}. Engaging safety halt."
@@ -194,7 +194,7 @@ class LiveKillSwitch:
                     (reason, operator_id, now_ms),
                 )
                 conn.commit()
-        except Exception as e:  # noqa: BLE001 — best-effort persistence
+        except Exception as e:
             logger.error(f"Error persisting kill switch activation to DB: {e}")
 
         audit_bus.emit_event(
@@ -234,7 +234,7 @@ class LiveKillSwitch:
                     (reason, operator_id, now_ms),
                 )
                 conn.commit()
-        except Exception as e:  # noqa: BLE001 — best-effort persistence
+        except Exception as e:
             logger.error(f"Error persisting kill switch deactivation to DB: {e}")
 
         audit_bus.emit_event(

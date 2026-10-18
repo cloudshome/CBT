@@ -292,7 +292,7 @@ class KnowledgeGraphEngine:
                 try:
                     conn.execute(f"ALTER TABLE research_claims ADD COLUMN {col_name} {col_type};")
                     conn.commit()
-                except Exception:  # noqa: S110,BLE001 — defensive fallback
+                except Exception:
                     pass
 
             logger.info("SKY Knowledge & Discovery Graph schema initialized.")
@@ -965,7 +965,18 @@ class KnowledgeGraphEngine:
                 ),
             ]
             now = int(time.time() * 1000)
-            for hid, cid, title, null_h, alt_h, indep, dep, sym, method, controls in initial_hypotheses:
+            for (
+                hid,
+                cid,
+                title,
+                null_h,
+                alt_h,
+                indep,
+                dep,
+                sym,
+                method,
+                controls,
+            ) in initial_hypotheses:
                 conn.execute(
                     """
                     INSERT INTO hypothesis_queue (
@@ -1001,7 +1012,7 @@ class KnowledgeGraphEngine:
                 d = dict(r)
                 try:
                     d["tags"] = json.loads(d["tags"]) if d.get("tags") else []
-                except Exception:  # noqa: BLE001 — defensive fallback
+                except Exception:
                     d["tags"] = []
                 concepts.append(d)
 
@@ -1018,7 +1029,7 @@ class KnowledgeGraphEngine:
                     d["observed_variables"] = (
                         json.loads(d["observed_variables"]) if d.get("observed_variables") else []
                     )
-                except Exception:  # noqa: BLE001 — defensive fallback
+                except Exception:
                     d["observed_variables"] = []
                 observations.append(d)
 
@@ -1037,7 +1048,7 @@ class KnowledgeGraphEngine:
                     d["control_variables"] = (
                         json.loads(d["control_variables"]) if d.get("control_variables") else []
                     )
-                except Exception:  # noqa: BLE001 — defensive fallback
+                except Exception:
                     d["control_variables"] = []
                 hypotheses.append(d)
 
@@ -1048,9 +1059,7 @@ class KnowledgeGraphEngine:
                 "sources_count": conn.execute(
                     "SELECT COUNT(*) FROM research_provenance_sources;"
                 ).fetchone()[0],
-                "claims_count": conn.execute(
-                    "SELECT COUNT(*) FROM research_claims;"
-                ).fetchone()[0],
+                "claims_count": conn.execute("SELECT COUNT(*) FROM research_claims;").fetchone()[0],
                 "concepts_count": conn.execute(
                     "SELECT COUNT(*) FROM research_concepts;"
                 ).fetchone()[0],

@@ -163,7 +163,7 @@ class BinanceMarketDataProvider(BaseMarketDataProvider):
                         }
                         for k in raw
                     ]
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.debug(f"Binance OHLCV failed for {symbol} ({timeframe}): {e}")
         return None
 
@@ -188,7 +188,7 @@ class BinanceMarketDataProvider(BaseMarketDataProvider):
                         "is_synthetic": 0,
                         "data_unavailable": False,
                     }
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.debug(f"Binance Ticker failed for {symbol}: {e}")
         return None
 
@@ -208,7 +208,7 @@ class BinanceMarketDataProvider(BaseMarketDataProvider):
                         "bids": bids,
                         "timestamp": int(time.time() * 1000),
                     }
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.debug(f"Binance Depth failed for {symbol}: {e}")
         return None
 
@@ -254,7 +254,7 @@ class BybitMarketDataProvider(BaseMarketDataProvider):
                         for k in reversed(raw_list)
                     ]
                     return candles if candles else None
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.debug(f"Bybit OHLCV failed for {symbol} ({timeframe}): {e}")
         return None
 
@@ -281,7 +281,7 @@ class BybitMarketDataProvider(BaseMarketDataProvider):
                             "is_synthetic": 0,
                             "data_unavailable": False,
                         }
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.debug(f"Bybit Ticker failed for {symbol}: {e}")
         return None
 
@@ -304,7 +304,7 @@ class BybitMarketDataProvider(BaseMarketDataProvider):
                         "bids": bids,
                         "timestamp": int(time.time() * 1000),
                     }
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.debug(f"Bybit Depth failed for {symbol}: {e}")
         return None
 
@@ -526,7 +526,7 @@ class CompositeMarketDataGateway:
                     # downgrade-only, so cached rows that were stored as
                     # synthetic keep their FABRICATED grade.
                     return stamp_records(data, EvidenceGrade.EMPIRICAL)
-            except Exception as e:  # noqa: BLE001 — defensive fallback
+            except Exception as e:
                 self._provider_health[p.provider_name]["errors"] += 1
                 self._provider_health[p.provider_name]["status"] = "DEGRADED"
                 logger.debug(f"Provider {p.provider_name} failed for {symbol}: {e}")
@@ -546,7 +546,7 @@ class CompositeMarketDataGateway:
                 data = await p.fetch_live_ticker(symbol)
                 if data and data.get("price"):
                     return data
-            except Exception:  # noqa: BLE001, S110 — best-effort fallback, never raise
+            except Exception:
                 pass
         fallback = await SyntheticMarketProvider().fetch_live_ticker(symbol)
         if fallback:
@@ -566,7 +566,7 @@ class CompositeMarketDataGateway:
                 data = await p.fetch_order_book_depth(symbol, limit=limit)
                 if data and data.get("asks") and data.get("bids"):
                     return data
-            except Exception:  # noqa: BLE001, S110 — best-effort fallback, never raise
+            except Exception:
                 pass
         return await SyntheticMarketProvider().fetch_order_book_depth(symbol, limit) or {
             "symbol": symbol,

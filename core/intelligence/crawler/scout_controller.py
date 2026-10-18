@@ -18,7 +18,7 @@ import logging
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from core.intelligence.crawler.adapters.academic_adapter import AcademicPaperAdapter
@@ -35,7 +35,7 @@ from core.intelligence.crawler.source_registry import SourceRegistry
 logger = logging.getLogger("ai_quant_sentinel.intelligence.crawler.scout_controller")
 
 
-class ScoutStatus(str, Enum):
+class ScoutStatus(StrEnum):
     IDLE = "IDLE"
     RUNNING = "RUNNING"
     PAUSED = "PAUSED"
@@ -176,7 +176,7 @@ class ScoutController:
                             else:
                                 run_record.records_rejected += 1
 
-                except Exception as e:  # noqa: BLE001 - Resilient loop: isolated adapter failure must not crash entire crawl run
+                except Exception as e:
                     err_msg = f"Error crawling domain {domain}: {e!s}"
                     logger.error(err_msg)
                     run_record.errors.append(err_msg)

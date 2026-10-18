@@ -387,9 +387,9 @@ def _job_row_to_payload(row: dict) -> dict:
     return {
         "job_id": row["job_id"],
         "kind": row["kind"],
-        "title": (
-            JOB_KINDS.get(row["kind"]) or COMPOSITE_JOBS.get(row["kind"]) or {}
-        ).get("title", row["kind"]),
+        "title": (JOB_KINDS.get(row["kind"]) or COMPOSITE_JOBS.get(row["kind"]) or {}).get(
+            "title", row["kind"]
+        ),
         "params": params,
         "status": row["status"],
         "user": row.get("username"),
@@ -421,9 +421,7 @@ class JobManager:
         runner: Callable[..., int] | None = None,
     ):
         self.db_path = db_path or config.DB_PATH
-        self.log_dir = (
-            Path(log_dir) if log_dir else (Path(self.db_path).parent / "job_logs")
-        )
+        self.log_dir = Path(log_dir) if log_dir else (Path(self.db_path).parent / "job_logs")
         self.log_dir.mkdir(parents=True, exist_ok=True)
         #: Injectable subprocess runner — tests replace this with a fake that
         #: streams a few lines and returns an exit code without a real shell.
@@ -442,9 +440,7 @@ class JobManager:
         return self.log_dir / f"{job_id}.log"
 
     # ── submission ───────────────────────────────────────────────────────
-    def submit(
-        self, kind: str, params: dict | None = None, user: dict | None = None
-    ) -> dict:
+    def submit(self, kind: str, params: dict | None = None, user: dict | None = None) -> dict:
         """Validate, dedup and enqueue a job. Returns ``{job_id, created}``.
 
         ``created`` is False when an identical job is already queued/running —
@@ -505,9 +501,7 @@ class JobManager:
     def get(self, job_id: str, tail_lines: int = 200) -> dict | None:
         """One job's persisted state plus a tail of its log."""
         with self._db() as db:
-            row = db.conn.execute(
-                "SELECT * FROM jobs WHERE job_id=?", (job_id,)
-            ).fetchone()
+            row = db.conn.execute("SELECT * FROM jobs WHERE job_id=?", (job_id,)).fetchone()
             if row is None:
                 return None
             payload = _job_row_to_payload(dict(row))
@@ -523,7 +517,7 @@ class JobManager:
             q += " WHERE status=?"
             args = (status,)
         q += " ORDER BY created_ts DESC LIMIT ?"
-        args = args + (int(limit),)
+        args = (*args, int(limit))
         with self._db() as db:
             rows = db.conn.execute(q, args).fetchall()
         return [_job_row_to_payload(dict(r)) for r in rows]
@@ -553,8 +547,7 @@ class JobManager:
             for s in primary
         )
         pp_gap = sum(
-            max(0, int(s.get("paper_target") or 0) - int(s.get("paper_n") or 0))
-            for s in primary
+            max(0, int(s.get("paper_target") or 0) - int(s.get("paper_n") or 0)) for s in primary
         )
 
         pattern = re.compile(
@@ -635,9 +628,7 @@ class JobManager:
                 )
         elif incomplete:
             result = "incomplete"
-            headline = (
-                "Evidence is incomplete — keep measuring; do not infer an edge yet."
-            )
+            headline = "Evidence is incomplete — keep measuring; do not infer an edge yet."
         elif len(proven) == len(primary):
             result = "edge_measured"
             headline = "Positive net edge measured at the sample bar; graduation rules still apply."
@@ -656,9 +647,7 @@ class JobManager:
             "projected_rounds": projected,
             "observed_rounds": len(observed),
             "observed_rate": {
-                "backtest_per_round": round(bt_rate, 2)
-                if bt_rate is not None
-                else None,
+                "backtest_per_round": round(bt_rate, 2) if bt_rate is not None else None,
                 "paper_per_round": round(pp_rate, 2) if pp_rate is not None else None,
             },
             "caveat": (
@@ -671,15 +660,11 @@ class JobManager:
     def request_cancel(self, job_id: str, user: dict | None = None) -> dict:
         """Ask the worker to stop a queued/running job. Returns the new state."""
         with self._db() as db:
-            row = db.conn.execute(
-                "SELECT status FROM jobs WHERE job_id=?", (job_id,)
-            ).fetchone()
+            row = db.conn.execute("SELECT status FROM jobs WHERE job_id=?", (job_id,)).fetchone()
             if row is None:
                 raise JobError(f"no such job: {job_id}")
             if row["status"] in TERMINAL:
-                raise JobError(
-                    f"job is already {row['status']} and cannot be cancelled"
-                )
+                raise JobError(f"job is already {row['status']} and cannot be cancelled")
             if row["status"] == "queued":
                 db.conn.execute(
                     "UPDATE jobs SET status='cancelled', cancel_requested=1, "
@@ -687,9 +672,7 @@ class JobManager:
                     (int(time.time() * 1000), job_id),
                 )
             else:
-                db.conn.execute(
-                    "UPDATE jobs SET cancel_requested=1 WHERE job_id=?", (job_id,)
-                )
+                db.conn.execute("UPDATE jobs SET cancel_requested=1 WHERE job_id=?", (job_id,))
             db.conn.commit()
         self._wake.set()
         return self.get(job_id) or {}
@@ -706,9 +689,7 @@ class JobManager:
         with self._lock:
             if self._thread is not None and self._thread.is_alive():
                 return
-            self._thread = threading.Thread(
-                target=self._worker_loop, name="sky-jobs", daemon=True
-            )
+            self._thread = threading.Thread(target=self._worker_loop, name="sky-jobs", daemon=True)
             self._thread.start()
 
     def stop(self) -> None:
@@ -743,8 +724,7 @@ class JobManager:
     def _next_queued(self) -> str | None:
         with self._db() as db:
             row = db.conn.execute(
-                "SELECT job_id FROM jobs WHERE status='queued' "
-                "ORDER BY created_ts ASC LIMIT 1"
+                "SELECT job_id FROM jobs WHERE status='queued' ORDER BY created_ts ASC LIMIT 1"
             ).fetchone()
             return row["job_id"] if row else None
 
@@ -783,9 +763,7 @@ class JobManager:
             return
         sets = ", ".join(f"{k}=?" for k in cols)
         with self._db() as db:
-            db.conn.execute(
-                f"UPDATE jobs SET {sets} WHERE job_id=?", (*cols.values(), job_id)
-            )
+            db.conn.execute(f"UPDATE jobs SET {sets} WHERE job_id=?", (*cols.values(), job_id))
             db.conn.commit()
 
     # ── execution ────────────────────────────────────────────────────────
@@ -813,9 +791,7 @@ class JobManager:
     def _run_job(self, job_id: str) -> None:
         """Execute one job's steps sequentially, streaming output to the log."""
         with self._db() as db:
-            row = db.conn.execute(
-                "SELECT * FROM jobs WHERE job_id=?", (job_id,)
-            ).fetchone()
+            row = db.conn.execute("SELECT * FROM jobs WHERE job_id=?", (job_id,)).fetchone()
             if row is None:
                 return
             kind, params_json = row["kind"], row["params_json"]
@@ -833,8 +809,7 @@ class JobManager:
                 db.conn.commit()
                 return
             db.conn.execute(
-                "UPDATE jobs SET status='running', started_ts=?, phase=? "
-                "WHERE job_id=?",
+                "UPDATE jobs SET status='running', started_ts=?, phase=? WHERE job_id=?",
                 (int(time.time() * 1000), "starting", job_id),
             )
             db.conn.commit()
@@ -951,9 +926,7 @@ class JobManager:
                 pass
 
     # ── SSE ──────────────────────────────────────────────────────────────
-    def events(
-        self, job_id: str, interval: float = 1.0, last_event_id: str | None = None
-    ):
+    def events(self, job_id: str, interval: float = 1.0, last_event_id: str | None = None):
         """Yield ``text/event-stream`` frames of a job's persisted state.
 
         Every frame is a full snapshot, so a client that reconnects (with or

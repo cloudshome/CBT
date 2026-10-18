@@ -16,11 +16,11 @@ import json
 import re
 from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class EventType(str, Enum):
+class EventType(StrEnum):
     MACRO_RATE_DECISION = "MACRO_RATE_DECISION"  # FOMC, ECB interest rate decisions
     MACRO_INFLATION_PRINT = "MACRO_INFLATION_PRINT"  # CPI, PPI, PCE
     MACRO_LABOR_PRINT = "MACRO_LABOR_PRINT"  # NFP, Unemployment rate

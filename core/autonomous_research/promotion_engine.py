@@ -106,7 +106,7 @@ class PromotionEngine:
 
         try:
             strategy_league_manager.register_strategy(genome)
-        except Exception:  # noqa: BLE001
+        except Exception:
             # Direct persistence fallback to strategy_dna table
             with db_manager.get_brain_conn() as conn:
                 conn.execute(
@@ -146,7 +146,7 @@ class PromotionEngine:
                 expectancy=float(metrics.get("expectancy_r", 0.0)),
                 p_value=float(metrics.get("dsr_p_value", 0.05)),
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(f"Could not update provenance engine on promotion: {e}")
 
         logger.info(

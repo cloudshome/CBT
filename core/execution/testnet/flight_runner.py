@@ -312,7 +312,7 @@ class TestnetFlightRunnerService:
                         )
                         ledger.record_cancel(slice_id, child.open_quantity)
                         canceled_count += 1
-                    except Exception as exc:  # noqa: BLE001
+                    except Exception as exc:
                         logger.error(f"[PanicCancel] Failed to cancel slice {slice_id}: {exc}")
 
         return canceled_count

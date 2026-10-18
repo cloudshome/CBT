@@ -49,7 +49,7 @@ class KronosModelAdapter:
                 import torch
 
                 self._device = "cuda" if torch.cuda.is_available() else "cpu"
-            except Exception:  # noqa: BLE001 — defensive fallback
+            except Exception:
                 self._device = "cpu"
         else:
             self._device = self.config.device
@@ -73,7 +73,7 @@ class KronosModelAdapter:
             # self._model = AutoModelForCausalLM.from_pretrained(self.config.model_dir)
             self._is_loaded = True
             return True
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.warning(
                 f"Native Kronos model weights not found or PyTorch unavailable ({e}). Using calibrated foundation simulator."
             )
@@ -169,7 +169,7 @@ class KronosModelAdapter:
                     )
                 )
 
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             kronos_health_monitor.record_failure(str(e))
             return self._build_error_forecast(
                 symbol,

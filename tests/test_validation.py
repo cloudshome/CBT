@@ -85,9 +85,7 @@ def test_walk_forward_windows_tile_the_analyzed_range():
     cursor = 120
     for name in ("train", "val", "oos", "recent"):
         start, end = windows[name]
-        assert (start, end) == (cursor, cursor + (end - start)), (
-            f"{name} window must be contiguous"
-        )
+        assert (start, end) == (cursor, cursor + (end - start)), f"{name} window must be contiguous"
         assert end > start, f"{name} window must be non-empty"
         cursor = end
     assert cursor == 1000
@@ -391,17 +389,13 @@ def test_validate_lookahead_cli_json_and_exit_code(tmp_path, capsys):
     from main import main
 
     safe = tmp_path / "safe.py"
-    safe.write_text(
-        "def feature(frame):\n    return frame.close.shift(1)\n", encoding="utf-8"
-    )
+    safe.write_text("def feature(frame):\n    return frame.close.shift(1)\n", encoding="utf-8")
     assert main(["validate", "lookahead", "--path", str(safe), "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "PASS"
 
     bad = tmp_path / "bad.py"
-    bad.write_text(
-        "def feature(frame):\n    return frame.close.shift(-1)\n", encoding="utf-8"
-    )
+    bad.write_text("def feature(frame):\n    return frame.close.shift(-1)\n", encoding="utf-8")
     assert main(["validate", "lookahead", "--path", str(bad), "--json"]) == 1
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "FAIL"

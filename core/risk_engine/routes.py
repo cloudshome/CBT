@@ -61,28 +61,42 @@ class PositionPayload(BaseModel):
     entry_price: float = Field(..., gt=0.0, description="Average entry price")
     current_mark_price: float = Field(..., gt=0.0, description="Current market mark price")
     initial_margin_rate: float = Field(0.05, gt=0.0, le=1.0, description="Initial margin rate")
-    maintenance_margin_rate: float = Field(0.025, gt=0.0, le=1.0, description="Maintenance margin rate")
+    maintenance_margin_rate: float = Field(
+        0.025, gt=0.0, le=1.0, description="Maintenance margin rate"
+    )
     asset_volatility: float = Field(0.03, gt=0.0, description="Estimated daily volatility")
 
 
 class EnsembleEvaluateRequest(BaseModel):
     """Request payload for multi-strategy ensemble allocation evaluation."""
 
-    portfolio_equity_usd: float = Field(10000.0, gt=0.0, description="Total portfolio equity in USD")
+    portfolio_equity_usd: float = Field(
+        10000.0, gt=0.0, description="Total portfolio equity in USD"
+    )
     regime: MarketRegimeClassification = Field(
         MarketRegimeClassification.TRENDING_HIGH_VOL,
         description="Market regime classification",
     )
-    positions: list[PositionPayload] = Field(default_factory=list, description="Current open positions")
-    estimated_portfolio_volatility: float = Field(0.02, gt=0.0, description="Estimated daily portfolio volatility")
+    positions: list[PositionPayload] = Field(
+        default_factory=list, description="Current open positions"
+    )
+    estimated_portfolio_volatility: float = Field(
+        0.02, gt=0.0, description="Estimated daily portfolio volatility"
+    )
 
 
 class StressSimulateRequest(BaseModel):
     """Request payload for multi-scenario stress simulation."""
 
-    collateral_cash_usd: float = Field(10000.0, gt=0.0, description="Unencumbered collateral cash in USD")
-    positions: list[PositionPayload] = Field(default_factory=list, description="Open positions to stress test")
-    estimated_portfolio_volatility: float = Field(0.02, gt=0.0, description="Estimated daily portfolio volatility")
+    collateral_cash_usd: float = Field(
+        10000.0, gt=0.0, description="Unencumbered collateral cash in USD"
+    )
+    positions: list[PositionPayload] = Field(
+        default_factory=list, description="Open positions to stress test"
+    )
+    estimated_portfolio_volatility: float = Field(
+        0.02, gt=0.0, description="Estimated daily portfolio volatility"
+    )
 
 
 class HRPOptimizeRequest(BaseModel):

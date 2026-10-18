@@ -25,7 +25,7 @@ import sqlite3
 import time
 import uuid
 from dataclasses import asdict, dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from core.audit_bus import audit_bus
@@ -45,7 +45,7 @@ from core.governance.institutional_deployment import DeploymentStage
 logger = logging.getLogger("sky.execution.strategy_gateway.job_manager")
 
 
-class JobStatus(str, Enum):
+class JobStatus(StrEnum):
     RECEIVED = "RECEIVED"
     VALIDATING = "VALIDATING"
     QUEUED = "QUEUED"
@@ -146,7 +146,7 @@ class QualificationJobManager:
                 conn.execute(
                     "CREATE INDEX IF NOT EXISTS idx_sg_jobs_idempotency ON strategy_gateway_jobs(idempotency_key)"
                 )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error(f"[JobManager] Failed to initialize SQLite schema: {exc}")
 
     def _persist_job(self, job: QualificationJob) -> None:
@@ -183,7 +183,7 @@ class QualificationJobManager:
                         report_json,
                     ),
                 )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error(f"[JobManager] Failed to persist job {job.job_id}: {exc}")
 
     async def submit_job(
@@ -416,7 +416,7 @@ class QualificationJobManager:
                 )
                 self._jobs[job_id] = job
                 return job
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error(f"[JobManager] Error querying job {job_id} from SQLite: {exc}")
         return None
 
@@ -467,7 +467,7 @@ class QualificationJobManager:
                 }
                 for r in rows
             ]
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error(f"[JobManager] Error listing jobs from SQLite: {exc}")
             return []
 

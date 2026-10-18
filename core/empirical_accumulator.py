@@ -170,7 +170,7 @@ class EmpiricalAccumulator:
                             pnl_usd=trade.pnl_usd,
                         )
                         new_samples += 1
-                except Exception as e:  # noqa: BLE001 — defensive fallback
+                except Exception as e:
                     logger.debug(f"Accumulation cycle error on {sym} {tf}: {e}")
 
         logger.info(

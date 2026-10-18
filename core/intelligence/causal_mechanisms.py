@@ -11,7 +11,7 @@ Enforces:
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field
 from core.intelligence.schema import IntelligenceDomain
 
 
-class ResearchFamilyId(str, Enum):
+class ResearchFamilyId(StrEnum):
     MACRO_LIQUIDITY_TRANSMISSION = "FAM_01_MACRO_LIQUIDITY"
     INFLATION_GROWTH_SURPRISE = "FAM_02_INFLATION_SURPRISE"
     REGULATORY_POLICY_SHOCK = "FAM_03_REGULATORY_SHOCK"
@@ -27,7 +27,7 @@ class ResearchFamilyId(str, Enum):
     CROSS_ASSET_CONTAGION = "FAM_05_CROSS_ASSET_CONTAGION"
 
 
-class CausalTransmissionType(str, Enum):
+class CausalTransmissionType(StrEnum):
     LIQUIDITY_WITHDRAWAL = "LIQUIDITY_WITHDRAWAL"
     VOLATILITY_EXPANSION = "VOLATILITY_EXPANSION"
     MOMENTUM_ACCELERATION = "MOMENTUM_ACCELERATION"
@@ -35,7 +35,7 @@ class CausalTransmissionType(str, Enum):
     ABSORPTION_EXHAUSTION = "ABSORPTION_EXHAUSTION"
 
 
-class MicrostructureReceptorType(str, Enum):
+class MicrostructureReceptorType(StrEnum):
     CVD_ABSORPTION = "CVD_ABSORPTION"
     L2_ORDERBOOK_IMBALANCE = "L2_ORDERBOOK_IMBALANCE"
     SMC_ORDER_BLOCK = "SMC_ORDER_BLOCK"

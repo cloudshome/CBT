@@ -117,7 +117,7 @@ class CanonicalExecutionReconciler:
         env_norm = environment.upper().strip()
         try:
             cred = credential_vault.get_credential(ex_norm, env_norm)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning(
                 f"[Reconciler] Could not retrieve credential for {ex_norm} {env_norm}: {exc}"
             )
@@ -176,7 +176,7 @@ class CanonicalExecutionReconciler:
         raw_orders: list[dict[str, Any]] = []
         try:
             raw_orders = await conn.get_open_orders(symbol=symbol_filter)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(f"[Reconciler] Error fetching open orders: {e}")
 
         for o in raw_orders:
@@ -207,7 +207,7 @@ class CanonicalExecutionReconciler:
                         created_at_ms=int(o.get("time", o.get("createdTime", now_ms)) or now_ms),
                     )
                 )
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.warning(f"[Reconciler] Error parsing open order: {e}")
 
         # Positions discovery
@@ -217,7 +217,17 @@ class CanonicalExecutionReconciler:
             tracked_symbols.add(symbol_filter.upper().replace("/", "").replace("-", ""))
         else:
             tracked_symbols.update(
-                {"BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "DOGEUSDT", "PEPEUSDT", "XRPUSDT", "LINKUSDT", "LTCUSDT"}
+                {
+                    "BTCUSDT",
+                    "ETHUSDT",
+                    "SOLUSDT",
+                    "BNBUSDT",
+                    "DOGEUSDT",
+                    "PEPEUSDT",
+                    "XRPUSDT",
+                    "LINKUSDT",
+                    "LTCUSDT",
+                }
             )
 
         # Get latest market prices
@@ -232,7 +242,7 @@ class CanonicalExecutionReconciler:
                     px = float(ticker.get("price", 0.0) or 0.0)
                 if px and px > 0:
                     market_prices[s] = px
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.debug(f"[Reconciler] Price query failed for {s}: {e}")
 
         # Fallback price discovery from open orders if market gateway lacks testnet feed
@@ -286,14 +296,27 @@ class CanonicalExecutionReconciler:
                                 bracket_id=bracket.bracket_id if bracket else None,
                             )
                         )
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.warning(f"[Reconciler] Error fetching Bybit positions: {e}")
 
         elif ex_norm == "BINANCE":
             # For spot, inspect balances (filtering out 500+ non-ASCII/numeric Binance Testnet faucet tokens)
             try:
                 allowed_testnet_assets = {
-                    "BTC", "ETH", "SOL", "BNB", "DOGE", "PEPE", "XRP", "ADA", "AVAX", "LINK", "LTC", "DOT", "UNI", "ATOM"
+                    "BTC",
+                    "ETH",
+                    "SOL",
+                    "BNB",
+                    "DOGE",
+                    "PEPE",
+                    "XRP",
+                    "ADA",
+                    "AVAX",
+                    "LINK",
+                    "LTC",
+                    "DOT",
+                    "UNI",
+                    "ATOM",
                 }
                 balances = await conn.get_balances()
                 for b in balances:
@@ -302,7 +325,11 @@ class CanonicalExecutionReconciler:
                         continue
                     sym = f"{asset}USDT"
                     bracket = self.get_bracket(sym)
-                    if env_norm == "TESTNET" and asset not in allowed_testnet_assets and not bracket:
+                    if (
+                        env_norm == "TESTNET"
+                        and asset not in allowed_testnet_assets
+                        and not bracket
+                    ):
                         continue
                     curr_qty = b.free + b.locked
                     mk_px = market_prices.get(sym, 0.0)
@@ -352,7 +379,7 @@ class CanonicalExecutionReconciler:
                                 bracket_id=bracket.bracket_id if bracket else None,
                             )
                         )
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.warning(f"[Reconciler] Error fetching Binance balances: {e}")
 
         # Compute overall protection status

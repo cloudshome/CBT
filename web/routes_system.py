@@ -102,9 +102,7 @@ def register(app, ctx):
         from data.database import SignalDB
 
         plan_type = request.args.get("plan_type") or None
-        symbol = (
-            _sym(request.args.get("symbol")) if request.args.get("symbol") else None
-        )
+        symbol = _sym(request.args.get("symbol")) if request.args.get("symbol") else None
         try:
             with SignalDB() as db:
                 if plan_type is None:
@@ -117,9 +115,7 @@ def register(app, ctx):
                         plan_type = plans[0].get("type") if plans else None
                     except Exception:
                         plan_type = None
-                return jsonify(
-                    _sanitize_for_json(explain(db, plan_type=plan_type, symbol=symbol))
-                )
+                return jsonify(_sanitize_for_json(explain(db, plan_type=plan_type, symbol=symbol)))
         except Exception as exc:
             return jsonify(
                 {
@@ -167,7 +163,12 @@ def register(app, ctx):
                     continue
                 doc = ""
                 try:
-                    doc = ast.get_docstring(ast.parse(path.read_text())) or ""
+                    doc = (
+                        ast.get_docstring(
+                            ast.parse(path.read_text(encoding="utf-8", errors="replace"))
+                        )
+                        or ""
+                    )
                 except Exception:
                     doc = ""
                 rel = str(path.relative_to(root))
@@ -183,19 +184,17 @@ def register(app, ctx):
                         summary = ""
                 if not summary and len(doc.strip().split("\n")) > 1:
                     summary = next(
-                        (
-                            ln.strip()
-                            for ln in doc.strip().split("\n")[1:]
-                            if ln.strip()
-                        ),
+                        (ln.strip() for ln in doc.strip().split("\n")[1:] if ln.strip()),
                         "",
                     )
                 modules.append(
                     {
-                        "name": str(path.relative_to(root)),
-                        "module": str(path.relative_to(root)).replace("/", ".")[:-3],
+                        "name": path.relative_to(root).as_posix(),
+                        "module": path.relative_to(root).as_posix().replace("/", ".")[:-3],
                         "summary": summary or "—",
-                        "lines": len(path.read_text().splitlines()),
+                        "lines": len(
+                            path.read_text(encoding="utf-8", errors="replace").splitlines()
+                        ),
                     }
                 )
             out.append(
@@ -243,9 +242,7 @@ def register(app, ctx):
         tf = body.get("tf", TIMEFRAME)
         bars = min(int(body.get("bars", 300)), 1000)
         step = int(body.get("step", 3))
-        horizons = [
-            float(h) for h in str(body.get("horizons", "1,4,24")).split(",") if h
-        ]
+        horizons = [float(h) for h in str(body.get("horizons", "1,4,24")).split(",") if h]
         try:
             from brain.calibrator import learn
             from data.backtester import run_backtest
@@ -424,9 +421,7 @@ def register(app, ctx):
                 )
             )
         except Exception as exc:  # never 500 — degrade gracefully
-            return jsonify(
-                {"ok": False, "error": f"{type(exc).__name__}: {exc}", "channels": {}}
-            )
+            return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}", "channels": {}})
 
     @app.get("/api/doctor")
     def api_doctor():
@@ -583,9 +578,7 @@ def register(app, ctx):
         except ValueError as exc:
             return jsonify({"ok": False, "error": str(exc)}), 400
         try:
-            payload = compute_payload(
-                user["symbol"], user["tf"], save=False, use_cache=True
-            )
+            payload = compute_payload(user["symbol"], user["tf"], save=False, use_cache=True)
         except Exception as exc:
             return jsonify(
                 {
@@ -740,9 +733,7 @@ def register(app, ctx):
         try:
             from brain.agent import morning_briefing
 
-            return jsonify(
-                morning_briefing(timeframe=request.args.get("tf", TIMEFRAME))
-            )
+            return jsonify(morning_briefing(timeframe=request.args.get("tf", TIMEFRAME)))
         except Exception as exc:  # never 500 — degrade gracefully
             return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
 
@@ -756,9 +747,7 @@ def register(app, ctx):
                 import mcp  # noqa: F401
 
                 available = True
-                note = (
-                    "run `python main.py mcp` and point Claude Desktop / Cursor at it"
-                )
+                note = "run `python main.py mcp` and point Claude Desktop / Cursor at it"
             except Exception:
                 available = False
                 note = "mcp package not installed — pip install mcp"
@@ -805,23 +794,15 @@ def register(app, ctx):
             key = next((k for k in GLOSSARY if k.lower() == term.lower()), None)
             if key is None:
                 key = next(
-                    (
-                        k
-                        for k in GLOSSARY
-                        if term.lower() in k.lower() or k.lower() in term.lower()
-                    ),
+                    (k for k in GLOSSARY if term.lower() in k.lower() or k.lower() in term.lower()),
                     None,
                 )
             if key is None:
-                return jsonify(
-                    {"found": False, "term": term, "error": "term not found"}
-                ), 404
+                return jsonify({"found": False, "term": term, "error": "term not found"}), 404
             meaning, why = GLOSSARY[key]
             return jsonify({"found": True, "term": key, "meaning": meaning, "why": why})
         except Exception as exc:
-            return jsonify(
-                {"found": False, "error": f"{type(exc).__name__}: {exc}"}
-            ), 500
+            return jsonify({"found": False, "error": f"{type(exc).__name__}: {exc}"}), 500
 
     # ══════════════════════════════════════════════════════════════════════
     # P18.2 — /api/v1: one envelope, typed errors, versioning, idempotency
@@ -899,18 +880,9 @@ def register(app, ctx):
         code = None
         details: dict = {}
         if body is not None:
-            message = (
-                body.get("error")
-                or body.get("message")
-                or body.get("detail")
-                or message
-            )
+            message = body.get("error") or body.get("message") or body.get("detail") or message
             code = body.get("code")
-            details = {
-                k: v
-                for k, v in body.items()
-                if k not in ("ok", "error", "code", "message")
-            }
+            details = {k: v for k, v in body.items() if k not in ("ok", "error", "code", "message")}
         # The desk's deliberate refusals deserve their own codes so a client
         # can render "the risk gate is closed" instead of a generic failure.
         if code is None:
@@ -950,9 +922,7 @@ def register(app, ctx):
             fingerprint = ""
             if idempotent:
                 try:
-                    key = apiv1.validate_key(
-                        request.headers.get(apiv1.IDEMPOTENCY_HEADER)
-                    )
+                    key = apiv1.validate_key(request.headers.get(apiv1.IDEMPOTENCY_HEADER))
                 except ValueError as exc:
                     return jsonify(
                         apiv1.envelope_error(
@@ -988,8 +958,7 @@ def register(app, ctx):
                     return jsonify(
                         apiv1.envelope_error(
                             apiv1.ErrorCode.IDEMPOTENCY_IN_PROGRESS,
-                            "An identical request is still being processed. "
-                            "Retry shortly.",
+                            "An identical request is still being processed. Retry shortly.",
                             {"key": key},
                             request_id=request_id,
                         )
@@ -999,8 +968,7 @@ def register(app, ctx):
                         return jsonify(
                             apiv1.envelope_error(
                                 apiv1.ErrorCode.IDEMPOTENCY_IN_PROGRESS,
-                                "An identical request is still being processed. "
-                                "Retry shortly.",
+                                "An identical request is still being processed. Retry shortly.",
                                 {"key": key},
                                 request_id=request_id,
                             )
@@ -1037,16 +1005,13 @@ def register(app, ctx):
                     pass
             return response
 
-        view.__name__ = (
-            f"v1_{method.lower()}_{sub.strip('/').replace('/', '_') or 'root'}"
-        )
+        view.__name__ = f"v1_{method.lower()}_{sub.strip('/').replace('/', '_') or 'root'}"
         return view
 
     for _route in apiv1.ROUTES:
         app.add_url_rule(
             f"{V1_PREFIX}{_route['path']}",
-            endpoint=f"v1_{_route['method'].lower()}"
-            f"_{_route['path'].strip('/').replace('/', '_')}",
+            endpoint=f"v1_{_route['method'].lower()}_{_route['path'].strip('/').replace('/', '_')}",
             view_func=_make_v1_view(_route),
             methods=[_route["method"]],
         )

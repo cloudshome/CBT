@@ -77,6 +77,23 @@ gantt
 ---
 
 ### Phase 5: Distributed Scaling & High Availability
-- [ ] **PostgreSQL & TimescaleDB Migration**: Scalable time-series storage for tick-level data and high-frequency trade journals.
-- [ ] **Redis Pub/Sub & Job Queues**: Asynchronous event bus for distributed order routing and notification fanout.
 - [ ] **Kubernetes Helm Charts**: Production deployment manifests for multi-region container orchestration with automated zero-downtime rolling updates.
+
+---
+
+## Canonical Multi-Platform Roadmap & Progression Phases
+
+### Phase History & Platform Delivery
+
+- **P1–P6**: RAG Library, LLM Reasoning, Autonomous Agents, MCP Server, Immune System, Hidden Alpha & Variance.
+- **P7–P9**: Multi-Exchange Price Verification, Cross-Exchange Collector, Data Independence.
+- **P10**: Normalised Schema, Partitioned Parquet CandleStore, Backfiller, Storage Invariants.
+- **P11**: Real Canonical Paper Trading & Proof of Edge.
+- **P12**: Boxed Scorecards, Plateau Testing, Costs & Funding, MC Resampler.
+- **P17**: Web Trader & Workstation Architecture.
+- **P18**: Authentication and authorization, role gating, and versioned APIs.
+- **P19**: **Ubuntu Sky Hub** package — one database (one DB) on the Ubuntu Hub acting as the single trading authority; no live order execution.
+- **P20**: **Windows Companion** (`.exe` installer for monitoring and paper approval). Note: Native installers do not exist yet in production checkout (built via packaging recipes).
+- **P21**: **Android Companion** (`.apk` package for alerts, daily ritual, and paper approvals). Note: Native APK installers do not exist yet.
+- **P22**: Multi-platform signed release engineering and operational hardening.
+

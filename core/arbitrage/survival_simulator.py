@@ -18,12 +18,12 @@ import logging
 import math
 import random
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 logger = logging.getLogger("sky.arbitrage.survival_sim")
 
 
-class AtomicityType(str, Enum):
+class AtomicityType(StrEnum):
     """Execution atomicity category across legs."""
 
     ATOMIC = "ATOMIC"  # Smart contract bundle (Flashbots / Jito bundle)
@@ -37,32 +37,32 @@ class AtomicityType(str, Enum):
 # ==============================================================================
 
 
-class EconomicRating(str, Enum):
+class EconomicRating(StrEnum):
     PROFITABLE = "PROFITABLE"  # P50 EV > 0 and P05 EV > -0.001 * notional
     UNPROFITABLE = "UNPROFITABLE"  # P50 EV <= 0
     UNCERTAIN = "UNCERTAIN"  # P50 EV > 0 but P05 EV has severe tail drawdown
 
 
-class ExecutionRiskRating(str, Enum):
+class ExecutionRiskRating(StrEnum):
     LOW_RISK = "LOW_RISK"  # Complete fill expected, low latency
     PARTIAL_FILL_RISK = "PARTIAL_FILL_RISK"  # CEX depth < 100% of size
     LATENCY_RISK = "LATENCY_RISK"  # State age > 2,000 ms or high block time
     FAILURE_RISK = "FAILURE_RISK"  # Revert probability > 5%
 
 
-class MevRiskRating(str, Enum):
+class MevRiskRating(StrEnum):
     LOW_MEV = "LOW_MEV"  # Private RPC / Flashbots builder route
     MODERATE_MEV = "MODERATE_MEV"  # Public mempool with low base fee
     EXTREME_SANDWICH_RISK = "EXTREME_SANDWICH_RISK"  # Public mempool, high slippage tolerance
 
 
-class HedgeHealthRating(str, Enum):
+class HedgeHealthRating(StrEnum):
     NEUTRAL = "NEUTRAL"  # |delta_net| < 0.02 base
     DRIFTING = "DRIFTING"  # 0.02 <= |delta_net| < 0.08 base
     UNSAFE_EXPOSURE = "UNSAFE_EXPOSURE"  # |delta_net| >= 0.08 base or liq margin < 15%
 
 
-class OperationalMode(str, Enum):
+class OperationalMode(StrEnum):
     OBSERVED = "OBSERVED"  # Passive real-time observation
     SIMULATED = "SIMULATED"  # Monte Carlo stress simulation
     ESTIMATED = "ESTIMATED"  # Heuristic proxy

@@ -84,9 +84,7 @@ from web.payload import (  # noqa: F401 — re-exported for back-compat
 # of a `\n` string escape, which stays correct without a raw Python literal.
 # The terminal template (HTML/JS) lives in web/static/terminal.html; loaded at import so the served output is byte-identical to the inline
 # literal it replaces (rendered via render_template_string below).
-HTML = (Path(__file__).resolve().parent / "static" / "terminal.html").read_text(
-    encoding="utf-8"
-)
+HTML = (Path(__file__).resolve().parent / "static" / "terminal.html").read_text(encoding="utf-8")
 
 
 def make_app(job_manager=None) -> Flask:
@@ -157,9 +155,7 @@ def make_app(job_manager=None) -> Flask:
 
         return _hmac.compare_digest(str(supplied), str(expected))
 
-    def _audit(
-        action: str, target: str = "", ok: bool = True, detail: dict | None = None
-    ) -> None:
+    def _audit(action: str, target: str = "", ok: bool = True, detail: dict | None = None) -> None:
         try:
             user = getattr(g, "user", None)
             auth.audit(
@@ -217,7 +213,7 @@ def make_app(job_manager=None) -> Flask:
         a_segs = [s for s in actual.split("/") if s]
         if len(t_segs) != len(a_segs):
             return False
-        for t, a in zip(t_segs, a_segs):
+        for t, a in zip(t_segs, a_segs, strict=True):
             if t.startswith("<") and t.endswith(">"):
                 if not a:
                     return False
@@ -247,9 +243,7 @@ def make_app(job_manager=None) -> Flask:
             return role
         return "operator" if path not in authmod.VIEWER_POST_PATHS else "viewer"
 
-    def _deny(
-        path: str, code: str, message: str, status: int, details: dict | None = None
-    ):
+    def _deny(path: str, code: str, message: str, status: int, details: dict | None = None):
         """Auth-gate refusal, rendered in whichever contract the caller used.
 
         A v1 client must never have to parse the legacy shape, and the legacy
@@ -279,9 +273,7 @@ def make_app(job_manager=None) -> Flask:
         # old to speak this contract must be told to upgrade, not handed a 401
         # it will misreport as "wrong password".
         if _is_v1(path):
-            bad = apiv1.check_client_version(
-                request.headers.get(apiv1.CLIENT_VERSION_HEADER)
-            )
+            bad = apiv1.check_client_version(request.headers.get(apiv1.CLIENT_VERSION_HEADER))
             if bad is not None:
                 code, message = bad
                 return jsonify(
@@ -318,17 +310,13 @@ def make_app(job_manager=None) -> Flask:
                 and _using_cookie_session()
                 and not _csrf_ok()
             ):
-                return _deny(
-                    path, apiv1.ErrorCode.CSRF, "CSRF token missing or invalid", 403
-                )
+                return _deny(path, apiv1.ErrorCode.CSRF, "CSRF token missing or invalid", 403)
             return None
         if not auth.is_enabled():
             return None
         user = _current_user()
         if user is None:
-            return _deny(
-                path, apiv1.ErrorCode.UNAUTHENTICATED, "authentication required", 401
-            )
+            return _deny(path, apiv1.ErrorCode.UNAUTHENTICATED, "authentication required", 401)
         g.user = user
         if request.method in ("POST", "PUT", "PATCH", "DELETE"):
             required = _required_role(path)
@@ -341,9 +329,7 @@ def make_app(job_manager=None) -> Flask:
                     {"required_role": required, "your_role": user.get("role")},
                 )
             if _using_cookie_session() and not _csrf_ok():
-                return _deny(
-                    path, apiv1.ErrorCode.CSRF, "CSRF token missing or invalid", 403
-                )
+                return _deny(path, apiv1.ErrorCode.CSRF, "CSRF token missing or invalid", 403)
         return None
 
     @app.get("/")
@@ -423,9 +409,7 @@ def make_app(job_manager=None) -> Flask:
     _register_chart(app, dict(_audit=_audit))
     from web.routes_system import register as _register_system
 
-    _jobs = _register_system(
-        app, dict(_audit=_audit, job_manager=job_manager, V1_PREFIX=V1_PREFIX)
-    )
+    _jobs = _register_system(app, dict(_audit=_audit, job_manager=job_manager, V1_PREFIX=V1_PREFIX))
     from web.routes_v1 import register as _register_v1
 
     _register_v1(

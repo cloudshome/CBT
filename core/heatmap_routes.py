@@ -86,7 +86,7 @@ async def _ensure_baseline_depth(symbol: str) -> None:
                     market_type=m_type,
                     source=DataSourceType.BINANCE_REST,
                 )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.debug("Live order book fetch failed for heatmap bootstrap: %s", e)
 
         # 2. If still empty, seed deterministic baseline frames for seamless UI & sandbox testing
@@ -261,7 +261,7 @@ class HeatmapWSManager:
         for ws in list(self.active_sockets):
             try:
                 await ws.send_json(message)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 dead.append(ws)
         for d in dead:
             self.disconnect(d)
@@ -290,5 +290,5 @@ async def websocket_heatmap_endpoint(websocket: WebSocket):
                 await websocket.send_json({"type": "HEATMAP_SNAPSHOT", "data": snap})
     except WebSocketDisconnect:
         heatmap_ws_manager.disconnect(websocket)
-    except Exception:  # noqa: BLE001
+    except Exception:
         heatmap_ws_manager.disconnect(websocket)

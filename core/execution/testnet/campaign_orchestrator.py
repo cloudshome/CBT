@@ -22,7 +22,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from core.execution.testnet.flight_manifest import FlightManifest
@@ -39,7 +39,7 @@ logger = logging.getLogger("sky.execution.testnet.campaign")
 REAL_CAPITAL_ENABLED: bool = False
 
 
-class CampaignState(str, Enum):
+class CampaignState(StrEnum):
     IDLE = "IDLE"
     STARTING = "STARTING"
     PREFLIGHT_VALIDATION = "PREFLIGHT_VALIDATION"
@@ -527,7 +527,7 @@ class CampaignOrchestrator:
 
             return True
 
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             self.consecutive_errors += 1
             self.last_error_message = str(exc)
             logger.error(f"[Campaign] Flight error on {manifest.flight_id}: {exc}")
@@ -594,5 +594,5 @@ class CampaignOrchestrator:
         """Cleanly releases lease and shuts down orchestrator."""
         try:
             self.fencer.release_lease()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning(f"[Campaign] Error releasing lease on shutdown: {exc}")

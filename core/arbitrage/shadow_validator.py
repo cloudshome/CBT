@@ -71,7 +71,7 @@ class ShadowValidator:
                     "CREATE INDEX IF NOT EXISTS idx_arb_shadow_status ON arbitrage_shadow_ledger(status);"
                 )
                 conn.commit()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(f"Could not initialize arbitrage_shadow_ledger schema: {e}")
 
     def simulate_entry_execution(
@@ -264,7 +264,7 @@ class ShadowValidator:
                     ),
                 )
                 conn.commit()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.debug(f"Failed to persist shadow record for {shadow.opportunity_id}: {e}")
 
     def list_active_shadows(self) -> list[ShadowOpportunity]:

@@ -71,9 +71,7 @@ def validate_hub_url(url: str, *, allow_insecure_loopback: bool = True) -> str:
 
 def pairing_payload(*, hub_url: str, code: str) -> dict[str, Any]:
     """QR / deep-link payload printed by ``hub pair``."""
-    display = (
-        code if "-" in code else f"{code[:4]}-{code[4:]}" if len(code) == 8 else code
-    )
+    display = code if "-" in code else f"{code[:4]}-{code[4:]}" if len(code) == 8 else code
     return {
         "v": 1,
         "hub": validate_hub_url(hub_url, allow_insecure_loopback=True),
@@ -87,9 +85,7 @@ def pairing_qr_text(payload: dict[str, Any]) -> str:
     return json.dumps(payload, separators=(",", ":"), sort_keys=True)
 
 
-def negotiate_version(
-    info: dict[str, Any], *, client_build: int = CLIENT_BUILD
-) -> dict[str, Any]:
+def negotiate_version(info: dict[str, Any], *, client_build: int = CLIENT_BUILD) -> dict[str, Any]:
     """Apply the same compatibility rules the Hub enforces."""
     bad = check_client_version(str(client_build))
     caps = (info or {}).get("capabilities") or {}
@@ -121,9 +117,7 @@ def new_idempotency_key() -> str:
     return uuid.uuid4().hex
 
 
-def mutation_headers(
-    *, token: str, idempotency_key: str | None = None
-) -> dict[str, str]:
+def mutation_headers(*, token: str, idempotency_key: str | None = None) -> dict[str, str]:
     key = idempotency_key or new_idempotency_key()
     if len(key) < 8:
         raise CompanionError("idempotency key too short")
@@ -202,9 +196,7 @@ class TokenStore:
             Path(path)
             if path
             else Path(
-                os.getenv(
-                    "SKY_COMPANION_STATE", str(Path.home() / ".sky" / "companion.json")
-                )
+                os.getenv("SKY_COMPANION_STATE", str(Path.home() / ".sky" / "companion.json"))
             )
         )
 
@@ -263,9 +255,7 @@ class TokenStore:
         except Exception:
             return None
 
-    def save(
-        self, *, hub_url: str, token: str, scope: str, name: str
-    ) -> dict[str, Any]:
+    def save(self, *, hub_url: str, token: str, scope: str, name: str) -> dict[str, Any]:
         if scope not in ALLOWED_SCOPES:
             raise CompanionError(f"scope must be one of {ALLOWED_SCOPES}")
         used_credman = self._win_cred_write(token)

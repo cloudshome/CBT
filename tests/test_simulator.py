@@ -247,9 +247,7 @@ def test_grind_verdict_explains_cost_flipped_setup_on_net_expectancy(sim_env):
             "proven": True,
         }
     ]
-    gap = next(
-        m for m in grind_verdict(fake)["missing"] if m["plan_type"] == "Buy Pullback"
-    )
+    gap = next(m for m in grind_verdict(fake)["missing"] if m["plan_type"] == "Buy Pullback")
     assert gap["expectancy"] > 0
     assert gap["expectancy_net"] < 0
     assert "positive net expectancy" in gap["missing"]
@@ -327,9 +325,7 @@ def test_graduation_status_met_on_strong_edge(sim_env):
 
     primary = primary_plan_types()
     # +0.54R expectancy, 60% win rate, PF 2.5, 95% compliance
-    progress = [
-        _full_row(pt, n=120, wins=72, win_r=108.0, loss_r=43.2) for pt in primary
-    ]
+    progress = [_full_row(pt, n=120, wins=72, win_r=108.0, loss_r=43.2) for pt in primary]
     g = graduation_status(progress, compliance=0.95)
     assert g["stats"]["expectancy"] == 0.54
     assert g["stats"]["win_rate"] == 0.6
@@ -372,9 +368,7 @@ def test_graduation_pf_without_losses(sim_env):
     from data.simulator import graduation_status, primary_plan_types
 
     primary = primary_plan_types()
-    progress = [
-        _full_row(pt, n=120, wins=120, win_r=240.0, loss_r=0.0) for pt in primary
-    ]
+    progress = [_full_row(pt, n=120, wins=120, win_r=240.0, loss_r=0.0) for pt in primary]
     g = graduation_status(progress, compliance=0.95)
     assert g["stats"]["pf"] is None
     assert g["met"]["pf"] is True

@@ -55,22 +55,16 @@ def test_compute_historical_direction_and_renormalisation():
     bear = compute_historical(10, 80, {"trend": "bearish", "adx": 30}, "SELL", "MEDIUM")
     assert bull > 40 and bear < -40
     # same scores, opposite signal action → score moves with the action
-    assert compute_historical(
-        50, 30, {"trend": "mixed"}, "BUY", "MEDIUM"
-    ) > compute_historical(50, 30, {"trend": "mixed"}, "SELL", "MEDIUM")
+    assert compute_historical(50, 30, {"trend": "mixed"}, "BUY", "MEDIUM") > compute_historical(
+        50, 30, {"trend": "mixed"}, "SELL", "MEDIUM"
+    )
     # no signal + mixed trend still resolves from the engine scores alone
     assert compute_historical(30, 35, {}, "NO TRADE") < 0
 
 
 def test_compute_historical_is_bounded():
-    assert (
-        abs(compute_historical(100, 0, {"trend": "bullish", "adx": 50}, "BUY", "HIGH"))
-        <= 100
-    )
-    assert (
-        abs(compute_historical(0, 100, {"trend": "bearish", "adx": 50}, "SELL", "HIGH"))
-        <= 100
-    )
+    assert abs(compute_historical(100, 0, {"trend": "bullish", "adx": 50}, "BUY", "HIGH")) <= 100
+    assert abs(compute_historical(0, 100, {"trend": "bearish", "adx": 50}, "SELL", "HIGH")) <= 100
 
 
 # ── walk clock (time-in-condition) ─────────────────────────────────────────
@@ -192,8 +186,7 @@ def test_scorecard_splits_by_sentiment(_tmp_db, _walk_df):
 
         db_rows = rows_from_backtest_db(db)
         assert db_rows and all(
-            r["sentiment_bucket"]
-            in ("deep_bull", "bull", "slate", "bear", "deep_bear", "UNKNOWN")
+            r["sentiment_bucket"] in ("deep_bull", "bull", "slate", "bear", "deep_bear", "UNKNOWN")
             for r in db_rows
         )
         assert any(r["sentiment_bucket"] != "UNKNOWN" for r in db_rows)
@@ -201,7 +194,7 @@ def test_scorecard_splits_by_sentiment(_tmp_db, _walk_df):
     assert "by_sentiment" in sc and "by_sentiment_depth" in sc
     assert set(sc["by_sentiment"]) == set(BUCKETS) | {"UNKNOWN"}
     # every bucket stat block is honest
-    for k, v in sc["by_sentiment"].items():
+    for _k, v in sc["by_sentiment"].items():
         assert v["n"] >= 0 and "expectancy_net" in v
     depth_keys = set(sc["by_sentiment_depth"])
     assert depth_keys <= {"DEEP", "FRESH", "SLATE", "UNKNOWN"}

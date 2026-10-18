@@ -61,7 +61,7 @@ class LiveBracketManager:
         env_norm = environment.upper().strip()
         try:
             cred = credential_vault.get_credential(ex_norm, env_norm)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning(
                 f"[BracketManager] Could not retrieve credential for {ex_norm} {env_norm}: {exc}"
             )
@@ -186,7 +186,7 @@ class LiveBracketManager:
                 error_message=f"No active protection bracket found for {clean_symbol}",
             )
 
-        conn, adapter = self._get_connector_and_adapter(exchange, environment)
+        _conn, adapter = self._get_connector_and_adapter(exchange, environment)
 
         # Break-Even Price calculation
         be_price = bracket.entry_price

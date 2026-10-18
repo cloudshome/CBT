@@ -101,11 +101,7 @@ def _print_human(payload: dict) -> None:
         print("-" * 72)
         print(
             f"   STATE MEMORY: {st}"
-            + (
-                f"  (stable, reaffirmed ×{mem.get('reaffirms', 0)})"
-                if st == "SAME"
-                else ""
-            )
+            + (f"  (stable, reaffirmed ×{mem.get('reaffirms', 0)})" if st == "SAME" else "")
         )
         for c in mem.get("changes", [])[:4]:
             print(f"     · {c}")
@@ -132,9 +128,7 @@ def _print_human(payload: dict) -> None:
         print(
             "   MTF: "
             + "  ".join(
-                f"{tf}:{v.get('trend', '?')[:1].upper()}"
-                if v.get("available")
-                else f"{tf}:—"
+                f"{tf}:{v.get('trend', '?')[:1].upper()}" if v.get("available") else f"{tf}:—"
                 for tf, v in views.items()
             )
         )
@@ -144,9 +138,7 @@ def _print_human(payload: dict) -> None:
             f"alignment {a.get('score')} ({a.get('label')})"
         )
         kl = mtf.get("key_levels", {})
-        print(
-            f"   support {kl.get('support', [])}  resistance {kl.get('resistance', [])}"
-        )
+        print(f"   support {kl.get('support', [])}  resistance {kl.get('resistance', [])}")
 
     ctx = payload.get("market_context", {})
     if ctx.get("data_symbol") and ctx.get("data_symbol") != sig.get("asset"):
@@ -261,8 +253,7 @@ def cmd_signal(args) -> int:
     print("  lifecycle:")
     for h in history:
         print(
-            f"    {h['from_state']} → {h['to_state']}  by {h['reviewer']}  "
-            f"note: {h['note'] or '—'}"
+            f"    {h['from_state']} → {h['to_state']}  by {h['reviewer']}  note: {h['note'] or '—'}"
         )
     if scan.get("plans_json"):
         plans = _json.loads(scan["plans_json"])
@@ -292,25 +283,14 @@ def cmd_learn(args) -> int:
         print("\nsource series in the learning store (P12.11):")
         for k in inv["keys"]:
             c = inv["counts"][k]
-            flag = (
-                "  ← research only (one-sided)" if k in inv.get("one_sided", []) else ""
-            )
-            print(
-                f"  {describe_source(k):<44} bt={c['backtest']} pp={c['paper']}{flag}"
-            )
-        print(
-            "  calibration keys are per source — a research series cannot "
-            "move live confidence."
-        )
+            flag = "  ← research only (one-sided)" if k in inv.get("one_sided", []) else ""
+            print(f"  {describe_source(k):<44} bt={c['backtest']} pp={c['paper']}{flag}")
+        print("  calibration keys are per source — a research series cannot move live confidence.")
 
     if args.json:
         import json as _json
 
-        print(
-            _json.dumps(
-                {"profile": result["profile"], "sources": inv}, indent=2, default=str
-            )
-        )
+        print(_json.dumps({"profile": result["profile"], "sources": inv}, indent=2, default=str))
     return 0
 
 
@@ -371,7 +351,7 @@ def cmd_glossary(args) -> int:
         else:
             print(f"unknown term '{args.term}'")
         return 0
-    for term, (meaning, why) in GLOSSARY.items():
+    for term, (meaning, _why) in GLOSSARY.items():
         print(f"{term:<18} {meaning}")
     return 0
 
@@ -408,14 +388,11 @@ def _print_context(ctx: dict) -> None:
         )
     geo = ctx.get("geopolitics") or {}
     if geo.get("available") and geo.get("count"):
-        print(
-            f"     ⚠️ geopolitics: {geo['count']} headline hit(s) — {geo['hits'][0]['keyword']}"
-        )
+        print(f"     ⚠️ geopolitics: {geo['count']} headline hit(s) — {geo['hits'][0]['keyword']}")
     social = ctx.get("social") or {}
     if social.get("available") and social.get("count"):
         print(
-            f"     social/influencer mentions: {social['count']} — "
-            f"{social['hits'][0]['keyword']}"
+            f"     social/influencer mentions: {social['count']} — {social['hits'][0]['keyword']}"
         )
     reg = ctx.get("risk_regime") or {}
     if reg.get("regime"):
@@ -483,9 +460,7 @@ def cmd_analyze(args) -> int:
             v = styles["styles"][s]
             print(f"     ✓ {s}: {v['direction']} {v['confidence']}% — {v['reason']}")
     else:
-        print(
-            "     nothing clean right now — " + "; ".join(styles.get("stand_aside", []))
-        )
+        print("     nothing clean right now — " + "; ".join(styles.get("stand_aside", [])))
     mem = payload.get("memory", {})
     if mem:
         print("-" * 72)
@@ -576,9 +551,7 @@ def cmd_stats(args) -> int:
     print("-" * 66)
     print("plan-type distribution (live scans):")
     for p in plan_stats:
-        print(
-            f"  {p['type']:<24} n={p['n']:>4} avgConf={p['avg_conf']}  avgRR={p['avg_rr']}"
-        )
+        print(f"  {p['type']:<24} n={p['n']:>4} avgConf={p['avg_conf']}  avgRR={p['avg_rr']}")
 
     overall = bt["overall"]
     print("-" * 66)
@@ -704,10 +677,7 @@ def cmd_tradestate(args) -> int:
 
     with SignalDB() as db:
         if (
-            any(
-                v is not None
-                for v in (args.angry, args.tired, args.revenge, args.chasing)
-            )
+            any(v is not None for v in (args.angry, args.tired, args.revenge, args.chasing))
             or args.clear
             or args.note
         ):
@@ -734,9 +704,7 @@ def cmd_tradestate(args) -> int:
         print(f"  {k:<8} {'✗ BLOCKED' if st.get(k) else 'clear'}")
     if st.get("note"):
         print(f"  note: {st['note']}")
-    print(
-        f"  gate: {'CLOSED — no new trades until cleared' if g['blocked'] else 'OPEN'}"
-    )
+    print(f"  gate: {'CLOSED — no new trades until cleared' if g['blocked'] else 'OPEN'}")
     return 0
 
 
@@ -776,9 +744,7 @@ def cmd_journal(args) -> int:
                 print(describe_entry(entry))
                 q = execution_quality(db, args.scan_id)
                 if q.get("recorded"):
-                    print(
-                        f"  → {q['verdict']} (quality {q['quality']}, {q['outcome_r']:+.2f}R)"
-                    )
+                    print(f"  → {q['verdict']} (quality {q['quality']}, {q['outcome_r']:+.2f}R)")
             else:
                 entry = get_journal(db, args.scan_id)
                 print(f"journal for scan #{args.scan_id}:")
@@ -796,13 +762,9 @@ def cmd_journal(args) -> int:
                     f"  rule violations   {stats['violations']} "
                     f"({stats['violation_rate'] * 100:.1f}%)"
                 )
-                print(
-                    "  (the goal is 0% — a loss with rules followed is an excellent trade)"
-                )
+                print("  (the goal is 0% — a loss with rules followed is an excellent trade)")
             else:
-                print(
-                    "  none yet — `python main.py journal <scan_id> --followed-rules 1 ...`"
-                )
+                print("  none yet — `python main.py journal <scan_id> --followed-rules 1 ...`")
     return 0
 
 
@@ -893,9 +855,7 @@ def cmd_agent(args) -> int:
             print(format_health(report))
         return 0
     if args.action == "ask":
-        result = ask(
-            args.question, symbol=args.symbol, timeframe=args.tf, bars=args.bars
-        )
+        result = ask(args.question, symbol=args.symbol, timeframe=args.tf, bars=args.bars)
         if args.json:
             print(json.dumps(result, indent=2, default=str))
         else:

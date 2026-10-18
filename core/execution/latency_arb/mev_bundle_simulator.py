@@ -26,10 +26,10 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 
-class RouteChannel(str, Enum):
+class RouteChannel(StrEnum):
     PRIVATE_RPC_BUNDLE = "PRIVATE_RPC_BUNDLE"  # Flashbots, MEV-Share, Titan, Beaver
     PUBLIC_MEMPOOL = "PUBLIC_MEMPOOL"  # Standard public mempool (toxic)
 

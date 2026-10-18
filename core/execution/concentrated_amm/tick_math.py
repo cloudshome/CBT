@@ -146,7 +146,7 @@ def get_tick_at_sqrt_ratio(sqrt_ratio_x96: int) -> int:
 
     # Initial approximation via double-precision float logarithm
     ratio_f = sqrt_ratio_x96 / Q96
-    approx_tick = int(math.floor(2.0 * math.log(ratio_f) / math.log(1.0001)))
+    approx_tick = math.floor(2.0 * math.log(ratio_f) / math.log(1.0001))
     approx_tick = max(MIN_TICK, min(MAX_TICK - 1, approx_tick))
 
     # Constant-time local search refinement

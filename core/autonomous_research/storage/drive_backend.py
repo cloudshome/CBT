@@ -156,7 +156,7 @@ class SimulatedDriveBackend:
                     data = json.load(f)
                 for k, v in data.items():
                     self._metadata_index[k] = DriveFileMetadata(**v)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.warning(f"Could not load simulated drive index: {e}")
 
     def _save_index(self) -> None:
@@ -164,7 +164,7 @@ class SimulatedDriveBackend:
             with open(self._index_file, "w", encoding="utf-8") as f:
                 data = {k: asdict(v) for k, v in self._metadata_index.items()}
                 json.dump(data, f, indent=2)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.error(f"Could not save simulated drive index: {e}")
 
     def check_connectivity(self) -> bool:
@@ -410,7 +410,7 @@ class GoogleDriveAPIBackend:
                         creds.refresh(Request())
                         with open(token_file, "w", encoding="utf-8") as f:
                             f.write(creds.to_json())
-                    except Exception as ref_err:  # noqa: BLE001
+                    except Exception as ref_err:
                         logger.warning(
                             "OAuth token refresh failed (%s); falling back to simulated storage.",
                             ref_err,
@@ -442,7 +442,7 @@ class GoogleDriveAPIBackend:
             self.service = build("drive", "v3", credentials=creds)
             self._initialized = True
             logger.info("Google Drive API v3 client successfully initialized.")
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(
                 f"Google Drive live client init failed ({e}); falling back to simulated storage."
             )
@@ -457,7 +457,7 @@ class GoogleDriveAPIBackend:
             try:
                 self.service.about().get(fields="user").execute()
                 return True
-            except Exception:  # noqa: BLE001
+            except Exception:
                 return False
         return False
 
@@ -472,7 +472,7 @@ class GoogleDriveAPIBackend:
                 name = user.get("displayName")
                 if name:
                     return name
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.debug("Failed to fetch connected account from Drive: %s", exc)
         return os.getenv("GDRIVE_USER_EMAIL")
 
@@ -551,7 +551,7 @@ class GoogleDriveAPIBackend:
             )
             logger.info("Uploaded %s to live Google Drive (ID: %s)", upload_name, file_item["id"])
             return meta
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error(
                 "Live Google Drive upload failed (%s); falling back to simulated storage.", exc
             )
@@ -563,7 +563,6 @@ class GoogleDriveAPIBackend:
         if not self._initialized or not self.service:
             return self._sim_fallback.download_file(drive_file_id, dest_path, chunk_size)
         try:
-            import io
             from googleapiclient.http import MediaIoBaseDownload
 
             dest = Path(dest_path).resolve()
@@ -573,10 +572,10 @@ class GoogleDriveAPIBackend:
                 downloader = MediaIoBaseDownload(fh, request, chunksize=chunk_size)
                 done = False
                 while not done:
-                    status, done = downloader.next_chunk()
+                    _status, done = downloader.next_chunk()
             logger.info("Downloaded Drive file %s to %s", drive_file_id, dest)
             return True
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error(
                 "Live Google Drive download failed (%s); falling back to simulated storage.", exc
             )
@@ -604,7 +603,7 @@ class GoogleDriveAPIBackend:
                 remote_size=remote_size,
                 remote_hash=md5,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return VerificationResult(
                 is_valid=False,
                 exists=False,
@@ -622,7 +621,7 @@ class GoogleDriveAPIBackend:
             self.service.files().delete(fileId=drive_file_id).execute()
             logger.info("Deleted Drive file ID: %s", drive_file_id)
             return True
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error("Live Google Drive delete failed: %s", exc)
             return self._sim_fallback.delete_file(drive_file_id)
 
@@ -655,7 +654,7 @@ class GoogleDriveAPIBackend:
                     )
                 )
             return results
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error("Live Google Drive list_folder failed: %s", exc)
             return self._sim_fallback.list_folder(drive_folder)
 

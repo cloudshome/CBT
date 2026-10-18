@@ -4,19 +4,17 @@ tests/test_sync_research_vault.py
 Automated verification tests for the Research Vault synchronization utility.
 """
 
-import os
-import shutil
 import sqlite3
 import tempfile
 from pathlib import Path
+
 import pytest
 
 from scripts.sync_research_vault import (
-    compute_sha256,
     export_vault,
-    inspect_bundle,
-    import_vault,
     get_sqlite_table_count,
+    import_vault,
+    inspect_bundle,
 )
 
 
@@ -62,6 +60,7 @@ def sandbox_env(monkeypatch):
 
         # Monkeypatch paths
         import scripts.sync_research_vault as srv
+
         monkeypatch.setattr(srv, "DATA_DIR", sandbox_data)
         monkeypatch.setattr(srv, "WIKI_DB_PATH", wiki_db)
         monkeypatch.setattr(srv, "BRAIN_DB_PATH", brain_db)
@@ -107,6 +106,7 @@ def test_import_bundle_into_fresh_environment(sandbox_env, monkeypatch):
     second_articles = second_data / "research_wiki" / "articles"
 
     import scripts.sync_research_vault as srv
+
     monkeypatch.setattr(srv, "DATA_DIR", second_data)
     monkeypatch.setattr(srv, "WIKI_DB_PATH", second_wiki)
     monkeypatch.setattr(srv, "BRAIN_DB_PATH", second_brain)
@@ -123,4 +123,3 @@ def test_import_bundle_into_fresh_environment(sandbox_env, monkeypatch):
     # Check database rows
     count = get_sqlite_table_count(second_wiki, "wiki_articles")
     assert count == 1
-

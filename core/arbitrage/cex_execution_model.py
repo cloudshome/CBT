@@ -13,12 +13,12 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 logger = logging.getLogger("sky.arbitrage.cex_execution")
 
 
-class CexFillStatus(str, Enum):
+class CexFillStatus(StrEnum):
     """Execution status for CEX market and IOC orders (Gate 6)."""
 
     COMPLETE_FILL = "COMPLETE_FILL"

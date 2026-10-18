@@ -24,7 +24,7 @@ import json
 import logging
 import sqlite3
 import time
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -38,7 +38,7 @@ class PlanTamperingError(ValueError):
     """Raised when an experiment plan's payload or parameters fail cryptographic verification."""
 
 
-class PlanLifecycleState(str, Enum):
+class PlanLifecycleState(StrEnum):
     QUEUED = "QUEUED"
     EXECUTING = "EXECUTING"
     COMPLETED = "COMPLETED"

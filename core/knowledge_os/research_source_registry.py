@@ -63,7 +63,6 @@ DEFAULT_CURATED_SOURCES: list[ResearchFeedSource] = [
         crawl_interval_hours=6,
         description="Realtime cryptocurrency market movements, protocol upgrades, and regulatory intelligence.",
     ),
-
     # 2. Institutional Crypto Research & Ethereum Foundation
     ResearchFeedSource(
         feed_id="src_eth_blog",
@@ -92,7 +91,6 @@ DEFAULT_CURATED_SOURCES: list[ResearchFeedSource] = [
         crawl_interval_hours=48,
         description="Bitcoin protocol changes, mempool telemetry, and soft fork discussions.",
     ),
-
     # 3. High-Quality YouTube Macro Channels
     ResearchFeedSource(
         feed_id="src_yt_fedwatch",
@@ -183,7 +181,9 @@ class ResearchSourceRegistry:
                     )
 
             # Deactivate legacy obsolete 404 feeds
-            conn.execute("UPDATE research_source_registry SET is_active = 0 WHERE source_id IN ('src_bis_speeches', 'src_imf_news');")
+            conn.execute(
+                "UPDATE research_source_registry SET is_active = 0 WHERE source_id IN ('src_bis_speeches', 'src_imf_news');"
+            )
             conn.commit()
 
         if seeded > 0:

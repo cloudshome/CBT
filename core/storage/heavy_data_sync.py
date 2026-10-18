@@ -15,11 +15,9 @@ Architectural Guarantees:
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import os
-import time
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -281,7 +279,7 @@ class HeavyDataSyncManager:
                                 "status": "SYNCED",
                             }
                         )
-                    except Exception as exc:  # noqa: BLE001
+                    except Exception as exc:
                         err_msg = f"Failed to sync {fpath}: {exc!s}"
                         logger.error(err_msg)
                         report.error_count += 1
@@ -342,8 +340,8 @@ class HeavyDataSyncManager:
                         }
                     )
                 else:
-                    raise IOError(f"Failed to download payload for {rel_path}")
-            except Exception as exc:  # noqa: BLE001
+                    raise OSError(f"Failed to download payload for {rel_path}")
+            except Exception as exc:
                 err_msg = f"Download failed for {rel_path}: {exc!s}"
                 logger.error(err_msg)
                 report.error_count += 1
@@ -378,4 +376,3 @@ class HeavyDataSyncManager:
 
 
 heavy_data_sync_manager = HeavyDataSyncManager()
-

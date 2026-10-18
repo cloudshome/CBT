@@ -267,9 +267,7 @@ def test_dry_run_writes_nothing(store):
 
 def test_gold_perp_is_rejected(store):
     with pytest.raises(DerivativesTransportError, match="no Binance perp market"):
-        DerivativesCollector(store, make_transport(), sleep_s=0.0).collect(
-            "XAUUSD", market="perp"
-        )
+        DerivativesCollector(store, make_transport(), sleep_s=0.0).collect("XAUUSD", market="perp")
 
 
 def test_unknown_metric_rejected(store):
@@ -295,10 +293,8 @@ def test_binance_transport_maps_none_to_honest_error():
         def funding_rate_history(self, *a, **k):
             return None
 
-    t = BinanceDerivativesTransport(
-        DownClient(), backoff_attempts=1, sleep_fn=lambda _s: None
-    )
-    with pytest.raises(DerivativesTransportError, match="geo-blocked|unreachable"):
+    t = BinanceDerivativesTransport(DownClient(), backoff_attempts=1, sleep_fn=lambda _s: None)
+    with pytest.raises(DerivativesTransportError, match=r"geo-blocked|unreachable"):
         t.funding_rate_page(SYMBOL, None, None, 1000)
 
 

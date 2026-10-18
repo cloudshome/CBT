@@ -211,13 +211,13 @@ class SyncEngine:
             try:
                 rcp = self.import_sync_package(pkg_dir)
                 receipts.append(rcp)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.error(f"Failed to import sync package from {pkg_dir}: {exc}")
 
         # Export local outbox
         try:
             self.export_sync_package()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error(f"Failed to export sync package: {exc}")
 
         return receipts

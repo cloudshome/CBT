@@ -71,7 +71,7 @@ class GradeE1StatisticalDefense:
                 ]
             )
 
-        n_blocks = int(math.ceil(n / self.block_size))
+        n_blocks = math.ceil(n / self.block_size)
         boot_means = np.empty(self.n_bootstrap)
 
         for b in range(self.n_bootstrap):
@@ -161,7 +161,7 @@ class GradeE1StatisticalDefense:
         mean_stat = float(np.mean(m5_arr))
 
         # Two-sided p-value against zero
-        t_stat, p_val = stats.ttest_1samp(m5_arr, 0.0)
+        _t_stat, p_val = stats.ttest_1samp(m5_arr, 0.0)
         null_rejected = (ci_upper < 0.0) and (p_val < 0.05)
 
         return HypothesisTestSummary(
@@ -197,7 +197,7 @@ class GradeE1StatisticalDefense:
                 verdict_impact="INSUFFICIENT_DATA",
             )
 
-        toxic_count = int(round(toxic_ratio * n_fills))
+        toxic_count = round(toxic_ratio * n_fills)
         # Binomial test against p0 = 0.50
         binom_res = stats.binomtest(toxic_count, n_fills, p=0.50, alternative="greater")
         ci = binom_res.proportion_ci(confidence_level=0.95)

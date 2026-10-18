@@ -5,18 +5,18 @@ Forex & Macro-Metals Data Models and Specifications.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 
-class ForexSession(str, Enum):
-    ASIAN = "ASIAN"          # Tokyo / Sydney (00:00 - 09:00 UTC)
-    LONDON = "LONDON"        # London / Frankfurt (07:00 - 16:00 UTC)
-    NEW_YORK = "NEW_YORK"    # New York (12:00 - 21:00 UTC)
+class ForexSession(StrEnum):
+    ASIAN = "ASIAN"  # Tokyo / Sydney (00:00 - 09:00 UTC)
+    LONDON = "LONDON"  # London / Frankfurt (07:00 - 16:00 UTC)
+    NEW_YORK = "NEW_YORK"  # New York (12:00 - 21:00 UTC)
     LONDON_NY_OVERLAP = "LONDON_NY_OVERLAP"  # Peak Global Liquidity (12:00 - 16:00 UTC)
-    WEEKEND_CLOSED = "WEEKEND_CLOSED"        # Friday 21:00 UTC to Sunday 21:00 UTC
+    WEEKEND_CLOSED = "WEEKEND_CLOSED"  # Friday 21:00 UTC to Sunday 21:00 UTC
 
 
-class EconomicImpact(str, Enum):
+class EconomicImpact(StrEnum):
     LOW = "LOW"
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"

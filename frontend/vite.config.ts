@@ -80,6 +80,7 @@ const PYTHON_PREFIXES = [
   '/api/portfolio',
   '/api/strategist',
   '/api/mastermind',
+  '/api/screener',
   '/api/risk',
   '/api/trader',
   '/api/metrics',

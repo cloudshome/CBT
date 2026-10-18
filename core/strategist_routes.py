@@ -314,5 +314,3 @@ async def trigger_arena_tournament_round(
         symbol=symbol,
     )
     return asdict(rnd)
-
-

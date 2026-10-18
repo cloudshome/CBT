@@ -206,7 +206,7 @@ class ReconciliationLedger:
                     "CREATE UNIQUE INDEX IF NOT EXISTS idx_rec_unique_fill ON execution_reconciliation_records(exchange, exchange_order_id, execution_id);"
                 )
                 conn.commit()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.error(f"Failed to initialize execution_reconciliation_records schema: {e}")
 
     @staticmethod
@@ -244,7 +244,7 @@ class ReconciliationLedger:
                 reason=reason,
                 details=details,
             )
-        except Exception as e:  # noqa: BLE001 — audit bus failure fallback
+        except Exception as e:
             logger.critical(
                 f"Audit bus failed to emit {event_type} for {symbol}: {e}. Record persisted to WAL."
             )
@@ -544,7 +544,7 @@ class ReconciliationLedger:
                 row = cursor.fetchone()
                 if row:
                     return ExecutionReconciliationRecord(**dict(row))
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.error(f"Error querying fill by execution_id: {e}")
         return None
 
@@ -594,7 +594,7 @@ class ReconciliationLedger:
                     ),
                 )
                 conn.commit()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.error(f"Failed to persist reconciliation record {r.reconciliation_id}: {e}")
 
     def list_records(
@@ -628,7 +628,7 @@ class ReconciliationLedger:
                 cursor = conn.execute(query, params)
                 for row in cursor.fetchall():
                     records.append(dict(row))
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.error(f"Error querying execution_reconciliation_records: {e}")
 
         return records
@@ -682,7 +682,7 @@ class ReconciliationLedger:
 
                     v = row["route_venue"]
                     venue_distribution[v] = venue_distribution.get(v, 0) + 1
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.error(f"Error computing reconciliation summary: {e}")
 
         avg_slippage = (total_slippage / total_orders) if total_orders > 0 else 0.0

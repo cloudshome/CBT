@@ -13,12 +13,12 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 logger = logging.getLogger("ai_quant_sentinel.intelligence.crawler.source_registry")
 
 
-class SourceType(str, Enum):
+class SourceType(StrEnum):
     OFFICIAL_AGENCY = "OFFICIAL_AGENCY"  # Federal Reserve, BLS, Treasury, ECB
     REGULATORY_FILING = "REGULATORY_FILING"  # SEC EDGAR, CFTC
     EXCHANGE_DIRECT = "EXCHANGE_DIRECT"  # Direct public venue feeds

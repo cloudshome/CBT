@@ -22,7 +22,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 import numpy as np
 from scipy.cluster.hierarchy import leaves_list, linkage
@@ -31,7 +31,7 @@ from scipy.spatial.distance import squareform
 logger = logging.getLogger("ai_quant_sentinel.risk_engine.hierarchical_risk_parity")
 
 
-class MarketRegime(str, Enum):
+class MarketRegime(StrEnum):
     """Categorical market regime governing portfolio volatility scaling."""
 
     TRENDING_BULL = "TRENDING_BULL"

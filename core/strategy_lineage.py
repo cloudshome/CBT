@@ -71,7 +71,7 @@ class StrategyLineageGraph:
                     "CREATE INDEX IF NOT EXISTS idx_lineage_genome ON strategy_lineage(genome_id);"
                 )
                 conn.commit()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error("Failed to initialize strategy_lineage table: %s", exc)
 
     def record_genome(
@@ -122,7 +122,7 @@ class StrategyLineageGraph:
                     ),
                 )
                 conn.commit()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error("Failed to write lineage record for %s: %s", genome_id, exc)
 
         return node
@@ -156,7 +156,7 @@ class StrategyLineageGraph:
                     )
                     ancestors.append(node)
                     curr_id = node.parent_genome_id
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error("Failed to query ancestors for %s: %s", genome_id, exc)
 
         return ancestors
@@ -186,7 +186,7 @@ class StrategyLineageGraph:
                             "created_at_ms": r[8],
                         }
                     )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error("Failed to query lineage tree: %s", exc)
 
         return nodes

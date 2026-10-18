@@ -313,7 +313,7 @@ class ShadowBurnInOrchestrator:
                 )
                 conn.commit()
             logger.info(f"Closed burn-in session {session_id} (PnL: ${sess_pnl:+,.2f})")
-        except Exception as ex:  # noqa: BLE001 — best-effort session persistence
+        except Exception as ex:
             logger.error(f"Error closing session record {session_id}: {ex}")
 
     def _recover_state_from_disk(self) -> None:
@@ -357,7 +357,7 @@ class ShadowBurnInOrchestrator:
                     logger.info(
                         f"BurnInOrchestrator: Seamlessly recovered active session {last_id} from disk."
                     )
-        except Exception as ex:  # noqa: BLE001 — recovery must degrade to cold start
+        except Exception as ex:
             logger.error(f"Failed to recover burn-in state from disk: {ex}")
 
     # -------------------------------------------------------------------------
@@ -430,7 +430,7 @@ class ShadowBurnInOrchestrator:
                         ),
                     )
                     conn.commit()
-            except Exception as ex:  # noqa: BLE001 — heartbeats are best-effort telemetry
+            except Exception as ex:
                 logger.debug(f"Could not persist heartbeat counts: {ex}")
 
         audit_bus.emit_event(

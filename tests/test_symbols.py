@@ -71,9 +71,7 @@ def test_binance_klines_routes_xau_alias_to_paxg(monkeypatch):
         )
 
     # klines() routes through the P10.2 header-aware seam (klines_page).
-    monkeypatch.setattr(
-        BinanceClient, "_get_first_host_with_headers", fake_get_first_host
-    )
+    monkeypatch.setattr(BinanceClient, "_get_first_host_with_headers", fake_get_first_host)
     df = BinanceClient().klines("XAU", "15m", 1)
 
     assert calls[0]["path"] == "/api/v3/klines"

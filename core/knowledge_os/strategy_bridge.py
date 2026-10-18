@@ -37,7 +37,9 @@ class StrategyCandidateRecord:
     parameter_bounds: dict[str, Any]
     timeframe: str = "15m"
     required_indicators: list[str] = field(default_factory=list)
-    validation_stage: str = "QUEUED_FOR_BACKTEST"  # UNTESTED, QUEUED_FOR_BACKTEST, WALK_FORWARD_TESTED, REJECTED
+    validation_stage: str = (
+        "QUEUED_FOR_BACKTEST"  # UNTESTED, QUEUED_FOR_BACKTEST, WALK_FORWARD_TESTED, REJECTED
+    )
     backtest_expectancy: float | None = None
     backtest_sharpe: float | None = None
     backtest_win_rate: float | None = None
@@ -69,7 +71,9 @@ class ResearchToStrategyBridge:
         """
         # 1. Fetch claim from research_claims
         with self._get_wiki_connection() as conn:
-            c_row = conn.execute("SELECT * FROM research_claims WHERE claim_id = ?;", (claim_id,)).fetchone()
+            c_row = conn.execute(
+                "SELECT * FROM research_claims WHERE claim_id = ?;", (claim_id,)
+            ).fetchone()
 
         if not c_row:
             logger.warning(f"Cannot synthesize strategy: Claim '{claim_id}' not found.")
@@ -102,7 +106,9 @@ class ResearchToStrategyBridge:
         cid = f"CAND_{uuid.uuid4().hex[:8].upper()}"
 
         # Determine directional bias & concept keywords
-        is_bearish = any(w in lower for w in ("bearish", "short", "dump", "fall", "resistance", "breakdown"))
+        is_bearish = any(
+            w in lower for w in ("bearish", "short", "dump", "fall", "resistance", "breakdown")
+        )
         direction = "SHORT" if is_bearish else "LONG"
 
         indicators = []
@@ -240,7 +246,9 @@ class ResearchToStrategyBridge:
             )
             conn.commit()
 
-        logger.info(f"Synthesized strategy candidate [{cid}] '{strat_name}' from claim '{claim_id}'")
+        logger.info(
+            f"Synthesized strategy candidate [{cid}] '{strat_name}' from claim '{claim_id}'"
+        )
         return candidate
 
     def scan_and_bridge_unconverted_claims(self, limit: int = 10) -> list[StrategyCandidateRecord]:
@@ -261,7 +269,9 @@ class ResearchToStrategyBridge:
 
         # Find existing candidates to prevent duplication
         with db_manager.get_brain_conn() as b_conn:
-            existing_rows = b_conn.execute("SELECT knowledge_id FROM strategy_candidates;").fetchall()
+            existing_rows = b_conn.execute(
+                "SELECT knowledge_id FROM strategy_candidates;"
+            ).fetchall()
             existing_kids = {r["knowledge_id"] for r in existing_rows}
 
         bridged: list[StrategyCandidateRecord] = []

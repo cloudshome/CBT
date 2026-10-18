@@ -85,7 +85,7 @@ def empty_frame() -> pd.DataFrame:
     data: dict[str, object] = {}
     for col in DERIVATIVE_COLUMNS:
         if col in _STR_COLS:
-            data[col] = pd.Series(dtype=str)
+            data[col] = pd.Series(dtype="string")
         elif col in _INT_COLS:
             data[col] = pd.Series(dtype=np.int64)
         else:
@@ -106,7 +106,7 @@ def coerce_derivative_frame(frame: pd.DataFrame | list[dict]) -> pd.DataFrame:
         else:
             out[col] = "" if col in _STR_COLS else (0 if col in _INT_COLS else 0.0)
     for col in _STR_COLS:
-        out[col] = out[col].fillna("").astype(str)
+        out[col] = out[col].fillna("").astype("string")
     for col in _INT_COLS:
         out[col] = out[col].fillna(0).astype(np.int64)
     out["value"] = out["value"].fillna(0.0).astype(np.float64)

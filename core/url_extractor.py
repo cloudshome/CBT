@@ -141,7 +141,6 @@ class URLExtractor:
 
         owner = path_parts[0]
         repo = path_parts[1]
-        source_title = f"GitHub: {owner}/{repo}"
 
         # If pointing to a specific file blob: /owner/repo/blob/branch/path/to/file
         if len(path_parts) >= 5 and path_parts[2] == "blob":
@@ -167,11 +166,17 @@ class URLExtractor:
         # Otherwise attempt to fetch README.md
         for branch in ("main", "master", "HEAD"):
             for readme_name in ("README.md", "readme.md", "README.rst", "README.txt", "README"):
-                raw_readme_url = f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{readme_name}"
+                raw_readme_url = (
+                    f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{readme_name}"
+                )
                 try:
                     raw_content = self._fetch_html(raw_readme_url)
                     if raw_content and len(raw_content.strip()) > 20:
-                        lines = [line.strip("# ").strip() for line in raw_content.splitlines() if line.strip()]
+                        lines = [
+                            line.strip("# ").strip()
+                            for line in raw_content.splitlines()
+                            if line.strip()
+                        ]
                         headline = lines[0] if lines else repo
                         return {
                             "success": True,
@@ -200,13 +205,23 @@ class URLExtractor:
         soup = BeautifulSoup(html, "html.parser")
 
         title_el = soup.find("h1", class_="title")
-        raw_title = title_el.get_text(strip=True).replace("Title:", "").strip() if title_el else f"ArXiv Paper {arxiv_id}"
+        raw_title = (
+            title_el.get_text(strip=True).replace("Title:", "").strip()
+            if title_el
+            else f"ArXiv Paper {arxiv_id}"
+        )
 
         authors_el = soup.find("div", class_="authors")
-        raw_authors = authors_el.get_text(strip=True).replace("Authors:", "").strip() if authors_el else "ArXiv Researchers"
+        raw_authors = (
+            authors_el.get_text(strip=True).replace("Authors:", "").strip()
+            if authors_el
+            else "ArXiv Researchers"
+        )
 
         abstract_el = soup.find("blockquote", class_="abstract")
-        raw_abstract = abstract_el.get_text(strip=True).replace("Abstract:", "").strip() if abstract_el else ""
+        raw_abstract = (
+            abstract_el.get_text(strip=True).replace("Abstract:", "").strip() if abstract_el else ""
+        )
 
         full_text = f"ArXiv Quantitative Paper: {raw_title}\nAuthors: {raw_authors}\nArXiv ID: {arxiv_id}\n\nAbstract:\n{raw_abstract}"
 
@@ -270,22 +285,36 @@ class URLExtractor:
 
         # 3. Description Extraction
         description = ""
-        og_desc = (
-            soup.find("meta", property="og:description")
-            or soup.find("meta", attrs={"name": "description"})
+        og_desc = soup.find("meta", property="og:description") or soup.find(
+            "meta", attrs={"name": "description"}
         )
         if og_desc and og_desc.get("content"):
             description = str(og_desc["content"]).strip()
 
         # 4. Remove boilerplate tags
-        for element in soup([
-            "script", "style", "nav", "header", "footer", "aside",
-            "noscript", "svg", "form", "button", "iframe"
-        ]):
+        for element in soup(
+            [
+                "script",
+                "style",
+                "nav",
+                "header",
+                "footer",
+                "aside",
+                "noscript",
+                "svg",
+                "form",
+                "button",
+                "iframe",
+            ]
+        ):
             element.decompose()
 
         # 5. Extract readable content
-        article_elem = soup.find("article") or soup.find("main") or soup.find(class_=re.compile(r"post-content|article-content|entry-content", re.I))
+        article_elem = (
+            soup.find("article")
+            or soup.find("main")
+            or soup.find(class_=re.compile(r"post-content|article-content|entry-content", re.I))
+        )
         search_root = article_elem if article_elem else soup.body or soup
 
         paragraphs = []

@@ -136,7 +136,9 @@ def _run(api: dict, body: str) -> dict:
         f.write(harness)
         path = f.name
     try:
-        r = subprocess.run([NODE, path], capture_output=True, text=True, encoding="utf-8", timeout=90)
+        r = subprocess.run(
+            [NODE, path], capture_output=True, text=True, encoding="utf-8", timeout=90
+        )
         assert r.returncode == 0, f"harness failed:\n{r.stdout}\n{r.stderr}"
         return json.loads(r.stdout.strip().splitlines()[-1])
     finally:
@@ -459,14 +461,11 @@ def test_confirm_retry_reuses_the_same_ticket_id():
     """
         + _OUT.replace(
             "confirmPrompt: global.__lastConfirm || null }",
-            "confirmPrompt: global.__lastConfirm || null, "
-            "sentIds: global.__sentIds || [] }",
+            "confirmPrompt: global.__lastConfirm || null, sentIds: global.__sentIds || [] }",
         ),
     )
     assert len(out["sentIds"]) == 2, "both attempts must send a ticket id"
-    assert out["sentIds"][0] == out["sentIds"][1], (
-        "a retried confirm must reuse its ticket id"
-    )
+    assert out["sentIds"][0] == out["sentIds"][1], "a retried confirm must reuse its ticket id"
     assert any("Ticket error" in t for t in out["toasts"]), out["toasts"]
     assert any("Paper position open" in t for t in out["toasts"])
 
@@ -656,10 +655,7 @@ def test_quiet_scan_keeps_ticket_and_does_not_toast_failure():
     )
     # first quiet success must not overwrite a dirty ticket
     assert out["entry"] == "111"
-    assert (
-        "Data stale" in (out["updated"] or "")
-        or "stale" in (out["updated"] or "").lower()
-    )
+    assert "Data stale" in (out["updated"] or "") or "stale" in (out["updated"] or "").lower()
     assert not any("Refresh failed" in t for t in out["toasts"])
 
 
@@ -872,9 +868,7 @@ def test_copilot_renders_sections_and_sources_without_double_print():
     )
     assert out[0]["kind"] == "msg" and out[0]["who"] == "user"
     bot_msgs = [m for m in out if m.get("kind") == "msg" and m.get("who") == "bot"]
-    assert len(bot_msgs) == 1, (
-        "exactly one bot answer — no double-print of the raw text"
-    )
+    assert len(bot_msgs) == 1, "exactly one bot answer — no double-print of the raw text"
     assert bot_msgs[0]["sections"] == {
         "Desk status": "DESK STATUS\n  risk gate: OPEN\n  ADVICE: STAND_ASIDE"
     }

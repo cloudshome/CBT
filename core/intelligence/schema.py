@@ -13,7 +13,7 @@ import logging
 import sqlite3
 import time
 from dataclasses import asdict, dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from core.database import db_manager
@@ -21,7 +21,7 @@ from core.database import db_manager
 logger = logging.getLogger("ai_quant_sentinel.intelligence.schema")
 
 
-class IntelligenceDomain(str, Enum):
+class IntelligenceDomain(StrEnum):
     MACRO = "MACRO"
     CRYPTO = "CRYPTO"
     EQUITIES = "EQUITIES"
@@ -29,14 +29,14 @@ class IntelligenceDomain(str, Enum):
     QUANT_RESEARCH = "QUANT_RESEARCH"
 
 
-class EvidenceGrade(str, Enum):
+class EvidenceGrade(StrEnum):
     VERIFIED_PRIMARY = "VERIFIED_PRIMARY"
     CORROBORATED_REPORT = "CORROBORATED_REPORT"
     UNVERIFIED_CLAIM = "UNVERIFIED_CLAIM"
     SPECULATION = "SPECULATION"
 
 
-class SourcePlatform(str, Enum):
+class SourcePlatform(StrEnum):
     WEB = "WEB"
     RSS = "RSS"
     YOUTUBE = "YOUTUBE"

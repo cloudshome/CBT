@@ -8,11 +8,15 @@ Unit tests for HypothesisFalsificationEngine:
 """
 
 from pathlib import Path
-import tempfile
+
 import pytest
 
 from core.autonomous_research.hypothesis_falsifier import HypothesisFalsificationEngine
-from core.knowledge_os.research_wikipedia import ResearchWikipediaEngine, WikiArticle, EpistemicClaim
+from core.knowledge_os.research_wikipedia import (
+    EpistemicClaim,
+    ResearchWikipediaEngine,
+    WikiArticle,
+)
 
 
 @pytest.fixture

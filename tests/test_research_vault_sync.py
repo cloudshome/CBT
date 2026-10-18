@@ -4,15 +4,15 @@ tests/test_research_vault_sync.py
 Verifies automated Git-native research vault export and rehydration.
 """
 
-import json
 import sqlite3
 import tempfile
 from pathlib import Path
+
 import pytest
 
 from core.knowledge_os.research_vault_sync import (
-    export_to_git_vault,
     auto_rehydrate_from_git_vault,
+    export_to_git_vault,
 )
 
 
@@ -37,6 +37,7 @@ def sandbox_vault_env(monkeypatch):
 
         # Monkeypatch paths
         import core.knowledge_os.research_vault_sync as rvs
+
         monkeypatch.setattr(rvs, "DATA_DIR", data_dir)
         monkeypatch.setattr(rvs, "VAULT_DIR", vault_dir)
         monkeypatch.setattr(rvs, "VAULT_MANIFEST", vault_manifest)
@@ -136,9 +137,15 @@ def test_export_and_rehydrate_git_vault(sandbox_vault_env):
 
     # Initialize empty tables in target DB
     conn = sqlite3.connect(str(target_wiki))
-    conn.execute("CREATE TABLE wiki_articles (article_id TEXT PRIMARY KEY, title TEXT, category TEXT, source_url TEXT, source_type TEXT, created_at INTEGER);")
-    conn.execute("CREATE TABLE research_sources (source_id TEXT PRIMARY KEY, original_url TEXT, source_domain TEXT, source_type TEXT, created_at INTEGER);")
-    conn.execute("CREATE TABLE research_claims (claim_id TEXT PRIMARY KEY, source_id TEXT, speaker_claim TEXT, claim_type TEXT, created_at INTEGER);")
+    conn.execute(
+        "CREATE TABLE wiki_articles (article_id TEXT PRIMARY KEY, title TEXT, category TEXT, source_url TEXT, source_type TEXT, created_at INTEGER);"
+    )
+    conn.execute(
+        "CREATE TABLE research_sources (source_id TEXT PRIMARY KEY, original_url TEXT, source_domain TEXT, source_type TEXT, created_at INTEGER);"
+    )
+    conn.execute(
+        "CREATE TABLE research_claims (claim_id TEXT PRIMARY KEY, source_id TEXT, speaker_claim TEXT, claim_type TEXT, created_at INTEGER);"
+    )
     conn.commit()
     conn.close()
 
@@ -156,4 +163,3 @@ def test_export_and_rehydrate_git_vault(sandbox_vault_env):
     # Verify target has the files
     assert (target_uploads / "doc.pdf").exists()
     assert (target_articles / "art_test_1.md").exists()
-

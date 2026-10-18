@@ -29,7 +29,7 @@ import hashlib
 import json
 import logging
 import time
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any, Literal
 
@@ -40,7 +40,7 @@ from core.execution.testnet.campaign_daemon_integrator import CampaignRunTelemet
 logger = logging.getLogger("ai_quant_sentinel.execution.testnet.burn_in_evaluator")
 
 
-class M32RStatus(str, Enum):
+class M32RStatus(StrEnum):
     """Formal qualification verdicts for Milestone 32-R burn-in."""
 
     QUALIFIED = "QUALIFIED"

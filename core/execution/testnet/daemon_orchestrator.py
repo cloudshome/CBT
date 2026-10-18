@@ -25,7 +25,7 @@ import json
 import logging
 import sqlite3
 import time
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Literal
 
@@ -39,7 +39,7 @@ from core.intelligence.forward_validation.qualification_freeze import (
 logger = logging.getLogger("ai_quant_sentinel.execution.testnet.daemon")
 
 
-class DaemonLifecycleState(str, Enum):
+class DaemonLifecycleState(StrEnum):
     """Lifecycle states of the 336-hour physical testnet daemon."""
 
     UNINITIALIZED = "UNINITIALIZED"
@@ -51,7 +51,7 @@ class DaemonLifecycleState(str, Enum):
     EMERGENCY_HALT = "EMERGENCY_HALT"
 
 
-class LostAckState(str, Enum):
+class LostAckState(StrEnum):
     """State matrix for lost-ACK reconciliation."""
 
     SUBMITTED = "SUBMITTED"

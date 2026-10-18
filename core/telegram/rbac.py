@@ -164,7 +164,7 @@ class TelegramRBACRegistry:
                 bot_chat = str(getattr(telegram_bot, "chat_id", "") or "")
                 if bot_chat and cid_str == bot_chat:
                     role = TelegramRole.TRADER
-            except Exception:  # noqa: S110,BLE001 — defensive fallback
+            except Exception:
                 pass
 
         # Priority 4: Development/Test sandbox fallback (when no credentials configured in environment)

@@ -138,7 +138,7 @@ class StrategyEligibilityVerifier:
                     ON strategy_eligibility_audits(strategy_id, strategy_version);
                     """
                 )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error(f"[Eligibility] Failed to initialize SQLite schema: {exc}")
 
     def quarantine_strategy(self, strategy_id: str, reason: str = "") -> None:
@@ -361,7 +361,7 @@ class StrategyEligibilityVerifier:
                         record.record_hash,
                     ),
                 )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error(f"[Eligibility] Failed to persist audit record: {exc}")
 
         return record

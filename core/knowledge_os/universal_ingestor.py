@@ -147,7 +147,9 @@ class UniversalIngestionResult:
             "claims_count": len(self.claims),
             "status": self.status,
             "message": self.message,
-            "real_life_summary": self.real_life_summary.to_dict() if self.real_life_summary else None,
+            "real_life_summary": self.real_life_summary.to_dict()
+            if self.real_life_summary
+            else None,
         }
 
 
@@ -307,7 +309,10 @@ class UniversalIngestor:
             return SourceType.SEC_DOCUMENT
         elif u.endswith(".pdf") or "pdf" in parsed.path.lower():
             return SourceType.PDF
-        elif any(news in domain for news in ("bloomberg", "reuters", "coindesk", "cointelegraph", "ft.com", "wsj.com")):
+        elif any(
+            news in domain
+            for news in ("bloomberg", "reuters", "coindesk", "cointelegraph", "ft.com", "wsj.com")
+        ):
             return SourceType.NEWS
         elif any(sub in domain for sub in ("substack.com", "medium.com")):
             return SourceType.BLOG
@@ -319,14 +324,9 @@ class UniversalIngestor:
         if not url.startswith(("http://", "https://")):
             url = f"https://{url}"
         parsed = urllib.parse.urlparse(url)
-        clean_url = urllib.parse.urlunparse((
-            parsed.scheme,
-            parsed.netloc.lower(),
-            parsed.path,
-            "",
-            parsed.query,
-            ""
-        ))
+        clean_url = urllib.parse.urlunparse(
+            (parsed.scheme, parsed.netloc.lower(), parsed.path, "", parsed.query, "")
+        )
         return clean_url, parsed.netloc.lower()
 
     def generate_source_id(self, url: str) -> str:
@@ -388,7 +388,11 @@ class UniversalIngestor:
     ) -> str:
         art_id = f"art_{uuid.uuid4().hex[:10]}"
         now = int(time.time() * 1000)
-        f_hash = hashlib.sha256(content_text.encode("utf-8", errors="replace")).hexdigest() if content_text else ""
+        f_hash = (
+            hashlib.sha256(content_text.encode("utf-8", errors="replace")).hexdigest()
+            if content_text
+            else ""
+        )
         with self._get_connection() as conn:
             conn.execute(
                 """
@@ -457,21 +461,25 @@ class UniversalIngestor:
         # ---------------------------------------------------------------------
         try:
             # Case A: Facebook / Instagram Social Video
-            if source_type in (SourceType.FACEBOOK_VIDEO, SourceType.FACEBOOK_REEL, SourceType.INSTAGRAM_REEL):
-                source_rec, wiki_article, artifacts, claims, real_life_summary = self._process_facebook_or_social_video(
-                    source_rec, opts
+            if source_type in (
+                SourceType.FACEBOOK_VIDEO,
+                SourceType.FACEBOOK_REEL,
+                SourceType.INSTAGRAM_REEL,
+            ):
+                source_rec, wiki_article, artifacts, claims, real_life_summary = (
+                    self._process_facebook_or_social_video(source_rec, opts)
                 )
 
             # Case B: YouTube Video
             elif source_type == SourceType.YOUTUBE_VIDEO:
-                source_rec, wiki_article, artifacts, claims, real_life_summary = self._process_youtube_video(
-                    source_rec, opts
+                source_rec, wiki_article, artifacts, claims, real_life_summary = (
+                    self._process_youtube_video(source_rec, opts)
                 )
 
             # Case C: Web Articles, ArXiv, GitHub, TradingView, Generic Web
             else:
-                source_rec, wiki_article, artifacts, claims, real_life_summary = self._process_web_document(
-                    source_rec, opts
+                source_rec, wiki_article, artifacts, claims, real_life_summary = (
+                    self._process_web_document(source_rec, opts)
                 )
 
         except Exception as exc:
@@ -518,7 +526,13 @@ class UniversalIngestor:
         self,
         source_rec: ResearchSourceRecord,
         opts: dict[str, Any],
-    ) -> tuple[ResearchSourceRecord, WikiArticle, list[dict[str, Any]], list[EpistemicClaim], RealLifeSummary]:
+    ) -> tuple[
+        ResearchSourceRecord,
+        WikiArticle,
+        list[dict[str, Any]],
+        list[EpistemicClaim],
+        RealLifeSummary,
+    ]:
         """
         Handles Facebook / Instagram reels & videos with yt-dlp audio extraction,
         Gemini cloud transcription, and OpenGraph metadata fallback.
@@ -536,7 +550,9 @@ class UniversalIngestor:
         exec_summary = ""
 
         # Step 1: Attempt Phase 3 Audio Extraction via yt-dlp
-        audio_extracted, audio_path, audio_meta = social_video_extractor.extract_audio(url, timeout=30)
+        audio_extracted, audio_path, audio_meta = social_video_extractor.extract_audio(
+            url, timeout=30
+        )
         if audio_extracted and audio_path and audio_path.exists():
             art_id = self.save_artifact(
                 source_id=source_rec.source_id,
@@ -555,7 +571,10 @@ class UniversalIngestor:
                     source_id=source_rec.source_id,
                     artifact_type="TRANSCRIPT",
                     content_text=transcript_res.text,
-                    content_json={"provider": transcript_res.provider, "language": transcript_res.language},
+                    content_json={
+                        "provider": transcript_res.provider,
+                        "language": transcript_res.language,
+                    },
                 )
                 artifacts.append({"artifact_id": art_tr_id, "type": "TRANSCRIPT"})
                 source_rec.access_status = AccessStatus.SUCCESS.value
@@ -572,7 +591,7 @@ class UniversalIngestor:
                     if len(seg_clean) > 20:
                         claims.append(
                             EpistemicClaim(
-                                claim_id=f"C-{i+1:02d}",
+                                claim_id=f"C-{i + 1:02d}",
                                 speaker_claim=seg_clean[:180],
                                 epistemic_status="HYPOTHESIS",
                                 cross_verification_evidence="Extracted from spoken audio stream.",
@@ -580,7 +599,9 @@ class UniversalIngestor:
                                 empirical_dataset_reference=source_rec.source_domain,
                             )
                         )
-                source_rec.title = title_found or f"Social Video Intelligence [{source_rec.source_id}]"
+                source_rec.title = (
+                    title_found or f"Social Video Intelligence [{source_rec.source_id}]"
+                )
                 source_rec.author_or_creator = author_found or "Social Media Creator"
                 wiki_article, real_life_summary = self._create_or_update_wiki_record(
                     source_rec=source_rec,
@@ -606,12 +627,16 @@ class UniversalIngestor:
             else:
                 is_blocked = True
                 block_reason = fetch_res.get("error", "Access restricted / login wall")
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             is_blocked = True
             block_reason = str(e)
 
         # Check if authentication / login wall prevented full media extraction
-        if not og_description or len(og_description.strip()) < 30 or "login" in og_description.lower():
+        if (
+            not og_description
+            or len(og_description.strip()) < 30
+            or "login" in og_description.lower()
+        ):
             is_blocked = True
             block_reason = (
                 "Facebook login wall / private video restriction prevents direct unauthenticated media download. "
@@ -663,7 +688,9 @@ class UniversalIngestor:
         else:
             source_rec.access_status = AccessStatus.PARTIAL.value
             source_rec.extraction_status = ExtractionStatus.EXTRACTED.value
-            exec_summary = f"Metadata extraction succeeded for social video. Summary: {og_description[:300]}"
+            exec_summary = (
+                f"Metadata extraction succeeded for social video. Summary: {og_description[:300]}"
+            )
 
         # Generate & Persist Wiki Article and RealLifeSummary
         wiki_article, real_life_summary = self._create_or_update_wiki_record(
@@ -679,7 +706,13 @@ class UniversalIngestor:
         self,
         source_rec: ResearchSourceRecord,
         opts: dict[str, Any],
-    ) -> tuple[ResearchSourceRecord, WikiArticle, list[dict[str, Any]], list[EpistemicClaim], RealLifeSummary]:
+    ) -> tuple[
+        ResearchSourceRecord,
+        WikiArticle,
+        list[dict[str, Any]],
+        list[EpistemicClaim],
+        RealLifeSummary,
+    ]:
         """Handles YouTube video transcripts and audio extraction fallback."""
         artifacts: list[dict[str, Any]] = []
         claims: list[EpistemicClaim] = []
@@ -714,7 +747,7 @@ class UniversalIngestor:
                 is_hype = any(hk.lower() in seg_text.lower() for hk in hype)
                 claims.append(
                     EpistemicClaim(
-                        claim_id=f"C-{i+1:02d}",
+                        claim_id=f"C-{i + 1:02d}",
                         speaker_claim=seg_text[:180],
                         epistemic_status="NARRATIVE" if is_hype else "HYPOTHESIS",
                         cross_verification_evidence="Extracted from spoken video transcript; awaiting quantitative backtest.",
@@ -752,13 +785,15 @@ class UniversalIngestor:
                     source_rec.access_status = AccessStatus.SUCCESS.value
                     source_rec.extraction_status = ExtractionStatus.EXTRACTED.value
                     raw_body = transcript_res.text
-                    exec_summary = f"Spoken YouTube audio transcribed via Gemini ({len(raw_body)} chars)."
+                    exec_summary = (
+                        f"Spoken YouTube audio transcribed via Gemini ({len(raw_body)} chars)."
+                    )
                     for i, seg in enumerate(raw_body.split(". ")[:8]):
                         s_c = seg.strip()
                         if len(s_c) > 20:
                             claims.append(
                                 EpistemicClaim(
-                                    claim_id=f"C-{i+1:02d}",
+                                    claim_id=f"C-{i + 1:02d}",
                                     speaker_claim=s_c[:180],
                                     epistemic_status="HYPOTHESIS",
                                     cross_verification_evidence="Transcribed from spoken YouTube audio stream.",
@@ -769,7 +804,9 @@ class UniversalIngestor:
                 else:
                     source_rec.access_status = AccessStatus.PARTIAL.value
                     source_rec.extraction_status = ExtractionStatus.PARTIAL.value
-                    source_rec.failure_reason = f"Audio downloaded, transcription failed: {transcript_res.error}"
+                    source_rec.failure_reason = (
+                        f"Audio downloaded, transcription failed: {transcript_res.error}"
+                    )
                     raw_body = ""
                     exec_summary = f"Audio extracted from YouTube; transcription pending ({transcript_res.error})."
             else:
@@ -793,7 +830,13 @@ class UniversalIngestor:
         self,
         source_rec: ResearchSourceRecord,
         opts: dict[str, Any],
-    ) -> tuple[ResearchSourceRecord, WikiArticle, list[dict[str, Any]], list[EpistemicClaim], RealLifeSummary]:
+    ) -> tuple[
+        ResearchSourceRecord,
+        WikiArticle,
+        list[dict[str, Any]],
+        list[EpistemicClaim],
+        RealLifeSummary,
+    ]:
         """Handles generic articles, ArXiv, GitHub, and financial blogs."""
         artifacts: list[dict[str, Any]] = []
         claims: list[EpistemicClaim] = []
@@ -823,7 +866,7 @@ class UniversalIngestor:
             for i, p in enumerate(paragraphs[:8]):
                 claims.append(
                     EpistemicClaim(
-                        claim_id=f"C-{i+1:02d}",
+                        claim_id=f"C-{i + 1:02d}",
                         speaker_claim=p[:200],
                         epistemic_status=(
                             "FACT"
@@ -846,15 +889,14 @@ class UniversalIngestor:
         else:
             source_rec.access_status = (
                 AccessStatus.ACCESS_BLOCKED.value
-                if "403" in url_res.get("error", "") or "blocked" in url_res.get("error", "").lower()
+                if "403" in url_res.get("error", "")
+                or "blocked" in url_res.get("error", "").lower()
                 else AccessStatus.PARTIAL.value
             )
             source_rec.extraction_status = ExtractionStatus.FAILED.value
             source_rec.failure_reason = url_res.get("error", "Extraction failed")
             raw_body = ""
-            exec_summary = (
-                f"Web resource preserved under Link Guarantee. Fetch error: {source_rec.failure_reason}."
-            )
+            exec_summary = f"Web resource preserved under Link Guarantee. Fetch error: {source_rec.failure_reason}."
 
         wiki_article, real_life_summary = self._create_or_update_wiki_record(
             source_rec=source_rec,
@@ -903,7 +945,10 @@ class UniversalIngestor:
                 )
                 payload = {
                     "contents": [{"parts": [{"text": prompt}]}],
-                    "generationConfig": {"temperature": 0.2, "response_mime_type": "application/json"},
+                    "generationConfig": {
+                        "temperature": 0.2,
+                        "response_mime_type": "application/json",
+                    },
                 }
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
                 resp = requests.post(url, json=payload, timeout=20.0)
@@ -931,7 +976,7 @@ class UniversalIngestor:
                                 hype_vs_reality=parsed["hype_vs_reality"].strip(),
                                 risk_warning=parsed["risk_warning"].strip(),
                             )
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.debug(f"Gemini RealLifeSummary synthesis fallback: {e}")
 
         # Step 2: High-Quality Deterministic Domain-Aware Synthesis Fallback
@@ -948,7 +993,15 @@ class UniversalIngestor:
         )
         is_smc = any(
             k in text_corpus
-            for k in ("fvg", "liquidity sweep", "order block", "orderflow", "cvd", "structure", "smc")
+            for k in (
+                "fvg",
+                "liquidity sweep",
+                "order block",
+                "orderflow",
+                "cvd",
+                "structure",
+                "smc",
+            )
         )
 
         num_facts = sum(1 for c in claims if c.epistemic_status == "FACT")
@@ -959,67 +1012,29 @@ class UniversalIngestor:
                 f"উৎসটি ({source_rec.source_domain}) প্ল্যাটফর্মের লগইন রিকোয়ারমেন্ট বা প্রাইভেসি পলিসির কারণে সম্পূর্ণ মিডিয়া স্ট্রিম সরাসরি পড়তে দেয়নি। "
                 f"তবে সোর্স রেকর্ড `{source_rec.source_id}` অপরিবর্তনযোগ্যভাবে উইকি ডেটাবেজে সংরক্ষিত রয়েছে।"
             )
-            impact_bn = (
-                "অন-চেইন ডেটা ও সরাসরি ভেরিফিকেশন ছাড়া সোশ্যাল মিডিয়া ভিডিওর তথ্যে তাৎক্ষণিক মার্কেটে কোনো প্রমাণিত মৌলিক প্রভাব নেই; এটি প্রধানত রিটেইল সেন্টিমেন্ট তৈরি করতে পারে।"
-            )
-            guidance_bn = (
-                f"সোর্স আইডি `{source_rec.source_id}`-তে লোকাল অডিও বা ট্রান্সক্রিপ্ট টেক্সট আপলোড করে পূর্ণাঙ্গ এনালাইসিস চালান। কোনো অবস্থাতেই যাচাই ছাড়া এই কন্টেন্ট দেখে ট্রেডিং সিদ্ধান্ত নেবেন না।"
-            )
-            hype_bn = (
-                "সোশ্যাল মিডিয়ায় শেয়ার করা ভিডিওগুলোতে প্রায়ই অতিরঞ্জিত মুনাফার দাবি থাকে। সিবিটি এভিডেন্স ইঞ্জিনে টেস্ট না করা পর্যন্ত এটিকে খাঁটি হাইপ হিসেবে বিবেচনা করুন।"
-            )
-            risk_bn = (
-                "অযাচাইকৃত সোশ্যাল সিগন্যাল বা হাইপে ট্রেড করলে হাই লিভারেজে সম্পূর্ণ অ্যাকাউন্ট লিকুইডেশনের চরম ঝুঁকি থাকে।"
-            )
+            impact_bn = "অন-চেইন ডেটা ও সরাসরি ভেরিফিকেশন ছাড়া সোশ্যাল মিডিয়া ভিডিওর তথ্যে তাৎক্ষণিক মার্কেটে কোনো প্রমাণিত মৌলিক প্রভাব নেই; এটি প্রধানত রিটেইল সেন্টিমেন্ট তৈরি করতে পারে।"
+            guidance_bn = f"সোর্স আইডি `{source_rec.source_id}`-তে লোকাল অডিও বা ট্রান্সক্রিপ্ট টেক্সট আপলোড করে পূর্ণাঙ্গ এনালাইসিস চালান। কোনো অবস্থাতেই যাচাই ছাড়া এই কন্টেন্ট দেখে ট্রেডিং সিদ্ধান্ত নেবেন না।"
+            hype_bn = "সোশ্যাল মিডিয়ায় শেয়ার করা ভিডিওগুলোতে প্রায়ই অতিরঞ্জিত মুনাফার দাবি থাকে। সিবিটি এভিডেন্স ইঞ্জিনে টেস্ট না করা পর্যন্ত এটিকে খাঁটি হাইপ হিসেবে বিবেচনা করুন।"
+            risk_bn = "অযাচাইকৃত সোশ্যাল সিগন্যাল বা হাইপে ট্রেড করলে হাই লিভারেজে সম্পূর্ণ অ্যাকাউন্ট লিকুইডেশনের চরম ঝুঁকি থাকে।"
         elif is_crypto or is_smc:
             entity_label = "বিটকয়েন ও ক্রিপ্টোকারেন্সি" if is_crypto else "স্মার্ট মানি ও মার্কেট স্ট্রাকচার"
-            core_bn = (
-                f"এই গবেষণাপত্রে {entity_label} সম্পর্কিত ট্রেন্ড, লিকুইডিটি ফ্লো এবং মূল্যের গতিবিধি বিশ্লেষণ করা হয়েছে ({source_rec.title or 'Research Entry'})।"
-            )
-            impact_bn = (
-                f"মার্কেটে তাৎক্ষণিক ভোলাটিলিটি বা অর্ডারবুকের ডেপথ পরিবর্তনের সম্ভাবনা রয়েছে। {f'{num_facts}টি ফ্যাক্ট ও {num_hype}টি ন্যারেটিভ শনাক্ত করা হয়েছে।' if claims else 'মার্কেট স্ট্রাকচার পরীক্ষা সাপেক্ষ।'}"
-            )
-            guidance_bn = (
-                "হাফ-কেলি (Half-Kelly) পজিশন সাইজিং মেনে চলুন। ক্যান্ডেল ক্লোজ হওয়ার আগে এবং সিভিডি (CVD) কনফার্মেশন ছাড়া কোনো রিভার্সাল বা ব্রেকআউটে এন্ট্রি নেবেন না।"
-            )
-            hype_bn = (
-                "যদি কোনো কন্টেন্টে ১০০% উইন রেট বা গ্যারান্টিড প্রফিটের দাবি থাকে, তবে তা পরিসংখ্যানগতভাবে অসম্ভব। কেবল হিস্টোরিক্যাল ব্যাকটেস্ট ও আউট-অফ-স্যাম্পল রেজাল্টকেই বিশ্বাস করুন।"
-            )
-            risk_bn = (
-                "ম্যাক্রো ইভেন্ট (CPI, FOMC) চলাকালীন স্প্রেড বড় হতে পারে এবং স্টপ-হান্ট হতে পারে। সর্বোচ্চ ২.৫% ইকুইটি রিক্সের বেশি কোনো অবস্থাতে এক্সপোজ করবেন না।"
-            )
+            core_bn = f"এই গবেষণাপত্রে {entity_label} সম্পর্কিত ট্রেন্ড, লিকুইডিটি ফ্লো এবং মূল্যের গতিবিধি বিশ্লেষণ করা হয়েছে ({source_rec.title or 'Research Entry'})।"
+            impact_bn = f"মার্কেটে তাৎক্ষণিক ভোলাটিলিটি বা অর্ডারবুকের ডেপথ পরিবর্তনের সম্ভাবনা রয়েছে। {f'{num_facts}টি ফ্যাক্ট ও {num_hype}টি ন্যারেটিভ শনাক্ত করা হয়েছে।' if claims else 'মার্কেট স্ট্রাকচার পরীক্ষা সাপেক্ষ।'}"
+            guidance_bn = "হাফ-কেলি (Half-Kelly) পজিশন সাইজিং মেনে চলুন। ক্যান্ডেল ক্লোজ হওয়ার আগে এবং সিভিডি (CVD) কনফার্মেশন ছাড়া কোনো রিভার্সাল বা ব্রেকআউটে এন্ট্রি নেবেন না।"
+            hype_bn = "যদি কোনো কন্টেন্টে ১০০% উইন রেট বা গ্যারান্টিড প্রফিটের দাবি থাকে, তবে তা পরিসংখ্যানগতভাবে অসম্ভব। কেবল হিস্টোরিক্যাল ব্যাকটেস্ট ও আউট-অফ-স্যাম্পল রেজাল্টকেই বিশ্বাস করুন।"
+            risk_bn = "ম্যাক্রো ইভেন্ট (CPI, FOMC) চলাকালীন স্প্রেড বড় হতে পারে এবং স্টপ-হান্ট হতে পারে। সর্বোচ্চ ২.৫% ইকুইটি রিক্সের বেশি কোনো অবস্থাতে এক্সপোজ করবেন না।"
         elif is_macro:
-            core_bn = (
-                f"এটি ম্যাক্রো-ইকোনমিক ফ্যাক্টর এবং আর্থিক তারল্য সংক্রান্ত বিশ্লেষণ ({source_rec.title or 'Macro Dossier'})।"
-            )
-            impact_bn = (
-                "কেন্দ্রীয় ব্যাংকের নীতি ও বৈশ্বিক লিকুইডিটি পরিবর্তনের সরাসরি প্রভাব ক্রিপ্টো ও গ্লোবাল ইক্যুইটি মার্কেটে পরিলক্ষিত হতে পারে।"
-            )
-            guidance_bn = (
-                "ম্যাক্রো ডেটা রিলিজের পর ইমপ্যাক্ট ফিল্টারে সারপ্রাইজ ডেল্টা (Surprise Delta) যাচাই করুন এবং উইকি ডাটাবেজে অন্যান্য পলিসির সাথে ক্রস-রেফারেন্স করুন।"
-            )
-            hype_bn = (
-                "সংবাদমাধ্যমের তাৎক্ষণিক হেডলাইন অনেক সময় মার্কেট রিয়েকশনের সাথে মেলে না; প্রাতিষ্ঠানিক ফ্লো দেখতে FED ব্যালেন্স শিট ও নেট লিকুইডিটি ট্র্যাক করুন।"
-            )
-            risk_bn = (
-                "ম্যাক্রো শকে আকস্মিক লিকুইডিটি ক্রাঞ্চ দেখা দিলে অল্টকয়েনগুলোতে বড় ড্রডাউন হতে পারে।"
-            )
+            core_bn = f"এটি ম্যাক্রো-ইকোনমিক ফ্যাক্টর এবং আর্থিক তারল্য সংক্রান্ত বিশ্লেষণ ({source_rec.title or 'Macro Dossier'})।"
+            impact_bn = "কেন্দ্রীয় ব্যাংকের নীতি ও বৈশ্বিক লিকুইডিটি পরিবর্তনের সরাসরি প্রভাব ক্রিপ্টো ও গ্লোবাল ইক্যুইটি মার্কেটে পরিলক্ষিত হতে পারে।"
+            guidance_bn = "ম্যাক্রো ডেটা রিলিজের পর ইমপ্যাক্ট ফিল্টারে সারপ্রাইজ ডেল্টা (Surprise Delta) যাচাই করুন এবং উইকি ডাটাবেজে অন্যান্য পলিসির সাথে ক্রস-রেফারেন্স করুন।"
+            hype_bn = "সংবাদমাধ্যমের তাৎক্ষণিক হেডলাইন অনেক সময় মার্কেট রিয়েকশনের সাথে মেলে না; প্রাতিষ্ঠানিক ফ্লো দেখতে FED ব্যালেন্স শিট ও নেট লিকুইডিটি ট্র্যাক করুন।"
+            risk_bn = "ম্যাক্রো শকে আকস্মিক লিকুইডিটি ক্রাঞ্চ দেখা দিলে অল্টকয়েনগুলোতে বড় ড্রডাউন হতে পারে।"
         else:
-            core_bn = (
-                f"উৎস থেকে প্রাপ্ত তথ্য পর্যালোচনা: {source_rec.title or 'Research Entry'}। ডকুমেন্টে মোট {len(claims)}টি যাচাইযোগ্য দাবি অন্তর্ভুক্ত রয়েছে।"
-            )
-            impact_bn = (
-                "কন্টেন্টটি থিওরিটিক্যাল বা স্ট্র্যাটেজিক বুদ্ধিমত্তা বৃদ্ধি করে; সরাসরি মার্কেট এক্সিকিউশনের পূর্বে এটিকে সিবিটি রিসার্চ ল্যাবে ব্যাকটেস্ট করা প্রয়োজন।"
-            )
-            guidance_bn = (
-                "ধারণাগুলোকে অ্যালগরিদমিক নিয়মে রূপান্তর করুন এবং `/test` কমান্ড দিয়ে সিমুলেটেড ওয়াক-ফরোয়ার্ড ভ্যালিডেশন সম্পন্ন করুন।"
-            )
-            hype_bn = (
-                f"উৎসটিতে {num_hype}টি ন্যারেটিভ রয়েছে যা এখনো অন-মার্কেট ডেটায় প্রমাণিত নয়; কেবল {num_facts}টি দাবি সরাসরি তথ্যের সাথে সঙ্গতিপূর্ণ।"
-            )
-            risk_bn = (
-                "তত্ত্ব বা কাগজের রিসার্চ সবসময় লাইভ মার্কেটের স্লিপেজ ও ফি-র সাথে মেলে না। ৩-টায়ার কস্ট মডেলিং ছাড়া ক্যাপিটাল ঝুঁকিতে ফেলা যাবে না।"
-            )
+            core_bn = f"উৎস থেকে প্রাপ্ত তথ্য পর্যালোচনা: {source_rec.title or 'Research Entry'}। ডকুমেন্টে মোট {len(claims)}টি যাচাইযোগ্য দাবি অন্তর্ভুক্ত রয়েছে।"
+            impact_bn = "কন্টেন্টটি থিওরিটিক্যাল বা স্ট্র্যাটেজিক বুদ্ধিমত্তা বৃদ্ধি করে; সরাসরি মার্কেট এক্সিকিউশনের পূর্বে এটিকে সিবিটি রিসার্চ ল্যাবে ব্যাকটেস্ট করা প্রয়োজন।"
+            guidance_bn = "ধারণাগুলোকে অ্যালগরিদমিক নিয়মে রূপান্তর করুন এবং `/test` কমান্ড দিয়ে সিমুলেটেড ওয়াক-ফরোয়ার্ড ভ্যালিডেশন সম্পন্ন করুন।"
+            hype_bn = f"উৎসটিতে {num_hype}টি ন্যারেটিভ রয়েছে যা এখনো অন-মার্কেট ডেটায় প্রমাণিত নয়; কেবল {num_facts}টি দাবি সরাসরি তথ্যের সাথে সঙ্গতিপূর্ণ।"
+            risk_bn = "তত্ত্ব বা কাগজের রিসার্চ সবসময় লাইভ মার্কেটের স্লিপেজ ও ফি-র সাথে মেলে না। ৩-টায়ার কস্ট মডেলিং ছাড়া ক্যাপিটাল ঝুঁকিতে ফেলা যাবে না।"
 
         return RealLifeSummary(
             core_concept_bn=core_bn,
@@ -1043,7 +1058,9 @@ class UniversalIngestor:
         Synthesizes and embeds the actionable RealLifeSummary.
         """
         now = int(time.time() * 1000)
-        slug = re.sub(r"[^a-zA-Z0-9]+", "_", (source_rec.title or "research").lower()).strip("_")[:28]
+        slug = re.sub(r"[^a-zA-Z0-9]+", "_", (source_rec.title or "research").lower()).strip("_")[
+            :28
+        ]
         article_id = f"wiki_{int(time.time())}_{slug or uuid.uuid4().hex[:6]}"
         provenance_id = f"[SRC-{source_rec.source_id.upper()}]"
 
@@ -1071,13 +1088,13 @@ class UniversalIngestor:
         else:
             score = 10.0 if source_rec.access_status == AccessStatus.ACCESS_BLOCKED.value else 50.0
 
-        markdown_content = f"""# {source_rec.title or 'Research Intelligence Entry'}
+        markdown_content = f"""# {source_rec.title or "Research Intelligence Entry"}
 
 ## Source Dossier
 - **Original URL:** [{source_rec.original_url}]({source_rec.original_url})
 - **Source ID:** `{source_rec.source_id}`
 - **Source Type:** `{source_rec.source_type}`
-- **Author / Speaker:** `{source_rec.author_or_creator or 'Unknown'}`
+- **Author / Speaker:** `{source_rec.author_or_creator or "Unknown"}`
 - **Access Status:** `{source_rec.access_status}`
 - **Extraction Status:** `{source_rec.extraction_status}`
 - **Provenance ID:** `{provenance_id}`
@@ -1182,11 +1199,12 @@ class UniversalIngestor:
                 full_cid = f"{source_rec.source_id}_{c.claim_id}"
                 claim_verifier.verify_claim(full_cid)
                 thesis_engine.auto_cluster_claim_to_theses(full_cid, c.speaker_claim)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.debug(f"Post-ingestion epistemic graph hook error (non-fatal): {e}")
 
         try:
             from core.knowledge_os.research_vault_sync import export_to_git_vault
+
             export_to_git_vault()
         except Exception as e:
             logger.debug(f"Post-ingestion vault export error: {e}")

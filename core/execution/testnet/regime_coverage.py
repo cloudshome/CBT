@@ -16,7 +16,7 @@ import logging
 import time
 from dataclasses import dataclass
 from decimal import Decimal
-from enum import Enum
+from enum import StrEnum
 
 from core.execution.testnet.endpoint_policy import Environment
 from core.execution.testnet.flight_manifest import FlightManifest
@@ -25,7 +25,7 @@ from core.execution.testnet.models import SlicingStrategy
 logger = logging.getLogger("sky.execution.testnet.regime")
 
 
-class ObservedRegimeType(str, Enum):
+class ObservedRegimeType(StrEnum):
     NORMAL = "NORMAL"
     HIGH_VOLATILITY = "HIGH_VOLATILITY"
     LOW_VOLATILITY = "LOW_VOLATILITY"
@@ -33,7 +33,7 @@ class ObservedRegimeType(str, Enum):
     BASIS_DRIFT = "BASIS_DRIFT"
 
 
-class CoverageStressProfile(str, Enum):
+class CoverageStressProfile(StrEnum):
     STANDARD_TEST = "STANDARD_TEST"
     BURST_TEST = "BURST_TEST"
     WIDE_SPREAD_TEST = "WIDE_SPREAD_TEST"

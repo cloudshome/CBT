@@ -35,7 +35,7 @@ def _get_project_brain():
         from core.knowledge_os.project_brain import project_brain
 
         return project_brain
-    except Exception as exc:  # noqa: BLE001 # pragma: no cover
+    except Exception as exc:  # pragma: no cover
         logger.warning("Knowledge OS not available — compiling without brain context: %s", exc)
         return None
 
@@ -177,7 +177,7 @@ class StrategyCompiler:
                     brain_autopsy_count,
                     name,
                 )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning("Knowledge OS pre-flight skipped (non-fatal): %s", exc)
         # ── End Knowledge OS scan ─────────────────────────────────────────────
 

@@ -24,8 +24,6 @@ Governing Principles:
 from __future__ import annotations
 
 import logging
-import os
-import re
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
@@ -96,9 +94,9 @@ class CentralTradingMind:
     """
 
     MAX_PORTFOLIO_HEAT_PCT: float = 2.50  # 2.5% max cumulative portfolio risk
-    MAX_TRADE_RISK_PCT: float = 1.50      # 1.5% max risk per trade
-    MAX_PRICE_DEVIATION_PCT: float = 1.50 # 1.5% max divergence from live ticker
-    MAX_CONCURRENT_POSITIONS: int = 3     # Institutional concurrency cap
+    MAX_TRADE_RISK_PCT: float = 1.50  # 1.5% max risk per trade
+    MAX_PRICE_DEVIATION_PCT: float = 1.50  # 1.5% max divergence from live ticker
+    MAX_CONCURRENT_POSITIONS: int = 3  # Institutional concurrency cap
 
     def __init__(self) -> None:
         self._ensure_tables()
@@ -141,6 +139,7 @@ class CentralTradingMind:
         """Retrieves authoritative real-world ticker price from live data streamer."""
         try:
             from core.data_streamer import data_streamer
+
             # 1. Check live recent candles
             candles = data_streamer.get_candles(symbol, "15m", limit=3)
             if candles and len(candles) > 0:
@@ -153,11 +152,16 @@ class CentralTradingMind:
                 return float(data_streamer._last_known_prices[symbol])
 
             # 3. Check SQLite candles
-            from pathlib import Path
             import sqlite3
+            from pathlib import Path
+
             m_db = Path("data/market_data.db")
             if m_db.exists():
-                slash_sym = f"{symbol[:3]}/{symbol[3:]}" if symbol.endswith("USDT") and "/" not in symbol else symbol
+                slash_sym = (
+                    f"{symbol[:3]}/{symbol[3:]}"
+                    if symbol.endswith("USDT") and "/" not in symbol
+                    else symbol
+                )
                 conn = sqlite3.connect(str(m_db))
                 cur = conn.execute(
                     "SELECT close FROM candles WHERE symbol IN (?, ?) AND is_synthetic = 0 ORDER BY timestamp DESC LIMIT 1;",
@@ -181,7 +185,9 @@ class CentralTradingMind:
         verdict_id = f"V_{uuid.uuid4().hex[:10].upper()}"
 
         def _reject(reason: str) -> CentralMindVerdict:
-            logger.warning(f"Central Mind REJECTED [{proposal.origin}] {proposal.direction} {proposal.symbol}: {reason}")
+            logger.warning(
+                f"Central Mind REJECTED [{proposal.origin}] {proposal.direction} {proposal.symbol}: {reason}"
+            )
             v = CentralMindVerdict(
                 verdict_id=verdict_id,
                 proposal_id=proposal.proposal_id,
@@ -228,14 +234,18 @@ class CentralTradingMind:
 
         origin_upper = proposal.origin.upper()
         if "SIMULATION" in origin_upper or "ARENA_SIM" in origin_upper:
-            return _reject("Causal Firewall: Research simulation cannot route live/paper execution.")
+            return _reject(
+                "Causal Firewall: Research simulation cannot route live/paper execution."
+            )
 
         # -------------------------------------------------------------
         # INVARIANT 3: Real Market Price Grounding
         # -------------------------------------------------------------
         live_price = self.get_live_market_price(proposal.symbol)
         if live_price is None or live_price <= 0:
-            return _reject(f"Price Grounding: No authoritative live market price stream for {proposal.symbol}.")
+            return _reject(
+                f"Price Grounding: No authoritative live market price stream for {proposal.symbol}."
+            )
 
         deviation_pct = abs(proposal.planned_entry - live_price) / live_price * 100.0
         if deviation_pct > self.MAX_PRICE_DEVIATION_PCT:
@@ -256,13 +266,19 @@ class CentralTradingMind:
 
         stop_dist = abs(effective_entry - proposal.stop_loss)
         if dir_upper == "LONG" and proposal.stop_loss >= effective_entry:
-            return _reject(f"Geometry Rejection: LONG stop loss (${proposal.stop_loss:,.2f}) must be strictly below entry (${effective_entry:,.2f}).")
+            return _reject(
+                f"Geometry Rejection: LONG stop loss (${proposal.stop_loss:,.2f}) must be strictly below entry (${effective_entry:,.2f})."
+            )
         if dir_upper == "SHORT" and proposal.stop_loss <= effective_entry:
-            return _reject(f"Geometry Rejection: SHORT stop loss (${proposal.stop_loss:,.2f}) must be strictly above entry (${effective_entry:,.2f}).")
+            return _reject(
+                f"Geometry Rejection: SHORT stop loss (${proposal.stop_loss:,.2f}) must be strictly above entry (${effective_entry:,.2f})."
+            )
 
         min_stop_dist = effective_entry * 0.001  # 10 bps minimum
         if stop_dist < min_stop_dist:
-            return _reject(f"Geometry Rejection: Stop distance ${stop_dist:.2f} is too tight (minimum 10 bps).")
+            return _reject(
+                f"Geometry Rejection: Stop distance ${stop_dist:.2f} is too tight (minimum 10 bps)."
+            )
 
         # -------------------------------------------------------------
         # INVARIANT 5: Deterministic Half-Kelly Risk Sizing (No arbitrary 1.0 unit!)
@@ -301,7 +317,8 @@ class CentralTradingMind:
 
         # Check existing portfolio heat
         current_heat_usd = sum(
-            float(p.get("size", 0.0)) * abs(float(p.get("entry_price", 0.0)) - float(p.get("stop_loss", 0.0)))
+            float(p.get("size", 0.0))
+            * abs(float(p.get("entry_price", 0.0)) - float(p.get("stop_loss", 0.0)))
             for p in open_positions
             if p.get("status") == "OPEN" and p.get("stop_loss") is not None
         )
@@ -416,7 +433,8 @@ class CentralTradingMind:
             pass
 
         current_heat_usd = sum(
-            float(p.get("size", 0.0)) * abs(float(p.get("entry_price", 0.0)) - float(p.get("stop_loss", 0.0)))
+            float(p.get("size", 0.0))
+            * abs(float(p.get("entry_price", 0.0)) - float(p.get("stop_loss", 0.0)))
             for p in open_pos
             if p.get("status") == "OPEN" and p.get("stop_loss") is not None
         )
@@ -445,4 +463,3 @@ class CentralTradingMind:
 
 # Global authoritative singleton
 central_mind = CentralTradingMind()
-

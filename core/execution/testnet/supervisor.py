@@ -162,7 +162,7 @@ class FlightSupervisor:
                             ledger.record_fill(slice_id, query_res.executed_quantity)
                         ledger.record_cancel(slice_id, rem)
                         reconciled_count += 1
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:
                     logger.warning(f"[Supervisor] Could not query slice {slice_id} on venue: {exc}")
 
         return reconciled_count

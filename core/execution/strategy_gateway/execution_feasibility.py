@@ -133,7 +133,7 @@ class ExecutionFeasibilityModel:
                     ON execution_feasibility_audits(proposal_id);
                     """
                 )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error(f"[Feasibility] Failed to initialize SQLite schema: {exc}")
 
     def evaluate_feasibility(
@@ -388,7 +388,7 @@ class ExecutionFeasibilityModel:
                         assessment.assessed_at_epoch_ms,
                     ),
                 )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error(f"[Feasibility] Failed to record audit: {exc}")
 
         return assessment

@@ -35,6 +35,7 @@ paper_router = APIRouter(tags=["paper-trading"])
 # PYDANTIC SCHEMAS
 # ==============================================================================
 
+
 class PaperTradeRequest(BaseModel):
     symbol: str = Field(min_length=3, max_length=24)
     side: str
@@ -88,6 +89,7 @@ class PaperCloseRequest(BaseModel):
 # DETERMINISTIC RISK GATE
 # ==============================================================================
 
+
 def enforce_paper_risk_gate(order: PaperTradeRequest) -> None:
     """
     Deterministic institutional Risk Gate for FastAPI paper trading.
@@ -128,6 +130,7 @@ def enforce_paper_risk_gate(order: PaperTradeRequest) -> None:
 # ENDPOINTS
 # ==============================================================================
 
+
 @paper_router.get("/api/paper/desk-overview", dependencies=[Depends(require_api_key)])
 async def get_paper_desk_overview():
     """
@@ -151,6 +154,7 @@ async def get_paper_desk_overview():
     # Format Current
     current = []
     from core.data_streamer import data_streamer
+
     for p in open_pos:
         side = "BUY" if p.get("direction") == "LONG" else "SELL"
         sym = p.get("symbol", "")
@@ -193,7 +197,9 @@ async def get_paper_desk_overview():
                 "RANGE": f"{asset_matched} Desk (Range Specialist)",
                 "SWING": f"{asset_matched} Desk (Macro Swing)",
             }
-            agent_mgr = style_desk_names.get(style_matched, f"{asset_matched} Desk ({style_matched})")
+            agent_mgr = style_desk_names.get(
+                style_matched, f"{asset_matched} Desk ({style_matched})"
+            )
             strat_name = f"{asset_matched} {style_matched.title()} Execution"
             thesis = entry_reason_val
         elif sl_pct < 1.5:
@@ -235,9 +241,7 @@ async def get_paper_desk_overview():
 
         opened_at_ts = p.get("opened_at")
         opened_at_fmt = (
-            datetime.fromtimestamp(opened_at_ts / 1000.0, tz=UTC).strftime(
-                "%Y-%m-%d %H:%M:%S UTC"
-            )
+            datetime.fromtimestamp(opened_at_ts / 1000.0, tz=UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
             if opened_at_ts
             else None
         )
@@ -298,16 +302,12 @@ async def get_paper_desk_overview():
         opened_at_ts = p.get("opened_at")
         closed_at_ts = p.get("closed_at")
         opened_at_fmt = (
-            datetime.fromtimestamp(opened_at_ts / 1000.0, tz=UTC).strftime(
-                "%Y-%m-%d %H:%M:%S UTC"
-            )
+            datetime.fromtimestamp(opened_at_ts / 1000.0, tz=UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
             if opened_at_ts
             else None
         )
         closed_at_fmt = (
-            datetime.fromtimestamp(closed_at_ts / 1000.0, tz=UTC).strftime(
-                "%Y-%m-%d %H:%M:%S UTC"
-            )
+            datetime.fromtimestamp(closed_at_ts / 1000.0, tz=UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
             if closed_at_ts
             else None
         )
@@ -418,7 +418,11 @@ async def get_paper_desk_overview():
     virtual_equity = round(settled_cash + total_unrealized, 2)
     daily_realized_loss = abs(min(0.0, float(accounting.get("daily_realized_pnl", 0.0))))
     daily_loss_pct = (daily_realized_loss / base_balance) * 100.0 if base_balance > 0 else 0.0
-    total_drawdown_pct = max(0.0, ((base_balance - virtual_equity) / base_balance) * 100.0) if base_balance > 0 else 0.0
+    total_drawdown_pct = (
+        max(0.0, ((base_balance - virtual_equity) / base_balance) * 100.0)
+        if base_balance > 0
+        else 0.0
+    )
 
     if virtual_equity <= 0 or total_drawdown_pct >= 20.0 or daily_loss_pct >= 3.0:
         circuit_breaker_status = "HALTED (DRAWDOWN BREACH)"
@@ -474,6 +478,7 @@ async def get_paper_positions():
     open_pos = portfolio_shadow.get_open_positions()
     mapped = []
     from core.data_streamer import data_streamer
+
     for p in open_pos:
         side = "BUY" if p.get("direction") == "LONG" else "SELL"
         sym = p.get("symbol", "")
@@ -502,7 +507,9 @@ async def get_paper_positions():
                 "RANGE": f"{asset_matched} Desk (Range Specialist)",
                 "SWING": f"{asset_matched} Desk (Macro Swing)",
             }
-            agent_mgr = style_desk_names.get(style_matched, f"{asset_matched} Desk ({style_matched})")
+            agent_mgr = style_desk_names.get(
+                style_matched, f"{asset_matched} Desk ({style_matched})"
+            )
             strat_name = f"{asset_matched} {style_matched.title()} Execution"
         else:
             horizon = "DAY"
@@ -580,9 +587,13 @@ async def place_paper_trade(order: PaperTradeRequest):
         # Record approved execution into Central Mind immutable decision ledger
         try:
             import uuid
-            from core.central_mind import central_mind, CentralMindVerdict
+
+            from core.central_mind import CentralMindVerdict, central_mind
+
             now_ms = int(time.time() * 1000)
-            trade_risk = round(float(order.size or 1.0) * abs(float(order.entryPrice) - float(order.sl)), 2)
+            trade_risk = round(
+                float(order.size or 1.0) * abs(float(order.entryPrice) - float(order.sl)), 2
+            )
             v = CentralMindVerdict(
                 verdict_id=f"V_{uuid.uuid4().hex[:10].upper()}",
                 proposal_id=f"PROP_{uuid.uuid4().hex[:10].upper()}",
@@ -608,7 +619,9 @@ async def place_paper_trade(order: PaperTradeRequest):
         # Also log rejection if from risk gate
         try:
             import uuid
-            from core.central_mind import central_mind, CentralMindVerdict
+
+            from core.central_mind import CentralMindVerdict, central_mind
+
             now_ms = int(time.time() * 1000)
             v = CentralMindVerdict(
                 verdict_id=f"V_{uuid.uuid4().hex[:10].upper()}",
@@ -690,7 +703,9 @@ async def close_paper_trade(req: PaperCloseRequest):
         eff_id, req.exitPrice, exit_reason=req.reason or "MANUAL_CLOSE"
     )
     if not success:
-        raise HTTPException(status_code=404, detail=f"Position {eff_id} not found or already closed.")
+        raise HTTPException(
+            status_code=404, detail=f"Position {eff_id} not found or already closed."
+        )
     return {"status": "SUCCESS", "message": f"Position {eff_id} closed."}
 
 
@@ -698,5 +713,5 @@ async def close_paper_trade(req: PaperCloseRequest):
 async def get_central_mind_status():
     """Returns real-time governance and supervisory status of the Central Trading Mind."""
     from core.central_mind import central_mind
-    return central_mind.get_system_governance_report()
 
+    return central_mind.get_system_governance_report()

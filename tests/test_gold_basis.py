@@ -50,14 +50,10 @@ def _candles(ts, closes, *, exchange, symbol, price_type=""):
     )
 
 
-def _write_seal(
-    directory: Path, *, pass_bar=True, criteria=None, fingerprint="sealed-1"
-):
+def _write_seal(directory: Path, *, pass_bar=True, criteria=None, fingerprint="sealed-1"):
     directory.mkdir(parents=True, exist_ok=True)
     criteria = criteria or dict(GRADUATION_CRITERIA)
-    windows = {
-        name: {"bar_met": bool(pass_bar)} for name in ("train", "val", "oos", "recent")
-    }
+    windows = {name: {"bar_met": bool(pass_bar)} for name in ("train", "val", "oos", "recent")}
     payload = {
         "ok": True,
         "seal": {
@@ -293,11 +289,7 @@ def test_dossier_reads_separate_store_keys_and_never_promotes(tmp_path):
     store = CandleStore(root=store_root)
     ts = [1_700_000_000_000 + i * 900_000 for i in range(4)]
     store.write(_candles(ts, [2010.0] * 4, exchange="binance", symbol="PAXGUSDT"))
-    store.write(
-        _candles(
-            ts, [2000.0] * 4, exchange="dukascopy", symbol="XAUUSD", price_type="bid"
-        )
-    )
+    store.write(_candles(ts, [2000.0] * 4, exchange="dukascopy", symbol="XAUUSD", price_type="bid"))
     _write_seal(seal_dir)
 
     dossier = build_xau_evidence_dossier(

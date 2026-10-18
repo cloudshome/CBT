@@ -288,7 +288,7 @@ class YouTubeExplorationAgent:
                             author_creator=vid.channel_name or source.channel_name,
                             source_uri=vid.canonical_url,
                         )
-                    except Exception as ingest_err:  # noqa: BLE001 — defensive fallback
+                    except Exception as ingest_err:
                         logger.warning(
                             f"Universal Ingestor sub-call error for {vid.video_id}: {ingest_err}"
                         )
@@ -296,7 +296,7 @@ class YouTubeExplorationAgent:
                     youtube_discovery.mark_video_status(vid.video_id, status="INGESTED")
                     res.videos_processed += 1
 
-                except Exception as vid_err:  # noqa: BLE001 — defensive fallback
+                except Exception as vid_err:
                     logger.error(f"Error deconstructing video {vid.video_id}: {vid_err}")
                     youtube_discovery.mark_video_status(vid.video_id, status="FAILED")
                     res.videos_failed += 1
@@ -361,7 +361,7 @@ class YouTubeExplorationAgent:
 
                     tg_msg = self.format_telegram_digest(res)
                     await telegram_bot.send_message(tg_msg, chat_id=chat_id)
-                except Exception as tg_err:  # noqa: BLE001 — defensive fallback
+                except Exception as tg_err:
                     logger.warning(f"Could not dispatch Telegram completion alert: {tg_err}")
 
             return res
@@ -379,7 +379,7 @@ class YouTubeExplorationAgent:
                     await telegram_bot.send_message(
                         f"❌ **YouTube Exploration Failed:** `{e}`", chat_id=chat_id
                     )
-                except Exception:  # noqa: S110,BLE001 — defensive fallback
+                except Exception:
                     pass
             return res
 

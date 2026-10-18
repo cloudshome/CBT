@@ -108,9 +108,7 @@ def test_live_open_rows_excludes_decided_and_cancelled(tmp_path):
     _open(db, 10, status="OPEN")
     _open(db, 11, status="WAITING_ENTRY")
     _open(db, 12, status="OPEN")
-    db.conn.execute(
-        "UPDATE paper_trades SET status='CLOSED', outcome='TP_HIT' WHERE scan_id=12"
-    )
+    db.conn.execute("UPDATE paper_trades SET status='CLOSED', outcome='TP_HIT' WHERE scan_id=12")
     db.conn.commit()
     assert sorted(r["scan_id"] for r in db.live_open_rows()) == [10, 11]
     db.close()

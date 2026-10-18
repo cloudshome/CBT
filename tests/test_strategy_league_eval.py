@@ -24,6 +24,7 @@ def test_tier_3_to_4_graduation_requires_empirical_returns_and_dsr():
     empirical returns (>= 30 samples) and DSR clearance, rejecting empty/insufficient samples.
     """
     import numpy as np
+
     from core.strategy_league import QuarantineTier, StrategyGenome, strategy_league_manager
 
     # 1. Reject insufficient returns
@@ -70,4 +71,3 @@ def test_tier_3_to_4_graduation_requires_empirical_returns_and_dsr():
     assert promoted_ok is True
     assert s_passed.quarantine_tier == QuarantineTier.TIER_4_PRODUCTION
     assert s_passed.allocation_weight > 0
-

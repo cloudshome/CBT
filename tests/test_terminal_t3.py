@@ -145,9 +145,7 @@ def test_confirm_market_ticket_runs_the_desk_path(client):
     assert detail["scan"]["entry"] == 60000.0
     assert detail["scan"]["stop_loss"] == 59000.0
     assert detail["scan"]["status"] in ("APPROVED", "EXECUTED", "CLOSED")
-    trail = [
-        (x["from_state"], x["to_state"], x["reviewer"]) for x in detail["decisions"]
-    ]
+    trail = [(x["from_state"], x["to_state"], x["reviewer"]) for x in detail["decisions"]]
     assert ("PENDING_REVIEW", "APPROVED", "terminal") in trail
     # The paper runner enrolled a durable paper record for the same scan.
     paper = detail["paper_trade"]
@@ -258,15 +256,11 @@ def test_confirm_force_requires_the_opt_in_and_is_audited(client, monkeypatch):
     import config
 
     monkeypatch.setattr(config, "SKY_ALLOW_FORCE_APPROVE", False)
-    res = client.post(
-        "/api/terminal/confirm", json=_market_ticket(ticket_id="t3-f1", force=True)
-    )
+    res = client.post("/api/terminal/confirm", json=_market_ticket(ticket_id="t3-f1", force=True))
     assert res.status_code == 403, res.get_json()
 
     monkeypatch.setattr(config, "SKY_ALLOW_FORCE_APPROVE", True)
-    res = client.post(
-        "/api/terminal/confirm", json=_market_ticket(ticket_id="t3-f2", force=True)
-    )
+    res = client.post("/api/terminal/confirm", json=_market_ticket(ticket_id="t3-f2", force=True))
     assert res.status_code == 200, res.get_json()
     d = res.get_json()
     # Same semantics as the desk force-approve: the scan is APPROVED but the
@@ -280,9 +274,7 @@ def test_confirm_blocked_by_trader_state(client):
 
     with SignalDB() as db:
         db.set_trader_state(angry=True)
-    res = client.post(
-        "/api/terminal/confirm", json=_market_ticket(ticket_id="t3-angry")
-    )
+    res = client.post("/api/terminal/confirm", json=_market_ticket(ticket_id="t3-angry"))
     assert res.status_code == 409, res.get_json()
     assert any("trader state" in b for b in res.get_json()["blocked_by"])
     with SignalDB() as db:
@@ -374,13 +366,9 @@ def _seed_open_position(
         return scan_id, trade["id"]
 
 
-def test_manual_close_records_profit_and_requires_journal(
-    client, tmp_path, monkeypatch
-):
+def test_manual_close_records_profit_and_requires_journal(client, tmp_path, monkeypatch):
     scan_id, trade_id = _seed_open_position(tmp_path, monkeypatch)
-    res = client.post(
-        "/api/terminal/close", json={"trade_id": trade_id, "exit_price": 61200.0}
-    )
+    res = client.post("/api/terminal/close", json={"trade_id": trade_id, "exit_price": 61200.0})
     assert res.status_code == 200, res.get_json()
     d = res.get_json()
     assert d["status"] == "CLOSED"
@@ -406,9 +394,7 @@ def test_manual_close_records_profit_and_requires_journal(
 
 def test_manual_close_records_loss_in_the_stop_bucket(client, tmp_path, monkeypatch):
     scan_id, trade_id = _seed_open_position(tmp_path, monkeypatch)
-    res = client.post(
-        "/api/terminal/close", json={"trade_id": trade_id, "exit_price": 58500.0}
-    )
+    res = client.post("/api/terminal/close", json={"trade_id": trade_id, "exit_price": 58500.0})
     assert res.status_code == 200, res.get_json()
     d = res.get_json()
     assert d["outcome"] == "STOP_LOSS" and d["rr_achieved"] == -1.5
@@ -425,9 +411,7 @@ def test_manual_close_sell_side_math(client, tmp_path, monkeypatch):
     scan_id, trade_id = _seed_open_position(
         tmp_path, monkeypatch, action="SELL", entry=60000.0, stop=61000.0, tp=58000.0
     )
-    res = client.post(
-        "/api/terminal/close", json={"trade_id": trade_id, "exit_price": 58500.0}
-    )
+    res = client.post("/api/terminal/close", json={"trade_id": trade_id, "exit_price": 58500.0})
     assert res.status_code == 200, res.get_json()
     d = res.get_json()
     assert d["outcome"] == "TP_HIT" and d["rr_achieved"] == 1.5
@@ -471,9 +455,7 @@ def test_close_unknown_or_already_closed_trade(client):
 
 
 def test_confirm_response_is_json_serializable(client):
-    res = client.post(
-        "/api/terminal/confirm", json=_market_ticket(ticket_id="t3-serial")
-    )
+    res = client.post("/api/terminal/confirm", json=_market_ticket(ticket_id="t3-serial"))
     assert res.status_code == 200
     body = res.get_json()
     json.dumps(body)  # must not raise

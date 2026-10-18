@@ -145,6 +145,5 @@ def test_intelligence_report_includes_key_levels():
     assert "key_levels" in out
     assert isinstance(out["key_levels"], list)
     assert all(
-        {"tier", "name", "level", "note", "distance_pct"} <= set(l)
-        for l in out["key_levels"]
+        {"tier", "name", "level", "note", "distance_pct"} <= set(l) for l in out["key_levels"]
     )

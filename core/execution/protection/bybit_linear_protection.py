@@ -96,7 +96,7 @@ class BybitLinearProtectionAdapter(BaseProtectionAdapter):
                 error_message=msg,
                 latency_ms=latency_ms,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             latency_ms = round((time.perf_counter() - t_start) * 1000.0, 2)
             msg = sanitize_text(str(exc))
             logger.error(
@@ -148,7 +148,7 @@ class BybitLinearProtectionAdapter(BaseProtectionAdapter):
                 latency_ms=latency_ms,
             )
 
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             latency_ms = round((time.perf_counter() - t_start) * 1000.0, 2)
             msg = sanitize_text(str(exc))
             logger.error(f"[BybitProtection] Failed to amend SL for {bracket.bracket_id}: {msg}")
@@ -180,7 +180,7 @@ class BybitLinearProtectionAdapter(BaseProtectionAdapter):
             bracket.updated_at_ms = int(time.time() * 1000)
             logger.info(f"[BybitProtection] Cleared trading stops for {bracket.symbol}")
             return True
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error(
                 f"[BybitProtection] Error clearing trading stops for {bracket.symbol}: {sanitize_text(str(exc))}"
             )
@@ -213,7 +213,7 @@ class BybitLinearProtectionAdapter(BaseProtectionAdapter):
                 if curr_tp > 0:
                     bracket.take_profit_price = curr_tp
 
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning(
                 f"[BybitProtection] Error querying position status for {bracket.bracket_id}: {exc}"
             )

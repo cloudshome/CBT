@@ -122,7 +122,7 @@ class CloudBackupManager:
                 is_verified=v_res.is_valid,
                 duration_ms=round(dur_ms, 2),
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.error(f"Failed uploading database backup to Google Drive: {e}")
             return CloudBackupResult(
                 backup_id=f"BKP-{content_hash[:12]}",
@@ -204,7 +204,7 @@ class CloudBackupManager:
             )
             drive_file_id = drive_meta.drive_file_id
             status = "ARCHIVED"
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(f"Could not upload knowledge snapshot to Drive: {e}")
 
         record = KnowledgeSnapshotRecord(
@@ -280,7 +280,7 @@ class CloudBackupManager:
                 hypotheses_recovered=fail_cnt,
                 manifest_entries_recovered=man_cnt,
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             return DisasterRecoveryResult(
                 is_success=False,
                 sources_recovered=0,

@@ -38,7 +38,7 @@ def fake_runner(argv, *, on_line, should_cancel):
     Emits three lines (so the log has content), honours cancel between
     "lines", and returns an exit code the test can observe.
     """
-    for i, text in enumerate(["starting fake work", "doing the thing", "done"]):
+    for _i, text in enumerate(["starting fake work", "doing the thing", "done"]):
         if should_cancel():
             return -15
         on_line(text)
@@ -395,9 +395,7 @@ def test_orphaned_running_row_is_marked_interrupted(tmp_path):
     from data.database import SignalDB
 
     with SignalDB(db_path) as db:
-        db.conn.execute(
-            "UPDATE jobs SET status='running' WHERE job_id=?", (res["job_id"],)
-        )
+        db.conn.execute("UPDATE jobs SET status='running' WHERE job_id=?", (res["job_id"],))
         db.conn.commit()
     # A fresh manager adopts the orphan and reports the truth.
     mgr2 = jobsmod.JobManager(db_path=db_path, log_dir=log_dir, runner=fake_runner)
@@ -488,9 +486,7 @@ def test_v1_jobs_list_is_enveloped(open_client):
 
 
 def test_v1_submit_and_stream(open_client, open_mgr):
-    r = open_client.post(
-        "/api/v1/jobs", json={"kind": "backfill", "params": {"symbol": "BTCUSDT"}}
-    )
+    r = open_client.post("/api/v1/jobs", json={"kind": "backfill", "params": {"symbol": "BTCUSDT"}})
     assert r.status_code == 201, r.get_data(as_text=True)
     body = r.get_json()
     assert body["ok"] is True
@@ -558,9 +554,7 @@ def test_v1_duplicate_submission_is_reported(open_client, open_mgr):
     assert r1.status_code == 201
     assert r2.status_code == 201
     assert r2.get_json()["data"]["duplicate"] is True
-    assert (
-        r2.get_json()["data"]["job"]["job_id"] == r1.get_json()["data"]["job"]["job_id"]
-    )
+    assert r2.get_json()["data"]["job"]["job_id"] == r1.get_json()["data"]["job"]["job_id"]
 
 
 def test_v1_role_split(monkeypatch, tmp_path):

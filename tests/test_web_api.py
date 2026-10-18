@@ -352,9 +352,7 @@ def test_scorecard_endpoint_returns_the_full_block(client, tmp_path, monkeypatch
         }
         for i in range(40)
     ]
-    monkeypatch.setattr(
-        sc, "scorecard_from_db", lambda **kw: build_scorecard(rows, min_decided=30)
-    )
+    monkeypatch.setattr(sc, "scorecard_from_db", lambda **kw: build_scorecard(rows, min_decided=30))
 
     resp = client.get("/api/scorecard?symbol=BTCUSDT")
     assert resp.status_code == 200

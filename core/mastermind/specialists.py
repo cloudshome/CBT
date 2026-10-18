@@ -82,7 +82,10 @@ class BtcMacroSpecialist(BaseSpecialistAgent):
             confidence_score=conf,
             invalidation_condition="HTF MSS failure or contrary liquidity pool sweep.",
             suggested_notional_usd=decision.suggested_position_size_usd,
-            telemetry={"kelly_fraction": decision.kelly_fraction, "regime": str(setup.regime if setup else "UNKNOWN")},
+            telemetry={
+                "kelly_fraction": decision.kelly_fraction,
+                "regime": str(setup.regime if setup else "UNKNOWN"),
+            },
         )
 
 

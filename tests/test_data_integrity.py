@@ -192,7 +192,7 @@ def test_concurrent_sqlite_wal_write_stress():
                 with db_manager.get_market_conn() as conn:
                     cur = conn.execute("SELECT COUNT(*) FROM candles WHERE symbol = 'STRESS/USDT'")
                     _ = cur.fetchone()
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             errors.append(f"Thread {worker_id} error: {e}")
 
     threads = [threading.Thread(target=worker, args=(t,)) for t in range(num_threads)]

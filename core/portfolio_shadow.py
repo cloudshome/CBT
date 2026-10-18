@@ -60,7 +60,7 @@ class PortfolioShadowManager:
                 if "exit_reason" not in cols:
                     conn.execute("ALTER TABLE shadow_positions ADD COLUMN exit_reason TEXT;")
                 conn.commit()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.debug(f"Shadow positions column verification check: {e}")
 
     def open_position(
@@ -142,18 +142,28 @@ class PortfolioShadowManager:
                                 )
 
             if enforce_atomic_limits:
-                cursor = conn.execute("SELECT COUNT(*) FROM shadow_positions WHERE status = 'OPEN';")
+                cursor = conn.execute(
+                    "SELECT COUNT(*) FROM shadow_positions WHERE status = 'OPEN';"
+                )
                 open_count = cursor.fetchone()[0]
-                eff_max_open = max_open_limit if max_open_limit is not None else int(os.getenv("MAX_PAPER_OPEN_POSITIONS", "3"))
+                eff_max_open = (
+                    max_open_limit
+                    if max_open_limit is not None
+                    else int(os.getenv("MAX_PAPER_OPEN_POSITIONS", "3"))
+                )
                 if open_count >= eff_max_open:
                     conn.rollback()
-                    raise ValueError(f"Risk Gate Rejection: {open_count} open positions — maximum {eff_max_open} reached.")
+                    raise ValueError(
+                        f"Risk Gate Rejection: {open_count} open positions — maximum {eff_max_open} reached."
+                    )
 
                 if max_risk_usd is not None:
                     trade_risk = float(size) * abs(float(entry_price) - float(stop_loss))
                     if trade_risk > max_risk_usd:
                         conn.rollback()
-                        raise ValueError(f"Risk Gate Rejection: trade risk ${trade_risk:.2f} exceeds allowable ${max_risk_usd:.2f}.")
+                        raise ValueError(
+                            f"Risk Gate Rejection: trade risk ${trade_risk:.2f} exceeds allowable ${max_risk_usd:.2f}."
+                        )
 
                     # Cumulative asset risk cap across all active styles for this symbol
                     existing_sym_risk = sum(
@@ -166,7 +176,6 @@ class PortfolioShadowManager:
                         raise ValueError(
                             f"Risk Gate Rejection: cumulative {symbol} risk ${(existing_sym_risk + trade_risk):.2f} exceeds allowable cap ${max_risk_usd:.2f}."
                         )
-
 
             conn.execute(
                 """
@@ -214,7 +223,7 @@ class PortfolioShadowManager:
                     "entry_reason": reason_text,
                 }
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug(f"Telegram entry alert dispatch error: {exc}")
 
         try:
@@ -229,7 +238,7 @@ class PortfolioShadowManager:
                 stop_loss=stop_loss,
                 take_profit=take_profit,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug(f"SDCC open event emission deferred: {exc}")
         return pos_id
 
@@ -328,11 +337,19 @@ class PortfolioShadowManager:
                     slippage_buffer = 0.0015
                     if is_long:
                         sl_with_slippage = round(active_sl * (1.0 - slippage_buffer), 6)
-                        exit_fill_price = max(min(active_sl, current_price), sl_with_slippage) if current_price > 0 else active_sl
+                        exit_fill_price = (
+                            max(min(active_sl, current_price), sl_with_slippage)
+                            if current_price > 0
+                            else active_sl
+                        )
                         final_pnl = (exit_fill_price - entry_p) * size
                     else:
                         sl_with_slippage = round(active_sl * (1.0 + slippage_buffer), 6)
-                        exit_fill_price = min(max(active_sl, current_price), sl_with_slippage) if current_price > 0 else active_sl
+                        exit_fill_price = (
+                            min(max(active_sl, current_price), sl_with_slippage)
+                            if current_price > 0
+                            else active_sl
+                        )
                         final_pnl = (entry_p - exit_fill_price) * size
 
             # Update database
@@ -373,7 +390,7 @@ class PortfolioShadowManager:
                                 "closed_at": now,
                             }
                         )
-                    except Exception as exc:  # noqa: BLE001
+                    except Exception as exc:
                         logger.debug(f"Telegram exit alert dispatch error: {exc}")
 
                     # Audit Event & Loss Autopsy Integration
@@ -508,7 +525,7 @@ class PortfolioShadowManager:
                         "closed_at": now,
                     }
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.debug(f"Telegram exit alert dispatch error: {exc}")
 
             # Trigger Autopsy on Manual/API Loss Close
@@ -549,7 +566,7 @@ class PortfolioShadowManager:
                     exit_price=float(p_price),
                     realized_pnl=float(pnl),
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.debug(f"SDCC close event emission deferred: {exc}")
             return True
 

@@ -30,6 +30,7 @@ os.environ["TELEGRAM_TRADER_IDS"] = "12345678"
 os.environ["RATE_LIMIT_MAX"] = "100000"
 os.environ["RATE_LIMIT_AUTH_MAX"] = "100000"
 
+
 def _init_test_subsystem_schemas() -> None:
     """Initializes base database schemas and all subsystem tables in test sandboxes."""
     try:
@@ -44,6 +45,7 @@ def _init_test_subsystem_schemas() -> None:
         # 1. Execution Idempotency & Reconciliation
         try:
             from core.execution.idempotency import LiveOrderIdempotencyStore
+
             LiveOrderIdempotencyStore()._init_table()
         except Exception:
             pass
@@ -51,6 +53,7 @@ def _init_test_subsystem_schemas() -> None:
         # 2. Intelligence Store
         try:
             from core.intelligence.schema import IntelligenceStore
+
             IntelligenceStore().init_schema()
         except Exception:
             pass
@@ -59,6 +62,7 @@ def _init_test_subsystem_schemas() -> None:
         try:
             from core.auth.security_store import security_store
             from core.web3.wallet_store import web3_wallet_store
+
             security_store._ensure_schema()
             web3_wallet_store._init_db()
         except Exception:
@@ -67,44 +71,59 @@ def _init_test_subsystem_schemas() -> None:
         # 4. Autonomous Research Storage & Manifest
         try:
             from core.autonomous_research.storage.research_storage import ResearchStorage
+
             ResearchStorage().init_schemas()
         except Exception:
             pass
 
         try:
             from core.autonomous_research.storage.storage_manifest import StorageManifest
+
             StorageManifest().init_schema()
         except Exception:
             pass
 
         # 5. Telegram & YouTube Subsystems
         try:
-            from core.telegram.jobs import JobManager
-            JobManager().init_table()
+            from core.telegram.jobs import TelegramJobManager
+
+            TelegramJobManager()._ensure_table_exists()
         except Exception:
             pass
 
         try:
-            from core.telegram.callbacks import ActionTokenManager
-            ActionTokenManager().init_table()
+            from core.telegram.callbacks import callback_router
+
+            callback_router._ensure_table_exists()
         except Exception:
             pass
 
         try:
-            from core.telegram.idempotency import IdempotencyManager
-            IdempotencyManager().init_table()
+            from core.telegram.idempotency import idempotency_manager
+
+            idempotency_manager._ensure_table_exists()
         except Exception:
             pass
 
         try:
-            from core.youtube.discovery import YouTubeDiscoveryStore
-            YouTubeDiscoveryStore().init_table()
+            from core.youtube.discovery import youtube_discovery
+
+            youtube_discovery._init_crawl_memory()
         except Exception:
             pass
 
         try:
             from core.telegram.rbac import rbac_registry
+
             rbac_registry.reset()
+        except Exception:
+            pass
+
+        try:
+            from core.macro_event_reporter import macro_event_reporter
+
+            macro_event_reporter._ensure_table_exists()
+            macro_event_reporter._seed_default_macro_releases()
         except Exception:
             pass
     except Exception:
@@ -125,7 +144,7 @@ def isolate_test_databases():
 
         logging.shutdown()
         _TEST_TEMP_DIR.cleanup()
-    except Exception:  # noqa: BLE001, S110 — best-effort fallback, never raise
+    except Exception:
         pass
 
 

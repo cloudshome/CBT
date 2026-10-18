@@ -80,23 +80,33 @@ export const MastermindSwarmDesk: React.FC = () => {
   const fetchData = async () => {
     try {
       setRefreshing(true);
-      const [sData, dData, oppData] = await Promise.all([
+      const [sRes, dRes, oppRes] = await Promise.allSettled([
         api.getMastermindStatus(),
         api.getMastermindDecisions(30),
         api.getMarketOpportunities(),
       ]);
 
-      if (sData) {
-        setStatus(sData);
+      let hasSuccess = false;
+
+      if (sRes.status === 'fulfilled' && sRes.value) {
+        setStatus(sRes.value);
+        hasSuccess = true;
       }
-      if (dData && dData.decisions) {
-        setDecisions(dData.decisions);
+      if (dRes.status === 'fulfilled' && dRes.value?.decisions) {
+        setDecisions(dRes.value.decisions);
+        hasSuccess = true;
       }
-      if (oppData && oppData.opportunities) {
-        setOpportunities(oppData.opportunities);
-        setScreenerHealth(oppData.health);
+      if (oppRes.status === 'fulfilled' && oppRes.value?.opportunities) {
+        setOpportunities(oppRes.value.opportunities);
+        setScreenerHealth(oppRes.value.health);
+        hasSuccess = true;
       }
-      setError(null);
+
+      if (hasSuccess) {
+        setError(null);
+      } else {
+        setError('Could not connect to Mastermind Swarm API.');
+      }
     } catch (err: unknown) {
       console.error('Failed to load Mastermind swarm data:', err);
       setError('Could not connect to Mastermind Swarm API.');

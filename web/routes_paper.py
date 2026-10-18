@@ -25,9 +25,7 @@ def register(app, ctx):
     @app.get("/api/paper")
     def api_paper():
         """Paper-monitor dashboard state. Read-only; does not start a runner."""
-        symbol = (
-            _sym(request.args.get("symbol")) if request.args.get("symbol") else None
-        )
+        symbol = _sym(request.args.get("symbol")) if request.args.get("symbol") else None
         from data.database import SignalDB
 
         with SignalDB() as db:
@@ -100,18 +98,14 @@ def register(app, ctx):
                     # opted into, and always audited.
                     return jsonify(
                         {
-                            "error": "Risk gate CLOSED — "
-                            + "; ".join(gate["blocked_by"]),
+                            "error": "Risk gate CLOSED — " + "; ".join(gate["blocked_by"]),
                             "blocked_by": gate["blocked_by"],
                             "force_available": config.SKY_ALLOW_FORCE_APPROVE,
                         }
                     ), 409
             if decision == "APPROVED" and force and not config.SKY_ALLOW_FORCE_APPROVE:
                 return jsonify(
-                    {
-                        "error": "force approve is disabled "
-                        "(SKY_ALLOW_FORCE_APPROVE is not set)"
-                    }
+                    {"error": "force approve is disabled (SKY_ALLOW_FORCE_APPROVE is not set)"}
                 ), 403
             # W3.3 journal-first discipline: a decided real trade without its
             # journal answer means the last commitment was never processed,
@@ -135,9 +129,7 @@ def register(app, ctx):
                         }
                     ), 409
             try:
-                new = db.update_status(
-                    int(scan_id), decision, note=note, reviewer=reviewer
-                )
+                new = db.update_status(int(scan_id), decision, note=note, reviewer=reviewer)
             except (LifecycleError, TypeError, ValueError) as exc:
                 return jsonify({"error": str(exc)}), 400
             if new is None:
@@ -198,13 +190,9 @@ def register(app, ctx):
             risk_pcts = None
             if rp_raw:
                 try:
-                    risk_pcts = tuple(
-                        float(x.strip()) for x in rp_raw.split(",") if x.strip()
-                    )
+                    risk_pcts = tuple(float(x.strip()) for x in rp_raw.split(",") if x.strip())
                 except ValueError:
-                    return jsonify(
-                        {"error": "risk_pcts must be comma-separated floats"}
-                    ), 400
+                    return jsonify({"error": "risk_pcts must be comma-separated floats"}), 400
             with SignalDB() as db:
                 result = monte_carlo_ruin_table(
                     db,
@@ -357,8 +345,7 @@ def register(app, ctx):
                 "feedback": feedback,
                 "five_levels": five_levels(payload),
                 "management": (
-                    payload.get("management")
-                    or management_checklist(plans[0] if plans else None)
+                    payload.get("management") or management_checklist(plans[0] if plans else None)
                 ),
             }
         )

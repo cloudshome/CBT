@@ -22,13 +22,13 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import asdict, dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 logger = logging.getLogger("ai_quant_sentinel.intelligence.friction_model")
 
 
-class FrictionTier(str, Enum):
+class FrictionTier(StrEnum):
     BASE = "BASE"
     CONSERVATIVE = "CONSERVATIVE"
     STRESS = "STRESS"

@@ -336,7 +336,7 @@ class AutonomousQuantStrategist:
                 "avg_persistence": round(avg_pers, 3),
                 "active_wall_count": float(len(walls)),
             }
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug("Heatmap feature extraction fallback: %s", exc)
             return {"wall_imbalance": 0.0, "avg_persistence": 0.5, "active_wall_count": 0.0}
 
@@ -454,7 +454,7 @@ class AutonomousQuantStrategist:
                 "ADMITTED %s to Strategy League TIER_1_SMOKE Quarantine", compiled.strategy_id
             )
             return True
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error("Failed to admit %s to Strategy League: %s", compiled.strategy_id, exc)
             return False
 
@@ -494,7 +494,7 @@ class AutonomousQuantStrategist:
                     ),
                 )
                 conn.commit()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error("Failed to write experiment record %s: %s", experiment_id, exc)
 
     def _generate_tear_sheet_markdown(
@@ -602,7 +602,7 @@ class AutonomousQuantStrategist:
             from core.kronos.domain_adapter import kronos_domain_adapter
 
             return kronos_domain_adapter.get_research_context(symbol, timeframe)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(
                 f"Failed fetching Kronos forecast context for {symbol} ({timeframe}): {e}"
             )

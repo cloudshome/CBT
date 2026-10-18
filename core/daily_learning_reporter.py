@@ -140,7 +140,7 @@ class DailyLearningReporter:
                     (start_ms,),
                 )
                 telemetry["concepts_count"] = cur_concepts.fetchone()[0]
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(f"Error querying brain telemetry: {e}")
 
         # Convert set to sorted list
@@ -218,7 +218,7 @@ class DailyLearningReporter:
                         sum((p["realized_pnl"] or 0) for p in closed_today), 2
                     )
 
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(f"Error querying trading logs: {e}")
 
         return telemetry

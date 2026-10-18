@@ -10,6 +10,7 @@ Records an immutable audit trail in SQLite (mastermind_decisions table).
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 import uuid
@@ -62,6 +63,7 @@ class MastermindArbiterCouncil:
 
     def __init__(self, account_equity_usd: float = 10_000.0) -> None:
         self.account_equity_usd = account_equity_usd
+        self._bg_tasks: set[asyncio.Task[Any]] = set()
         self.specialists: list[BaseSpecialistAgent] = [
             BtcMacroSpecialist(),
             EthSpecialist(),
@@ -111,7 +113,9 @@ class MastermindArbiterCouncil:
         now_ms = int(time.time() * 1000)
 
         # 1. Authoritative Daily Drawdown Circuit Breaker Check
-        accounting = portfolio_shadow.get_portfolio_accounting(starting_capital=self.account_equity_usd)
+        accounting = portfolio_shadow.get_portfolio_accounting(
+            starting_capital=self.account_equity_usd
+        )
         current_eq = float(accounting.get("virtual_equity", self.account_equity_usd))
         realized_pnl = float(accounting.get("daily_realized_pnl", 0.0))
         unrealized_pnl = float(accounting.get("total_unrealized_pnl", 0.0))
@@ -142,7 +146,7 @@ class MastermindArbiterCouncil:
                     multi_tf_candles=multi_tf,
                     order_book=order_book,
                 )
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.error("Specialist %s evaluation failed: %s", spec.specialist_id, e)
                 continue
 
@@ -154,7 +158,9 @@ class MastermindArbiterCouncil:
 
             # Guard A: Passive NO_TRADE / WATCH
             if proposal.direction not in (DecisionAction.LONG, DecisionAction.SHORT):
-                rejection_reason = f"Specialist reported {proposal.direction.value}: no qualified edge."
+                rejection_reason = (
+                    f"Specialist reported {proposal.direction.value}: no qualified edge."
+                )
 
             # Guard B: Master Risk Gate
             elif not gate.is_trading_allowed:
@@ -162,7 +168,9 @@ class MastermindArbiterCouncil:
 
             # Guard C: Portfolio Position Capacity
             elif len(open_positions) >= max_active_portfolio_positions:
-                rejection_reason = f"Max portfolio positions ({max_active_portfolio_positions}) reached."
+                rejection_reason = (
+                    f"Max portfolio positions ({max_active_portfolio_positions}) reached."
+                )
 
             # Guard D: Symbol Deduplication
             elif sym in existing_symbols:
@@ -209,11 +217,17 @@ class MastermindArbiterCouncil:
                         prevent_duplicate_symbol=True,
                     )
                     existing_symbols.add(sym)
-                    logger.info("Mastermind approved and deployed: %s %s (Notional: $%.2f)", direction_str, sym, approved_notional)
+                    logger.info(
+                        "Mastermind approved and deployed: %s %s (Notional: $%.2f)",
+                        direction_str,
+                        sym,
+                        approved_notional,
+                    )
 
                     # Dispatch immediate notification to Telegram
                     try:
                         import asyncio
+
                         from core.telegram_bot import telegram_bot
 
                         emoji_dir = "🟢 LONG" if direction_str == "LONG" else "🔴 SHORT"
@@ -227,16 +241,22 @@ class MastermindArbiterCouncil:
                             f"🛡️ *Stop-Loss:* `${proposal.stop_loss:,.2f}`\n"
                             f"🎯 *Take-Profit:* `${proposal.take_profit:,.2f}`\n"
                             f"📐 *Risk-Reward:* `{proposal.risk_reward_ratio:.2f}R`\n"
-                            f"📊 *Net EV:* `+{proposal.expected_value_r:.2f}R` | *Conf:* `{proposal.confidence_score*100:.0f}%`\n"
+                            f"📊 *Net EV:* `+{proposal.expected_value_r:.2f}R` | *Conf:* `{proposal.confidence_score * 100:.0f}%`\n"
                             f"💼 *Approved Sizing:* `${approved_notional:,.2f}` ({units:.4f} units)\n"
                             f"📝 *Thesis:* _{proposal.thesis[:160]}_\n"
                             f"━━━━━━━━━━━━━━━━━━━━━━\n"
                             f"Darwinian Mastermind Council • Virtual Paper Execution"
                         )
-                        asyncio.create_task(telegram_bot.send_message(telegram_msg, parse_mode="Markdown"))
-                    except Exception as t_err:  # noqa: BLE001
-                        logger.warning("Failed to dispatch Mastermind trade alert to Telegram: %s", t_err)
-                except Exception as ex:  # noqa: BLE001
+                        t_task = asyncio.create_task(
+                            telegram_bot.send_message(telegram_msg, parse_mode="Markdown")
+                        )
+                        self._bg_tasks.add(t_task)
+                        t_task.add_done_callback(self._bg_tasks.discard)
+                    except Exception as t_err:
+                        logger.warning(
+                            "Failed to dispatch Mastermind trade alert to Telegram: %s", t_err
+                        )
+                except Exception as ex:
                     is_approved = False
                     rejection_reason = f"Shadow execution rejected: {ex}"
                     approved_notional = 0.0
@@ -247,7 +267,9 @@ class MastermindArbiterCouncil:
                 proposal_id=proposal.proposal_id,
                 specialist_id=proposal.specialist_id,
                 symbol=proposal.symbol,
-                direction=proposal.direction.value if isinstance(proposal.direction, DecisionAction) else proposal.direction,
+                direction=proposal.direction.value
+                if isinstance(proposal.direction, DecisionAction)
+                else proposal.direction,
                 is_approved=is_approved,
                 rejection_reason=rejection_reason,
                 approved_notional_usd=approved_notional,
@@ -311,7 +333,7 @@ class MastermindArbiterCouncil:
                 import fcntl
 
                 lock_path = "/tmp/cbt_mastermind_arbiter_supervisor.lock"
-                lock_fd = open(lock_path, "w")  # noqa: SIM115
+                lock_fd = open(lock_path, "w")
                 fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
             except OSError:
                 logger.info(
@@ -321,10 +343,13 @@ class MastermindArbiterCouncil:
                 if lock_fd is not None:
                     lock_fd.close()
                 return
-            except Exception:  # noqa: BLE001
+            except Exception:
                 pass
 
-        logger.info("MastermindArbiterCouncil: Continuous Swarm loop started (interval: %.1fs).", interval_sec)
+        logger.info(
+            "MastermindArbiterCouncil: Continuous Swarm loop started (interval: %.1fs).",
+            interval_sec,
+        )
         await asyncio.sleep(15.0)  # Initial boot stagger
 
         while True:
@@ -335,7 +360,7 @@ class MastermindArbiterCouncil:
                     sym = spec.target_symbol
                     try:
                         candles_15m = await data_streamer.fetch_external_ohlcv(sym, "15m", limit=30)
-                    except Exception:  # noqa: BLE001
+                    except Exception:
                         candles_15m = data_streamer.get_candles(sym, "15m", limit=30)
 
                     if candles_15m and not any(
@@ -343,13 +368,17 @@ class MastermindArbiterCouncil:
                     ):
                         tf_map = {"15m": candles_15m}
                         for tf in ("1d", "4h", "1h", "5m"):
-                            c_tf = data_streamer.get_candles(sym, tf, limit=30, exclude_synthetic=True)
+                            c_tf = data_streamer.get_candles(
+                                sym, tf, limit=30, exclude_synthetic=True
+                            )
                             if c_tf:
                                 tf_map[tf] = c_tf
                         market_data[sym] = {
                             "15m": candles_15m,
                             "multi_tf": tf_map,
-                            "order_book": data_streamer.get_orderbook(sym) if hasattr(data_streamer, "get_orderbook") else None,
+                            "order_book": data_streamer.get_orderbook(sym)
+                            if hasattr(data_streamer, "get_orderbook")
+                            else None,
                         }
 
                 if market_data:
@@ -357,7 +386,7 @@ class MastermindArbiterCouncil:
 
             except asyncio.CancelledError:
                 break
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.error("MastermindArbiterCouncil loop error (non-fatal): %s", exc)
 
             await asyncio.sleep(interval_sec)
@@ -365,4 +394,3 @@ class MastermindArbiterCouncil:
 
 # Singleton Arbiter Instance
 mastermind_arbiter = MastermindArbiterCouncil()
-

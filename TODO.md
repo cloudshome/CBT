@@ -895,5 +895,32 @@
 1. Mark items `[x]` only when implementation is complete **AND** unit tests are written and passing.
 2. Link modified and created files directly.
 
+---
+
+## 📋 Decisions waiting on user & Parked Items
+
+| ID | Decision | Default |
+|---|---|---|
+| TODO-7 | Root CI runs offline test suite and wheel gate | Completed ✅ |
+| TODO-8 | Verify/protect `main` (require PR, no direct push, require both CI jobs) | human / recommend yes |
+| TODO-9 | Dify integration — parked | Parked after graduation and P10 |
+| TODO-10 | LibreChat integration — parked | Parked after Dify |
+| TODO-12 | P10 data infrastructure roadmap — see `DATA_INFRASTRUCTURE_ROADMAP.md` | Completed ✅ |
+| TODO-13 | Freqtrade review F1–F8 and Backtrader review BT1–BT8 — see `FREQTRADE_REVIEW.md` and `docs/BACKTRADER_REVIEW.md` (P12 kept ideas) | Completed ✅ |
+
+- **Parked & Study-Only Frameworks**: `OpenHands` study patterns only; see `docs/INFRASTRUCTURE_LAYERS.md`.
+- **Cactus Needle 2**: `docs/NEEDLE_REVIEW.md` — parked; cactus-needle is an external client, do not install into SKY runtime.
+- **Production Delivery Target**: Next implementation is P22 (signed multi-platform release and operations contract, unsigned recipe, not an installer wrapper). Platforms supported: Ubuntu Sky Hub, Windows `.exe` companion, Android `.apk` companion.
+
+---
+
+## 🚫 Explicitly out of scope (do NOT add to TODO)
+
+- **Freqtrade, Hyperopt, FreqAI, or any exchange-order bot.** Reviewed and rejected (see `docs/FREQTRADE_REVIEW.md`). Do not install or vendor `freqtrade`.
+- **Backtrader — as dependency, dev tool, vendored engine, or adapter.** Reviewed and rejected (see `docs/BACKTRADER_REVIEW.md`). Do not install `backtrader`.
+- **Cactus Needle 2 as internal engine dependency.** See `docs/NEEDLE_REVIEW.md`; do not install `cactus-needle`.
+- **Vendoring OpenHands, Dify, or LibreChat.** Study patterns only; see `docs/INFRASTRUCTURE_LAYERS.md`.
+
+
 
 

@@ -59,7 +59,7 @@ def _sync_registry_with_mesh_nodes(local_node_id: str) -> None:
                     schema_version=m.get("schema_version", 1),
                     metadata=m.get("metadata", {}),
                 )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.debug("Mesh node discovery error: %s", exc)
 
 
@@ -142,7 +142,7 @@ def trigger_sync() -> dict[str, Any]:
     """Forces an immediate synchronization cycle across local transport and cloud mesh."""
     try:
         gdrive_cluster_mesh.pull_and_reconcile()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.warning("Cloud mesh pull failed during sync: %s", exc)
 
     receipts = sync_engine.run_sync_cycle()
@@ -150,7 +150,7 @@ def trigger_sync() -> dict[str, Any]:
     try:
         gdrive_cluster_mesh.export_and_push()
         gdrive_cluster_mesh.publish_node_profile()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.warning("Cloud mesh push failed during sync: %s", exc)
 
     identity = node_identity_manager.get_or_create_identity()

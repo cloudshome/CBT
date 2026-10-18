@@ -5,7 +5,6 @@ Tests for autonomous research feed extractor, registry, and pipeline ingestion.
 Ensures zero-touch RSS ingestion, XML parsing, database persistence, and invariant safety.
 """
 
-
 from core.knowledge_os.feed_extractor import FeedExtractor
 from core.knowledge_os.research_source_registry import ResearchSourceRegistry
 

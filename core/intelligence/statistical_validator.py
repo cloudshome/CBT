@@ -97,7 +97,7 @@ class StatisticalValidator:
 
         # 4. Deflated Sharpe Ratio (DSR)
         returns = [e.net_pnl_usd / 10000.0 for e in episodes]
-        dsr, raw_sharpe = self._calculate_dsr(returns, total_trials=self.family_trial_count)
+        dsr, _raw_sharpe = self._calculate_dsr(returns, total_trials=self.family_trial_count)
         dsr_pass = dsr >= 0.90
         scorecard["DEFLATED_SHARPE_RATIO"] = dsr_pass
 

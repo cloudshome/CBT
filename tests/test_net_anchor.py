@@ -46,9 +46,7 @@ def test_net_anchor_still_boosts_a_genuine_edge():
 
 def test_net_anchor_falls_back_to_gross_when_unknown():
     """No net number available → behaviour is exactly as before (no guessing)."""
-    assert multiplier_from_score(
-        0.5, 50.0, expectancy_net=None
-    ) == multiplier_from_score(0.5, 50.0)
+    assert multiplier_from_score(0.5, 50.0, expectancy_net=None) == multiplier_from_score(0.5, 50.0)
 
 
 def test_net_anchor_respects_clamps():
@@ -69,9 +67,7 @@ def test_net_anchor_can_only_lower_never_raise():
 # ──────────────────────────────────────────────────────────────────────────
 # The calibrator, end to end
 # ──────────────────────────────────────────────────────────────────────────
-def _seed_cost_flipped(
-    db: SignalDB, plan_type: str = "Cost Flipped", n: int = 120
-) -> None:
+def _seed_cost_flipped(db: SignalDB, plan_type: str = "Cost Flipped", n: int = 120) -> None:
     """A book that is positive gross and negative once costs are applied."""
     rows = []
     for i in range(n):
@@ -154,9 +150,7 @@ def test_build_profile_filter_reads_net(tmp_path):
             }
         )
     db.save_backtest_rows(rows, run_id="p128_filter")
-    entry = build_profile(db, filter_neg=True, min_n=50)[
-        profile_key("Deep Loser", "TRENDING_BULL")
-    ]
+    entry = build_profile(db, filter_neg=True, min_n=50)[profile_key("Deep Loser", "TRENDING_BULL")]
     assert entry["expectancy_net"] < entry["expectancy"]
     assert entry["multiplier"] < 1.0
     db.close()

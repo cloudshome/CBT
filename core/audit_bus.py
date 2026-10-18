@@ -66,7 +66,7 @@ class AuditBus:
                     "CREATE INDEX IF NOT EXISTS idx_audit_sym ON system_audit_events(symbol)"
                 )
                 conn.commit()
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.warning(f"Could not initialize system_audit_events table: {e}")
 
     def emit_event(
@@ -119,7 +119,7 @@ class AuditBus:
                     ),
                 )
                 conn.commit()
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.error(f"Failed to record audit event {event_id}: {e}")
 
         logger.info(f"Audit [{ev.severity}] {ev.event_type} on {ev.symbol}: {ev.reason}")
@@ -175,7 +175,7 @@ class AuditBus:
                             software_version=r["software_version"],
                         )
                     )
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.error(f"Error fetching audit events: {e}")
             # Fallback to memory ring
             if event_type:

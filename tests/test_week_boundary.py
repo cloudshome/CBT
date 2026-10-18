@@ -52,9 +52,7 @@ def _frozen(now: datetime):
 
 
 def _monday_of(now: datetime) -> datetime:
-    return (now - timedelta(days=now.weekday())).replace(
-        hour=0, minute=0, second=0, microsecond=0
-    )
+    return (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
 
 
 # ── 1. the arithmetic ──────────────────────────────────────────────────────

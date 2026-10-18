@@ -43,16 +43,12 @@ def register(app, ctx):
         p256dh = keys.get("p256dh")
         auth_key = keys.get("auth")
         if not endpoint or not p256dh or not auth_key:
-            return jsonify(
-                {"ok": False, "error": "missing endpoint or subscription keys"}
-            ), 400
+            return jsonify({"ok": False, "error": "missing endpoint or subscription keys"}), 400
         ua = request.headers.get("User-Agent", "")
         user = _current_user()
         uid = user.get("id") if user else None
         with SignalDB() as db:
-            res = db.save_push_subscription(
-                endpoint, p256dh, auth_key, user_id=uid, user_agent=ua
-            )
+            res = db.save_push_subscription(endpoint, p256dh, auth_key, user_id=uid, user_agent=ua)
         return jsonify({"ok": True, "registered": res})
 
     @app.post("/api/push/unsubscribe")
@@ -90,9 +86,7 @@ def register(app, ctx):
     @app.post("/api/auth/setup")
     def api_auth_setup():
         if auth.owner_exists():
-            return jsonify(
-                {"ok": False, "error": "an owner account already exists"}
-            ), 409
+            return jsonify({"ok": False, "error": "an owner account already exists"}), 409
         body = request.get_json(silent=True) or {}
         try:
             user = auth.create_owner(
@@ -102,9 +96,7 @@ def register(app, ctx):
             )
         except (ValueError, PermissionError) as exc:
             return jsonify({"ok": False, "error": str(exc)}), 400
-        token = auth.create_session(
-            user["id"], ip=_client_ip(), user_agent=_client_ua()
-        )
+        token = auth.create_session(user["id"], ip=_client_ip(), user_agent=_client_ua())
         session.clear()
         session["uid"] = user["id"]
         session["sid"] = token
@@ -154,9 +146,7 @@ def register(app, ctx):
         session["sid"] = token
         session["_csrf"] = secrets.token_hex(16)
         session.permanent = True
-        auth.audit(
-            "login", username, user=user, ok=True, ip=ip, user_agent=_client_ua()
-        )
+        auth.audit("login", username, user=user, ok=True, ip=ip, user_agent=_client_ua())
         return jsonify(
             {
                 "ok": True,
@@ -251,9 +241,7 @@ def register(app, ctx):
         # a token can never exceed its creator's role
         if not authmod.role_allows(user.get("role"), scope):
             scope = "viewer"
-        token = auth.create_device_token(
-            user["id"], str(body.get("name") or "device"), scope=scope
-        )
+        token = auth.create_device_token(user["id"], str(body.get("name") or "device"), scope=scope)
         auth.audit(
             "device_token_created",
             user["username"],
@@ -299,6 +287,4 @@ def register(app, ctx):
             return jsonify({"ok": False, "error": "authentication required"}), 401
         if not authmod.role_allows(user.get("role"), "operator"):
             return jsonify({"ok": False, "error": "operator role required"}), 403
-        return jsonify(
-            {"ok": True, "rows": auth.recent_audit(request.args.get("limit", 100))}
-        )
+        return jsonify({"ok": True, "rows": auth.recent_audit(request.args.get("limit", 100))})

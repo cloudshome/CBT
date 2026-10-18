@@ -70,7 +70,7 @@ class TTLCache:
                     logger.debug(f"TTLCache sweeper purged {purged} expired entries.")
             except asyncio.CancelledError:
                 break
-            except Exception as e:  # noqa: BLE001 — defensive fallback
+            except Exception as e:
                 logger.warning(f"TTLCache sweeper error: {e}")
 
     def clear(self) -> None:

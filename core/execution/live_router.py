@@ -717,7 +717,7 @@ class LiveExecutionRouter:
                     "price": req.price,
                 },
             )
-        except Exception as ex:  # noqa: BLE001 — best-effort audit emission
+        except Exception as ex:
             logger.error(f"Failed to emit rejection audit event: {ex}")
 
     async def reconcile_order(

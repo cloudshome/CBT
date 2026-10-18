@@ -160,10 +160,7 @@ def cmd_calendar(args) -> int:
         return 0
 
     name = payload["calendar"]["name"]
-    print(
-        f"calendar    {name}"
-        f"{'  (always open)' if payload['calendar']['always_open'] else ''}"
-    )
+    print(f"calendar    {name}{'  (always open)' if payload['calendar']['always_open'] else ''}")
     print(f"  series    {args.exchange}/{args.market}/{symbol}/{args.tf}")
     print(f"  at        {fmt_ts(now_ms)} UTC")
     print(f"  open now  {'YES' if payload['open_now'] else 'no — venue shut'}")

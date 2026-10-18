@@ -13,13 +13,13 @@ Covers:
 
 from __future__ import annotations
 
-import os
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 from core.autonomous_trader import classify_trading_style
 from core.portfolio_shadow import portfolio_shadow
-from core.sky_intelligence.types import DecisionAction, SetupType, SKYSetup
+from core.sky_intelligence.types import SetupType, SKYSetup
 
 
 @pytest.fixture(autouse=True)
@@ -35,43 +35,57 @@ def test_classify_trading_style_all_archetypes():
     # 1. Scalp: VWAP Reclaim
     setup_scalp = MagicMock(spec=SKYSetup)
     setup_scalp.setup_type = SetupType.SETUP_E_VWAP_RECLAIM
-    style, desk = classify_trading_style("BTC/USDT", setup_scalp, entry_price=70000.0, stop_loss=69500.0, timeframe="15m")
+    style, desk = classify_trading_style(
+        "BTC/USDT", setup_scalp, entry_price=70000.0, stop_loss=69500.0, timeframe="15m"
+    )
     assert style == "SCALP"
     assert desk == "BTC Desk (Scalp Specialist)"
 
     # 2. Day Trading: Sweep + MSS
     setup_day = MagicMock(spec=SKYSetup)
     setup_day.setup_type = SetupType.SETUP_A_SWEEP_MSS
-    style, desk = classify_trading_style("BTC/USDT", setup_day, entry_price=70000.0, stop_loss=69000.0, timeframe="15m")
+    style, desk = classify_trading_style(
+        "BTC/USDT", setup_day, entry_price=70000.0, stop_loss=69000.0, timeframe="15m"
+    )
     assert style == "DAY"
     assert desk == "BTC Desk (Intraday SMC)"
 
     # 3. Trend Trading: Pullback + FVG & Breakout + Expansion
     setup_trend_fvg = MagicMock(spec=SKYSetup)
     setup_trend_fvg.setup_type = SetupType.SETUP_B_PULLBACK_FVG
-    style, desk = classify_trading_style("BTC/USDT", setup_trend_fvg, entry_price=70000.0, stop_loss=68500.0, timeframe="15m")
+    style, desk = classify_trading_style(
+        "BTC/USDT", setup_trend_fvg, entry_price=70000.0, stop_loss=68500.0, timeframe="15m"
+    )
     assert style == "TREND"
     assert desk == "BTC Desk (Trend Hunter)"
 
     setup_trend_bo = MagicMock(spec=SKYSetup)
     setup_trend_bo.setup_type = SetupType.SETUP_C_BREAKOUT_EXPANSION
-    style, desk = classify_trading_style("ETH/USDT", setup_trend_bo, entry_price=2500.0, stop_loss=2450.0, timeframe="15m")
+    style, desk = classify_trading_style(
+        "ETH/USDT", setup_trend_bo, entry_price=2500.0, stop_loss=2450.0, timeframe="15m"
+    )
     assert style == "TREND"
     assert desk == "ETH Desk (Trend Hunter)"
 
     # 4. Range Trading: Range Sweep & Reclaim
     setup_range = MagicMock(spec=SKYSetup)
     setup_range.setup_type = SetupType.SETUP_D_RANGE_SWEEP_RECLAIM
-    style, desk = classify_trading_style("SOL/USDT", setup_range, entry_price=150.0, stop_loss=147.0, timeframe="15m")
+    style, desk = classify_trading_style(
+        "SOL/USDT", setup_range, entry_price=150.0, stop_loss=147.0, timeframe="15m"
+    )
     assert style == "RANGE"
     assert desk == "SOL Desk (Range Specialist)"
 
     # 5. Swing Trading: HTF (4h) or wide stop distance (>= 3.5%)
-    style_htf, desk_htf = classify_trading_style("BTC/USDT", setup_day, entry_price=70000.0, stop_loss=69000.0, timeframe="4h")
+    style_htf, desk_htf = classify_trading_style(
+        "BTC/USDT", setup_day, entry_price=70000.0, stop_loss=69000.0, timeframe="4h"
+    )
     assert style_htf == "SWING"
     assert desk_htf == "BTC Desk (Macro Swing)"
 
-    style_wide_sl, desk_wide_sl = classify_trading_style("BTC/USDT", None, entry_price=70000.0, stop_loss=67000.0, timeframe="15m")
+    style_wide_sl, desk_wide_sl = classify_trading_style(
+        "BTC/USDT", None, entry_price=70000.0, stop_loss=67000.0, timeframe="15m"
+    )
     assert style_wide_sl == "SWING"
     assert desk_wide_sl == "BTC Desk (Macro Swing)"
 
@@ -219,6 +233,7 @@ def test_cumulative_asset_risk_cap_enforcement():
 async def test_paper_routes_desk_overview_formatting():
     """Verifies that paper_routes correctly formats positions into institutional desks."""
     from unittest.mock import patch
+
     from core.execution.paper_routes import get_paper_positions
 
     # Open a multi-style position
@@ -234,7 +249,10 @@ async def test_paper_routes_desk_overview_formatting():
         allow_multi_style=True,
     )
 
-    with patch("core.execution.paper_routes.portfolio_shadow.get_portfolio_accounting", return_value={"portfolio_equity": 10000.0}):
+    with patch(
+        "core.execution.paper_routes.portfolio_shadow.get_portfolio_accounting",
+        return_value={"portfolio_equity": 10000.0},
+    ):
         result = await get_paper_positions()
         positions = result["positions"]
         assert len(positions) == 1
@@ -242,4 +260,3 @@ async def test_paper_routes_desk_overview_formatting():
         assert pos["horizon"] == "SCALP"
         assert pos["agentManager"] == "BTC Desk (Scalp Specialist)"
         assert pos["strategyName"] == "BTC Scalp Execution"
-

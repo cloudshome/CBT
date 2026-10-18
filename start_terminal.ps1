@@ -15,3 +15,4 @@ Write-Host "`n============================================================" -For
 Write-Host " Both servers launched in separate windows!" -ForegroundColor Green
 Write-Host " Open your browser at: http://localhost:5173" -ForegroundColor White
 Write-Host "============================================================" -ForegroundColor Cyan
+

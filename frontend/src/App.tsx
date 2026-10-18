@@ -132,12 +132,19 @@ export const App: React.FC = () => {
   const [isVaultLocked, setIsVaultLocked] = useState<boolean>(false);
   const [showUpdateModal, setShowUpdateModal] = useState<boolean>(false);
   const [wsState, setWsState] = useState<'CONNECTING' | 'CONNECTED' | 'RECONNECTING' | 'DISCONNECTED' | 'ERROR' | 'IDLE'>('IDLE');
+  const [latencyMs, setLatencyMs] = useState<number>(0);
 
   useEffect(() => {
-    const unsub = marketProvider.onConnectionStateChange((state) => {
+    const unsubState = marketProvider.onConnectionStateChange((state) => {
       setWsState(state);
     });
-    return () => unsub();
+    const unsubLatency = marketProvider.onLatencyChange((lat) => {
+      setLatencyMs(lat);
+    });
+    return () => {
+      unsubState();
+      unsubLatency();
+    };
   }, []);
 
   // Check First-Run Setup & Session Unlock Status on App Launch
@@ -568,6 +575,7 @@ export const App: React.FC = () => {
         onViewChange={setActiveMainView}
         openPositionsCount={positions.length}
         wsState={wsState}
+        latencyMs={latencyMs}
       />
 
       {/* Primary View Routing: Dedicated Shadow Paper Desk vs Master Cockpit vs Top-Level Research Lab vs Classic Terminal */}

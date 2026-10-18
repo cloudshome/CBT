@@ -15,13 +15,13 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 
-class YouTubeSourceType(str, enum.Enum):
+class YouTubeSourceType(enum.StrEnum):
     VIDEO = "VIDEO"
     PLAYLIST = "PLAYLIST"
     CHANNEL = "CHANNEL"
 
 
-class VideoRelevance(str, enum.Enum):
+class VideoRelevance(enum.StrEnum):
     RESEARCH_RELEVANT = "RESEARCH_RELEVANT"
     LOW_SIGNAL = "LOW_SIGNAL"
     PROMOTIONAL = "PROMOTIONAL"

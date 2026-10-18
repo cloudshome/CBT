@@ -154,7 +154,7 @@ class OrthogonalityTester:
             p_val_kronos = max(
                 0.0, min(1.0, 1.0 - self._normal_cdf(t_kronos))
             )  # One-sided test H1: beta > 0
-        except Exception:  # noqa: BLE001
+        except Exception:
             alpha_val, b_base, b_kronos = 0.0, 1.0, 0.0
             se_kronos, t_kronos, p_val_kronos = 0.1, 0.0, 0.50
 

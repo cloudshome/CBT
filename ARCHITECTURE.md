@@ -200,3 +200,12 @@ Leverages the Google Gemini SDK (`@google/genai`):
 - **Frontend Container (`ctb-frontend`)**: Built on `node:20-alpine` (builder) and `nginx:alpine` (runner), exposes port `80`.
 - **Network**: Shared bridge network `ctb-network` enabling internal DNS resolution (`http://backend:3000`).
 - **Storage Volume**: Named volume `ctb-data` attached to `/app/data` to ensure persistence across container rebuilds.
+
+---
+
+## 12. Architectural Invariants & Governance Directives
+
+13. **SKY is not a trading bot and is not a Backtrader host.** Do not add `backtrader` — dependency, dev tool, vendored copy, or adapter — and do not add a second backtest engine “for cross-validation” (`docs/BACKTRADER_REVIEW.md`, BT1–BT4/BT7). The strategy runtime is `engine/rules.py` + `engine/signal_engine.py`. The backtester is `data/backtester.py`. Live execution, if it ever exists, is a SKY-owned thin adapter *after* the graduation gate — never a third-party strategy runtime. Do not add `freqtrade`, Hyperopt, or FreqAI.
+
+14. **A tool router is a client, not an authority.** Cactus Needle 2 is not part of SKY's runtime and must not be installed merely to duplicate the existing typed MCP boundary (`docs/NEEDLE_REVIEW.md`, N1–N8). If a real offline/privacy/edge-device constraint justifies a pilot, Needle may only be evaluated as an external read-only MCP client. Its confidence can choose call / clarify / escalate / abstain; it can never approve, mutate, open the risk gate, count toward graduation, or reach an exchange.
+

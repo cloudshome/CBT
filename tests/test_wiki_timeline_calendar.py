@@ -6,6 +6,7 @@ Verifies the Wiki Ingestion Timeline, Calendar, and File Download API endpoints.
 
 import pytest
 from fastapi.testclient import TestClient
+
 from app import app
 
 
@@ -55,4 +56,3 @@ def test_wiki_file_download_safety(client):
     # Non-existent file
     response = client.get("/api/knowledge/wiki/files/non_existent_paper_9999.pdf")
     assert response.status_code == 404
-

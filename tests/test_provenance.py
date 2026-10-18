@@ -96,17 +96,11 @@ def test_profile_key_is_unchanged_for_the_live_series():
     assert profile_key("Buy Pullback", "TREND_UP") == "Buy Pullback::TREND_UP"
     # Explicitly passing the canonical series changes nothing.
     assert profile_key("Buy Pullback", "TREND_UP", "") == "Buy Pullback::TREND_UP"
-    assert (
-        profile_key("Buy Pullback", "TREND_UP", "binance:spot")
-        == "Buy Pullback::TREND_UP"
-    )
+    assert profile_key("Buy Pullback", "TREND_UP", "binance:spot") == "Buy Pullback::TREND_UP"
 
 
 def test_profile_key_separates_a_research_series():
-    assert (
-        profile_key("Buy Pullback", "TREND_UP", DUKA)
-        == f"Buy Pullback::TREND_UP@{DUKA}"
-    )
+    assert profile_key("Buy Pullback", "TREND_UP", DUKA) == f"Buy Pullback::TREND_UP@{DUKA}"
     assert profile_key("Buy Pullback", "", DUKA) == f"Buy Pullback@{DUKA}"
 
 
@@ -344,9 +338,10 @@ def test_research_profile_applies_when_explicitly_asked_for():
             "source_key": DUKA,
         }
     }
-    assert engine_apply(
-        70, "Buy Pullback", profile, "TRENDING_BULL", source_key=DUKA
-    ) == (84, False)
+    assert engine_apply(70, "Buy Pullback", profile, "TRENDING_BULL", source_key=DUKA) == (
+        84,
+        False,
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -386,8 +381,7 @@ def test_setup_proven_still_counts_legacy_rows_as_live(tmp_path):
     db.save_backtest_rows(_rows(n=120), run_id="legacy")
     # Simulate a genuinely pre-migration book: NULL provenance columns.
     db.conn.execute(
-        "UPDATE backtest_results SET source_key=NULL, "
-        "exchange=NULL, market=NULL, price_type=NULL"
+        "UPDATE backtest_results SET source_key=NULL, exchange=NULL, market=NULL, price_type=NULL"
     )
     db.conn.commit()
     verdict = setup_proven(db, "Buy Pullback")
@@ -471,9 +465,7 @@ def test_graduation_progress_ignores_noncanonical_books_both_directions(tmp_path
         run_id="research-up",
     )
     mixed.save_backtest_rows(
-        _rows(
-            n=200, win_r=0.05, loss_r=-6.0, prov={"exchange": "bybit", "market": "spot"}
-        ),
+        _rows(n=200, win_r=0.05, loss_r=-6.0, prov={"exchange": "bybit", "market": "spot"}),
         run_id="research-down",
     )
     _save_paper_outcome(
@@ -584,9 +576,7 @@ def test_scorecard_reports_and_filters_by_source(tmp_path):
     assert live["overall"]["n"] == 60
     assert live["sources"]["mixed"] is False
 
-    research = scorecard_from_db(
-        db=db, source="backtest", min_decided=10, source_key=DUKA
-    )
+    research = scorecard_from_db(db=db, source="backtest", min_decided=10, source_key=DUKA)
     assert research["sources"]["keys"] == [DUKA]
     # The two books really are different — that is the point of separating.
     assert research["overall"]["expectancy"] != live["overall"]["expectancy"]

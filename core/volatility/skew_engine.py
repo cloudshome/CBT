@@ -112,7 +112,7 @@ class SkewEngine:
         if not calls or not puts:
             return None
 
-        tenor_days = max(1, int(round((exp_ms - now_ms) / (86400 * 1000))))
+        tenor_days = max(1, round((exp_ms - now_ms) / (86400 * 1000)))
         t_years = tenor_days / 365.25
 
         # 1. Locate ATM Call & Put (strike closest to underlying)

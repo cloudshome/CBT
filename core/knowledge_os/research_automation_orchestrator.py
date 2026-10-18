@@ -58,7 +58,10 @@ INTERVAL_KNOWLEDGE_AUDIT = 24 * 60 * 60  # 24 hours
 INTERVAL_DRIVE_SYNC = 6 * 60 * 60  # 6 hours
 
 # User preference: Quiz reminders to Telegram disabled by default (play in Research Lab)
-ENABLE_TELEGRAM_QUIZ_REMINDERS = os.getenv("ENABLE_TELEGRAM_QUIZ_REMINDERS", "false").lower() in ("true", "1")
+ENABLE_TELEGRAM_QUIZ_REMINDERS = os.getenv("ENABLE_TELEGRAM_QUIZ_REMINDERS", "false").lower() in (
+    "true",
+    "1",
+)
 
 # How many queued hypotheses to process per run (avoid thundering-herd)
 MAX_HYPOTHESES_PER_RUN = 5
@@ -134,7 +137,9 @@ class ResearchAutomationOrchestrator:
             ),
         ]
         if self.quiz_reminders_enabled:
-            logger.info("ResearchAutomationOrchestrator: Spaced repetition quiz reminder pipeline active.")
+            logger.info(
+                "ResearchAutomationOrchestrator: Spaced repetition quiz reminder pipeline active."
+            )
             self._tasks.append(
                 asyncio.create_task(
                     self._loop("quiz_reminder", INTERVAL_QUIZ_REMINDER, self._run_quiz_reminder)
@@ -181,7 +186,7 @@ class ResearchAutomationOrchestrator:
                 ps.total_runs += 1
             self._log_run(run_id, name, "OK", result, started_at)
             return {"triggered": name, "result": result}
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if ps:
                 ps.last_run_status = "ERROR"
                 ps.last_error = str(exc)
@@ -440,7 +445,7 @@ class ResearchAutomationOrchestrator:
                         f"• Gates: {result.get('gates_passed')}/{result.get('total_gates')}"
                     )
 
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.error("Hypothesis backtest pipeline error for %s: %s", hyp_id, exc)
                 skipped += 1
                 with db_manager.get_brain_conn() as conn:
@@ -468,7 +473,9 @@ class ResearchAutomationOrchestrator:
         Disabled by default per user preference (quizzes played directly in Research Lab).
         """
         if not self.quiz_reminders_enabled and not force:
-            logger.info("Spaced repetition quiz Telegram reminders are disabled by user preference.")
+            logger.info(
+                "Spaced repetition quiz Telegram reminders are disabled by user preference."
+            )
             return {
                 "items_processed": 0,
                 "reminders_sent": 0,
@@ -519,7 +526,7 @@ class ResearchAutomationOrchestrator:
                 await self._notify(msg)
                 reminded += 1
 
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.warning("Quiz reminder failed for concept %s: %s", concept_id, exc)
 
         return {"items_processed": len(due_rows), "reminders_sent": reminded}
@@ -590,7 +597,7 @@ class ResearchAutomationOrchestrator:
                     f"• Max videos: {max_vids}"
                 )
 
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.error("YouTube crawler failed for %s: %s", url, exc)
 
         return {
@@ -641,7 +648,7 @@ class ResearchAutomationOrchestrator:
                     # Ingest feed item into Research Wikipedia
                     content_to_ingest = f"Title: {item.title}\nSource: {item.link}\nSummary: {item.summary}\nDate: {item.published_at}"
                     try:
-                        art = research_wikipedia_engine.ingest_url_or_content(
+                        research_wikipedia_engine.ingest_url_or_content(
                             url_or_text=content_to_ingest,
                             custom_title=item.title,
                             custom_category=category,
@@ -649,8 +656,10 @@ class ResearchAutomationOrchestrator:
                         )
                         articles_created += 1
                         items_ingested_for_src += 1
-                    except Exception as in_err:  # noqa: BLE001
-                        logger.warning("Error ingesting item '%s' from %s: %s", item.title, feed_name, in_err)
+                    except Exception as in_err:
+                        logger.warning(
+                            "Error ingesting item '%s' from %s: %s", item.title, feed_name, in_err
+                        )
 
                 research_source_registry.record_crawl_success(source_id, items_ingested_for_src)
                 sources_crawled += 1
@@ -663,7 +672,7 @@ class ResearchAutomationOrchestrator:
                         f"• Category: `{category}`"
                     )
 
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.error("Feed crawler error for %s: %s", feed_name, exc)
 
         return {
@@ -698,9 +707,7 @@ class ResearchAutomationOrchestrator:
 
         if warnings or failures:
             lines = ["🔍 *Daily Knowledge Audit Report*", "━━━━━━━━━━━━━━━━━━━━━━"]
-            lines.append(
-                f"✅ Passed: {passed_checks} / {total_checks}"
-            )
+            lines.append(f"✅ Passed: {passed_checks} / {total_checks}")
             if failures:
                 lines.append(f"\n🔴 *FAILURES ({len(failures)}):*")
                 for f in failures:
@@ -711,7 +718,7 @@ class ResearchAutomationOrchestrator:
                 for w in warnings:
                     desc = w.get("details") or w.get("message") or ""
                     lines.append(f"  • {w['check_name']}: {desc}")
-            overall = result.get('overall_status', 'UNKNOWN')
+            overall = result.get("overall_status", "UNKNOWN")
             if overall == "WARN" and not failures:
                 lines.append(f"\n_Overall: {overall} (Minor Hygiene Only · 0 Failures)_")
             else:
@@ -750,7 +757,7 @@ class ResearchAutomationOrchestrator:
         # Ensure directory tree exists
         try:
             backend.ensure_directory_tree(root_prefix="SKY")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning("Drive directory tree setup failed: %s", exc)
             return {"items_processed": 0, "files_synced": 0, "error": str(exc)}
 
@@ -764,7 +771,7 @@ class ResearchAutomationOrchestrator:
             )
             files_synced += 1
             logger.info("Drive sync: brain_memory.db archived as %s", snap_name)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error("Drive sync: brain_memory.db archive failed: %s", exc)
             errors += 1
 
@@ -780,7 +787,7 @@ class ResearchAutomationOrchestrator:
                         )
                         src_file.unlink()  # Clear from inbox after successful archive
                         files_synced += 1
-                    except Exception as exc:  # noqa: BLE001
+                    except Exception as exc:
                         logger.warning("Drive sync: failed to archive %s: %s", src_file.name, exc)
                         errors += 1
 
@@ -814,7 +821,7 @@ class ResearchAutomationOrchestrator:
             from core.telegram_bot import telegram_bot
 
             await telegram_bot.send_message(message, parse_mode="Markdown")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.info("[AUTOMATION NOTIFY] %s | (Telegram unavailable: %s)", message[:120], exc)
 
     def _log_run(
@@ -850,7 +857,7 @@ class ResearchAutomationOrchestrator:
                     ),
                 )
                 conn.commit()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning("Could not persist run log for %s: %s", pipeline, exc)
 
     def get_status(self) -> dict[str, Any]:

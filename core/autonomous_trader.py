@@ -101,7 +101,10 @@ class AutonomousTrader:
 
         # Master Risk Gate Guard: Check 3.0% daily drawdown circuit breaker
         from core.risk_manager import risk_manager
-        accounting = portfolio_shadow.get_portfolio_accounting(starting_capital=self.account_equity_usd)
+
+        accounting = portfolio_shadow.get_portfolio_accounting(
+            starting_capital=self.account_equity_usd
+        )
         realized_pnl = float(accounting.get("daily_realized_pnl", 0.0))
         unrealized_pnl = float(accounting.get("total_unrealized_pnl", 0.0))
         current_eq = float(accounting.get("virtual_equity", self.account_equity_usd))
@@ -123,7 +126,7 @@ class AutonomousTrader:
                 # 2. Fetch/Refresh Live MTF Candlesticks from market gateway
                 try:
                     candles_15m = await data_streamer.fetch_external_ohlcv(sym, "15m", limit=60)
-                except Exception as ex:  # noqa: BLE001 — defensive fallback
+                except Exception as ex:
                     logger.debug(f"Falling back to local cache for {sym} 15m: {ex}")
                     candles_15m = data_streamer.get_candles(sym, "15m", limit=60)
 
@@ -155,7 +158,7 @@ class AutonomousTrader:
                             fresh_tf = await data_streamer.fetch_external_ohlcv(sym, tf, limit=30)
                             if fresh_tf:
                                 cached_tf = fresh_tf
-                        except Exception as tf_ex:  # noqa: BLE001
+                        except Exception as tf_ex:
                             logger.debug(f"Could not refresh {sym} {tf} external OHLCV: {tf_ex}")
                     tf_map[tf] = cached_tf
 
@@ -188,7 +191,10 @@ class AutonomousTrader:
                     existing_sym_positions = [p for p in open_positions if p.get("symbol") == sym]
                     if existing_sym_positions:
                         # Anti-Cannibalization Guard: reject opposing direction (fail-closed)
-                        if any(p.get("direction") != decision_out.decision.value for p in existing_sym_positions):
+                        if any(
+                            p.get("direction") != decision_out.decision.value
+                            for p in existing_sym_positions
+                        ):
                             logger.info(
                                 f"Skipping {sym} trade: Opposing {existing_sym_positions[0].get('direction')} position already open (anti-cannibalization guard)."
                             )
@@ -197,7 +203,7 @@ class AutonomousTrader:
                     # Guard 2: Live Market Price Alignment
                     try:
                         live_price = await data_streamer.get_live_ticker(sym)
-                    except Exception:  # noqa: BLE001 — defensive fallback
+                    except Exception:
                         live_price = float(candles_15m[-1]["close"])
 
                     cur_price = live_price if live_price > 0 else float(candles_15m[-1]["close"])
@@ -267,7 +273,8 @@ class AutonomousTrader:
 
                     # Prevent duplicate positions of the exact same style sub-book on this asset
                     if any(
-                        p.get("entry_reason") and style_tag.upper() in p.get("entry_reason", "").upper()
+                        p.get("entry_reason")
+                        and style_tag.upper() in p.get("entry_reason", "").upper()
                         for p in existing_sym_positions
                     ):
                         logger.info(
@@ -284,7 +291,8 @@ class AutonomousTrader:
 
                     # Deduct existing open risk on this symbol to respect 1.5% constitutional asset cap
                     existing_sym_risk = sum(
-                        float(p.get("size", 0.0)) * abs(float(p.get("entry_price", 0.0)) - float(p.get("stop_loss", 0.0)))
+                        float(p.get("size", 0.0))
+                        * abs(float(p.get("entry_price", 0.0)) - float(p.get("stop_loss", 0.0)))
                         for p in existing_sym_positions
                         if p.get("stop_loss") is not None
                     )
@@ -365,9 +373,11 @@ class AutonomousTrader:
                     )
 
                     # 7. Mirror qualified crypto trade to real Binance Spot Testnet during burn-in
-                    await self._mirror_trade_to_testnet(sym, direction_str, sl_price=sl, tp_price=tp)
+                    await self._mirror_trade_to_testnet(
+                        sym, direction_str, sl_price=sl, tp_price=tp
+                    )
 
-            except Exception as e:  # noqa: BLE001 — defensive fallback
+            except Exception as e:
                 logger.error(f"AutonomousTrader scan error for {sym}: {e}")
 
         return executed_actions
@@ -418,7 +428,12 @@ class AutonomousTrader:
             )
 
             # If entry filled and we have a valid stop loss price, place native resting stop order on exchange
-            if res.status == "LIVE_ORDER_FILLED" and res.executed_qty > 0 and sl_price and sl_price > 0:
+            if (
+                res.status == "LIVE_ORDER_FILLED"
+                and res.executed_qty > 0
+                and sl_price
+                and sl_price > 0
+            ):
                 try:
                     connector = BinanceSpotConnector(
                         environment="TESTNET",
@@ -426,7 +441,11 @@ class AutonomousTrader:
                         api_secret=cred.api_secret,
                     )
                     prot_side = "SELL" if side == "BUY" else "BUY"
-                    sl_limit = round(sl_price * 0.999, 2) if prot_side == "SELL" else round(sl_price * 1.001, 2)
+                    sl_limit = (
+                        round(sl_price * 0.999, 2)
+                        if prot_side == "SELL"
+                        else round(sl_price * 1.001, 2)
+                    )
                     stop_params = {
                         "symbol": exchange_sym,
                         "side": prot_side,
@@ -436,7 +455,9 @@ class AutonomousTrader:
                         "stopPrice": f"{sl_price:.2f}".rstrip("0").rstrip("."),
                         "timeInForce": "GTC",
                     }
-                    stop_data, _ = await connector._send_request("POST", "/api/v3/order", params=stop_params)
+                    stop_data, _ = await connector._send_request(
+                        "POST", "/api/v3/order", params=stop_params
+                    )
                     logger.info(
                         f"AutonomousTrader resting Stop-Loss placed on BINANCE TESTNET for {exchange_sym}: "
                         f"Order ID {stop_data.get('orderId')} @ Stop ${sl_price:.2f} (Limit: ${sl_limit:.2f})"
@@ -448,10 +469,11 @@ class AutonomousTrader:
             try:
                 cred_fut = credential_vault.get_credential("BINANCE_FUTURES", "TESTNET")
                 if cred_fut and cred_fut.is_active:
-                    import aiohttp
                     import hashlib
                     import hmac
                     import urllib.parse
+
+                    import aiohttp
 
                     base_fut_url = "https://testnet.binancefuture.com"
                     ts = int(time.time() * 1000)
@@ -489,7 +511,7 @@ class AutonomousTrader:
             except Exception as fut_err:
                 logger.warning(f"Could not mirror to Binance Futures testnet: {fut_err}")
 
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning(f"AutonomousTrader Testnet mirror skipped for {symbol}: {exc}")
 
     async def start_loop(self) -> None:
@@ -504,7 +526,7 @@ class AutonomousTrader:
             import fcntl
 
             lock_path = "/tmp/cbt_autonomous_trader_supervisor.lock"
-            lock_fd = open(lock_path, "w")  # noqa: SIM115
+            lock_fd = open(lock_path, "w")
             fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:
             logger.info(
@@ -513,7 +535,7 @@ class AutonomousTrader:
             if lock_fd is not None:
                 lock_fd.close()
             return
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass
 
         logger.info(
@@ -526,7 +548,7 @@ class AutonomousTrader:
             except asyncio.CancelledError:
                 logger.info("AutonomousTrader loop cancelled.")
                 break
-            except Exception as e:  # noqa: BLE001 — defensive fallback
+            except Exception as e:
                 logger.error(f"AutonomousTrader loop uncaught exception: {e}")
             await asyncio.sleep(self.scan_interval_sec)
 

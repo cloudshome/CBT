@@ -113,7 +113,7 @@ class HypothesisGenerator:
                 target_symbol=target_symbol,
                 test_method="CHRONOLOGICAL_REPLAY",
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(f"Could not register hypothesis to knowledge_graph_engine: {e}")
 
         return result

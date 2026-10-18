@@ -62,8 +62,7 @@ def cmd_sky_agent(args) -> int:
             "readiness": strip,
             "system": sys_probe,
             "agent": "sky_agent",
-            "ok": sys_probe.get("level") not in ("HIGH", "CRITICAL")
-            or not sys_probe.get("alerts"),
+            "ok": sys_probe.get("level") not in ("HIGH", "CRITICAL") or not sys_probe.get("alerts"),
         }
         if is_json:
             print(json.dumps(payload, indent=2, default=str))

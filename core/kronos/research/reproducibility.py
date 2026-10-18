@@ -69,13 +69,13 @@ class ReproducibilityReplayEngine:
         expected_ds_hash = record["dataset_hash"]
 
         try:
-            manifest_entry, candles = dataset_freeze_manager.load_frozen_dataset(dataset_id)
+            manifest_entry, _candles = dataset_freeze_manager.load_frozen_dataset(dataset_id)
             actual_ds_hash = manifest_entry.content_hash
             verified["dataset_hash_match"] = actual_ds_hash == expected_ds_hash
             audit_trail.append(
                 f"Dataset {dataset_id} content hash verified ({actual_ds_hash[:12]})"
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             verified["dataset_hash_match"] = False
             audit_trail.append(f"Dataset verification failed: {e}")
             return ReproducibilityReport(

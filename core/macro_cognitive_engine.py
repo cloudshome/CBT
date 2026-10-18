@@ -167,7 +167,7 @@ class MacroCognitiveEngine:
                 )
                 self._persist_macro_state(result, source_id=source_id)
                 return result
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.warning(
                     f"Gemini macro cognitive analysis encountered error: {e}. Falling back to deterministic engine."
                 )
@@ -714,7 +714,7 @@ Return a valid, strict JSON object with EXACTLY this structure:
                 )
                 conn.commit()
             logger.info(f"Persisted macro intelligence snapshot {mem_id} into SQLite memory.")
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(f"Failed to persist macro intelligence to DB: {e}")
 
     def get_latest_macro_state(self) -> dict[str, Any] | None:
@@ -726,7 +726,7 @@ Return a valid, strict JSON object with EXACTLY this structure:
                 ).fetchone()
                 if row and row["payload_json"]:
                     return json.loads(row["payload_json"])
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(f"Could not load latest macro state: {e}")
         return None
 

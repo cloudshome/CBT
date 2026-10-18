@@ -54,9 +54,7 @@ def register(app, ctx):
                         "volume": _num(data.get("volume")),
                     }
                 )
-            return jsonify(
-                {"candles": candles, "count": len(candles), "symbol": symbol, "tf": tf}
-            )
+            return jsonify({"candles": candles, "count": len(candles), "symbol": symbol, "tf": tf})
         except ConnectionError as exc:
             return jsonify({"error": str(exc)}), 502
         except Exception as exc:  # never blank the chart on an engine hiccup
@@ -82,9 +80,7 @@ def register(app, ctx):
         except ConnectionError as exc:
             return jsonify({"error": str(exc), "candles": []}), 502
         except Exception as exc:
-            return jsonify(
-                {"error": f"{type(exc).__name__}: {exc}", "candles": []}
-            ), 500
+            return jsonify({"error": f"{type(exc).__name__}: {exc}", "candles": []}), 500
         payload = None
         if with_plan:
             try:
@@ -93,14 +89,10 @@ def register(app, ctx):
                 payload = None
         try:
             return jsonify(
-                _sanitize_for_json(
-                    build_chart(df, symbol, tf, payload=payload, limit=limit)
-                )
+                _sanitize_for_json(build_chart(df, symbol, tf, payload=payload, limit=limit))
             )
         except Exception as exc:  # pragma: no cover — defensive
-            return jsonify(
-                {"error": f"{type(exc).__name__}: {exc}", "candles": []}
-            ), 500
+            return jsonify({"error": f"{type(exc).__name__}: {exc}", "candles": []}), 500
 
     @app.get("/api/chart/stream")
     def api_chart_stream():
@@ -177,9 +169,7 @@ def register(app, ctx):
             _audit("command_run", command_id, ok=bool(result.get("ok")))
             return jsonify(result)
         except CommandError as exc:
-            return jsonify(
-                {"ok": False, "error": str(exc), "command_id": command_id}
-            ), 400
+            return jsonify({"ok": False, "error": str(exc), "command_id": command_id}), 400
         except Exception as exc:  # pragma: no cover
             return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
 
@@ -246,9 +236,7 @@ def register(app, ctx):
             if model.spread_pct is not None
             else SPREADS.get(symbol, DEFAULT_HALF_SPREAD)
         )
-        fee_per_side = (
-            model.spot_fee_pct if model.market == "spot" else model.taker_fee_pct
-        )
+        fee_per_side = model.spot_fee_pct if model.market == "spot" else model.taker_fee_pct
         round_trip_cost_pct = round(
             2.0 * fee_per_side + 2.0 * half_spread + 2.0 * model.slip_pct, 6
         )
@@ -285,9 +273,7 @@ def register(app, ctx):
         from brain.coach import management_checklist
         from data.database import SignalDB
 
-        symbol = (
-            _sym(request.args.get("symbol")) if request.args.get("symbol") else None
-        )
+        symbol = _sym(request.args.get("symbol")) if request.args.get("symbol") else None
         try:
             with SignalDB() as db:
                 rows = db.live_open_rows(symbol=symbol)
@@ -338,14 +324,10 @@ def register(app, ctx):
                     "current_r": current_r,
                     "risk_per_unit": risk,
                     "stop_distance": (
-                        abs(float(price) - float(stop))
-                        if price is not None and stop
-                        else None
+                        abs(float(price) - float(stop)) if price is not None and stop else None
                     ),
                     "tp_distance": (
-                        abs(float(take) - float(price))
-                        if price is not None and take
-                        else None
+                        abs(float(take) - float(price)) if price is not None and take else None
                     ),
                     "minutes_in_trade": max(0, int((now_ms - int(opened)) / 60000)),
                     "management": management_checklist(
@@ -395,10 +377,7 @@ def register(app, ctx):
             return jsonify({"error": "action must be BUY or SELL"}), 400
         if ticket_type not in ("market", "limit", "conditional"):
             return jsonify(
-                {
-                    "error": f"bad ticket_type {ticket_type!r} "
-                    "(market | limit | conditional)"
-                }
+                {"error": f"bad ticket_type {ticket_type!r} (market | limit | conditional)"}
             ), 400
         try:
             entry = float(body.get("entry"))
@@ -422,9 +401,7 @@ def register(app, ctx):
         if tps:
             for i in (1, 2):
                 if len(tps) > i and tps[i] <= tps[i - 1]:
-                    return jsonify(
-                        {"error": "take_profits must be strictly increasing"}
-                    ), 400
+                    return jsonify({"error": "take_profits must be strictly increasing"}), 400
         tp1 = tps[0] if tps else None
         rr = round(abs(tp1 - entry) / abs(entry - stop), 3) if tp1 is not None else None
         risk_raw = body.get("risk_pct")
@@ -444,9 +421,7 @@ def register(app, ctx):
         conf_label = str(body.get("confidence_label") or "").strip()[:20] or None
         reason = str(body.get("reason") or "manual terminal ticket")[:300]
         ticket_id = str(body.get("ticket_id") or "")[:80]
-        sentiment = (
-            body.get("sentiment") if isinstance(body.get("sentiment"), dict) else {}
-        )
+        sentiment = body.get("sentiment") if isinstance(body.get("sentiment"), dict) else {}
         now_ms = int(time.time() * 1000)
         signal_id = (
             f"terminal_{ticket_id}"
@@ -557,10 +532,7 @@ def register(app, ctx):
                 ), 409
             if force and not config.SKY_ALLOW_FORCE_APPROVE:
                 return jsonify(
-                    {
-                        "error": "force confirm is disabled "
-                        "(SKY_ALLOW_FORCE_APPROVE is not set)"
-                    }
+                    {"error": "force confirm is disabled (SKY_ALLOW_FORCE_APPROVE is not set)"}
                 ), 403
             # W3.3 journal-first discipline — same fail-closed population and
             # audited escape as /api/review.
@@ -592,11 +564,7 @@ def register(app, ctx):
             )
             if new_status is None:
                 return jsonify({"error": f"scan #{scan_id} not found"}), 404
-            run = (
-                PaperTradingRunner(db=db, client=maybe_client())
-                .run_once(symbol=symbol)
-                .as_dict()
-            )
+            run = PaperTradingRunner(db=db, client=maybe_client()).run_once(symbol=symbol).as_dict()
             paper = db.paper_trade_for_scan(scan_id)
             scan = db.get_scan(scan_id)
         _audit(
@@ -670,8 +638,7 @@ def register(app, ctx):
                 return jsonify(
                     {
                         "ok": False,
-                        "error": f"paper trade #{trade_id} is already "
-                        f"{trade.get('status')}",
+                        "error": f"paper trade #{trade_id} is already {trade.get('status')}",
                         "status": trade.get("status"),
                     }
                 ), 409
@@ -721,9 +688,7 @@ def register(app, ctx):
             risk = abs(entry - stop)
             if exit_price is None:
                 exit_price = (
-                    float(trade["last_price"])
-                    if trade.get("last_price") is not None
-                    else None
+                    float(trade["last_price"]) if trade.get("last_price") is not None else None
                 )
             if exit_price is None:
                 try:
@@ -743,9 +708,7 @@ def register(app, ctx):
                 ), 409
             side = str(trade["action"]).upper()
             rr = round(
-                (entry - exit_price) / risk
-                if side == "SELL"
-                else (exit_price - entry) / risk,
+                (entry - exit_price) / risk if side == "SELL" else (exit_price - entry) / risk,
                 3,
             )
             tp = trade.get("take_profit")
@@ -799,10 +762,7 @@ def register(app, ctx):
             )
             if not closed:
                 return jsonify(
-                    {
-                        "error": "position was closed concurrently "
-                        "(runner or another session)"
-                    }
+                    {"error": "position was closed concurrently (runner or another session)"}
                 ), 409
         _audit(
             "terminal_close",

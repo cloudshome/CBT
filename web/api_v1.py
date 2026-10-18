@@ -319,8 +319,7 @@ class IdempotencyStore:
                 return ("miss", None)
             if (row["created_ts"] or 0) < cutoff:
                 db.conn.execute(
-                    "DELETE FROM idempotency_keys WHERE key=? AND user_id IS ? "
-                    "AND endpoint=?",
+                    "DELETE FROM idempotency_keys WHERE key=? AND user_id IS ? AND endpoint=?",
                     (key, user_id, endpoint),
                 )
                 db.conn.commit()
@@ -335,9 +334,7 @@ class IdempotencyStore:
                 return ("miss", None)
             return ("replay", (int(row["status_code"] or 200), payload))
 
-    def reserve(
-        self, key: str, user_id: int | None, endpoint: str, fingerprint: str
-    ) -> bool:
+    def reserve(self, key: str, user_id: int | None, endpoint: str, fingerprint: str) -> bool:
         """Claim a key before executing. False if someone else already has it."""
         import sqlite3
 
@@ -386,9 +383,7 @@ class IdempotencyStore:
     def purge_expired(self) -> int:
         cutoff = int(time.time()) - IDEMPOTENCY_TTL_SECONDS
         with self._db() as db:
-            cur = db.conn.execute(
-                "DELETE FROM idempotency_keys WHERE created_ts < ?", (cutoff,)
-            )
+            cur = db.conn.execute("DELETE FROM idempotency_keys WHERE created_ts < ?", (cutoff,))
             db.conn.commit()
             return cur.rowcount
 
@@ -837,9 +832,7 @@ def route_catalog() -> dict:
             "error": "null on success, else {code, message, details}",
             "meta": "{api_version, server_version, request_id, ts}",
         },
-        "error_codes": sorted(
-            v for k, v in vars(ErrorCode).items() if not k.startswith("_")
-        ),
+        "error_codes": sorted(v for k, v in vars(ErrorCode).items() if not k.startswith("_")),
     }
 
 

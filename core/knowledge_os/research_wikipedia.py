@@ -24,7 +24,7 @@ import sqlite3
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -170,8 +170,12 @@ class ResearchWikipediaEngine:
                 );
                 """
             )
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_wiki_links_src ON wiki_links(source_article_id);")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_wiki_links_slug ON wiki_links(target_slug);")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_wiki_links_src ON wiki_links(source_article_id);"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_wiki_links_slug ON wiki_links(target_slug);"
+            )
 
             # 3. wiki_source_citations (Provenance traceability)
             conn.execute(
@@ -188,7 +192,9 @@ class ResearchWikipediaEngine:
                 );
                 """
             )
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_wiki_citations_art ON wiki_source_citations(article_id);")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_wiki_citations_art ON wiki_source_citations(article_id);"
+            )
 
             # 4. wiki_contradictions (Dialectical consensus tracking)
             conn.execute(
@@ -205,7 +211,9 @@ class ResearchWikipediaEngine:
                 );
                 """
             )
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_wiki_contradictions_art ON wiki_contradictions(article_id);")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_wiki_contradictions_art ON wiki_contradictions(article_id);"
+            )
 
             # 5. wiki_triage_inbox (Human-in-the-loop candidate queue)
             conn.execute(
@@ -225,7 +233,9 @@ class ResearchWikipediaEngine:
                 );
                 """
             )
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_wiki_triage_status ON wiki_triage_inbox(status);")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_wiki_triage_status ON wiki_triage_inbox(status);"
+            )
 
             # 6. research_sources (Universal research source inputs & documents)
             conn.execute(
@@ -251,9 +261,15 @@ class ResearchWikipediaEngine:
                 );
                 """
             )
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_research_sources_domain ON research_sources(source_domain);")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_research_sources_type ON research_sources(source_type);")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_research_sources_created ON research_sources(created_at);")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_research_sources_domain ON research_sources(source_domain);"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_research_sources_type ON research_sources(source_type);"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_research_sources_created ON research_sources(created_at);"
+            )
 
             # 7. research_claims (Epistemic claims ledger)
             conn.execute(
@@ -275,8 +291,12 @@ class ResearchWikipediaEngine:
                 );
                 """
             )
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_claims_source ON research_claims(source_id);")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_claims_type ON research_claims(claim_type);")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_claims_source ON research_claims(source_id);"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_claims_type ON research_claims(claim_type);"
+            )
 
             # 7. research_evidence (Empirical verification ledger)
             conn.execute(
@@ -485,8 +505,12 @@ class ResearchWikipediaEngine:
             )
 
             # Phase 1: Bidirectional WikiLinks Extraction & Indexing
-            conn.execute("DELETE FROM wiki_links WHERE source_article_id = ?", (article.article_id,))
-            link_matches = re.findall(r"\[\[([^\]\|]+)(?:\|([^\]]+))?\]\]", article.full_markdown_content)
+            conn.execute(
+                "DELETE FROM wiki_links WHERE source_article_id = ?", (article.article_id,)
+            )
+            link_matches = re.findall(
+                r"\[\[([^\]\|]+)(?:\|([^\]]+))?\]\]", article.full_markdown_content
+            )
             for target_title_raw, anchor_raw in link_matches:
                 t_title = target_title_raw.strip()
                 t_slug = re.sub(r"[^a-z0-9]+", "-", t_title.lower()).strip("-")
@@ -502,9 +526,21 @@ class ResearchWikipediaEngine:
 
             # Phase 1: Provenance Citations
             for claim in article.key_claims:
-                c_id = claim.claim_id if isinstance(claim, EpistemicClaim) else claim.get("claim_id", "")
-                c_status = claim.epistemic_status if isinstance(claim, EpistemicClaim) else claim.get("epistemic_status", "UNVERIFIED")
-                c_text = claim.speaker_claim if isinstance(claim, EpistemicClaim) else claim.get("speaker_claim", "")
+                c_id = (
+                    claim.claim_id
+                    if isinstance(claim, EpistemicClaim)
+                    else claim.get("claim_id", "")
+                )
+                c_status = (
+                    claim.epistemic_status
+                    if isinstance(claim, EpistemicClaim)
+                    else claim.get("epistemic_status", "UNVERIFIED")
+                )
+                c_text = (
+                    claim.speaker_claim
+                    if isinstance(claim, EpistemicClaim)
+                    else claim.get("speaker_claim", "")
+                )
                 citation_id = f"cit_{article.article_id}_{c_id}"
                 conn.execute(
                     """
@@ -525,7 +561,10 @@ class ResearchWikipediaEngine:
 
             # Phase 3: Automatic Contradiction Recording
             if article.contradictions_detected:
-                claims = [c if isinstance(c, EpistemicClaim) else EpistemicClaim(**c) for c in article.key_claims]
+                claims = [
+                    c if isinstance(c, EpistemicClaim) else EpistemicClaim(**c)
+                    for c in article.key_claims
+                ]
                 c_a = claims[0].claim_id if claims else "CLM_01"
                 c_b = claims[1].claim_id if len(claims) > 1 else "CLM_EXT"
                 for contra_text in article.contradictions_detected:
@@ -545,13 +584,16 @@ class ResearchWikipediaEngine:
         # Write permanent Markdown file
         md_file = self.articles_dir / f"{article.article_id}.md"
         md_file.write_text(article.full_markdown_content, encoding="utf-8")
-        logger.info(f"Saved Research Wikipedia article: {article.article_id} (v{next_version}) -> {md_file}")
+        logger.info(
+            f"Saved Research Wikipedia article: {article.article_id} (v{next_version}) -> {md_file}"
+        )
         self._export_vault()
 
     def _auto_rehydrate_vault(self) -> None:
         """Seamlessly rehydrates SQLite from Git-synced data/research/vault/ on startup."""
         try:
             from core.knowledge_os.research_vault_sync import auto_rehydrate_from_git_vault
+
             auto_rehydrate_from_git_vault(wiki_db_path=self.db_path, articles_dir=self.articles_dir)
         except Exception as e:
             logger.debug(f"Vault rehydration skipped: {e}")
@@ -560,6 +602,7 @@ class ResearchWikipediaEngine:
         """Mirrors local research knowledge into data/research/vault/ for effortless git sync."""
         try:
             from core.knowledge_os.research_vault_sync import export_to_git_vault
+
             export_to_git_vault(wiki_db_path=self.db_path, articles_dir=self.articles_dir)
         except Exception as e:
             logger.debug(f"Vault export skipped: {e}")
@@ -690,7 +733,9 @@ class ResearchWikipediaEngine:
             conn.commit()
         return item_id
 
-    def list_triage_inbox(self, status: str | None = "STAGING", limit: int = 50) -> list[dict[str, Any]]:
+    def list_triage_inbox(
+        self, status: str | None = "STAGING", limit: int = 50
+    ) -> list[dict[str, Any]]:
         """Lists candidate articles awaiting human review."""
         with self._get_connection() as conn:
             if status:
@@ -730,7 +775,9 @@ class ResearchWikipediaEngine:
         and marks the triage item status as 'MERGED'.
         """
         with self._get_connection() as conn:
-            row = conn.execute("SELECT * FROM wiki_triage_inbox WHERE item_id = ?;", (item_id,)).fetchone()
+            row = conn.execute(
+                "SELECT * FROM wiki_triage_inbox WHERE item_id = ?;", (item_id,)
+            ).fetchone()
             if not row:
                 return None
             data = dict(row)
@@ -785,7 +832,9 @@ class ResearchWikipediaEngine:
 
         if search_query:
             term = f"%{search_query.strip()}%"
-            conditions.append("(s.title LIKE ? OR s.original_url LIKE ? OR s.author_or_creator LIKE ?)")
+            conditions.append(
+                "(s.title LIKE ? OR s.original_url LIKE ? OR s.author_or_creator LIKE ?)"
+            )
             params.extend([term, term, term])
 
         if date_str:
@@ -843,7 +892,11 @@ class ResearchWikipediaEngine:
             download_url = None
 
             target_file = None
-            if orig_url and (orig_url.endswith(".pdf") or "uploads" in orig_url or not orig_url.startswith("http")):
+            if orig_url and (
+                orig_url.endswith(".pdf")
+                or "uploads" in orig_url
+                or not orig_url.startswith("http")
+            ):
                 candidate = Path(orig_url)
                 if candidate.exists() and candidate.is_file():
                     target_file = candidate
@@ -857,34 +910,40 @@ class ResearchWikipediaEngine:
                 download_url = f"/api/knowledge/wiki/files/{target_file.name}"
 
             created_ts = r["created_at"]
-            created_dt = datetime.fromtimestamp(created_ts / 1000, tz=timezone.utc) if created_ts else None
+            created_dt = datetime.fromtimestamp(created_ts / 1000, tz=UTC) if created_ts else None
             formatted_date = created_dt.strftime("%Y-%m-%d %H:%M UTC") if created_dt else ""
 
-            timeline_items.append({
-                "source_id": r["source_id"],
-                "title": r["title"] or (file_name if is_file else orig_url) or "Untitled Research Source",
-                "original_url": orig_url,
-                "source_domain": r["source_domain"],
-                "source_type": r["source_type"],
-                "author_or_creator": r["author_or_creator"] or "Research Ingest",
-                "publication_date": r["publication_date"],
-                "content_hash": r["content_hash"],
-                "wiki_article_id": r["wiki_article_id"],
-                "wiki_article_title": r["wiki_article_title"],
-                "wiki_category": r["wiki_category"],
-                "wiki_score": r["wiki_score"],
-                "is_file": is_file,
-                "file_name": file_name,
-                "file_size_bytes": file_size_bytes,
-                "file_size_mb": round(file_size_bytes / (1024 * 1024), 2) if file_size_bytes else 0,
-                "download_url": download_url,
-                "total_claims": int(r["total_claims"] or 0),
-                "facts_count": int(r["facts_count"] or 0),
-                "hypotheses_count": int(r["hypotheses_count"] or 0),
-                "contradictions_count": int(r["contradictions_count"] or 0),
-                "created_at": created_ts,
-                "created_at_formatted": formatted_date,
-            })
+            timeline_items.append(
+                {
+                    "source_id": r["source_id"],
+                    "title": r["title"]
+                    or (file_name if is_file else orig_url)
+                    or "Untitled Research Source",
+                    "original_url": orig_url,
+                    "source_domain": r["source_domain"],
+                    "source_type": r["source_type"],
+                    "author_or_creator": r["author_or_creator"] or "Research Ingest",
+                    "publication_date": r["publication_date"],
+                    "content_hash": r["content_hash"],
+                    "wiki_article_id": r["wiki_article_id"],
+                    "wiki_article_title": r["wiki_article_title"],
+                    "wiki_category": r["wiki_category"],
+                    "wiki_score": r["wiki_score"],
+                    "is_file": is_file,
+                    "file_name": file_name,
+                    "file_size_bytes": file_size_bytes,
+                    "file_size_mb": round(file_size_bytes / (1024 * 1024), 2)
+                    if file_size_bytes
+                    else 0,
+                    "download_url": download_url,
+                    "total_claims": int(r["total_claims"] or 0),
+                    "facts_count": int(r["facts_count"] or 0),
+                    "hypotheses_count": int(r["hypotheses_count"] or 0),
+                    "contradictions_count": int(r["contradictions_count"] or 0),
+                    "created_at": created_ts,
+                    "created_at_formatted": formatted_date,
+                }
+            )
 
         return {
             "timeline": timeline_items,
@@ -941,42 +1000,51 @@ class ResearchWikipediaEngine:
             d = r["activity_date"]
             if not d:
                 continue
-            calendar_map.setdefault(d, {
-                "date": d,
-                "sources_count": 0,
-                "articles_count": 0,
-                "claims_count": 0,
-                "facts_count": 0,
-                "hypotheses_count": 0,
-            })
+            calendar_map.setdefault(
+                d,
+                {
+                    "date": d,
+                    "sources_count": 0,
+                    "articles_count": 0,
+                    "claims_count": 0,
+                    "facts_count": 0,
+                    "hypotheses_count": 0,
+                },
+            )
             calendar_map[d]["sources_count"] = r["sources_count"]
 
         for r in article_days:
             d = r["activity_date"]
             if not d:
                 continue
-            calendar_map.setdefault(d, {
-                "date": d,
-                "sources_count": 0,
-                "articles_count": 0,
-                "claims_count": 0,
-                "facts_count": 0,
-                "hypotheses_count": 0,
-            })
+            calendar_map.setdefault(
+                d,
+                {
+                    "date": d,
+                    "sources_count": 0,
+                    "articles_count": 0,
+                    "claims_count": 0,
+                    "facts_count": 0,
+                    "hypotheses_count": 0,
+                },
+            )
             calendar_map[d]["articles_count"] = r["articles_count"]
 
         for r in claim_days:
             d = r["activity_date"]
             if not d:
                 continue
-            calendar_map.setdefault(d, {
-                "date": d,
-                "sources_count": 0,
-                "articles_count": 0,
-                "claims_count": 0,
-                "facts_count": 0,
-                "hypotheses_count": 0,
-            })
+            calendar_map.setdefault(
+                d,
+                {
+                    "date": d,
+                    "sources_count": 0,
+                    "articles_count": 0,
+                    "claims_count": 0,
+                    "facts_count": 0,
+                    "hypotheses_count": 0,
+                },
+            )
             calendar_map[d]["claims_count"] = r["total_claims"] or 0
             calendar_map[d]["facts_count"] = int(r["facts_count"] or 0)
             calendar_map[d]["hypotheses_count"] = int(r["hypotheses_count"] or 0)
@@ -1091,7 +1159,7 @@ class ResearchWikipediaEngine:
                             is_hype = any(hk.lower() in seg_text.lower() for hk in hype)
                             claims.append(
                                 EpistemicClaim(
-                                    claim_id=f"C-{i+1:02d}",
+                                    claim_id=f"C-{i + 1:02d}",
                                     speaker_claim=f"{tc_prefix}{seg_text[:160]}",
                                     epistemic_status="NARRATIVE" if is_hype else "HYPOTHESIS",
                                     cross_verification_evidence=(
@@ -1103,7 +1171,7 @@ class ResearchWikipediaEngine:
                                     empirical_dataset_reference="YouTube Spoken Transcript Ledger",
                                 )
                             )
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.warning(f"YouTube extraction fallback: {e}")
 
         # 2. Live Extraction for Web Articles, GitHub, ArXiv, TradingView
@@ -1112,7 +1180,9 @@ class ResearchWikipediaEngine:
                 from core.url_extractor import url_extractor
 
                 url_res = url_extractor.extract(source_url)
-                if url_res.get("success") and (url_res.get("text_content") or url_res.get("summary")):
+                if url_res.get("success") and (
+                    url_res.get("text_content") or url_res.get("summary")
+                ):
                     title = custom_title or url_res.get("title") or title
                     author = custom_author or url_res.get("author_creator") or author
                     source_type = url_res.get("source_type", source_type)
@@ -1128,11 +1198,13 @@ class ResearchWikipediaEngine:
                         )
 
                     # Extract key claim paragraphs
-                    paragraphs = [p.strip() for p in raw_body_text.split("\n") if len(p.strip()) > 35]
+                    paragraphs = [
+                        p.strip() for p in raw_body_text.split("\n") if len(p.strip()) > 35
+                    ]
                     for i, p in enumerate(paragraphs[:6]):
                         claims.append(
                             EpistemicClaim(
-                                claim_id=f"C-{i+1:02d}",
+                                claim_id=f"C-{i + 1:02d}",
                                 speaker_claim=p[:180],
                                 epistemic_status=(
                                     "FACT"
@@ -1158,7 +1230,7 @@ class ResearchWikipediaEngine:
                                 empirical_dataset_reference=f"{url_res.get('domain', 'Web')} Published Corpus",
                             )
                         )
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.warning(f"URL extraction fallback: {e}")
 
         # 3. Raw text or fallback if no claims yet
@@ -1169,7 +1241,7 @@ class ResearchWikipediaEngine:
             for i, line in enumerate(lines[:5]):
                 claims.append(
                     EpistemicClaim(
-                        claim_id=f"C-{i+1:02d}",
+                        claim_id=f"C-{i + 1:02d}",
                         speaker_claim=line[:160],
                         epistemic_status="HYPOTHESIS",
                         cross_verification_evidence="Extracted from submitted research dossier.",

@@ -18,7 +18,7 @@ import json
 import logging
 import time
 from collections.abc import Awaitable, Callable
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 import websockets
@@ -28,7 +28,7 @@ from core.execution.testnet.endpoint_policy import EndpointPolicy, Environment
 logger = logging.getLogger("sky.execution.testnet.websocket_transport")
 
 
-class WebSocketState(str, Enum):
+class WebSocketState(StrEnum):
     """Lifecycle states of the private WebSocket connection."""
 
     DISCONNECTED = "DISCONNECTED"
@@ -129,7 +129,7 @@ class WebSocketTransport:
                 break
             except asyncio.CancelledError:
                 break
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.error(f"Error in WebSocket listen loop: {exc}")
                 if self._running:
                     await self._trigger_reconnect(reason=f"Unexpected error ({exc})")
@@ -144,12 +144,12 @@ class WebSocketTransport:
                     # Send text ping frame if supported or protocol ping
                     try:
                         await self._ws.ping()
-                    except Exception:  # noqa: BLE001
+                    except Exception:
                         # Some venues like Bybit expect {"op": "ping"}
                         await self._ws.send(json.dumps({"op": "ping"}))
             except asyncio.CancelledError:
                 break
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.debug(f"Keepalive ping error: {exc}")
 
     async def _trigger_reconnect(self, reason: str) -> None:
@@ -163,7 +163,7 @@ class WebSocketTransport:
         if self._ws:
             try:
                 await self._ws.close()
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.debug(f"Silently ignored error closing websocket during reconnect: {exc}")
 
         backoff = 1.0
@@ -182,7 +182,7 @@ class WebSocketTransport:
                 # Re-arm listen loop
                 self._listen_task = asyncio.create_task(self._listen_loop())
                 break
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.warning(f"[Reconnect] Reconnect failed ({exc}), retrying in {backoff}s...")
                 await asyncio.sleep(backoff)
                 backoff = min(30.0, backoff * 1.5)

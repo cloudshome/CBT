@@ -12,17 +12,17 @@ Structural Safety Invariant:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class ArbitrageExecutionPermission(str, Enum):
+class ArbitrageExecutionPermission(StrEnum):
     """Structural research-only guard. Live execution is impossible through this system."""
 
     RESEARCH_ONLY = "RESEARCH_ONLY"
 
 
-class Venue(str, Enum):
+class Venue(StrEnum):
     BINANCE_SPOT = "BINANCE_SPOT"
     BINANCE_PERP = "BINANCE_PERP"
     BYBIT_LINEAR = "BYBIT_LINEAR"
@@ -30,32 +30,32 @@ class Venue(str, Enum):
     OKX_SPOT = "OKX_SPOT"
 
 
-class MarketType(str, Enum):
+class MarketType(StrEnum):
     SPOT = "SPOT"
     PERPETUAL = "PERPETUAL"
 
 
-class ContractType(str, Enum):
+class ContractType(StrEnum):
     SPOT = "SPOT"
     LINEAR = "LINEAR"
     INVERSE = "INVERSE"
 
 
-class SourceHealth(str, Enum):
+class SourceHealth(StrEnum):
     HEALTHY = "HEALTHY"
     DEGRADED = "DEGRADED"
     STALE = "STALE"
     DEAD = "DEAD"
 
 
-class OpportunityType(str, Enum):
+class OpportunityType(StrEnum):
     SPOT_PERP_BASIS = "SPOT_PERP_BASIS"
     CROSS_VENUE_PERP = "CROSS_VENUE_PERP"
     FUNDING_RATE_DIVERGENCE = "FUNDING_RATE_DIVERGENCE"
     TRIANGULAR_DISLOCATION = "TRIANGULAR_DISLOCATION"
 
 
-class OpportunityClassification(str, Enum):
+class OpportunityClassification(StrEnum):
     OBSERVE = "OBSERVE"
     CANDIDATE = "CANDIDATE"
     VALIDATING = "VALIDATING"
@@ -65,7 +65,7 @@ class OpportunityClassification(str, Enum):
     EXPIRED = "EXPIRED"
 
 
-class RejectionCode(str, Enum):
+class RejectionCode(StrEnum):
     NONE = "NONE"
     ERR_STALE_DATA = "ERR_STALE_DATA"
     ERR_CLOCK_DRIFT = "ERR_CLOCK_DRIFT"
@@ -85,7 +85,7 @@ class RejectionCode(str, Enum):
     ERR_RISK_PERIMETER_BLOCKED = "ERR_RISK_PERIMETER_BLOCKED"
 
 
-class BasisRegime(str, Enum):
+class BasisRegime(StrEnum):
     CONTANGO_EXTREME = "CONTANGO_EXTREME"  # Z >= 2.5
     NORMAL_CONTANGO = "NORMAL_CONTANGO"  # 0.5 <= Z < 2.5
     NEUTRAL_BASIS = "NEUTRAL_BASIS"  # -0.5 <= Z < 0.5

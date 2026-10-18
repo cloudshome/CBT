@@ -36,9 +36,7 @@ def store(tmp_path):
     return CandleStore(root=tmp_path)
 
 
-def frame(
-    n: int = 300, *, last_ts: int = NOW - 10 * STEP, seed: int = 7
-) -> pd.DataFrame:
+def frame(n: int = 300, *, last_ts: int = NOW - 10 * STEP, seed: int = 7) -> pd.DataFrame:
     """Deterministic healthy 1m OHLCV ending at ``last_ts``."""
     rng = np.random.default_rng(seed)
     ts = np.arange(n, dtype=np.int64) * STEP + (last_ts - (n - 1) * STEP)
@@ -299,9 +297,7 @@ def test_quarantined_data_rolls_desk_to_not_ready(store, monkeypatch):
             "detail": "no blocks",
         },
     )
-    monkeypatch.setattr(
-        agent, "_data_pillar", lambda: _data_pillar(store=store, now_ms=NOW)
-    )
+    monkeypatch.setattr(agent, "_data_pillar", lambda: _data_pillar(store=store, now_ms=NOW))
 
     strip = agent.readiness_strip(status={"time": NOW, "version": "x", "advice": {}})
     assert strip["level"] == "down"
@@ -356,9 +352,7 @@ def test_data_pillar_is_exception_isolated(store, monkeypatch):
             "detail": "no blocks",
         },
     )
-    monkeypatch.setattr(
-        agent, "_data_pillar", lambda: real_pillar(store=store, now_ms=NOW)
-    )
+    monkeypatch.setattr(agent, "_data_pillar", lambda: real_pillar(store=store, now_ms=NOW))
     strip = agent.readiness_strip(status={"time": NOW, "version": "x", "advice": {}})
     assert strip["level"] == "down"
     assert {p["name"] for p in strip["pillars"]} == {

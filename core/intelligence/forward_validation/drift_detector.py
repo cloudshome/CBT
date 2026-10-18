@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import logging
 import time
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -39,7 +39,7 @@ from core.intelligence.forward_validation.paper_fill_simulator import (
 logger = logging.getLogger("ai_quant_sentinel.intelligence.drift_detector")
 
 
-class DriftStatus(str, Enum):
+class DriftStatus(StrEnum):
     """Multi-dimensional drift severity classification."""
 
     NORMAL = "NORMAL"

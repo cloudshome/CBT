@@ -31,7 +31,7 @@ class QuantMentor:
 
                 self._client = genai.Client(api_key=self.api_key)
                 logger.info(f"Gemini GenAI client initialized with model '{self.model_name}'.")
-            except Exception as e:  # noqa: BLE001 — defensive fallback
+            except Exception as e:
                 logger.warning(f"Could not initialize google-genai client: {e}")
                 self._client = None
 
@@ -71,10 +71,8 @@ class QuantMentor:
                     )
                     if response and response.text:
                         return response.text.strip()
-                except Exception as e:  # noqa: BLE001 — defensive fallback
-                    logger.debug(
-                        f"Gemini API generation error with model '{candidate_model}': {e}"
-                    )
+                except Exception as e:
+                    logger.debug(f"Gemini API generation error with model '{candidate_model}': {e}")
 
         # Local High-Precision Heuristic Fallback
         return self._generate_heuristic_response(user_message, telemetry_ctx, language_preference)
@@ -86,7 +84,14 @@ class QuantMentor:
             return "ETH/USDT"
         if "SOL" in t or "SOLANA" in t or "সোলানা" in lower:
             return "SOL/USDT"
-        if "XAU" in t or "GOLD" in t or "PAXG" in t or "স্বর্ণ" in lower or "সোনা" in lower or "গোল্ড" in lower:
+        if (
+            "XAU" in t
+            or "GOLD" in t
+            or "PAXG" in t
+            or "স্বর্ণ" in lower
+            or "সোনা" in lower
+            or "গোল্ড" in lower
+        ):
             return "XAU/USD"
         if "BTC" in t or "BITCOIN" in t or "বিটকয়েন" in lower or "বিটিসি" in lower:
             return "BTC/USDT"
@@ -94,7 +99,12 @@ class QuantMentor:
 
     def _detect_timeframe(self, text: str, default: str = "15m") -> str:
         lower = text.lower()
-        if re.search(r"\b15m\b", lower) or "15 মিনিট" in lower or "১৫ মিনিট" in lower or "১৫ মি" in lower:
+        if (
+            re.search(r"\b15m\b", lower)
+            or "15 মিনিট" in lower
+            or "১৫ মিনিট" in lower
+            or "১৫ মি" in lower
+        ):
             return "15m"
         if re.search(r"\b5m\b", lower) or "5 মিনিট" in lower or "৫ মিনিট" in lower:
             return "5m"
@@ -169,7 +179,10 @@ class QuantMentor:
         # --------------------------------------------------------------------------
         # INTENT -1: RESEARCH / EVIDENCE DOSSIER GROUNDED REQUEST
         # --------------------------------------------------------------------------
-        if any(w in msg_lower for w in ["research", "evidence", "findings", "রিসার্চ", "গবেষণা", "নলেজ", "প্রজেক্টের ডাটা"]):
+        if any(
+            w in msg_lower
+            for w in ["research", "evidence", "findings", "রিসার্চ", "গবেষণা", "নলেজ", "প্রজেক্টের ডাটা"]
+        ):
             if telemetry.get("research_grounding"):
                 return telemetry["research_grounding"]
 

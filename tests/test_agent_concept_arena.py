@@ -8,7 +8,7 @@ Unit tests for AgentConceptArena and Mastermind Tournament:
 """
 
 from pathlib import Path
-import tempfile
+
 import pytest
 
 from core.research.agent_concept_arena import AgentConceptArena
@@ -53,8 +53,11 @@ def test_agent_concept_arena_paper_deployment_risk_invariants(temp_arena_env):
     assert res_default.paper_trades_deployed == 0
 
     # 2. When deploy_to_paper=True, verify size is Half-Kelly risk bounded (NOT hardcoded 1.0)
-    res_deployed = arena.run_tournament_round(bars_count=200, deploy_to_paper=True, symbol="ETH/USDT")
+    res_deployed = arena.run_tournament_round(
+        bars_count=200, deploy_to_paper=True, symbol="ETH/USDT"
+    )
     from core.portfolio_shadow import portfolio_shadow
+
     positions = portfolio_shadow.get_open_positions()
     arena_pos = [p for p in positions if "Arena Leader" in (p.get("entry_reason") or "")]
     if arena_pos:
@@ -71,6 +74,3 @@ def test_agent_concept_arena_paper_deployment_risk_invariants(temp_arena_env):
         assert max_loss <= 150.0
         # Clean up test position
         portfolio_shadow.close_position(pos["position_id"], pos["entry_price"], "TEST_CLEANUP")
-
-
-

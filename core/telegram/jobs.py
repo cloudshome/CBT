@@ -70,7 +70,7 @@ class TelegramJobManager:
                     "CREATE INDEX IF NOT EXISTS idx_tg_jobs_user ON telegram_jobs (user_id);"
                 )
                 conn.commit()
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.warning(f"Could not initialize telegram_jobs table: {e}")
 
     def create_job(
@@ -112,7 +112,7 @@ class TelegramJobManager:
                     ),
                 )
                 conn.commit()
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.error(f"Error creating telegram job {job_id}: {e}")
 
         return job
@@ -155,7 +155,7 @@ class TelegramJobManager:
                         (status, now, res_str, error, job_id),
                     )
                 conn.commit()
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.error(f"Error updating job {job_id}: {e}")
 
     def get_job(self, job_id: str) -> TelegramJob | None:
@@ -179,7 +179,7 @@ class TelegramJobManager:
                         result_json=row["result_json"] or "",
                         error_message=row["error_message"] or "",
                     )
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.error(f"Error querying job {clean_id}: {e}")
         return None
 
@@ -247,7 +247,7 @@ class TelegramJobManager:
                     )
                     for row in rows
                 ]
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.error(f"Error listing jobs: {e}")
             return []
 
@@ -270,7 +270,7 @@ class TelegramJobManager:
                 if reconciled > 0:
                     logger.info(f"Reconciled {reconciled} orphaned jobs to INTERRUPTED.")
                 return reconciled
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.warning(f"Failed reconciling orphaned jobs: {e}")
             return 0
 

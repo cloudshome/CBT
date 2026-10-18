@@ -128,9 +128,7 @@ def test_pre_trade_checklist(tmp_path):
             "risk_reward": 2.0,
         },
         "plans": [{"type": "Buy Pullback"}],
-        "snapshot": {
-            "features": {"symbol": "BTCUSDT", "regime_label": "Trending Bull"}
-        },
+        "snapshot": {"features": {"symbol": "BTCUSDT", "regime_label": "Trending Bull"}},
         "mtf": {"htf_bias": "bullish"},
         "context": {"macro": {"label": "normal"}},
     }
@@ -155,9 +153,7 @@ def test_business_metrics(tmp_path):
     assert o["max_win_streak"] == 6
     assert o["max_loss_streak"] == 4
     assert o["expectancy_r"] == pytest.approx(0.8)
-    assert (
-        m["rolling"]["50"]["n"] == 10
-    )  # window smaller than the sample: uses the tail
+    assert m["rolling"]["50"]["n"] == 10  # window smaller than the sample: uses the tail
     assert m["rolling"]["100"]["n"] == 10
     db.close()
 

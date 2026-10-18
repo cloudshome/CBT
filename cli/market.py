@@ -51,9 +51,7 @@ def cmd_backfill(args) -> int:
         csv_source = getattr(args, "csv_source", "binance")
         csv_exchange = "dukascopy" if csv_source == "dukascopy" else args.exchange
         csv_market = "spot" if csv_source == "dukascopy" else args.market
-        price_type = (
-            getattr(args, "price_type", "") if csv_source == "dukascopy" else ""
-        )
+        price_type = getattr(args, "price_type", "") if csv_source == "dukascopy" else ""
         source_tag = "dukascopy_csv" if csv_source == "dukascopy" else "csv"
         try:
             payload = backfill_from_csv(
@@ -217,9 +215,7 @@ def cmd_backfill(args) -> int:
     if args.json:
         print(json.dumps(payload, indent=2, default=str))
     else:
-        print(
-            f"backfill {result.exchange}/{result.market}/{result.symbol}/{result.timeframe}"
-        )
+        print(f"backfill {result.exchange}/{result.market}/{result.symbol}/{result.timeframe}")
         print(
             f"  pages {result.pages}  before {result.rows_before}  "
             f"after {result.rows_after}  added {result.rows_added}"
@@ -321,9 +317,7 @@ def cmd_doctor(args) -> int:
         try:
             immune = run_health_check()
         except Exception as exc:  # pragma: no cover - defensive
-            immune = {
-                "error": f"immune.run_health_check() failed: {type(exc).__name__}: {exc}"
-            }
+            immune = {"error": f"immune.run_health_check() failed: {type(exc).__name__}: {exc}"}
         try:
             from brain.agent import readiness_strip
 
@@ -373,11 +367,7 @@ def cmd_channels(args) -> int:
 
     if args.json:
         channels = probe_all()
-        print(
-            json.dumps(
-                {n: ch.to_dict() for n, ch in channels.items()}, indent=2, default=str
-            )
-        )
+        print(json.dumps({n: ch.to_dict() for n, ch in channels.items()}, indent=2, default=str))
         return 0
     print(list_channels(as_json=False))
     return 0
@@ -467,9 +457,7 @@ def cmd_derivatives(args) -> int:
             return 0
         print(f"derivatives {symbol}/{args.market} — {len(rows)} metrics stored")
         for r in rows:
-            print(
-                f"  {r['metric']:<22} {r['count']:>9,} rows  {r['first']} → {r['last']} UTC"
-            )
+            print(f"  {r['metric']:<22} {r['count']:>9,} rows  {r['first']} → {r['last']} UTC")
     return 0
 
 
@@ -491,9 +479,7 @@ def cmd_cross(args) -> int:
     from data.symbols import resolve_symbol
 
     store = (
-        CrossExchangeStore(root=args.root)
-        if getattr(args, "root", None)
-        else CrossExchangeStore()
+        CrossExchangeStore(root=args.root) if getattr(args, "root", None) else CrossExchangeStore()
     )
     symbol = resolve_symbol(args.symbol).symbol
 
@@ -501,9 +487,7 @@ def cmd_cross(args) -> int:
         candle_root = getattr(args, "candle_root", None)
         deriv_root = getattr(args, "deriv_root", None)
         candle_store = CandleStore(root=candle_root) if candle_root else CandleStore()
-        deriv_store = (
-            DerivativesStore(root=deriv_root) if deriv_root else DerivativesStore()
-        )
+        deriv_store = DerivativesStore(root=deriv_root) if deriv_root else DerivativesStore()
         try:
             collector = CrossExchangeCollector(
                 store,
@@ -527,16 +511,10 @@ def cmd_cross(args) -> int:
         if args.json:
             print(json.dumps(payload, indent=2, default=str))
         else:
-            dest = (
-                "dry-run — nothing written"
-                if args.dry_run
-                else "written to " + str(store.root)
-            )
+            dest = "dry-run — nothing written" if args.dry_run else "written to " + str(store.root)
             print(f"cross {symbol}/{args.market} ({dest})")
             if not runs:
-                print(
-                    "  (nothing collected — backfill both venues or rely on the snapshot)"
-                )
+                print("  (nothing collected — backfill both venues or rely on the snapshot)")
             for key, r in runs.items():
                 print(
                     f"  {key:<28} fetched {r.rows_fetched:>5}  "
@@ -550,9 +528,7 @@ def cmd_cross(args) -> int:
     for series in store.list_series():
         if series["symbol"] != symbol:
             continue
-        df = store.read(
-            series["exchange"], series["market"], series["symbol"], series["metric"]
-        )
+        df = store.read(series["exchange"], series["market"], series["symbol"], series["metric"])
         if df.empty:
             continue
         rows.append(

@@ -86,7 +86,7 @@ class TelegramMediaHandler:
             await bot_dispatcher.send_message(summary_msg, chat_id=chat_id)
             return res
 
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.error(f"Error in async research ingestion: {e}")
             if job_id:
                 job_manager.update_job(job_id, status="FAILED", error=str(e))

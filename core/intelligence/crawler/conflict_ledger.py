@@ -18,21 +18,21 @@ import sqlite3
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger("ai_quant_sentinel.intelligence.crawler.conflict_ledger")
 
 
-class ConflictType(str, Enum):
+class ConflictType(StrEnum):
     DATA_REVISION = "DATA_REVISION"  # Official agency revised previous print (e.g. GDP, CPI)
     CONTRADICTORY_REPORT = "CONTRADICTORY_REPORT"  # Two sources report conflicting values
     TIMING_DISCREPANCY = "TIMING_DISCREPANCY"  # Conflicting release timestamps reported
     ENTITY_AMBIGUITY = "ENTITY_AMBIGUITY"  # Unclear whether report applies to asset or issuer
 
 
-class ConflictStatus(str, Enum):
+class ConflictStatus(StrEnum):
     UNRESOLVED = "UNRESOLVED"
     OFFICIAL_PREVAILED = (
         "OFFICIAL_PREVAILED"  # Primary source (officiality=1.0) overrides secondary

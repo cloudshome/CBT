@@ -135,7 +135,7 @@ class OptionsDataFeed:
                                 currency,
                             )
                             return contracts
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.warning("Deribit live options feed failed for %s: %s", currency, exc)
 
             # If live fetch failed, return cached if available, else synthetic calibrated fallback

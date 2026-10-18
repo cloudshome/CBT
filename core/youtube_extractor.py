@@ -87,7 +87,7 @@ def parse_video_id(url_or_id: str) -> str | None:
                 cand = cand.split("?")[0]
                 if len(cand) == 11:
                     return cand
-    except Exception as e:  # noqa: BLE001 — defensive fallback
+    except Exception as e:
         logger.debug(f"Failed to parse URL '{url_or_id}': {e}")
 
     # Fallback regex extraction across the string
@@ -102,7 +102,7 @@ def parse_video_id(url_or_id: str) -> str | None:
 
 def format_timecode(seconds: float) -> str:
     """Formats float seconds into standard MM:SS or HH:MM:SS string."""
-    total_sec = max(0, int(round(seconds)))
+    total_sec = max(0, round(seconds))
     hours = total_sec // 3600
     minutes = (total_sec % 3600) // 60
     secs = total_sec % 60
@@ -123,7 +123,7 @@ def timecode_to_seconds(tc: str) -> float:
             return float(int(parts[0]) * 60 + float(parts[1]))
         elif len(parts) == 1:
             return float(parts[0])
-    except Exception:  # noqa: BLE001 — defensive fallback
+    except Exception:
         return 0.0
     return 0.0
 
@@ -176,7 +176,7 @@ class YouTubeResearchExtractor:
                     meta["description"] = (info.get("description") or "")[:2000]
                     meta["view_count"] = int(info.get("view_count") or 0)
                     meta["upload_date"] = str(info.get("upload_date") or "")
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.warning(f"yt-dlp metadata extraction failed for {video_id}: {e}")
 
         return meta
@@ -194,7 +194,7 @@ class YouTubeResearchExtractor:
             raw = fetched.to_raw_data()
             if raw and len(raw) > 0:
                 return raw
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.debug(f"Direct transcript fetch failed for {video_id}: {e}")
 
         # 2. Attempt via transcript list discovery
@@ -204,23 +204,23 @@ class YouTubeResearchExtractor:
             try:
                 t = transcript_list.find_manually_created_transcript(["en", "en-US", "en-GB"])
                 return t.fetch().to_raw_data()
-            except Exception:  # noqa: S110,BLE001 — defensive fallback
+            except Exception:
                 pass
 
             # Find generated transcript
             try:
                 t = transcript_list.find_generated_transcript(["en", "en-US", "en-GB"])
                 return t.fetch().to_raw_data()
-            except Exception:  # noqa: S110,BLE001 — defensive fallback
+            except Exception:
                 pass
 
             # Any available transcript
             for t in transcript_list:
                 try:
                     return t.fetch().to_raw_data()
-                except Exception:  # noqa: BLE001 — defensive fallback
+                except Exception:
                     continue
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.warning(
                 f"youtube-transcript-api could not retrieve transcript for {video_id}: {e}"
             )

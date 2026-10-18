@@ -167,7 +167,7 @@ class UniversalIngestor:
                     return raw_text, metadata
                 else:
                     return f"Error reading PDF: {pdf_res.get('error')}", metadata
-            except Exception as e:  # noqa: BLE001 — defensive fallback
+            except Exception as e:
                 logger.error(f"PDF extraction error: {e}")
                 return f"Error reading PDF: {e}", metadata
 
@@ -178,7 +178,7 @@ class UniversalIngestor:
                 tree = ast.parse(code_str)
                 funcs = [node.name for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)]
                 metadata["functions"] = funcs
-            except Exception:  # noqa: BLE001 — defensive fallback
+            except Exception:
                 metadata["functions"] = []
             return code_str, metadata
 
@@ -212,7 +212,7 @@ class UniversalIngestor:
                     if transcription:
                         metadata["transcription_provider"] = "GEMINI_MULTIMODAL"
                         return transcription, metadata
-                except Exception as e:  # noqa: BLE001
+                except Exception as e:
                     logger.warning(f"Gemini media transcription failed for {file_path.name}: {e}")
 
             # Fallback for media files when API key not set or offline
@@ -348,7 +348,7 @@ class UniversalIngestor:
                     author=creator,
                     source_id=sid,
                 )
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.warning(f"Macro cognitive analysis notice: {e}")
 
         # 2. Deconstruct into Atomic Claims, Concepts, Observations
@@ -532,7 +532,7 @@ class UniversalIngestor:
                     metadata={"title": inferred_title, "author": creator, "worldview": worldview},
                 )
                 archive_info = arch_res.to_dict()
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.warning(f"Storage archival notice during universal ingestion: {e}")
 
         # Generate macro-informed live trading plans
@@ -548,11 +548,19 @@ class UniversalIngestor:
                 url_or_text=content[:25000] if not uri.startswith("http") else uri,
                 custom_title=inferred_title,
                 custom_author=creator,
-                custom_category="Quantitative Market Structure" if has_trading_rules else ("Crypto & Decentralized Settlement" if "btc" in content.lower() else "Monetary Policy & Debt Cycles"),
+                custom_category="Quantitative Market Structure"
+                if has_trading_rules
+                else (
+                    "Crypto & Decentralized Settlement"
+                    if "btc" in content.lower()
+                    else "Monetary Policy & Debt Cycles"
+                ),
             )
             wiki_article_id = wiki_art.article_id
-            logger.info(f"Auto-published research ingest {sid} into Wikipedia article: {wiki_article_id}")
-        except Exception as e:  # noqa: BLE001
+            logger.info(
+                f"Auto-published research ingest {sid} into Wikipedia article: {wiki_article_id}"
+            )
+        except Exception as e:
             logger.debug(f"Wikipedia auto-publish note for {sid}: {e}")
 
         return {

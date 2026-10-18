@@ -48,7 +48,7 @@ class LocalKronosProvider:
                 import torch
 
                 self.actual_device = "cuda" if torch.cuda.is_available() else "cpu"
-            except Exception:  # noqa: BLE001
+            except Exception:
                 self.actual_device = "cpu"
         else:
             self.actual_device = self.requested_device
@@ -76,7 +76,7 @@ class LocalKronosProvider:
                 f"Loaded native Kronos weights ({self.model_variant}) on {self.actual_device}"
             )
             return True
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(f"Failed to load local Kronos weights: {e}")
             self._is_loaded = False
             self.checkpoint_hash = "load_error"

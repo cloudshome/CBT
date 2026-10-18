@@ -93,7 +93,7 @@ class ArbitrageMarketFeed:
                     )
                     self._quotes_cache[(Venue.BINANCE_SPOT, canonical_symbol)] = quote
                     return quote
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.debug(f"Live Binance Spot quote fetch failed for {canonical_symbol}: {e}")
 
         if self.simulation_mode:
@@ -140,7 +140,7 @@ class ArbitrageMarketFeed:
                     )
                     self._quotes_cache[(Venue.BINANCE_PERP, canonical_symbol)] = quote
                     return quote
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.debug(f"Live Binance Perp quote fetch failed for {canonical_symbol}: {e}")
 
         if self.simulation_mode:
@@ -190,7 +190,7 @@ class ArbitrageMarketFeed:
                         )
                         self._quotes_cache[(Venue.BYBIT_LINEAR, canonical_symbol)] = quote
                         return quote
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.debug(f"Live Bybit quote fetch failed for {canonical_symbol}: {e}")
 
         if self.simulation_mode:
@@ -239,7 +239,7 @@ class ArbitrageMarketFeed:
                         )
                         self._quotes_cache[(Venue.OKX_PERP, canonical_symbol)] = quote
                         return quote
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.debug(f"Live OKX quote fetch failed for {canonical_symbol}: {e}")
 
         if self.simulation_mode:
@@ -274,7 +274,7 @@ class ArbitrageMarketFeed:
                     )
                     self._funding_cache[(Venue.BINANCE_PERP, canonical_symbol)] = record
                     return record
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.debug(f"Binance funding fetch failed for {canonical_symbol}: {e}")
 
         if self.simulation_mode:
@@ -311,7 +311,7 @@ class ArbitrageMarketFeed:
                         )
                         self._funding_cache[(Venue.BYBIT_LINEAR, canonical_symbol)] = record
                         return record
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.debug(f"Bybit funding fetch failed for {canonical_symbol}: {e}")
 
         if self.simulation_mode:
@@ -346,7 +346,7 @@ class ArbitrageMarketFeed:
                         )
                         self._funding_cache[(Venue.OKX_PERP, canonical_symbol)] = record
                         return record
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.debug(f"OKX funding fetch failed for {canonical_symbol}: {e}")
 
         if self.simulation_mode:
@@ -434,7 +434,7 @@ class ArbitrageMarketFeed:
                         )
                         self._books_cache[(venue, canonical_symbol)] = snap
                         return snap
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.debug(f"Live book fetch failed for {venue} {canonical_symbol}: {e}")
 
         # Fallback to realistic synthetic depth book

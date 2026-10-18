@@ -197,7 +197,7 @@ async def get_live_canary_status(
                 "SELECT * FROM canary_execution_ledger ORDER BY created_at_ms DESC LIMIT 20"
             ).fetchall()
             recent_executions = [dict(r) for r in rows]
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.debug(f"Could not query recent canary executions: {exc}")
 
     return {
@@ -373,7 +373,7 @@ async def submit_protected_live_order(req: ProtectedOrderRequest):
     if req.environment.upper() == "PRODUCTION":
         from core.auth.hardware_key import hardware_key_manager
 
-        is_cleared, clearance, reason_code = hardware_key_manager.check_live_clearance(
+        is_cleared, _clearance, reason_code = hardware_key_manager.check_live_clearance(
             session_id=req.session_id
         )
         if not is_cleared:

@@ -27,14 +27,14 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 logger = logging.getLogger("ai_quant_sentinel.intelligence.evolution_shield")
 
 REAL_CAPITAL_ENABLED: bool = False
 
 
-class LessonVerdict(str, Enum):
+class LessonVerdict(StrEnum):
     APPROVED_CANDIDATE = "APPROVED_CANDIDATE"
     REJECTED_TOXIC_RISK = "REJECTED_TOXIC_RISK"
     REJECTED_INSUFFICIENT_SAMPLE = "REJECTED_INSUFFICIENT_SAMPLE"
@@ -54,7 +54,7 @@ class ProposedLesson:
     asset_scope: list[str] = field(default_factory=lambda: ["ALL"])
     target_regime: str = "ALL"
     requested_stop_loss_pct_change: float = 0.0  # > 0 means widening stop loss
-    requested_leverage_multiplier: float = 1.0   # > 1.0 means increasing leverage
+    requested_leverage_multiplier: float = 1.0  # > 1.0 means increasing leverage
     attempts_risk_relaxation: bool = False
     attempts_execution_mutation: bool = False
 
@@ -80,12 +80,41 @@ class EvolutionShield:
 
     # Regex patterns detecting toxic risk dilution or defeatism
     TOXIC_PATTERNS = [
-        (re.compile(r"\b(widen|increase|expand|loosen)\s+(the\s+)?(stop|sl|invalidation)\b", re.IGNORECASE), "Prohibited: Widening stop-loss limits."),
-        (re.compile(r"\b(increase|boost|raise|double)\s+(the\s+)?(leverage|margin|notional|risk)\b", re.IGNORECASE), "Prohibited: Increasing leverage or risk exposure."),
-        (re.compile(r"\b(disable|bypass|ignore|override)\s+(the\s+)?(risk|circuit|breaker|kill[- ]?switch|limit)\b", re.IGNORECASE), "Prohibited: Bypassing risk controls or kill switches."),
-        (re.compile(r"\bnever\s+(go\s+)?(long|buy)\s+(btc|eth|crypto)\s+again\b", re.IGNORECASE), "Prohibited: Permanent asymmetric directional defeatism."),
-        (re.compile(r"\bnever\s+(go\s+)?(short|sell)\s+(btc|eth|crypto)\s+again\b", re.IGNORECASE), "Prohibited: Permanent asymmetric directional defeatism."),
-        (re.compile(r"\b(double\s+down|martingale|average\s+down)\b", re.IGNORECASE), "Prohibited: Martingale or loss averaging heuristics."),
+        (
+            re.compile(
+                r"\b(widen|increase|expand|loosen)\s+(the\s+)?(stop|sl|invalidation)\b",
+                re.IGNORECASE,
+            ),
+            "Prohibited: Widening stop-loss limits.",
+        ),
+        (
+            re.compile(
+                r"\b(increase|boost|raise|double)\s+(the\s+)?(leverage|margin|notional|risk)\b",
+                re.IGNORECASE,
+            ),
+            "Prohibited: Increasing leverage or risk exposure.",
+        ),
+        (
+            re.compile(
+                r"\b(disable|bypass|ignore|override)\s+(the\s+)?(risk|circuit|breaker|kill[- ]?switch|limit)\b",
+                re.IGNORECASE,
+            ),
+            "Prohibited: Bypassing risk controls or kill switches.",
+        ),
+        (
+            re.compile(r"\bnever\s+(go\s+)?(long|buy)\s+(btc|eth|crypto)\s+again\b", re.IGNORECASE),
+            "Prohibited: Permanent asymmetric directional defeatism.",
+        ),
+        (
+            re.compile(
+                r"\bnever\s+(go\s+)?(short|sell)\s+(btc|eth|crypto)\s+again\b", re.IGNORECASE
+            ),
+            "Prohibited: Permanent asymmetric directional defeatism.",
+        ),
+        (
+            re.compile(r"\b(double\s+down|martingale|average\s+down)\b", re.IGNORECASE),
+            "Prohibited: Martingale or loss averaging heuristics.",
+        ),
     ]
 
     def __init__(self, min_sample_size: int = MINIMUM_SAMPLE_SIZE) -> None:
@@ -100,13 +129,19 @@ class EvolutionShield:
 
         # Layer 1: Toxic Parameter Modifications
         if lesson.requested_stop_loss_pct_change > 0:
-            rejection_reasons.append("Rejected: Direct request to widen stop-loss invalidation distance.")
+            rejection_reasons.append(
+                "Rejected: Direct request to widen stop-loss invalidation distance."
+            )
         if lesson.requested_leverage_multiplier > 1.0:
-            rejection_reasons.append(f"Rejected: Request to increase leverage by {lesson.requested_leverage_multiplier}x.")
+            rejection_reasons.append(
+                f"Rejected: Request to increase leverage by {lesson.requested_leverage_multiplier}x."
+            )
         if lesson.attempts_risk_relaxation:
             rejection_reasons.append("Rejected: Flagged as attempting risk ceiling relaxation.")
         if lesson.attempts_execution_mutation:
-            rejection_reasons.append("Rejected: AI lessons cannot directly alter execution order routers.")
+            rejection_reasons.append(
+                "Rejected: AI lessons cannot directly alter execution order routers."
+            )
 
         # Layer 1b: Toxic Language / Pattern Inspection
         full_text = f"{lesson.proposed_rule} {lesson.rationale}"

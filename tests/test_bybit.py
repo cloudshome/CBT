@@ -123,12 +123,8 @@ def test_descending_v5_rows_are_reversed_to_ascending(monkeypatch):
 
 
 def test_start_and_end_params_are_ms(monkeypatch):
-    calls = _patch_bybit(
-        monkeypatch, lambda p: (_bybit_payload([_bybit_row(T0, 1.0)]), {}, 200)
-    )
-    BybitClient().klines_page(
-        "BTCUSDT", "1m", 10, start_time=T0, end_time=T0 + 9 * STEP
-    )
+    calls = _patch_bybit(monkeypatch, lambda p: (_bybit_payload([_bybit_row(T0, 1.0)]), {}, 200))
+    BybitClient().klines_page("BTCUSDT", "1m", 10, start_time=T0, end_time=T0 + 9 * STEP)
     assert calls[0]["params"]["start"] == T0
     assert calls[0]["params"]["end"] == T0 + 9 * STEP
     assert calls[0]["params"]["interval"] == "1"
@@ -136,9 +132,7 @@ def test_start_and_end_params_are_ms(monkeypatch):
 
 
 def test_rate_limit_retcode_maps_to_429(monkeypatch):
-    _patch_bybit(
-        monkeypatch, lambda p: (_bybit_payload([], retcode=RETCODE_RATE_LIMIT), {}, 200)
-    )
+    _patch_bybit(monkeypatch, lambda p: (_bybit_payload([], retcode=RETCODE_RATE_LIMIT), {}, 200))
     page = BybitClient().klines_page("BTCUSDT", "1m", 10)
     assert page.data is None
     assert page.status == 429  # backfill backoff engages
@@ -179,9 +173,7 @@ def test_unsupported_timeframe_raises():
 
 
 def test_klines_wrapper_raises_connection_error_on_failure(monkeypatch):
-    _patch_bybit(
-        monkeypatch, lambda p: (_bybit_payload([], retcode=RETCODE_RATE_LIMIT), {}, 200)
-    )
+    _patch_bybit(monkeypatch, lambda p: (_bybit_payload([], retcode=RETCODE_RATE_LIMIT), {}, 200))
     with pytest.raises(ConnectionError):
         BybitClient().klines("BTCUSDT", "1m", 10)
 
@@ -258,9 +250,7 @@ def test_bybit_adapter_satisfies_the_contract(monkeypatch):
     def fake(self, hosts, path, params, timeout=None, retries=None):
         calls.append({"hosts": list(hosts), "path": path, "params": params})
         return (
-            _bybit_payload(
-                [_bybit_row(T0 + (2 - i) * STEP, 60_000.0 + i) for i in range(3)]
-            ),
+            _bybit_payload([_bybit_row(T0 + (2 - i) * STEP, 60_000.0 + i) for i in range(3)]),
             {},
             200,
         )
@@ -382,9 +372,7 @@ def test_funding_history_parses_v5_and_sorts_ascending(monkeypatch):
         },
         {"symbol": "BTCUSDT", "fundingRate": "0.0001", "fundingRateTimestamp": str(t0)},
     ]
-    calls = _patch_bybit(
-        monkeypatch, lambda p: ({"retCode": 0, "result": {"list": rows}}, {}, 200)
-    )
+    calls = _patch_bybit(monkeypatch, lambda p: ({"retCode": 0, "result": {"list": rows}}, {}, 200))
     df = BybitClient().funding_history("BTCUSDT", t0, t0 + step, 200)
     assert calls[0]["path"] == "/v5/market/funding/history"
     assert calls[0]["params"]["category"] == "linear"

@@ -18,7 +18,7 @@ import asyncio
 import logging
 import time
 from dataclasses import asdict, dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from core.audit_bus import audit_bus
@@ -34,7 +34,7 @@ from core.execution.protection.base_adapter import (
 logger = logging.getLogger("sky.execution.state_machine")
 
 
-class EntryState(str, Enum):
+class EntryState(StrEnum):
     INTENT = "INTENT"
     ENTRY_SUBMITTED = "ENTRY_SUBMITTED"
     ENTRY_PARTIALLY_FILLED = "ENTRY_PARTIALLY_FILLED"
@@ -285,10 +285,10 @@ class ProtectedEntryStateMachine:
                         elif st.status in ("CANCELLED", "REJECTED", "EXPIRED"):
                             self.transition(ctx, EntryState.CANCELLED, reason=f"Order {st.status}")
                             return ctx
-                    except Exception as e:  # noqa: BLE001
+                    except Exception as e:
                         logger.warning(f"[StateMachine] Polling entry status error: {e}")
 
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             msg = sanitize_text(str(exc))
             logger.error(f"[StateMachine] Entry dispatch exception: {msg}")
             ctx.error_message = msg
@@ -337,7 +337,7 @@ class ProtectedEntryStateMachine:
                 f"[StateMachine] 🚨 TIMEOUT ({protection_timeout_sec}s) placing protection bracket for {ctx.symbol}!"
             )
             ctx.error_message = f"Protection placement timed out after {protection_timeout_sec}s"
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             msg = sanitize_text(str(exc))
             logger.critical(
                 f"[StateMachine] 🚨 Exception placing protection bracket for {ctx.symbol}: {msg}"

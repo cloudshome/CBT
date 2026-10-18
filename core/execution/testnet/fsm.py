@@ -173,7 +173,7 @@ class RehearsalFSM:
         for hook in self._on_transition_hooks:
             try:
                 hook(from_state, target, reason)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.error(f"FSM transition hook error: {e}")
 
     def register_transition_hook(

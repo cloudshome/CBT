@@ -199,7 +199,7 @@ class ParameterPerturbationAuditor:
                         if p_std > 1e-9
                         else 0.0
                     )
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:
                     logger.debug("Perturbation evaluation failed for %s=%s: %s", key, new_val, exc)
                     p_sr = 0.0
 

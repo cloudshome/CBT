@@ -55,7 +55,7 @@ class VoiceInterface:
                 )
                 if response and response.text:
                     return response.text.strip()
-            except Exception as e:  # noqa: BLE001 — defensive fallback
+            except Exception as e:
                 # 2. Legacy google.generativeai fallback
                 try:
                     import google.generativeai as genai_legacy
@@ -68,7 +68,7 @@ class VoiceInterface:
                     )
                     if response and response.text:
                         return response.text.strip()
-                except Exception as ex:  # noqa: BLE001 — defensive fallback
+                except Exception as ex:
                     logger.warning(
                         f"Gemini audio transcription failed ({e} / {ex}), falling back to local extractor."
                     )

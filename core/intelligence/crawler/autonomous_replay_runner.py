@@ -19,7 +19,7 @@ import logging
 import os
 import sqlite3
 import time
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any, Literal
 
@@ -49,7 +49,7 @@ from core.intelligence.research_contract import PreregisteredResearchContract
 logger = logging.getLogger("ai_quant_sentinel.intelligence.crawler.autonomous_replay_runner")
 
 
-class ReplayJobStatus(str, Enum):
+class ReplayJobStatus(StrEnum):
     """Lifecycle status of an individual replay execution job."""
 
     PENDING = "PENDING"
@@ -378,7 +378,7 @@ class AutonomousReplayRunner:
                 holding_period_bars=12,
                 trial_budget=1,
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             err_msg = f"Failed to instantiate PreregisteredResearchContract: {e}"
             job = self._create_failed_job(plan, tier_upper, idempotency_key, err_msg)
             return job, None

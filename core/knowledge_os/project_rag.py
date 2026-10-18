@@ -121,9 +121,29 @@ class UnifiedProjectKnowledgeRAG:
         tokens = {w.strip() for w in cleaned.split() if len(w.strip()) >= 3}
         # Filter common stopwords
         stopwords = {
-            "the", "and", "for", "with", "that", "this", "from", "are", "what",
-            "how", "about", "have", "kemon", "bhai", "koto", "dike", "jabe",
-            "kore", "holo", "hoy", "ache", "ki", "shob"
+            "the",
+            "and",
+            "for",
+            "with",
+            "that",
+            "this",
+            "from",
+            "are",
+            "what",
+            "how",
+            "about",
+            "have",
+            "kemon",
+            "bhai",
+            "koto",
+            "dike",
+            "jabe",
+            "kore",
+            "holo",
+            "hoy",
+            "ache",
+            "ki",
+            "shob",
         }
         return tokens - stopwords
 
@@ -163,7 +183,8 @@ class UnifiedProjectKnowledgeRAG:
                     article_id=r["article_id"],
                     title=r["title"],
                     category=r["category"],
-                    summary=r["executive_summary"][:300] + ("..." if len(r["executive_summary"]) > 300 else ""),
+                    summary=r["executive_summary"][:300]
+                    + ("..." if len(r["executive_summary"]) > 300 else ""),
                     verification_score=float(r["verification_score"]),
                     relevance_score=score,
                 )
@@ -301,8 +322,12 @@ class UnifiedProjectKnowledgeRAG:
                     candidate_id=r["candidate_id"],
                     strategy_name=r["strategy_name"],
                     validation_stage=r["validation_stage"],
-                    backtest_expectancy=float(r["backtest_expectancy"]) if r["backtest_expectancy"] is not None else None,
-                    win_rate=float(r["backtest_win_rate"]) if r["backtest_win_rate"] is not None else None,
+                    backtest_expectancy=float(r["backtest_expectancy"])
+                    if r["backtest_expectancy"] is not None
+                    else None,
+                    win_rate=float(r["backtest_win_rate"])
+                    if r["backtest_win_rate"] is not None
+                    else None,
                 )
                 results.append((score, item))
 
@@ -356,17 +381,23 @@ class UnifiedProjectKnowledgeRAG:
         lines.append("📊 **1. CURRENT MARKET VITALS:**")
         lines.append(f"• BTC Price: `${btc_p:,.2f}` | ETH Price: `${eth_p:,.2f}`")
         if "virtual_equity" in v:
-            lines.append(f"• Shadow Equity: `${v['virtual_equity']:,.2f}` | Open Positions: `{v.get('open_positions_count', 0)}`")
+            lines.append(
+                f"• Shadow Equity: `${v['virtual_equity']:,.2f}` | Open Positions: `{v.get('open_positions_count', 0)}`"
+            )
         lines.append("• Risk Bounds: Half-Kelly (Max 2.5% Equity/Trade) | Real Capital: `LOCKED`\n")
 
         # 2. CBT RESEARCH
         lines.append("📚 **2. RELEVANT CBT RESEARCH & THESES:**")
         if d.theses:
             for t in d.theses:
-                lines.append(f"• **Thesis [{t.thesis_id}]:** {t.title} `[{t.status}]` (Conf: {t.confidence_score:.2f})")
+                lines.append(
+                    f"• **Thesis [{t.thesis_id}]:** {t.title} `[{t.status}]` (Conf: {t.confidence_score:.2f})"
+                )
         if d.wiki_articles:
             for a in d.wiki_articles:
-                lines.append(f"• **Wiki [{a.article_id}]:** {a.title} ({a.category}) — Score: {a.verification_score:.2f}")
+                lines.append(
+                    f"• **Wiki [{a.article_id}]:** {a.title} ({a.category}) — Score: {a.verification_score:.2f}"
+                )
         if not d.theses and not d.wiki_articles:
             lines.append("• _No directly matching long-form research articles._")
         lines.append("")
@@ -375,8 +406,14 @@ class UnifiedProjectKnowledgeRAG:
         lines.append("⚖️ **3. EMPIRICAL CLAIMS & EVIDENCE LEDGER:**")
         if d.claims:
             for c in d.claims:
-                icon = "✅" if c.verification_status in ("VERIFIED_TRUE", "EMPIRICALLY_SUPPORTED") else ("❌" if c.verification_status in ("CONTRADICTED", "REFUTED") else "🔍")
-                lines.append(f"• {icon} `[{c.claim_id}]` **[{c.verification_status}]** ({c.claim_type}): {c.claim_text}")
+                icon = (
+                    "✅"
+                    if c.verification_status in ("VERIFIED_TRUE", "EMPIRICALLY_SUPPORTED")
+                    else ("❌" if c.verification_status in ("CONTRADICTED", "REFUTED") else "🔍")
+                )
+                lines.append(
+                    f"• {icon} `[{c.claim_id}]` **[{c.verification_status}]** ({c.claim_type}): {c.claim_text}"
+                )
                 if c.corroborating_evidence:
                     lines.append(f"   ↳ _Evidence:_ {c.corroborating_evidence[:100]}...")
         else:
@@ -387,13 +424,21 @@ class UnifiedProjectKnowledgeRAG:
         lines.append("🧪 **4. DERIVED STRATEGIES & CONCLUSION:**")
         if d.strategies:
             for s in d.strategies:
-                exp_str = f"{s.backtest_expectancy:+.2f}R" if s.backtest_expectancy is not None else "Pending"
-                lines.append(f"• `[{s.candidate_id}]` **{s.strategy_name}** `[{s.validation_stage}]` (EV: {exp_str})")
+                exp_str = (
+                    f"{s.backtest_expectancy:+.2f}R"
+                    if s.backtest_expectancy is not None
+                    else "Pending"
+                )
+                lines.append(
+                    f"• `[{s.candidate_id}]` **{s.strategy_name}** `[{s.validation_stage}]` (EV: {exp_str})"
+                )
         else:
             lines.append("• _No qualified strategy candidates tied to this topic._")
 
         lines.append("━━━━━━━━━━━━━━━━━━━━━━")
-        lines.append("🔒 _Ground Truth Priority: Grounded in SQLite Ledgers & Zero-Lookahead conventions._")
+        lines.append(
+            "🔒 _Ground Truth Priority: Grounded in SQLite Ledgers & Zero-Lookahead conventions._"
+        )
         return "\n".join(lines)
 
 

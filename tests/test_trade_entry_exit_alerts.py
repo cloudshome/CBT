@@ -90,8 +90,10 @@ class TestTradeEntryExitAlerts(unittest.IsolatedAsyncioTestCase):
             self.assertIn("Exit Time (প্রস্থান সময়):", sent_text)
 
     def test_shadow_position_lifecycle_with_reasons(self):
-        with patch.object(telegram_bot, "notify_trade_entry_sync") as mock_entry_notify, \
-             patch.object(telegram_bot, "notify_trade_exit_sync") as mock_exit_notify:
+        with (
+            patch.object(telegram_bot, "notify_trade_entry_sync") as mock_entry_notify,
+            patch.object(telegram_bot, "notify_trade_exit_sync") as mock_exit_notify,
+        ):
             # 1. Open Position
             reason_entry = "Confluence of daily trend and hourly FVG sweep"
             pos_id = portfolio_shadow.open_position(
@@ -161,9 +163,7 @@ class TestTradeEntryExitAlerts(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(current_pos), 1)
         self.assertIn("openedAtFormatted", current_pos[0])
         self.assertTrue(current_pos[0]["openedAtFormatted"].endswith("UTC"))
-        self.assertEqual(
-            current_pos[0]["entryReason"], "Key Support bounce + Bullish Divergence"
-        )
+        self.assertEqual(current_pos[0]["entryReason"], "Key Support bounce + Bullish Divergence")
 
         # Close position
         portfolio_shadow.close_position(
@@ -181,9 +181,7 @@ class TestTradeEntryExitAlerts(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(past_pos), 1)
         self.assertIn("openedAtFormatted", past_pos[0])
         self.assertIn("closedAtFormatted", past_pos[0])
-        self.assertEqual(
-            past_pos[0]["entryReason"], "Key Support bounce + Bullish Divergence"
-        )
+        self.assertEqual(past_pos[0]["entryReason"], "Key Support bounce + Bullish Divergence")
         self.assertEqual(past_pos[0]["exitReason"], "TP2 TARGET REACHED")
 
     def test_telegram_close_by_position_id_and_symbol(self):
@@ -249,9 +247,11 @@ class TestTradeEntryExitAlerts(unittest.IsolatedAsyncioTestCase):
             role=TelegramRole.TRADER,
         )
 
-        with patch.object(telegram_bot, "send_message", new_callable=AsyncMock) as mock_send, \
-             patch.object(telegram_bot, "answer_callback_query", new_callable=AsyncMock) as mock_ans, \
-             patch("core.telegram.rbac.rbac_registry.is_authorized", return_value=(True, identity)):
+        with (
+            patch.object(telegram_bot, "send_message", new_callable=AsyncMock) as mock_send,
+            patch.object(telegram_bot, "answer_callback_query", new_callable=AsyncMock) as mock_ans,
+            patch("core.telegram.rbac.rbac_registry.is_authorized", return_value=(True, identity)),
+        ):
             mock_send.return_value = True
             mock_ans.return_value = True
 
@@ -268,7 +268,9 @@ class TestTradeEntryExitAlerts(unittest.IsolatedAsyncioTestCase):
             mock_ans.assert_called_with("cb_001", "SL moved to breakeven.")
 
             # Check that stop loss was updated to entry price (160.0)
-            open_pos = [p for p in portfolio_shadow.get_open_positions() if p["position_id"] == pos_id]
+            open_pos = [
+                p for p in portfolio_shadow.get_open_positions() if p["position_id"] == pos_id
+            ]
             self.assertEqual(len(open_pos), 1)
             self.assertEqual(open_pos[0]["stop_loss"], 160.0)
 
@@ -285,5 +287,7 @@ class TestTradeEntryExitAlerts(unittest.IsolatedAsyncioTestCase):
             mock_ans.assert_called_with("cb_002", "Trade closed.")
 
             # Verify position is closed
-            remaining = [p for p in portfolio_shadow.get_open_positions() if p["position_id"] == pos_id]
+            remaining = [
+                p for p in portfolio_shadow.get_open_positions() if p["position_id"] == pos_id
+            ]
             self.assertEqual(len(remaining), 0)

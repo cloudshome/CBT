@@ -17,13 +17,13 @@ from __future__ import annotations
 import hashlib
 import json
 import time
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
 
-class AdmissionStatus(str, Enum):
+class AdmissionStatus(StrEnum):
     """Lifecycle status of a strategy within the Forward Validation Research League."""
 
     PENDING_REVIEW = "PENDING_REVIEW"
@@ -36,7 +36,7 @@ class AdmissionStatus(str, Enum):
     DATA_INVALIDATED = "DATA_INVALIDATED"
 
 
-class EvaluationMode(str, Enum):
+class EvaluationMode(StrEnum):
     """Execution mode for forward evaluation."""
 
     SHADOW_ONLY = "SHADOW_ONLY"

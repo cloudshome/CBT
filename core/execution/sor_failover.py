@@ -24,7 +24,7 @@ import logging
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from core.audit_bus import audit_bus
@@ -34,7 +34,7 @@ from core.mbo.feed_adapter import ToxicityRegime, mbo_feed_adapter
 logger = logging.getLogger("sky.execution.sor_failover")
 
 
-class ChildSliceStatus(str, Enum):
+class ChildSliceStatus(StrEnum):
     SUBMITTED = "SUBMITTED"
     ACKED = "ACKED"
     PARTIALLY_FILLED = "PARTIALLY_FILLED"
@@ -44,7 +44,7 @@ class ChildSliceStatus(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 
-class VenueHealthState(str, Enum):
+class VenueHealthState(StrEnum):
     HEALTHY = "HEALTHY"
     DEGRADED = "DEGRADED"
     OFFLINE = "OFFLINE"
@@ -190,7 +190,7 @@ class SORFailoverEngine:
                     """
                 )
                 conn.commit()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug(f"Failover schema note: {exc}")
 
     def register_child_slice(self, slice_track: ChildSliceTracking) -> None:
@@ -358,10 +358,10 @@ class SORFailoverEngine:
                             "cooldown_seconds": self.toxic_cooldown_seconds,
                         },
                     )
-                except Exception as _e:  # noqa: BLE001
+                except Exception as _e:
                     logger.debug(f"Audit log error: {_e}")
                 return True, reason
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug(f"VPIN calculation check note: {exc}")
 
         return False, "FLOW_NORMAL"
@@ -402,7 +402,7 @@ class SORFailoverEngine:
                     ),
                 )
                 conn.commit()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug(f"Failed to persist venue health: {exc}")
 
     def _record_failover_event(self, dec: FailoverDecision) -> None:
@@ -430,7 +430,7 @@ class SORFailoverEngine:
                     ),
                 )
                 conn.commit()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug(f"Failed to record failover event: {exc}")
 
 

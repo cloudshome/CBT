@@ -208,7 +208,7 @@ class LibraryIngestor:
             try:
                 reader = pypdf.PdfReader(str(file_path))
                 total_pages = len(reader.pages)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 total_pages = 0
                 logger.error(f"Cannot read PDF structure for {file_path}: {e}")
 
@@ -281,7 +281,7 @@ class LibraryIngestor:
 
         try:
             reader = pypdf.PdfReader(str(file_path))
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             self._fail_job(job.job_id, f"Malformed PDF file: {e}")
             yield {"job_id": job.job_id, "status": "FAILED", "error": str(e)}
             return
@@ -294,7 +294,7 @@ class LibraryIngestor:
         for i in range(min(10, total_pages)):
             try:
                 front_pages.append(reader.pages[i].extract_text() or "")
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.debug("Failed extracting front page %d: %s", i, e)
         front_text = "\n".join(front_pages)
         meta = pdf_book_extractor.extract_metadata_and_isbn(reader, front_text)
@@ -344,7 +344,7 @@ class LibraryIngestor:
             try:
                 page_obj = reader.pages[page_idx]
                 raw_page_text = page_obj.extract_text() or ""
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.warning(
                     f"Failed extracting text on page {page_num} of {file_path.name}: {e}"
                 )

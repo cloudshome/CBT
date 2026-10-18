@@ -14,7 +14,7 @@ import enum
 from dataclasses import dataclass
 
 
-class ToxicityRegime(str, enum.Enum):
+class ToxicityRegime(enum.StrEnum):
     """Classification of order flow toxicity based on VPIN and adverse selection hazard."""
 
     BENIGN = "BENIGN"  # VPIN < 0.35: Retail/Noise-dominated flow
@@ -23,7 +23,7 @@ class ToxicityRegime(str, enum.Enum):
     EXTREME_ADVERSE = "EXTREME_ADVERSE"  # VPIN >= 0.85: Toxic inventory cascade / predatory sweep
 
 
-class ExecutionUrgency(str, enum.Enum):
+class ExecutionUrgency(enum.StrEnum):
     """Prescribed execution urgency under dynamic surface geometry."""
 
     PASSIVE_POST_ONLY = "PASSIVE_POST_ONLY"  # Route exclusively as maker to capture toxic spread

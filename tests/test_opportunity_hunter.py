@@ -13,7 +13,6 @@ Verifies:
 from __future__ import annotations
 
 import pytest
-from unittest.mock import AsyncMock, patch
 
 from core.screener.opportunity_hunter import (
     AttentionState,
@@ -99,7 +98,12 @@ def test_liquidity_and_spread_gate_rejection(hunter: OpportunityHunter):
     """Verifies illiquid coins (< $15M) and wide-spread coins (> 12 bps) are rejected, while core anchors pass."""
     fake_spot = [
         # Illiquid coin: $2M volume -> REJECTED
-        {"symbol": "SHITCOIN1USDT", "quoteVolume": "2000000.0", "lastPrice": "1.0", "priceChangePercent": "50.0"},
+        {
+            "symbol": "SHITCOIN1USDT",
+            "quoteVolume": "2000000.0",
+            "lastPrice": "1.0",
+            "priceChangePercent": "50.0",
+        },
         # Wide-spread coin: 50 bps spread -> REJECTED
         {
             "symbol": "WIDECOINUSDT",
@@ -129,8 +133,18 @@ def test_liquidity_and_spread_gate_rejection(hunter: OpportunityHunter):
         },
     ]
     fake_futures = [
-        {"symbol": "LINKUSDT", "quoteVolume": "120000000.0", "lastPrice": "20.0", "priceChangePercent": "12.0"},
-        {"symbol": "BTCUSDT", "quoteVolume": "900000000.0", "lastPrice": "82000.0", "priceChangePercent": "1.5"},
+        {
+            "symbol": "LINKUSDT",
+            "quoteVolume": "120000000.0",
+            "lastPrice": "20.0",
+            "priceChangePercent": "12.0",
+        },
+        {
+            "symbol": "BTCUSDT",
+            "quoteVolume": "900000000.0",
+            "lastPrice": "82000.0",
+            "priceChangePercent": "1.5",
+        },
     ]
 
     records = hunter._process_and_rank_tickers(fake_spot, fake_futures)
@@ -145,10 +159,20 @@ def test_liquidity_and_spread_gate_rejection(hunter: OpportunityHunter):
 def test_watchlist_lifecycle_transitions(hunter: OpportunityHunter):
     """Verifies DISCOVERED -> QUALIFIED -> ACTIVE -> RETIRED lifecycle."""
     fake_spot = [
-        {"symbol": "LINKUSDT", "quoteVolume": "50000000.0", "lastPrice": "20.0", "priceChangePercent": "10.0"},
+        {
+            "symbol": "LINKUSDT",
+            "quoteVolume": "50000000.0",
+            "lastPrice": "20.0",
+            "priceChangePercent": "10.0",
+        },
     ]
     fake_futures = [
-        {"symbol": "LINKUSDT", "quoteVolume": "50000000.0", "lastPrice": "20.0", "priceChangePercent": "10.0"},
+        {
+            "symbol": "LINKUSDT",
+            "quoteVolume": "50000000.0",
+            "lastPrice": "20.0",
+            "priceChangePercent": "10.0",
+        },
     ]
 
     records = hunter._process_and_rank_tickers(fake_spot, fake_futures)
@@ -164,6 +188,7 @@ def test_watchlist_lifecycle_transitions(hunter: OpportunityHunter):
 async def test_screener_api_endpoint_contracts():
     """Verifies that FastAPI /api/screener/opportunities returns valid JSON schema."""
     from httpx import ASGITransport, AsyncClient
+
     from app import app
 
     transport = ASGITransport(app=app)
@@ -182,4 +207,3 @@ async def test_screener_api_endpoint_contracts():
         resp_wl = await client.get("/api/screener/watchlist")
         assert resp_wl.status_code == 200
         assert "watchlist" in resp_wl.json()
-

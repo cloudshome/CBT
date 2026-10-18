@@ -259,9 +259,7 @@ def cmd_xau_evidence(args) -> int:
     print("XAU PROMOTION EVIDENCE — RESEARCH ONLY")
     print("=" * 76)
     print("  sources    binance:spot:PAXGUSDT  vs  dukascopy:spot:XAUUSD")
-    print(
-        f"  alignment  exact timestamp only · no fill/resample · {result['timeframe']}"
-    )
+    print(f"  alignment  exact timestamp only · no fill/resample · {result['timeframe']}")
     print(
         f"  basis      {basis['status']} · matched {basis['matched_rows']:,} "
         f"(minimum {basis['minimum_overlap']:,})"
@@ -276,9 +274,7 @@ def cmd_xau_evidence(args) -> int:
             f"             MAD {metrics['mad_bps']} bps · max |basis| {metrics['max_abs_bps']} bps"
         )
         print(f"  period     {basis['start']} → {basis['end']}")
-        print(
-            f"  XAU side   {basis['xau']['price_type']} (one-sided research provenance)"
-        )
+        print(f"  XAU side   {basis['xau']['price_type']} (one-sided research provenance)")
     for error in basis.get("errors", []):
         print(f"  basis gap  {error}")
     print(f"  seal       {sealed['status']} · {sealed['seal_key']}")
@@ -373,10 +369,6 @@ def cmd_monte(args) -> int:
             f"{row['time_to_recovery_median_trades']:>11.1f}"
         )
     print("=" * 96)
-    print(
-        "exp DD% = expected maximum drawdown; ruin% = prob drawdown >= ruin threshold;"
-    )
-    print(
-        "below0% = prob final equity below start; TTR = trades to recover to prior peak."
-    )
+    print("exp DD% = expected maximum drawdown; ruin% = prob drawdown >= ruin threshold;")
+    print("below0% = prob final equity below start; TTR = trades to recover to prior peak.")
     return 0

@@ -227,8 +227,19 @@ class MacroEventReporter:
                     "CREATE INDEX IF NOT EXISTS idx_macro_rel_sched ON macro_event_releases (scheduled_timestamp_ms);"
                 )
                 conn.commit()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(f"Could not initialize macro_event_releases table: {e}")
+
+    def _ensure_ready(self) -> None:
+        """Ensures table exists and default catalog is seeded if table is empty."""
+        self._ensure_table_exists()
+        try:
+            with db_manager.get_trading_conn() as conn:
+                cur = conn.execute("SELECT COUNT(*) FROM macro_event_releases;")
+                if cur.fetchone()[0] == 0:
+                    self._seed_default_macro_releases()
+        except Exception:
+            pass
 
     def _seed_default_macro_releases(self) -> None:
         """Seeds realistic historical and upcoming major macro catalysts."""
@@ -363,11 +374,12 @@ class MacroEventReporter:
                         ),
                     )
                 conn.commit()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(f"Error seeding macro releases: {e}")
 
     def get_latest_released_event(self) -> MacroReleaseRecord | None:
         """Retrieves the most recent high-impact macroeconomic event that has released."""
+        self._ensure_ready()
         try:
             with db_manager.get_trading_conn() as conn:
                 cur = conn.execute(
@@ -381,12 +393,13 @@ class MacroEventReporter:
                 row = cur.fetchone()
                 if row:
                     return self._row_to_record(row)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(f"Error fetching latest macro release: {e}")
         return None
 
     def get_upcoming_event(self) -> MacroReleaseRecord | None:
         """Retrieves the nearest pending high-impact macroeconomic catalyst."""
+        self._ensure_ready()
         now_ms = int(time.time() * 1000)
         try:
             with db_manager.get_trading_conn() as conn:
@@ -402,12 +415,13 @@ class MacroEventReporter:
                 row = cur.fetchone()
                 if row:
                     return self._row_to_record(row)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(f"Error fetching upcoming macro release: {e}")
         return None
 
     def list_recent_releases(self, limit: int = 5) -> list[MacroReleaseRecord]:
         """Lists recent macro releases and pending calendar events."""
+        self._ensure_ready()
         try:
             with db_manager.get_trading_conn() as conn:
                 cur = conn.execute(
@@ -419,7 +433,7 @@ class MacroEventReporter:
                     (limit,),
                 )
                 return [self._row_to_record(r) for r in cur.fetchall()]
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(f"Error listing macro releases: {e}")
             return []
 
@@ -590,6 +604,7 @@ class MacroEventReporter:
             currency=currency,
         )
 
+        self._ensure_ready()
         try:
             with db_manager.get_trading_conn() as conn:
                 conn.execute(
@@ -633,13 +648,14 @@ class MacroEventReporter:
                     ),
                 )
                 conn.commit()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(f"Error recording macro release: {e}")
 
         return rec
 
     def check_and_generate_pending_releases(self) -> list[dict[str, Any]]:
         """Checks for newly released events that have not yet been dispatched to Telegram."""
+        self._ensure_ready()
         pending = []
         try:
             with db_manager.get_trading_conn() as conn:
@@ -671,12 +687,13 @@ class MacroEventReporter:
                             "record": rec,
                         }
                     )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.error(f"Error checking pending macro releases: {e}")
         return pending
 
     def mark_notified(self, event_id: str) -> None:
         """Marks a release as dispatched in the database to prevent duplicate alerts."""
+        self._ensure_ready()
         try:
             with db_manager.get_trading_conn() as conn:
                 conn.execute(
@@ -684,7 +701,7 @@ class MacroEventReporter:
                     (event_id,),
                 )
                 conn.commit()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.error(f"Error marking macro release as notified: {e}")
 
     def get_recent_releases(self, limit: int = 5) -> list[dict[str, Any]]:

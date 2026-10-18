@@ -263,7 +263,7 @@ class TCAEngine:
                     "CREATE INDEX IF NOT EXISTS idx_tca_venue ON tca_execution_ledger(venue, created_at_ms);"
                 )
                 conn.commit()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug(f"TCA schema initialization note: {exc}")
 
     def calculate_implementation_shortfall(self, ctx: TCAExecutionContext) -> SlippageAttribution:
@@ -445,7 +445,7 @@ class TCAEngine:
                     "provenance": ctx.provenance,
                 },
             )
-        except Exception as _e:  # noqa: BLE001
+        except Exception as _e:
             logger.debug(f"TCA audit publication note: {_e}")
 
         return result
@@ -511,7 +511,7 @@ class TCAEngine:
                     ),
                 )
                 conn.commit()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error(f"Failed to persist TCA record {res.tca_id}: {exc}")
 
     def get_recent_records(self, limit: int = 50) -> list[dict[str, Any]]:
@@ -527,7 +527,7 @@ class TCAEngine:
                     (limit,),
                 )
                 return [dict(row) for row in cursor.fetchall()]
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug(f"Error reading TCA records: {exc}")
             return []
 
@@ -610,7 +610,7 @@ class TCAEngine:
                         "300s": round(row["avg_markout_300s"] or 0.0, 2),
                     },
                 }
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug(f"Error computing TCA summary: {exc}")
             return {"total_trades": 0, "avg_shortfall_bps": 0.0}
 

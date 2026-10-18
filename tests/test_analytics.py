@@ -101,12 +101,8 @@ def test_mae_mfe_by_setup(db):
         mae=9.5,
         mfe=3.0,
     )
-    db.add_trade(
-        plan_type="reversal", outcome="TP_HIT", rr_achieved=1.5, mae=3.0, mfe=8.0
-    )
-    db.add_trade(
-        plan_type="reversal", outcome="STOP_LOSS", rr_achieved=-1.0, mae=8.0, mfe=2.0
-    )
+    db.add_trade(plan_type="reversal", outcome="TP_HIT", rr_achieved=1.5, mae=3.0, mfe=8.0)
+    db.add_trade(plan_type="reversal", outcome="STOP_LOSS", rr_achieved=-1.0, mae=8.0, mfe=2.0)
 
     r = mae_mfe_summary(db)
     assert r["available"] is True
@@ -140,12 +136,8 @@ def test_mae_mfe_overall_insight(db):
         mae=9.5,
         mfe=3.0,
     )
-    db.add_trade(
-        plan_type="reversal", outcome="TP_HIT", rr_achieved=1.5, mae=3.0, mfe=8.0
-    )
-    db.add_trade(
-        plan_type="reversal", outcome="STOP_LOSS", rr_achieved=-1.0, mae=8.0, mfe=2.0
-    )
+    db.add_trade(plan_type="reversal", outcome="TP_HIT", rr_achieved=1.5, mae=3.0, mfe=8.0)
+    db.add_trade(plan_type="reversal", outcome="STOP_LOSS", rr_achieved=-1.0, mae=8.0, mfe=2.0)
 
     r = mae_mfe_summary(db)
     assert r["overall"]["n"] == 4
@@ -190,9 +182,7 @@ def test_mae_mfe_plan_type_filter(db):
         mae=5.0,
         mfe=15.0,
     )
-    db.add_trade(
-        plan_type="reversal", outcome="TP_HIT", rr_achieved=1.5, mae=3.0, mfe=8.0
-    )
+    db.add_trade(plan_type="reversal", outcome="TP_HIT", rr_achieved=1.5, mae=3.0, mfe=8.0)
 
     r_all = mae_mfe_summary(db)
     assert r_all["overall"]["n"] == 2

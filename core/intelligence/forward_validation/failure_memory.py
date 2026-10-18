@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -25,7 +25,7 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger("ai_quant_sentinel.intelligence.failure_memory")
 
 
-class FailureComponent(str, Enum):
+class FailureComponent(StrEnum):
     """Subsystem where the failure or anomaly originated."""
 
     GATEWAY = "GATEWAY"
@@ -38,7 +38,7 @@ class FailureComponent(str, Enum):
     STRATEGY_GENOME = "STRATEGY_GENOME"
 
 
-class FailureTriggerType(str, Enum):
+class FailureTriggerType(StrEnum):
     """Formal trigger taxonomy for strategy anomalies and suspensions."""
 
     MAX_DRAWDOWN_BREACH = "MAX_DRAWDOWN_BREACH"

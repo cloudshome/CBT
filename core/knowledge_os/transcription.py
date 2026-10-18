@@ -51,7 +51,9 @@ class TranscriptResult:
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
-        d["segments"] = [s.to_dict() if isinstance(s, TranscriptSegment) else s for s in self.segments]
+        d["segments"] = [
+            s.to_dict() if isinstance(s, TranscriptSegment) else s for s in self.segments
+        ]
         return d
 
 
@@ -99,7 +101,9 @@ class GeminiAudioProvider(BaseTranscriptionProvider):
             )
 
         try:
-            mime_type = "audio/mp4" if audio_path.suffix.lower() in (".m4a", ".mp4") else "audio/mp3"
+            mime_type = (
+                "audio/mp4" if audio_path.suffix.lower() in (".m4a", ".mp4") else "audio/mp3"
+            )
             audio_bytes = audio_path.read_bytes()
             b64_data = base64.b64encode(audio_bytes).decode("utf-8")
 
@@ -152,7 +156,7 @@ class GeminiAudioProvider(BaseTranscriptionProvider):
                 provider="GEMINI_CLOUD",
                 error=f"Gemini API returned status {resp.status_code}: {resp.text[:200]}",
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             return TranscriptResult(
                 success=False,
                 text="",
@@ -171,7 +175,9 @@ class SocialVideoAudioExtractor:
         self.download_dir = download_dir or Path(tempfile.gettempdir()) / "cbt_audio_cache"
         self.download_dir.mkdir(parents=True, exist_ok=True)
 
-    def extract_audio(self, url: str, timeout: int = 40) -> tuple[bool, Path | None, dict[str, Any]]:
+    def extract_audio(
+        self, url: str, timeout: int = 40
+    ) -> tuple[bool, Path | None, dict[str, Any]]:
         """
         Attempts to extract audio from video URL using yt-dlp.
         Returns: (success: bool, audio_path: Path | None, metadata: dict)
@@ -216,7 +222,7 @@ class SocialVideoAudioExtractor:
                     return True, expected_file, metadata
 
                 return False, None, {"error": "Downloaded media file empty or not located on disk."}
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug(f"yt-dlp audio download failed for {url}: {exc}")
             return False, None, {"error": str(exc)}
 
@@ -238,7 +244,7 @@ class SocialVideoAudioExtractor:
                         "description": info.get("description", "")[:500],
                         "duration": info.get("duration", 0),
                     }
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             return {"error": str(e)}
         return {}
 

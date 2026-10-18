@@ -60,7 +60,7 @@ class BrainBackupManager:
             with open(enc_path, "wb") as fout:
                 # Store 12-byte nonce followed by authenticated ciphertext
                 fout.write(b"AESGCM:" + nonce + ciphertext)
-        except Exception:  # noqa: BLE001 — defensive fallback
+        except Exception:
             try:
                 from cryptography.fernet import Fernet
 
@@ -69,7 +69,7 @@ class BrainBackupManager:
                 encrypted_data = f.encrypt(data)
                 with open(enc_path, "wb") as fout:
                     fout.write(encrypted_data)
-            except Exception:  # noqa: BLE001 — defensive fallback
+            except Exception:
                 # Deterministic byte transform fallback
                 key_bytes = self._get_encryption_key()
                 buf = bytearray(data)
@@ -109,7 +109,7 @@ class BrainBackupManager:
                 ciphertext = enc_data[19:]
                 aesgcm = AESGCM(key)
                 dec_data = aesgcm.decrypt(nonce, ciphertext, None)
-            except Exception as e:  # noqa: BLE001 — defensive fallback
+            except Exception as e:
                 logger.warning(f"AES-GCM decryption failed ({e}), attempting fallback ciphers.")
 
         # Try Fernet
@@ -120,7 +120,7 @@ class BrainBackupManager:
                 fernet_key = base64.urlsafe_b64encode(self._get_encryption_key())
                 f = Fernet(fernet_key)
                 dec_data = f.decrypt(enc_data)
-            except Exception:  # noqa: BLE001, S110 — best-effort fallback, never raise
+            except Exception:
                 pass
 
         # Fallback byte transform

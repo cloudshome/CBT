@@ -15,10 +15,10 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 
-class ChainId(str, Enum):
+class ChainId(StrEnum):
     ETHEREUM_MAINNET = "ETHEREUM_MAINNET"  # Chain ID 1
     ARBITRUM_ONE = "ARBITRUM_ONE"  # Chain ID 42161
     OPTIMISM = "OPTIMISM"  # Chain ID 10
@@ -26,7 +26,7 @@ class ChainId(str, Enum):
     BASE = "BASE"  # Chain ID 8453
 
 
-class BridgeProtocol(str, Enum):
+class BridgeProtocol(StrEnum):
     ACROSS_V3 = "ACROSS_V3"  # Optimistic intent filler network
     STARGATE_V2 = "STARGATE_V2"  # LayerZero unified liquidity pool
     CHAINLINK_CCIP = "CHAINLINK_CCIP"  # Decentralized oracle network relay
@@ -34,13 +34,13 @@ class BridgeProtocol(str, Enum):
     DIRECT_SOLVER_INVENTORY = "DIRECT"  # Instant filler balance rebalancing
 
 
-class VerificationMechanism(str, Enum):
+class VerificationMechanism(StrEnum):
     OPTIMISTIC_CHALLENGE = "OPTIMISTIC_CHALLENGE"  # 90s challenge window
     MULTISIG_QUORUM = "MULTISIG_QUORUM"  # CCIP / Axelar threshold
     LIGHT_CLIENT_ZK = "LIGHT_CLIENT_ZK"  # ZK / DVN proof
 
 
-class IntentStatus(str, Enum):
+class IntentStatus(StrEnum):
     CREATED = "CREATED"
     AUCTION_OPEN = "AUCTION_OPEN"
     SOLVER_ASSIGNED = "SOLVER_ASSIGNED"

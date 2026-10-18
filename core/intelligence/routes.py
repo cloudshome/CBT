@@ -631,7 +631,7 @@ def _load_market_candles(
             conn.close()
             if rows:
                 return [dict(r) for r in reversed(rows)]
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(f"Failed to query market_data.db: {e}")
 
     # Synthetic fallback sequence for testing environments
@@ -677,7 +677,7 @@ def _load_macro_events(limit: int = 50) -> list[dict[str, Any]]:
             conn.close()
             if rows:
                 return [dict(r) for r in rows]
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(f"Failed to query macro_event_releases: {e}")
     return []
 

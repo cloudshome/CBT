@@ -16,7 +16,7 @@ import asyncio
 import logging
 import time
 from dataclasses import asdict, dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 import aiohttp
@@ -73,7 +73,7 @@ POPULAR_TOKENS: dict[str, dict[str, dict[str, Any]]] = {
 }
 
 
-class RpcFreshness(str, Enum):
+class RpcFreshness(StrEnum):
     FRESH = "FRESH"
     STALE = "STALE"
     DEGRADED = "DEGRADED"
@@ -167,7 +167,7 @@ class MultiRpcQuorumClient:
                     data=body.get("result"),
                     latency_ms=lat,
                 )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             lat = (time.perf_counter() - t0) * 1000.0
             return RpcNodeResponse(
                 url=url,

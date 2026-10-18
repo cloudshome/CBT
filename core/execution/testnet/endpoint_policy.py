@@ -12,7 +12,7 @@ fallbacks before any network socket or credential loader executes.
 from __future__ import annotations
 
 import logging
-from enum import Enum
+from enum import StrEnum
 from typing import Any, ClassVar
 from urllib.parse import urlparse
 
@@ -23,7 +23,7 @@ class EndpointSecurityBreachError(PermissionError):
     """Raised when an unauthorized, production, or non-allowlisted endpoint is accessed."""
 
 
-class Environment(str, Enum):
+class Environment(StrEnum):
     """Strict execution environments permitted in testnet testing."""
 
     DETERMINISTIC = "DETERMINISTIC"

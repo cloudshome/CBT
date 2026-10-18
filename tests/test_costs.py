@@ -81,9 +81,7 @@ def test_spread_r_calculation():
 
     # ETHUSDT spread = 0.035% half-spread -> 0.07% round trip (0.0007)
     # spread_r = 0.0007 / 0.00823 = 0.0851R
-    cost_eth = calculate_trade_cost(
-        entry=100_000.0, stop_loss=99_177.0, symbol="ETHUSDT"
-    )
+    cost_eth = calculate_trade_cost(entry=100_000.0, stop_loss=99_177.0, symbol="ETHUSDT")
     assert cost_eth.slip_r == pytest.approx(0.0851, abs=1e-4)
 
 
@@ -156,9 +154,7 @@ def test_net_r_increases_loss_size():
 
 def test_costs_disabled_returns_zero_drag():
     model = CostModel(enabled=False)
-    cost = calculate_trade_cost(
-        entry=100.0, stop_loss=99.0, gross_r=1.5, cost_model=model
-    )
+    cost = calculate_trade_cost(entry=100.0, stop_loss=99.0, gross_r=1.5, cost_model=model)
     assert cost.fee_r == 0.0
     assert cost.slip_r == 0.0
     assert cost.funding_r == 0.0
@@ -173,9 +169,7 @@ def test_maker_execution_cheaper_than_taker():
 
     c_taker = calculate_trade_cost(entry=100.0, stop_loss=99.0, cost_model=taker_model)
     c_maker = calculate_trade_cost(entry=100.0, stop_loss=99.0, cost_model=maker_model)
-    c_hybrid = calculate_trade_cost(
-        entry=100.0, stop_loss=99.0, cost_model=maker_in_taker_out
-    )
+    c_hybrid = calculate_trade_cost(entry=100.0, stop_loss=99.0, cost_model=maker_in_taker_out)
 
     assert c_maker.fee_r < c_hybrid.fee_r < c_taker.fee_r
     assert c_maker.fee_r == pytest.approx(0.04, abs=1e-4)  # 2 * 0.02% / 1%

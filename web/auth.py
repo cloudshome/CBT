@@ -104,9 +104,7 @@ class AuthManager:
         from data.database import SignalDB
 
         with SignalDB(self.db_path) as db:
-            row = db.conn.execute(
-                "SELECT value FROM auth_meta WHERE key=?", (key,)
-            ).fetchone()
+            row = db.conn.execute("SELECT value FROM auth_meta WHERE key=?", (key,)).fetchone()
             return row["value"] if row else None
 
     def _meta_set(self, key: str, value: str) -> None:
@@ -122,8 +120,7 @@ class AuthManager:
 
     def _fetch_user(self, db, user_id: int) -> dict | None:
         row = db.conn.execute(
-            "SELECT id, username, role, created_ts, last_login_ts "
-            "FROM users WHERE id=?",
+            "SELECT id, username, role, created_ts, last_login_ts FROM users WHERE id=?",
             (user_id,),
         ).fetchone()
         return dict(row) if row else None
@@ -166,9 +163,7 @@ class AuthManager:
             return True
         return self.owner_exists()
 
-    def create_owner(
-        self, username: str, password: str, role: str = ROLE_OPERATOR
-    ) -> dict:
+    def create_owner(self, username: str, password: str, role: str = ROLE_OPERATOR) -> dict:
         """First-run owner creation. Refuses if an owner already exists."""
         username = (username or "").strip()
         if len(username) < MIN_USERNAME_LEN:
@@ -261,9 +256,7 @@ class AuthManager:
                 db.conn.execute("DELETE FROM login_attempts WHERE key=?", (key,))
             db.conn.commit()
 
-    def authenticate(
-        self, username: str, password: str, ip: str = ""
-    ) -> dict | None:
+    def authenticate(self, username: str, password: str, ip: str = "") -> dict | None:
         """Return the user dict on success, else None (and record a failure)."""
         user = self.get_user_by_name(username)
         if user is None:
@@ -341,9 +334,7 @@ class AuthManager:
                 db.conn.execute("DELETE FROM sessions WHERE token_hash=?", (th,))
                 db.conn.commit()
                 return None
-            db.conn.execute(
-                "UPDATE sessions SET last_seen_ts=? WHERE token_hash=?", (now, th)
-            )
+            db.conn.execute("UPDATE sessions SET last_seen_ts=? WHERE token_hash=?", (now, th))
             db.conn.commit()
             return self._fetch_user(db, row["user_id"])
 
@@ -351,9 +342,7 @@ class AuthManager:
         from data.database import SignalDB
 
         with SignalDB(self.db_path) as db:
-            db.conn.execute(
-                "DELETE FROM sessions WHERE token_hash=?", (_token_hash(token),)
-            )
+            db.conn.execute("DELETE FROM sessions WHERE token_hash=?", (_token_hash(token),))
             db.conn.commit()
 
     def revoke_all_sessions(self, user_id: int) -> int:
@@ -365,9 +354,7 @@ class AuthManager:
             return cur.rowcount
 
     # ── device tokens (companion clients) ───────────────────────────────
-    def create_device_token(
-        self, user_id: int, name: str, scope: str = ROLE_VIEWER
-    ) -> str:
+    def create_device_token(self, user_id: int, name: str, scope: str = ROLE_VIEWER) -> str:
         if scope not in ROLES:
             raise ValueError(f"bad scope {scope!r}")
         token = secrets.token_urlsafe(32)
@@ -399,17 +386,14 @@ class AuthManager:
         th = _token_hash(token)
         with SignalDB(self.db_path) as db:
             row = db.conn.execute(
-                "SELECT user_id, scope, expires_ts, revoked FROM device_tokens "
-                "WHERE token_hash=?",
+                "SELECT user_id, scope, expires_ts, revoked FROM device_tokens WHERE token_hash=?",
                 (th,),
             ).fetchone()
             if row is None or row["revoked"]:
                 return None
             if row["expires_ts"] and now > row["expires_ts"]:
                 return None
-            db.conn.execute(
-                "UPDATE device_tokens SET last_used_ts=? WHERE token_hash=?", (now, th)
-            )
+            db.conn.execute("UPDATE device_tokens SET last_used_ts=? WHERE token_hash=?", (now, th))
             db.conn.commit()
             user = self._fetch_user(db, row["user_id"])
             if user is None:

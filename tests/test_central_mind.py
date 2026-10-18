@@ -11,6 +11,7 @@ Unit tests verifying the 6 Constitutional Invariants of CentralTradingMind:
 """
 
 import pytest
+
 from core.central_mind import CentralTradingMind, TradeProposal
 from core.portfolio_shadow import portfolio_shadow
 
@@ -132,4 +133,3 @@ def test_central_mind_governance_report(clean_central_mind):
     assert "HALF_KELLY_1_5_PCT_CAP" in report["governance_invariants"]
     assert "REAL_PRICE_GROUNDING_STRICT" in report["governance_invariants"]
     assert "max_positions" in report
-

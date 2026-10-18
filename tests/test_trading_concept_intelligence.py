@@ -16,27 +16,28 @@ Covers all 10 mandatory verification categories:
 
 from __future__ import annotations
 
+import os
+
 import numpy as np
 import pandas as pd
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-import os
 from core.execution.kill_switch import live_kill_switch
 from core.research.concept_evaluation import (
     ConceptEvaluationEngine,
     CostTierAssumptions,
     RegimeOrchestrationAdvisor,
-     SimulatedTrade,
+    SimulatedTrade,
     compute_overlap_adjusted_n_eff,
 )
 from core.research.concept_registry import (
+    REAL_CAPITAL_ENABLED,
     ConceptEvidenceGate,
     ConceptFamily,
     ConceptLifecycleStatus,
     ConceptRole,
-    REAL_CAPITAL_ENABLED,
     TradingConceptRegistry,
 )
 from core.strategist_routes import strategist_router
@@ -189,10 +190,14 @@ def test_registry_search_filter_compare_and_overlap_detection() -> None:
     # TC_001 and TC_004 are both in FAM_01_TREND_FOLLOWING and share TRENDING regimes,
     # so their redundancy score must exceed TC_001 vs TC_005 (Mean Reversion).
     pair_1_4 = next(
-        p for p in comp["pairwise_overlap"] if {p["concept_a"], p["concept_b"]} == {"TC_001", "TC_004"}
+        p
+        for p in comp["pairwise_overlap"]
+        if {p["concept_a"], p["concept_b"]} == {"TC_001", "TC_004"}
     )
     pair_1_5 = next(
-        p for p in comp["pairwise_overlap"] if {p["concept_a"], p["concept_b"]} == {"TC_001", "TC_005"}
+        p
+        for p in comp["pairwise_overlap"]
+        if {p["concept_a"], p["concept_b"]} == {"TC_001", "TC_005"}
     )
     assert pair_1_4["redundancy_score"] > pair_1_5["redundancy_score"]
 
@@ -221,8 +226,8 @@ def test_fail_closed_lifecycle_promotion_gates() -> None:
         concept_id="TC_001",
         requested_status=ConceptLifecycleStatus.OUT_OF_SAMPLE_VALIDATED.value,
         evidence={
-            "oos_effective_trades": 8,          # < 25
-            "oos_net_expectancy_r": -0.12,      # < 0.05
+            "oos_effective_trades": 8,  # < 25
+            "oos_net_expectancy_r": -0.12,  # < 0.05
             "conservative_1_5x_net_expectancy_r": -0.25,
             "oos_profit_factor": 0.85,
             "oos_max_drawdown_r": 28.0,
@@ -249,7 +254,10 @@ def test_fail_closed_lifecycle_promotion_gates() -> None:
         },
     )
     assert good_oos_verdict.approved is True
-    assert reg.get_concept("TC_001").lifecycle_status == ConceptLifecycleStatus.OUT_OF_SAMPLE_VALIDATED.value
+    assert (
+        reg.get_concept("TC_001").lifecycle_status
+        == ConceptLifecycleStatus.OUT_OF_SAMPLE_VALIDATED.value
+    )
 
     # 3) Promoting to PAPER_QUALIFIED without RiskGate verification or with excessive correlation MUST FAIL
     bad_paper_q = reg.request_lifecycle_transition(
@@ -266,7 +274,9 @@ def test_fail_closed_lifecycle_promotion_gates() -> None:
         evidence={"max_pairwise_correlation": 0.32, "risk_gate_verified": True},
     )
     assert good_paper_q.approved is True
-    assert reg.get_concept("TC_001").lifecycle_status == ConceptLifecycleStatus.PAPER_QUALIFIED.value
+    assert (
+        reg.get_concept("TC_001").lifecycle_status == ConceptLifecycleStatus.PAPER_QUALIFIED.value
+    )
 
     # 5) Promoting to PAPER_VALIDATED requires >= 20 paper trades, positive net R, bounded slippage, and kill-switch intact
     good_paper_val = reg.request_lifecycle_transition(
@@ -280,7 +290,9 @@ def test_fail_closed_lifecycle_promotion_gates() -> None:
         },
     )
     assert good_paper_val.approved is True
-    assert reg.get_concept("TC_001").lifecycle_status == ConceptLifecycleStatus.PAPER_VALIDATED.value
+    assert (
+        reg.get_concept("TC_001").lifecycle_status == ConceptLifecycleStatus.PAPER_VALIDATED.value
+    )
 
 
 # ============================================================================
@@ -292,8 +304,12 @@ def test_strategy_evaluation_determinism_all_candidates() -> None:
     df = _make_regime_ohlcv(n_bars=320, seed=101)
     engine = ConceptEvaluationEngine()
 
-    res_run1 = engine.evaluate_all_baseline_candidates(df, symbol="BTCUSDT", timeframe="1h", record_to_registry=True)
-    res_run2 = engine.evaluate_all_baseline_candidates(df, symbol="BTCUSDT", timeframe="1h", record_to_registry=False)
+    res_run1 = engine.evaluate_all_baseline_candidates(
+        df, symbol="BTCUSDT", timeframe="1h", record_to_registry=True
+    )
+    res_run2 = engine.evaluate_all_baseline_candidates(
+        df, symbol="BTCUSDT", timeframe="1h", record_to_registry=False
+    )
 
     assert set(res_run1.keys()) == set(engine.CANDIDATE_TO_CONCEPT.keys())
     for key in res_run1:
@@ -326,9 +342,19 @@ def test_point_in_time_causal_no_lookahead_guarantee() -> None:
 
     # All causal features at index <= decision_t must be bit-for-bit identical
     feature_cols = [
-        "ema_20", "ema_50", "sma_20", "bb_upper", "bb_lower",
-        "atr_14", "rsi_14", "er_20", "tsmom_z_20", "rvol_20",
-        "prev_high_20", "prev_low_20", "regime",
+        "ema_20",
+        "ema_50",
+        "sma_20",
+        "bb_upper",
+        "bb_lower",
+        "atr_14",
+        "rsi_14",
+        "er_20",
+        "tsmom_z_20",
+        "rvol_20",
+        "prev_high_20",
+        "prev_low_20",
+        "regime",
     ]
     for col in feature_cols:
         s_base = work_base[col].iloc[: decision_t + 1]
@@ -364,36 +390,71 @@ def test_three_tier_transaction_costs_and_overlap_n_eff() -> None:
     res = engine.evaluate_candidate("CAND_B_TREND_PULLBACK", df, record_to_registry=False)
     m = res.overall_metrics
     assert m.nominal_trades > 0
-    assert m.gross_expectancy_r > m.net_expectancy_r_base > m.net_expectancy_r_conservative_1_5x > m.net_expectancy_r_stress_2_5x
+    assert (
+        m.gross_expectancy_r
+        > m.net_expectancy_r_base
+        > m.net_expectancy_r_conservative_1_5x
+        > m.net_expectancy_r_stress_2_5x
+    )
 
     # Verify N_eff overlap calculation:
     # 10 completely overlapping trades on bars [10, 50] must yield N_eff == 1.0
     overlapping_trades = [
         SimulatedTrade(
-            candidate_id="TEST", concept_id="TC_013", split_name="train",
-            entry_idx=10, exit_idx=50, direction=1, regime="TRENDING_UP",
-            entry_price=100.0, stop_loss=98.0, take_profit=104.0, exit_price=104.0,
-            exit_reason="TAKE_PROFIT", holding_bars=40, stop_distance_bps=200.0,
-            gross_r=2.0, cost_r_base=0.1, net_r_base=1.9,
-            net_r_conservative_1_5x=1.85, net_r_stress_2_5x=1.75,
+            candidate_id="TEST",
+            concept_id="TC_013",
+            split_name="train",
+            entry_idx=10,
+            exit_idx=50,
+            direction=1,
+            regime="TRENDING_UP",
+            entry_price=100.0,
+            stop_loss=98.0,
+            take_profit=104.0,
+            exit_price=104.0,
+            exit_reason="TAKE_PROFIT",
+            holding_bars=40,
+            stop_distance_bps=200.0,
+            gross_r=2.0,
+            cost_r_base=0.1,
+            net_r_base=1.9,
+            net_r_conservative_1_5x=1.85,
+            net_r_stress_2_5x=1.75,
         )
         for _ in range(10)
     ]
-    assert compute_overlap_adjusted_n_eff(overlapping_trades, total_bars=100) == pytest.approx(1.0, abs=0.01)
+    assert compute_overlap_adjusted_n_eff(overlapping_trades, total_bars=100) == pytest.approx(
+        1.0, abs=0.01
+    )
 
     # 3 strictly non-overlapping trades must yield N_eff == 3.0
     disjoint_trades = [
         SimulatedTrade(
-            candidate_id="TEST", concept_id="TC_013", split_name="train",
-            entry_idx=i * 20, exit_idx=i * 20 + 10, direction=1, regime="TRENDING_UP",
-            entry_price=100.0, stop_loss=98.0, take_profit=104.0, exit_price=104.0,
-            exit_reason="TAKE_PROFIT", holding_bars=10, stop_distance_bps=200.0,
-            gross_r=2.0, cost_r_base=0.1, net_r_base=1.9,
-            net_r_conservative_1_5x=1.85, net_r_stress_2_5x=1.75,
+            candidate_id="TEST",
+            concept_id="TC_013",
+            split_name="train",
+            entry_idx=i * 20,
+            exit_idx=i * 20 + 10,
+            direction=1,
+            regime="TRENDING_UP",
+            entry_price=100.0,
+            stop_loss=98.0,
+            take_profit=104.0,
+            exit_price=104.0,
+            exit_reason="TAKE_PROFIT",
+            holding_bars=10,
+            stop_distance_bps=200.0,
+            gross_r=2.0,
+            cost_r_base=0.1,
+            net_r_base=1.9,
+            net_r_conservative_1_5x=1.85,
+            net_r_stress_2_5x=1.75,
         )
         for i in range(3)
     ]
-    assert compute_overlap_adjusted_n_eff(disjoint_trades, total_bars=100) == pytest.approx(3.0, abs=0.01)
+    assert compute_overlap_adjusted_n_eff(disjoint_trades, total_bars=100) == pytest.approx(
+        3.0, abs=0.01
+    )
 
 
 # ============================================================================
@@ -410,7 +471,9 @@ def test_rejection_of_invalid_or_missing_data() -> None:
 
     # Missing required columns
     with pytest.raises(ValueError, match="Missing required OHLCV columns"):
-        engine.evaluate_candidate("CAND_A_TSMOM_VOL_TREND", pd.DataFrame({"open": [1, 2], "close": [1, 2]}))
+        engine.evaluate_candidate(
+            "CAND_A_TSMOM_VOL_TREND", pd.DataFrame({"open": [1, 2], "close": [1, 2]})
+        )
 
     # Insufficient bars (< 80)
     short_df = _make_regime_ohlcv(n_bars=40)
@@ -510,7 +573,9 @@ def test_fastapi_concept_intelligence_routes_and_governance_lock() -> None:
     assert body_sum["summary"]["real_capital_enabled"] is False
 
     # List & Filter endpoint
-    r_list = client.get("/api/strategist/concepts", params={"family_id": "FAM_10_FUNDING_BASIS_CARRY"})
+    r_list = client.get(
+        "/api/strategist/concepts", params={"family_id": "FAM_10_FUNDING_BASIS_CARRY"}
+    )
     assert r_list.status_code == 200
     assert r_list.json()["count"] == 4
 
@@ -545,7 +610,9 @@ def test_fastapi_concept_intelligence_routes_and_governance_lock() -> None:
     assert r_tr.json()["approved"] is False
 
     # Arbiter allocation endpoint
-    r_arb = client.get("/api/strategist/concepts/arbiter/allocation", params={"regime": "RANGE_BOUND"})
+    r_arb = client.get(
+        "/api/strategist/concepts/arbiter/allocation", params={"regime": "RANGE_BOUND"}
+    )
     assert r_arb.status_code == 200
     assert r_arb.json()["allocation"]["real_capital_enabled"] is False
     assert r_arb.json()["allocation"]["risk_gate_mandatory"] is True

@@ -27,7 +27,7 @@ import logging
 import time
 import uuid
 from dataclasses import asdict, dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from core.audit_bus import audit_bus
@@ -36,7 +36,7 @@ from core.database import db_manager
 logger = logging.getLogger("sky.execution.collateral")
 
 
-class CollateralState(str, Enum):
+class CollateralState(StrEnum):
     NORMAL = "NORMAL"
     CAUTION = "CAUTION"
     DANGER = "DANGER"
@@ -45,7 +45,7 @@ class CollateralState(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 
-class DataQuality(str, Enum):
+class DataQuality(StrEnum):
     FRESH = "FRESH"
     STALE = "STALE"
     MISSING = "MISSING"
@@ -213,7 +213,7 @@ class CollateralGovernor:
                     """
                 )
                 conn.commit()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug(f"Collateral governor schema notice: {exc}")
 
     def evaluate_venue_snapshot(
@@ -403,7 +403,7 @@ class CollateralGovernor:
                         "recommendations": recommendations,
                     },
                 )
-            except Exception as _e:  # noqa: BLE001
+            except Exception as _e:
                 logger.debug(f"Audit log error: {_e}")
 
         return SystemCollateralReport(
@@ -543,7 +543,7 @@ class CollateralGovernor:
                     ),
                 )
                 conn.commit()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug(f"Failed to persist collateral snapshot: {exc}")
 
 

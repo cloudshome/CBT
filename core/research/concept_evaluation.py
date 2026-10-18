@@ -31,8 +31,8 @@ import pandas as pd
 from scipy import stats
 
 from core.research.concept_registry import (
-    ConceptLifecycleStatus,
     REAL_CAPITAL_ENABLED,
+    ConceptLifecycleStatus,
     TradingConceptRegistry,
     concept_registry,
 )
@@ -45,12 +45,14 @@ class CostTierAssumptions:
     """Explicit transaction cost assumptions per round-trip trade."""
 
     tier_name: str
-    fee_bps_per_leg: float = 4.0          # 4 bps taker (8 bps round-trip)
+    fee_bps_per_leg: float = 4.0  # 4 bps taker (8 bps round-trip)
     half_spread_bps_per_leg: float = 1.5  # 1.5 bps half-spread (3 bps round-trip)
-    slippage_bps_per_leg: float = 2.5     # 2.5 bps volatility-adjusted slippage (5 bps round-trip)
-    funding_bps_per_8h: float = 1.0       # 1.0 bps per 8h holding period
+    slippage_bps_per_leg: float = 2.5  # 2.5 bps volatility-adjusted slippage (5 bps round-trip)
+    funding_bps_per_8h: float = 1.0  # 1.0 bps per 8h holding period
 
-    def round_trip_cost_bps(self, holding_bars: int, bar_minutes: int = 60, vol_ratio: float = 1.0) -> float:
+    def round_trip_cost_bps(
+        self, holding_bars: int, bar_minutes: int = 60, vol_ratio: float = 1.0
+    ) -> float:
         legs_fee = 2.0 * self.fee_bps_per_leg
         legs_spread = 2.0 * self.half_spread_bps_per_leg
         legs_slip = 2.0 * self.slippage_bps_per_leg * max(0.75, min(2.5, float(vol_ratio)))
@@ -61,7 +63,8 @@ class CostTierAssumptions:
     def scale(self, multiplier: float, new_name: str) -> CostTierAssumptions:
         return CostTierAssumptions(
             tier_name=new_name,
-            fee_bps_per_leg=self.fee_bps_per_leg * (1.0 if multiplier <= 1.0 else min(1.25, multiplier)),
+            fee_bps_per_leg=self.fee_bps_per_leg
+            * (1.0 if multiplier <= 1.0 else min(1.25, multiplier)),
             half_spread_bps_per_leg=self.half_spread_bps_per_leg * multiplier,
             slippage_bps_per_leg=self.slippage_bps_per_leg * multiplier,
             funding_bps_per_8h=self.funding_bps_per_8h * multiplier,
@@ -77,7 +80,7 @@ class SimulatedTrade:
     split_name: str  # "train", "validation", "sealed_oos"
     entry_idx: int
     exit_idx: int
-    direction: int   # +1 Long, -1 Short
+    direction: int  # +1 Long, -1 Short
     regime: str
     entry_price: float
     stop_loss: float
@@ -204,7 +207,7 @@ def compute_deflated_sharpe(
     else:
         sr0_unann = 0.0
 
-    var_est = 1.0 - skew * sr_unann + ((kurt - 1.0) / 4.0) * (sr_unann ** 2)
+    var_est = 1.0 - skew * sr_unann + ((kurt - 1.0) / 4.0) * (sr_unann**2)
     std_err = np.sqrt(max(1e-4, var_est) / max(1.0, n - 1.0))
     z_stat = (sr_unann - sr0_unann) / std_err
     dsr = float(stats.norm.cdf(z_stat))
@@ -262,13 +265,17 @@ class ConceptEvaluationEngine:
             }
         )
         if "funding_rate" in lower_map:
-            work["funding_rate"] = pd.to_numeric(df[lower_map["funding_rate"]], errors="coerce").fillna(0.0)
+            work["funding_rate"] = pd.to_numeric(
+                df[lower_map["funding_rate"]], errors="coerce"
+            ).fillna(0.0)
         else:
             work["funding_rate"] = 0.0
 
         work = work.dropna(subset=["open", "high", "low", "close", "volume"]).reset_index(drop=True)
         if len(work) < 80:
-            raise ValueError(f"Insufficient OHLCV bars ({len(work)} < 80 minimum warmup + evaluation).")
+            raise ValueError(
+                f"Insufficient OHLCV bars ({len(work)} < 80 minimum warmup + evaluation)."
+            )
 
         if (work["close"] <= 0).any() or (work["high"] < work["low"]).any():
             raise ValueError("Corrupted OHLCV data: non-positive close or high < low detected.")
@@ -286,8 +293,10 @@ class ConceptEvaluationEngine:
         work["bb_upper"] = work["sma_20"] + 2.0 * work["std_20"]
         work["bb_lower"] = work["sma_20"] - 2.0 * work["std_20"]
         work["bb_width"] = (work["bb_upper"] - work["bb_lower"]) / work["sma_20"].replace(0, np.nan)
-        work["bb_width_pct_rank"] = work["bb_width"].rolling(50, min_periods=20).apply(
-            lambda x: float(np.sum(x <= x[-1])) / len(x), raw=True
+        work["bb_width_pct_rank"] = (
+            work["bb_width"]
+            .rolling(50, min_periods=20)
+            .apply(lambda x: float(np.sum(x <= x[-1])) / len(x), raw=True)
         )
 
         # True Range and ATR(14)
@@ -301,7 +310,9 @@ class ConceptEvaluationEngine:
             axis=1,
         ).max(axis=1)
         work["atr_14"] = tr.rolling(14, min_periods=14).mean()
-        work["atr_ratio"] = work["atr_14"] / work["atr_14"].rolling(50, min_periods=20).mean().replace(0, np.nan)
+        work["atr_ratio"] = work["atr_14"] / work["atr_14"].rolling(
+            50, min_periods=20
+        ).mean().replace(0, np.nan)
 
         # RSI(14)
         delta = close.diff()
@@ -340,8 +351,16 @@ class ConceptEvaluationEngine:
         regimes: list[str] = []
         for idx in range(len(work)):
             er = float(work["er_20"].iloc[idx]) if not pd.isna(work["er_20"].iloc[idx]) else 0.25
-            atr_r = float(work["atr_ratio"].iloc[idx]) if not pd.isna(work["atr_ratio"].iloc[idx]) else 1.0
-            bb_pct = float(work["bb_width_pct_rank"].iloc[idx]) if not pd.isna(work["bb_width_pct_rank"].iloc[idx]) else 0.5
+            atr_r = (
+                float(work["atr_ratio"].iloc[idx])
+                if not pd.isna(work["atr_ratio"].iloc[idx])
+                else 1.0
+            )
+            bb_pct = (
+                float(work["bb_width_pct_rank"].iloc[idx])
+                if not pd.isna(work["bb_width_pct_rank"].iloc[idx])
+                else 0.5
+            )
             e20 = float(work["ema_20"].iloc[idx])
             e50 = float(work["ema_50"].iloc[idx])
             c_val = float(close.iloc[idx])
@@ -396,7 +415,9 @@ class ConceptEvaluationEngine:
         rvol = float(row["rvol_20"]) if not pd.isna(row["rvol_20"]) else 1.0
         bb_u = float(row["bb_upper"]) if not pd.isna(row["bb_upper"]) else c * 1.05
         bb_l = float(row["bb_lower"]) if not pd.isna(row["bb_lower"]) else c * 0.95
-        bb_pct_prev = float(prev["bb_width_pct_rank"]) if not pd.isna(prev["bb_width_pct_rank"]) else 0.5
+        bb_pct_prev = (
+            float(prev["bb_width_pct_rank"]) if not pd.isna(prev["bb_width_pct_rank"]) else 0.5
+        )
         prev_h10 = float(row["prev_high_10"]) if not pd.isna(row["prev_high_10"]) else h
         prev_l10 = float(row["prev_low_10"]) if not pd.isna(row["prev_low_10"]) else l
         f_z = float(row["funding_z"]) if not pd.isna(row["funding_z"]) else 0.0
@@ -411,9 +432,23 @@ class ConceptEvaluationEngine:
 
         # Candidate B: Trend Pullback & Continuation (TC_013 / TC_014)
         if candidate_key == "CAND_B_TREND_PULLBACK":
-            if e20 > e50 and adx >= 20.0 and l <= e20 * 1.004 and c > e20 and c > o and 36.0 <= rsi <= 62.0:
+            if (
+                e20 > e50
+                and adx >= 20.0
+                and l <= e20 * 1.004
+                and c > e20
+                and c > o
+                and 36.0 <= rsi <= 62.0
+            ):
                 return (+1, 1.5, 2.2)
-            if e20 < e50 and adx >= 20.0 and h >= e20 * 0.996 and c < e20 and c < o and 38.0 <= rsi <= 64.0:
+            if (
+                e20 < e50
+                and adx >= 20.0
+                and h >= e20 * 0.996
+                and c < e20
+                and c < o
+                and 38.0 <= rsi <= 64.0
+            ):
                 return (-1, 1.5, 2.2)
             return None
 
@@ -507,7 +542,11 @@ class ConceptEvaluationEngine:
         sharpe = (mean_net / std_net) * annual_scale if std_net > 1e-9 else 0.0
 
         downside = net_base[net_base < 0.0]
-        down_std = float(np.std(downside, ddof=1)) if len(downside) > 1 else (std_net if std_net > 0 else 1.0)
+        down_std = (
+            float(np.std(downside, ddof=1))
+            if len(downside) > 1
+            else (std_net if std_net > 0 else 1.0)
+        )
         sortino = (mean_net / down_std) * annual_scale if down_std > 1e-9 else 0.0
 
         cum_r = np.cumsum(net_base)
@@ -589,7 +628,9 @@ class ConceptEvaluationEngine:
             direction, stop_atr_mult, rr_target = sig
             entry_price = float(work["close"].iloc[t])
             atr = float(work["atr_14"].iloc[t])
-            vol_ratio = float(work["atr_ratio"].iloc[t]) if not pd.isna(work["atr_ratio"].iloc[t]) else 1.0
+            vol_ratio = (
+                float(work["atr_ratio"].iloc[t]) if not pd.isna(work["atr_ratio"].iloc[t]) else 1.0
+            )
 
             stop_dist = max(entry_price * 0.0025, stop_atr_mult * atr)
             stop_dist_bps = (stop_dist / entry_price) * 10000.0
@@ -657,9 +698,15 @@ class ConceptEvaluationEngine:
                     break
 
             holding_bars = max(1, exit_idx - t)
-            cost_bps_base = self.base_costs.round_trip_cost_bps(holding_bars, bar_minutes, vol_ratio)
-            cost_bps_cons = self.conservative_costs.round_trip_cost_bps(holding_bars, bar_minutes, vol_ratio)
-            cost_bps_stress = self.stress_costs.round_trip_cost_bps(holding_bars, bar_minutes, vol_ratio)
+            cost_bps_base = self.base_costs.round_trip_cost_bps(
+                holding_bars, bar_minutes, vol_ratio
+            )
+            cost_bps_cons = self.conservative_costs.round_trip_cost_bps(
+                holding_bars, bar_minutes, vol_ratio
+            )
+            cost_bps_stress = self.stress_costs.round_trip_cost_bps(
+                holding_bars, bar_minutes, vol_ratio
+            )
 
             cost_r_base = cost_bps_base / max(1.0, stop_dist_bps)
             cost_r_cons = cost_bps_cons / max(1.0, stop_dist_bps)
@@ -758,10 +805,20 @@ class ConceptEvaluationEngine:
 
         if passed_oos:
             rec_status = ConceptLifecycleStatus.OUT_OF_SAMPLE_VALIDATED.value
-        elif overall_m.nominal_trades > 0 and overall_m.gross_expectancy_r > 0 and overall_m.net_expectancy_r_base <= 0:
+        elif (
+            overall_m.nominal_trades > 0
+            and overall_m.gross_expectancy_r > 0
+            and overall_m.net_expectancy_r_base <= 0
+        ):
             rec_status = ConceptLifecycleStatus.QUARANTINED.value
-            gate_reasons.append("Gross expectancy is positive but net expectancy after costs is non-positive.")
-        elif overall_m.nominal_trades > 0 and oos_m.effective_sample_size_n_eff < self.registry.evidence_gate.min_oos_effective_trades:
+            gate_reasons.append(
+                "Gross expectancy is positive but net expectancy after costs is non-positive."
+            )
+        elif (
+            overall_m.nominal_trades > 0
+            and oos_m.effective_sample_size_n_eff
+            < self.registry.evidence_gate.min_oos_effective_trades
+        ):
             rec_status = ConceptLifecycleStatus.NEEDS_MORE_DATA.value
         elif overall_m.nominal_trades > 0:
             rec_status = ConceptLifecycleStatus.BACKTESTED.value
@@ -1019,4 +1076,3 @@ class RegimeOrchestrationAdvisor:
 # Singleton instances
 concept_evaluation_engine = ConceptEvaluationEngine()
 regime_orchestration_advisor = RegimeOrchestrationAdvisor()
-

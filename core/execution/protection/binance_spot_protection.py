@@ -139,7 +139,7 @@ class BinanceSpotProtectionAdapter(BaseProtectionAdapter):
                 error_message=msg,
                 latency_ms=latency_ms,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             latency_ms = round((time.perf_counter() - t_start) * 1000.0, 2)
             msg = sanitize_text(str(exc))
             logger.error(
@@ -203,7 +203,7 @@ class BinanceSpotProtectionAdapter(BaseProtectionAdapter):
                 logger.info(
                     f"[BinanceProtection] Successfully cancelled superseded OCO {old_list_id}"
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.warning(
                     f"[BinanceProtection] Could not cancel old OCO {old_list_id} after new OCO ACKed: {exc}"
                 )
@@ -235,7 +235,7 @@ class BinanceSpotProtectionAdapter(BaseProtectionAdapter):
                 f"[BinanceProtection] Cancelled OCO {bracket.exchange_order_list_id} for {bracket.symbol}"
             )
             return True
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error(
                 f"[BinanceProtection] Error cancelling OCO {bracket.exchange_order_list_id}: {sanitize_text(str(exc))}"
             )
@@ -303,7 +303,7 @@ class BinanceSpotProtectionAdapter(BaseProtectionAdapter):
                 bracket.status = ProtectionStatus.CANCELLED
                 bracket.updated_at_ms = int(time.time() * 1000)
 
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning(
                 f"[BinanceProtection] Error polling protection status for bracket {bracket.bracket_id}: {exc}"
             )

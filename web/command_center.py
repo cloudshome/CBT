@@ -93,9 +93,7 @@ def _choice(
     }
 
 
-def _bool(
-    name: str, label: str, default: bool = False, flag: str | None = None
-) -> dict:
+def _bool(name: str, label: str, default: bool = False, flag: str | None = None) -> dict:
     return {
         "name": name,
         "label": label,
@@ -128,9 +126,7 @@ def _positional(
 
 
 _SYMBOL = _text("symbol", "Asset", "BTCUSDT", "BTCUSDT / ETHUSDT / XAUUSD")
-_TF = _choice(
-    "tf", "Timeframe", ["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w"], "15m"
-)
+_TF = _choice("tf", "Timeframe", ["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w"], "15m")
 
 
 def _cmd(
@@ -213,8 +209,7 @@ COMMANDS: list[dict] = [
         "Scan",
         "State memory",
         ["state"],
-        "What the AI currently remembers about this market plus its recent "
-        "state-change event log.",
+        "What the AI currently remembers about this market plus its recent state-change event log.",
         inputs=[_SYMBOL, _TF],
         related=["analyze"],
     ),
@@ -430,9 +425,7 @@ COMMANDS: list[dict] = [
         "One polling pass: market snapshot, system probe, news, optional "
         "EDGAR demo ingest. Writes research memory only.",
         inputs=[
-            _choice(
-                "target", "Target", ["all", "market", "system", "edgar", "news"], "all"
-            ),
+            _choice("target", "Target", ["all", "market", "system", "edgar", "news"], "all"),
             _bool("demo", "Offline demo (no network)"),
             _bool("json", "Raw JSON output"),
         ],
@@ -499,8 +492,7 @@ COMMANDS: list[dict] = [
         "Trades",
         "Execute (paper)",
         ["execute"],
-        "Mark an approved signal as executed. Paper only — no exchange order "
-        "is ever sent.",
+        "Mark an approved signal as executed. Paper only — no exchange order is ever sent.",
         inputs=[_positional("scan_id", "Scan ID", "int"), _text("note", "Note", "")],
         safety="write",
         related=["close"],
@@ -540,8 +532,7 @@ COMMANDS: list[dict] = [
         "Trades",
         "Post-trade review",
         ["postreview"],
-        "Post-trade review of a closed scan: R achieved, MAE/MFE and the "
-        "discipline verdict.",
+        "Post-trade review of a closed scan: R achieved, MAE/MFE and the discipline verdict.",
         inputs=[_positional("scan_id", "Scan ID", "int")],
         related=["journal_new"],
     ),
@@ -796,8 +787,7 @@ COMMANDS: list[dict] = [
         "Hub",
         "First night (home PC)",
         ["hub", "first-night"],
-        "One-page checklist to run SKY 24h on a home Ubuntu PC. "
-        "No trade keys, no public :8050.",
+        "One-page checklist to run SKY 24h on a home Ubuntu PC. No trade keys, no public :8050.",
         related=["hub_status", "hub_doctor", "hub_role"],
     ),
     _cmd(
@@ -814,8 +804,7 @@ COMMANDS: list[dict] = [
         "Hub",
         "Hub status",
         ["hub", "status"],
-        "Ubuntu Hub layout, disk, backups and systemd snapshot. "
-        "Does not place an order.",
+        "Ubuntu Hub layout, disk, backups and systemd snapshot. Does not place an order.",
         related=["hub_doctor", "hub_backup"],
     ),
     _cmd(
@@ -940,9 +929,7 @@ def catalog() -> dict:
             }
         )
     ordered = [
-        {"category": name, "commands": groups[name]}
-        for name in CATEGORY_ORDER
-        if name in groups
+        {"category": name, "commands": groups[name]} for name in CATEGORY_ORDER if name in groups
     ]
     for name in sorted(groups):
         if name not in CATEGORY_ORDER:
@@ -1011,9 +998,7 @@ def build_argv(command_id: str, params: dict | None = None) -> list[str]:
     return argv
 
 
-def run_command(
-    command_id: str, params: dict | None = None, timeout: int | None = None
-) -> dict:
+def run_command(command_id: str, params: dict | None = None, timeout: int | None = None) -> dict:
     """Run one catalog command as a subprocess and capture its output.
 
     Never uses a shell, never accepts a free-form command string, and only

@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 logger = logging.getLogger("ai_quant_sentinel.intelligence.data_contract")
@@ -31,7 +31,7 @@ logger = logging.getLogger("ai_quant_sentinel.intelligence.data_contract")
 REAL_CAPITAL_ENABLED: bool = False
 
 
-class DataStatus(str, Enum):
+class DataStatus(StrEnum):
     VALID = "VALID"
     INSUFFICIENT_HISTORY = "INSUFFICIENT_HISTORY"
     UNCLOSED_CANDLE_CONTAMINATION = "UNCLOSED_CANDLE_CONTAMINATION"

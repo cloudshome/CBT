@@ -18,7 +18,7 @@ import os
 import sqlite3
 import time
 from dataclasses import asdict, dataclass
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -29,7 +29,7 @@ from core.intelligence.causal_mechanisms import ResearchFamilyId
 logger = logging.getLogger("ai_quant_sentinel.intelligence.crawler.qualification_contracts")
 
 
-class EvidenceKind(str, Enum):
+class EvidenceKind(StrEnum):
     """
     Strict epistemic taxonomy distinguishing raw observations from validated findings.
     Transitions across these states must be explicit, auditable, and irreversible without proof.
@@ -47,7 +47,7 @@ class EvidenceKind(str, Enum):
     )
 
 
-class CausalQualificationStatus(str, Enum):
+class CausalQualificationStatus(StrEnum):
     """Lifecycle progression of a candidate research hypothesis."""
 
     CANDIDATE_GENERATED = "CANDIDATE_GENERATED"

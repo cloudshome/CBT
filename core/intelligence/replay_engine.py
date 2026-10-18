@@ -122,8 +122,10 @@ class CausalReplayEngine:
 
         sorted_events = sorted(
             macro_events,
-            key=lambda e: e.get("effective_availability_utc")
-            or self._to_sec(e.get("released_timestamp_ms", 0)),
+            key=lambda e: (
+                e.get("effective_availability_utc")
+                or self._to_sec(e.get("released_timestamp_ms", 0))
+            ),
         )
 
         episodes: list[ReplayEpisode] = []

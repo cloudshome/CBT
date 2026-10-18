@@ -41,9 +41,7 @@ KELLY_MAX_RISK_PCT = float(os.getenv("KELLY_MAX_RISK_PCT", "0.5"))
 # (not a fixed target); setup-specific targets come from measured expectancy.
 INTELLIGENCE_MIN_CONFIDENCE = int(os.getenv("INTELLIGENCE_MIN_CONFIDENCE", "80"))
 INTELLIGENCE_MIN_RR = float(os.getenv("INTELLIGENCE_MIN_RR", "1.5"))
-ACCOUNT_BALANCE = float(
-    os.getenv("ACCOUNT_BALANCE", "0") or 0
-)  # optional; enables position sizing
+ACCOUNT_BALANCE = float(os.getenv("ACCOUNT_BALANCE", "0") or 0)  # optional; enables position sizing
 RISK_PCT = max(0.0, min(MAX_RISK_PCT, float(os.getenv("RISK_PCT", "0.5"))))
 MAX_DAILY_LOSS_PCT = float(os.getenv("MAX_DAILY_LOSS_PCT", "1.5"))
 MAX_WEEKLY_LOSS_PCT = float(os.getenv("MAX_WEEKLY_LOSS_PCT", "3.0"))
@@ -109,9 +107,7 @@ if PROGRESSION not in PROGRESSION_LEVELS:
 # tradeable confidence; every other setup is a watch-item until individually
 # proven.  Default = the roadmap's suggested first edge: liquidity sweep +
 # trend continuation (sweep reversals + OB/FVG pullbacks).
-PRIMARY_SETUP_FAMILY = (
-    os.getenv("PRIMARY_SETUP_FAMILY", "sweep_trend_continuation").strip().lower()
-)
+PRIMARY_SETUP_FAMILY = os.getenv("PRIMARY_SETUP_FAMILY", "sweep_trend_continuation").strip().lower()
 PRIMARY_FAMILIES = {
     "sweep_trend_continuation": {
         "Sweep Reversal Buy",
@@ -213,9 +209,7 @@ PAPER_POLL_SECONDS = int(os.getenv("PAPER_POLL_SECONDS", "30"))
 PAPER_MAX_CANDLES_PER_CHECK = int(os.getenv("PAPER_MAX_CANDLES_PER_CHECK", "1000"))
 
 # ── Backtester ───────────────────────────────────────────────────────────
-BACKTEST_HORIZONS = [
-    float(h) for h in os.getenv("BACKTEST_HORIZONS", "1,4,24").split(",")
-]
+BACKTEST_HORIZONS = [float(h) for h in os.getenv("BACKTEST_HORIZONS", "1,4,24").split(",")]
 BACKTEST_MIN_BARS = int(os.getenv("BACKTEST_MIN_BARS", "120"))
 BACKTEST_STEP = int(os.getenv("BACKTEST_STEP", "1"))
 EXECUTION_MODEL = os.getenv("EXECUTION_MODEL", "none")  # none | slip | impact
@@ -227,9 +221,7 @@ CALIBRATE_MIN_N = int(
     os.getenv("CALIBRATE_MIN_N", "100")
 )  # min backtest+paper samples to calibrate a setup
 CALIBRATE_MIN_PAPER_N = int(os.getenv("CALIBRATE_MIN_PAPER_N", "20"))
-CALIBRATE_GAIN = float(
-    os.getenv("CALIBRATE_GAIN", "0.25")
-)  # expectancy -> multiplier sensitivity
+CALIBRATE_GAIN = float(os.getenv("CALIBRATE_GAIN", "0.25"))  # expectancy -> multiplier sensitivity
 CALIBRATE_MAX_MULT = float(os.getenv("CALIBRATE_MAX_MULT", "1.25"))
 CALIBRATE_MIN_MULT = float(os.getenv("CALIBRATE_MIN_MULT", "0.6"))
 CALIBRATE_FILTER = os.getenv("CALIBRATE_FILTER", "false").lower() in (
@@ -237,9 +229,7 @@ CALIBRATE_FILTER = os.getenv("CALIBRATE_FILTER", "false").lower() in (
     "true",
     "yes",
 )
-CALIBRATE_FILTER_THRESHOLD = float(
-    os.getenv("CALIBRATE_FILTER_THRESHOLD", "-0.35")
-)  # R, negative
+CALIBRATE_FILTER_THRESHOLD = float(os.getenv("CALIBRATE_FILTER_THRESHOLD", "-0.35"))  # R, negative
 
 # ── Risk enforcement (decision B6) ───────────────────────────────────────
 # When enabled, the approval queue and paper runner HALT new trades once the
@@ -296,8 +286,6 @@ SOURCE_TIER_NAMES = {
 }
 
 # ── State memory / signal stability (anti-spam, anti-whipsaw) ────────────
-SIGNAL_COOLDOWN_MINUTES = int(
-    os.getenv("SIGNAL_COOLDOWN_MINUTES", "30")
-)  # global floor
+SIGNAL_COOLDOWN_MINUTES = int(os.getenv("SIGNAL_COOLDOWN_MINUTES", "30"))  # global floor
 FLIP_PRICE_THRESHOLD_PCT = float(os.getenv("FLIP_PRICE_THRESHOLD_PCT", "0.8"))
 MAX_FLIPS_PER_HOUR = int(os.getenv("MAX_FLIPS_PER_HOUR", "2"))

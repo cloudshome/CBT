@@ -53,7 +53,7 @@ async def get_kronos_forecast(
             candles = data_streamer.generate_synthetic_candles(
                 norm_sym, timeframe, count=lookback + 20
             )
-    except Exception:  # noqa: BLE001
+    except Exception:
         norm_sym = symbol.replace("USDT", "/USDT") if "/" not in symbol else symbol
         candles = data_streamer.generate_synthetic_candles(norm_sym, timeframe, count=lookback + 20)
 
@@ -189,7 +189,7 @@ async def run_brier_audit(req: BrierAuditRequest):
                         entry_price=p.prediction_distribution.get("expected_return", latest_price),
                     )
                     resolved_count += 1
-                except Exception as e:  # noqa: BLE001
+                except Exception as e:
                     logger.debug(f"Could not resolve outcome for {p.forecast_id}: {e}")
 
     context = kronos_domain_adapter.get_research_context(req.symbol, req.timeframe)

@@ -86,7 +86,7 @@ def _call(fn):
     """Return ('ok', value) or ('raised', 'ExcType: msg')."""
     try:
         return "ok", fn()
-    except Exception as exc:  # noqa: BLE001 - the probe is measuring this
+    except Exception as exc:
         return "raised", f"{type(exc).__name__}: {exc}"
 
 
@@ -128,8 +128,7 @@ def case_helper(db: SignalDB) -> dict:
             "crossing_status": crossing[0],
             "crossing_is_correct_monday": crossing[0] == "ok"
             and crossing[1] == _expected_monday(CROSSING),
-            "safe_is_correct_monday": safe[0] == "ok"
-            and safe[1] == _expected_monday(SAFE),
+            "safe_is_correct_monday": safe[0] == "ok" and safe[1] == _expected_monday(SAFE),
         },
         "detail_pre_fix": crossing[1] if crossing[0] == "raised" else None,
         "expected_after_P12_17": {
@@ -240,9 +239,7 @@ def case_cli_approval(db: SignalDB) -> dict:
     _seed_approved(db)
     with _frozen(CROSSING):
         status, value = _call(
-            lambda: risk_gate.evaluate(
-                db, symbol="BTCUSDT", plan_type="Buy Pullback", action="BUY"
-            )
+            lambda: risk_gate.evaluate(db, symbol="BTCUSDT", plan_type="Buy Pullback", action="BUY")
         )
     # `approve` must return a DECISION with reasons a human can act on. The
     # standing B10 "setup unproven" block is expected on an empty book; a date
@@ -256,9 +253,7 @@ def case_cli_approval(db: SignalDB) -> dict:
             "call": status,
             "date_reason_reported": date_reason,
             "weekly_read": (
-                value["details"]["daily_weekly"]["week"]["n"]
-                if status == "ok"
-                else None
+                value["details"]["daily_weekly"]["week"]["n"] if status == "ok" else None
             ),
         },
         "detail_pre_fix": value if status == "raised" else None,

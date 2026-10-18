@@ -439,6 +439,9 @@ def test_backtest_rows_filter_by_symbol(db):
     assert len(got) == 1 and got[0]["symbol"] == "ETHUSDT"
 
 
+_paper_counter = [0]
+
+
 def add_paper(
     db,
     *,
@@ -448,8 +451,10 @@ def add_paper(
     opened=1000,
     closed=1000 + 3 * MS_PER_HOUR,
     sim_key=None,
-    counter=[0],
+    counter=None,
 ):
+    if counter is None:
+        counter = _paper_counter
     counter[0] += 1
     db.conn.execute(
         "INSERT INTO paper_trades "
@@ -614,9 +619,7 @@ def test_rows_from_backtest_db_honours_since_until_eras(tmp_path, monkeypatch):
         assert [r["ts"] for r in new] == [1_800_000_000_000, 1_800_000_000_001]
         # Date strings route through the same CLI parser.
         assert (
-            rows_from_backtest_db(
-                db, symbol="BTCUSDT", since_ts=0, until_ts=1_750_000_000_000
-            )
+            rows_from_backtest_db(db, symbol="BTCUSDT", since_ts=0, until_ts=1_750_000_000_000)
             == old
         )
 
@@ -772,9 +775,7 @@ def test_overlap_factor_paper_and_unknown_are_independent():
 
 
 def test_effective_sample_size_divides_by_overlap():
-    rows = [
-        bt_row_overlap(1.0, ts=i + 1, horizon_hours=24.0, step=3) for i in range(96)
-    ]
+    rows = [bt_row_overlap(1.0, ts=i + 1, horizon_hours=24.0, step=3) for i in range(96)]
     n_eff, overlap = effective_sample_size(rows)
     assert n_eff == 3.0  # 96 decided / 32× overlap
     assert overlap == 32.0
@@ -788,10 +789,7 @@ def test_effective_sample_size_divides_by_overlap():
 def test_trade_stats_reports_honest_n_eff_and_widens_ci():
     """SE = σ/√N_eff, not σ/√N — the raw N would understate uncertainty ~32×."""
     rs = [1.0 if i % 2 == 0 else -1.0 for i in range(96)]
-    rows = [
-        bt_row_overlap(r, ts=i + 1, horizon_hours=24.0, step=3)
-        for i, r in enumerate(rs)
-    ]
+    rows = [bt_row_overlap(r, ts=i + 1, horizon_hours=24.0, step=3) for i, r in enumerate(rs)]
     s = trade_stats(rows, step=3)
     assert s["n"] == 96
     assert s["n_eff"] == 3.0
@@ -808,10 +806,7 @@ def test_trade_stats_reports_honest_n_eff_and_widens_ci():
 def test_build_scorecard_flags_n_eff_below_min_decided():
     # 96 overlapping rows = only 3 independent, yet raw n clears min 30.
     rs = [1.0 if i % 2 == 0 else -1.0 for i in range(96)]
-    rows = [
-        bt_row_overlap(r, ts=i + 1, horizon_hours=24.0, step=3)
-        for i, r in enumerate(rs)
-    ]
+    rows = [bt_row_overlap(r, ts=i + 1, horizon_hours=24.0, step=3) for i, r in enumerate(rs)]
     rep = build_scorecard(rows, min_decided=30, step=3)
     assert rep["overall"]["n_eff"] == 3.0
     assert rep["overall"]["overlap"] == 32.0

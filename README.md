@@ -378,6 +378,32 @@ CBT/
 
 ---
 
+## 📦 Production Installation Status
+
+SKY's current release runs from the Python source checkout. Hardened Ubuntu
+Gunicorn/systemd service definitions exist, but a one-click signed Ubuntu
+package, Windows `.exe`, and Android `.apk` are **not released yet**. Do not
+download unofficial installers that claim otherwise.
+
+The active merged roadmap is [`ROADMAP.md`](ROADMAP.md):
+
+```text
+Ubuntu SKY Hub (one database, risk gate, workers, audit history)
+    ▲
+    ├── browser / installed PWA
+    ├── Windows companion .exe
+    └── Android companion .apk
+```
+
+The build order is security first: authentication/roles → stable `/api/v1` →
+background jobs/SSE → PWA → Ubuntu package → Windows → Android → signed release
+operations. This avoids packaging today's local development server as an unsafe
+public product. Packaging does not add live exchange execution or alter the
+paper/graduation gate.
+
+---
+
 ## License
 
 This quantitative platform is licensed under the MIT License.
+

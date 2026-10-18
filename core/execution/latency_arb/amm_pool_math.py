@@ -31,15 +31,15 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 
-class PoolType(str, Enum):
+class PoolType(StrEnum):
     CONSTANT_PRODUCT_V2 = "CONSTANT_PRODUCT_V2"
     CONCENTRATED_LIQUIDITY_V3 = "CONCENTRATED_LIQUIDITY_V3"
 
 
-class SwapDirection(str, Enum):
+class SwapDirection(StrEnum):
     BUY_BASE_WITH_QUOTE = "BUY_BASE_WITH_QUOTE"  # e.g., Swap USDT -> Buy ETH (In: Quote, Out: Base)
     SELL_BASE_FOR_QUOTE = "SELL_BASE_FOR_QUOTE"  # e.g., Swap ETH -> Get USDT (In: Base, Out: Quote)
 

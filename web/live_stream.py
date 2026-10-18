@@ -179,9 +179,7 @@ def candle_events(
                     "time": bar["time"],
                     "age": round(age, 3),
                     "ts": now,
-                    "message": (f"no new data for {int(age)}s")
-                    if state == "stale"
-                    else "",
+                    "message": (f"no new data for {int(age)}s") if state == "stale" else "",
                 },
             )
         sent += 1

@@ -445,7 +445,7 @@ class HFTelemetryPipeline:
                 self.flush_to_sqlite()
                 logger.info("HFTelemetryPipeline flush worker cancelled cleanly.")
                 break
-            except Exception as e:  # noqa: BLE001 — worker must survive and keep looping
+            except Exception as e:
                 logger.error(f"HFTelemetryPipeline flush worker uncaught error: {e}")
 
     # -------------------------------------------------------------------------

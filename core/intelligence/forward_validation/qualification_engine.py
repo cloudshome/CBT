@@ -27,7 +27,7 @@ import hashlib
 import json
 import logging
 import time
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -42,7 +42,7 @@ from core.intelligence.forward_validation.failure_memory import FailureMemorySto
 logger = logging.getLogger("ai_quant_sentinel.intelligence.qualification_engine")
 
 
-class QualificationStatus(str, Enum):
+class QualificationStatus(StrEnum):
     """Formal qualification status for strategy forward validation."""
 
     QUALIFIED = "QUALIFIED"

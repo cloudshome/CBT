@@ -128,7 +128,7 @@ class MEVMitigationSentinel:
                 real_capital_enabled=False,
             )
 
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error("MEV Mitigation Sentinel caught unhandled anomaly: %s", exc)
             return MEVProtectedOrderPlan(
                 order_id=order_id,

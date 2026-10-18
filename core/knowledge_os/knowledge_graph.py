@@ -46,7 +46,9 @@ class GraphRelation:
     relation_id: str
     source_entity_id: str
     target_entity_id: str
-    relation_type: str  # DRIVES, INFLUENCES, CORRELATED_WITH, INVERSE_TO, REGULATES, HEDGES, CONTRADICTS
+    relation_type: (
+        str  # DRIVES, INFLUENCES, CORRELATED_WITH, INVERSE_TO, REGULATES, HEDGES, CONTRADICTS
+    )
     weight: float
     claim_id: str = ""
     source_id: str = ""
@@ -88,7 +90,9 @@ class KnowledgeGraphEngine:
                 """
             )
             conn.execute("CREATE INDEX IF NOT EXISTS idx_entities_name ON research_entities(name);")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_entities_type ON research_entities(entity_type);")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_entities_type ON research_entities(entity_type);"
+            )
 
             conn.execute(
                 """
@@ -107,26 +111,100 @@ class KnowledgeGraphEngine:
                 );
                 """
             )
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_rel_source ON research_relations(source_entity_id);")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_rel_target ON research_relations(target_entity_id);")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_rel_type ON research_relations(relation_type);")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_rel_source ON research_relations(source_entity_id);"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_rel_target ON research_relations(target_entity_id);"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_rel_type ON research_relations(relation_type);"
+            )
             conn.commit()
 
     def _seed_canonical_knowledge_graph(self) -> None:
         """Pre-seeds institutional quantitative trading and macro relationships."""
         canonical_entities = [
-            GraphEntity("ent_btc", "Bitcoin", "ASSET", ["btc", "xbt", "digital gold"], "Primary decentralized benchmark asset"),
-            GraphEntity("ent_eth", "Ethereum", "ASSET", ["eth", "ether"], "Smart contract base settlement layer"),
-            GraphEntity("ent_sol", "Solana", "ASSET", ["sol"], "High-throughput layer 1 blockchain"),
-            GraphEntity("ent_gold", "Gold", "ASSET", ["xau", "precious metals"], "Historical monetary store of value"),
-            GraphEntity("ent_dxy", "US Dollar Index", "MACRO_INDICATOR", ["dxy", "usd index"], "Relative strength of USD vs basket of global currencies"),
-            GraphEntity("ent_fed", "Federal Reserve", "CENTRAL_BANK", ["fed", "fomc", "us central bank"], "United States central bank determining interest rates"),
-            GraphEntity("ent_cpi", "CPI Inflation", "MACRO_INDICATOR", ["cpi", "headline cpi", "core cpi", "inflation"], "Consumer Price Index measuring price changes"),
-            GraphEntity("ent_us10y", "10-Year Treasury Yield", "MACRO_INDICATOR", ["us10y", "10y yield", "treasuries"], "Risk-free rate benchmark for global financial assets"),
-            GraphEntity("ent_m2", "Global Liquidity M2", "MACRO_INDICATOR", ["m2", "global liquidity", "money supply"], "Total liquid money supply across G4 central banks"),
-            GraphEntity("ent_fvg", "Fair Value Gap", "SMC_CONCEPT", ["fvg", "imbalance", "inefficiency"], "Price delivery imbalance awaiting institutional rebalance"),
-            GraphEntity("ent_ob", "Order Block", "SMC_CONCEPT", ["order block", "ob", "institutional footprint"], "Specific candle range preceding aggressive institutional displacement"),
-            GraphEntity("ent_kelly", "Half-Kelly Sizing", "RISK_CONTROL", ["half-kelly", "kelly criterion", "risk gate"], "Deterministic capital risk cap (1.5% - 2.5% max)"),
+            GraphEntity(
+                "ent_btc",
+                "Bitcoin",
+                "ASSET",
+                ["btc", "xbt", "digital gold"],
+                "Primary decentralized benchmark asset",
+            ),
+            GraphEntity(
+                "ent_eth",
+                "Ethereum",
+                "ASSET",
+                ["eth", "ether"],
+                "Smart contract base settlement layer",
+            ),
+            GraphEntity(
+                "ent_sol", "Solana", "ASSET", ["sol"], "High-throughput layer 1 blockchain"
+            ),
+            GraphEntity(
+                "ent_gold",
+                "Gold",
+                "ASSET",
+                ["xau", "precious metals"],
+                "Historical monetary store of value",
+            ),
+            GraphEntity(
+                "ent_dxy",
+                "US Dollar Index",
+                "MACRO_INDICATOR",
+                ["dxy", "usd index"],
+                "Relative strength of USD vs basket of global currencies",
+            ),
+            GraphEntity(
+                "ent_fed",
+                "Federal Reserve",
+                "CENTRAL_BANK",
+                ["fed", "fomc", "us central bank"],
+                "United States central bank determining interest rates",
+            ),
+            GraphEntity(
+                "ent_cpi",
+                "CPI Inflation",
+                "MACRO_INDICATOR",
+                ["cpi", "headline cpi", "core cpi", "inflation"],
+                "Consumer Price Index measuring price changes",
+            ),
+            GraphEntity(
+                "ent_us10y",
+                "10-Year Treasury Yield",
+                "MACRO_INDICATOR",
+                ["us10y", "10y yield", "treasuries"],
+                "Risk-free rate benchmark for global financial assets",
+            ),
+            GraphEntity(
+                "ent_m2",
+                "Global Liquidity M2",
+                "MACRO_INDICATOR",
+                ["m2", "global liquidity", "money supply"],
+                "Total liquid money supply across G4 central banks",
+            ),
+            GraphEntity(
+                "ent_fvg",
+                "Fair Value Gap",
+                "SMC_CONCEPT",
+                ["fvg", "imbalance", "inefficiency"],
+                "Price delivery imbalance awaiting institutional rebalance",
+            ),
+            GraphEntity(
+                "ent_ob",
+                "Order Block",
+                "SMC_CONCEPT",
+                ["order block", "ob", "institutional footprint"],
+                "Specific candle range preceding aggressive institutional displacement",
+            ),
+            GraphEntity(
+                "ent_kelly",
+                "Half-Kelly Sizing",
+                "RISK_CONTROL",
+                ["half-kelly", "kelly criterion", "risk gate"],
+                "Deterministic capital risk cap (1.5% - 2.5% max)",
+            ),
         ]
 
         with self._get_connection() as conn:
@@ -151,13 +229,62 @@ class KnowledgeGraphEngine:
                 )
 
             canonical_relations = [
-                GraphRelation("rel_fed_dxy", "ent_fed", "ent_dxy", "REGULATES", 0.95, description="Fed rate policy heavily directs US Dollar strength"),
-                GraphRelation("rel_dxy_btc", "ent_dxy", "ent_btc", "INVERSE_TO", 0.88, description="Dollar liquidity expansion inversely impacts Bitcoin valuation"),
-                GraphRelation("rel_m2_btc", "ent_m2", "ent_btc", "DRIVES", 0.92, description="Global M2 expansion is structural driver of Bitcoin adoption and valuation"),
-                GraphRelation("rel_cpi_fed", "ent_cpi", "ent_fed", "INFLUENCES", 0.94, description="Inflation surprise shifts FOMC rate cut probabilities"),
-                GraphRelation("rel_fed_us10y", "ent_fed", "ent_us10y", "INFLUENCES", 0.90, description="Fed benchmark policy sets terminal treasury yield expectations"),
-                GraphRelation("rel_fvg_ob", "ent_fvg", "ent_ob", "CORRELATED_WITH", 0.85, description="Order blocks frequently origin-bound fair value gaps"),
-                GraphRelation("rel_kelly_btc", "ent_kelly", "ent_btc", "REGULATES", 1.00, description="Deterministic risk control bounds Bitcoin position size to <= 2.5% equity"),
+                GraphRelation(
+                    "rel_fed_dxy",
+                    "ent_fed",
+                    "ent_dxy",
+                    "REGULATES",
+                    0.95,
+                    description="Fed rate policy heavily directs US Dollar strength",
+                ),
+                GraphRelation(
+                    "rel_dxy_btc",
+                    "ent_dxy",
+                    "ent_btc",
+                    "INVERSE_TO",
+                    0.88,
+                    description="Dollar liquidity expansion inversely impacts Bitcoin valuation",
+                ),
+                GraphRelation(
+                    "rel_m2_btc",
+                    "ent_m2",
+                    "ent_btc",
+                    "DRIVES",
+                    0.92,
+                    description="Global M2 expansion is structural driver of Bitcoin adoption and valuation",
+                ),
+                GraphRelation(
+                    "rel_cpi_fed",
+                    "ent_cpi",
+                    "ent_fed",
+                    "INFLUENCES",
+                    0.94,
+                    description="Inflation surprise shifts FOMC rate cut probabilities",
+                ),
+                GraphRelation(
+                    "rel_fed_us10y",
+                    "ent_fed",
+                    "ent_us10y",
+                    "INFLUENCES",
+                    0.90,
+                    description="Fed benchmark policy sets terminal treasury yield expectations",
+                ),
+                GraphRelation(
+                    "rel_fvg_ob",
+                    "ent_fvg",
+                    "ent_ob",
+                    "CORRELATED_WITH",
+                    0.85,
+                    description="Order blocks frequently origin-bound fair value gaps",
+                ),
+                GraphRelation(
+                    "rel_kelly_btc",
+                    "ent_kelly",
+                    "ent_btc",
+                    "REGULATES",
+                    1.00,
+                    description="Deterministic risk control bounds Bitcoin position size to <= 2.5% equity",
+                ),
             ]
 
             for rel in canonical_relations:
@@ -187,12 +314,16 @@ class KnowledgeGraphEngine:
         clean = name_or_id.strip().lower()
         with self._get_connection() as conn:
             # Check ID
-            row = conn.execute("SELECT * FROM research_entities WHERE entity_id = ?;", (name_or_id,)).fetchone()
+            row = conn.execute(
+                "SELECT * FROM research_entities WHERE entity_id = ?;", (name_or_id,)
+            ).fetchone()
             if row:
                 return self._row_to_entity(row)
 
             # Check exact name (case-insensitive)
-            row = conn.execute("SELECT * FROM research_entities WHERE LOWER(name) = ?;", (clean,)).fetchone()
+            row = conn.execute(
+                "SELECT * FROM research_entities WHERE LOWER(name) = ?;", (clean,)
+            ).fetchone()
             if row:
                 return self._row_to_entity(row)
 
@@ -256,7 +387,9 @@ class KnowledgeGraphEngine:
         tgt_ent = self.get_entity(target_name_or_id)
 
         if not src_ent or not tgt_ent:
-            logger.warning(f"Cannot link '{source_name_or_id}' and '{target_name_or_id}': Entity not found.")
+            logger.warning(
+                f"Cannot link '{source_name_or_id}' and '{target_name_or_id}': Entity not found."
+            )
             return None
 
         rel_id = f"rel_{src_ent.entity_id}_{tgt_ent.entity_id}_{relation_type.lower()}"
@@ -323,14 +456,16 @@ class KnowledgeGraphEngine:
             ).fetchall()
 
             for r in out_rows:
-                edges.append({
-                    "relation_id": r["relation_id"],
-                    "source": r["source_entity_id"],
-                    "target": r["target_entity_id"],
-                    "type": r["relation_type"],
-                    "weight": r["weight"],
-                    "description": r["description"],
-                })
+                edges.append(
+                    {
+                        "relation_id": r["relation_id"],
+                        "source": r["source_entity_id"],
+                        "target": r["target_entity_id"],
+                        "type": r["relation_type"],
+                        "weight": r["weight"],
+                        "description": r["description"],
+                    }
+                )
                 if r["target_entity_id"] not in nodes_map:
                     nodes_map[r["target_entity_id"]] = {
                         "entity_id": r["target_entity_id"],
@@ -352,14 +487,16 @@ class KnowledgeGraphEngine:
             ).fetchall()
 
             for r in in_rows:
-                edges.append({
-                    "relation_id": r["relation_id"],
-                    "source": r["source_entity_id"],
-                    "target": r["target_entity_id"],
-                    "type": r["relation_type"],
-                    "weight": r["weight"],
-                    "description": r["description"],
-                })
+                edges.append(
+                    {
+                        "relation_id": r["relation_id"],
+                        "source": r["source_entity_id"],
+                        "target": r["target_entity_id"],
+                        "type": r["relation_type"],
+                        "weight": r["weight"],
+                        "description": r["description"],
+                    }
+                )
                 if r["source_entity_id"] not in nodes_map:
                     nodes_map[r["source_entity_id"]] = {
                         "entity_id": r["source_entity_id"],
@@ -372,12 +509,16 @@ class KnowledgeGraphEngine:
 
     def list_all_entities(self, limit: int = 100) -> list[dict[str, Any]]:
         with self._get_connection() as conn:
-            rows = conn.execute("SELECT * FROM research_entities ORDER BY mention_count DESC LIMIT ?;", (limit,)).fetchall()
+            rows = conn.execute(
+                "SELECT * FROM research_entities ORDER BY mention_count DESC LIMIT ?;", (limit,)
+            ).fetchall()
             return [self._row_to_entity(r).to_dict() for r in rows]
 
     def list_all_relations(self, limit: int = 100) -> list[dict[str, Any]]:
         with self._get_connection() as conn:
-            rows = conn.execute("SELECT * FROM research_relations ORDER BY weight DESC LIMIT ?;", (limit,)).fetchall()
+            rows = conn.execute(
+                "SELECT * FROM research_relations ORDER BY weight DESC LIMIT ?;", (limit,)
+            ).fetchall()
             return [dict(r) for r in rows]
 
 

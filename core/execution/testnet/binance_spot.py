@@ -294,7 +294,7 @@ class BinanceSpotTestnetAdapter(BaseTestnetAdapter):
                     logger.debug("Successfully extended Binance Spot Testnet listenKey")
             except asyncio.CancelledError:
                 break
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.error(f"Error extending listenKey: {exc}")
 
     async def _handle_ws_message(self, data: dict[str, Any]) -> None:
@@ -329,6 +329,6 @@ class BinanceSpotTestnetAdapter(BaseTestnetAdapter):
                 headers = {"X-MBX-APIKEY": self.credentials.api_key}
                 params = {"listenKey": self._listen_key}
                 await self.transport.request("DELETE", url, headers=headers, params=params)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.debug(f"Silently ignored error closing listenKey: {exc}")
         await self.transport.close()

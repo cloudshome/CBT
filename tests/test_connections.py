@@ -40,9 +40,7 @@ def test_module_has_no_write_http_verb():
     """There must be no POST/PUT/DELETE call anywhere in the account client."""
     from pathlib import Path
 
-    src = (
-        Path(__file__).resolve().parent.parent / "data" / "exchange_account.py"
-    ).read_text()
+    src = (Path(__file__).resolve().parent.parent / "data" / "exchange_account.py").read_text()
     for verb in (
         "requests.post",
         "requests.put",
@@ -71,9 +69,12 @@ def test_a_trading_key_is_flagged_as_unsafe():
     with pytest.raises(ExchangeAccountError):
         assert_read_only_key({"permissions": ["WITHDRAWALS"]})
     # a genuinely read-only key passes
-    assert_read_only_key(
-        {"canTrade": False, "canWithdraw": False, "permissions": ["SPOT_READ"]}
-    ) is None
+    assert (
+        assert_read_only_key(
+            {"canTrade": False, "canWithdraw": False, "permissions": ["SPOT_READ"]}
+        )
+        is None
+    )
 
 
 def test_unconfigured_account_degrades_quietly():

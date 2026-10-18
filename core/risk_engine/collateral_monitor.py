@@ -19,14 +19,14 @@ from __future__ import annotations
 
 import logging
 import time
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger("ai_quant_sentinel.risk_engine.collateral_monitor")
 
 
-class LiquidationRiskTier(str, Enum):
+class LiquidationRiskTier(StrEnum):
     """Categorical risk state based on liquidation distance buffer."""
 
     NORMAL = "NORMAL"  # LDB > 1500 bps (>15%)

@@ -73,7 +73,7 @@ class ProvenanceTracker:
                     from core.autonomous_research.storage.storage_manifest import storage_manifest
 
                     arch_record = storage_manifest.get_by_content_hash(imm_src.content_hash)
-                except Exception:  # noqa: BLE001
+                except Exception:
                     arch_record = None
 
             # 4. Strategy Candidates

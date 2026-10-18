@@ -112,18 +112,14 @@ def pairing_qr_text(payload: dict[str, Any]) -> str:
     return _pairing_qr_text(payload)
 
 
-def negotiate_version(
-    info: dict[str, Any], *, client_build: int = CLIENT_BUILD
-) -> dict[str, Any]:
+def negotiate_version(info: dict[str, Any], *, client_build: int = CLIENT_BUILD) -> dict[str, Any]:
     """Apply the same compatibility rules the Hub enforces (Android client)."""
     out = _negotiate_version(info, client_build=client_build)
     out["client_name"] = CLIENT_NAME
     return out
 
 
-def mutation_headers(
-    *, token: str, idempotency_key: str | None = None
-) -> dict[str, str]:
+def mutation_headers(*, token: str, idempotency_key: str | None = None) -> dict[str, str]:
     return _mutation_headers(token=token, idempotency_key=idempotency_key)
 
 
@@ -159,9 +155,7 @@ class KeystoreTokenStore:
         """No-op outside Android: real Keystore access lives in the APK."""
         return False
 
-    def save(
-        self, *, hub_url: str, token: str, scope: str, name: str
-    ) -> dict[str, Any]:
+    def save(self, *, hub_url: str, token: str, scope: str, name: str) -> dict[str, Any]:
         if scope not in ALLOWED_SCOPES:
             raise CompanionError(f"scope must be one of {ALLOWED_SCOPES}")
         used_keystore = self._keystore_write(token)
@@ -199,7 +193,7 @@ class KeystoreTokenStore:
             self.path.chmod(0o600)
         except OSError:
             pass
-        if self.path.stat().st_mode & stat.S_IROTH:
+        if os.name != "nt" and (self.path.stat().st_mode & stat.S_IROTH):
             self.path.unlink(missing_ok=True)
             raise CompanionError("refusing a world-readable token file")
         return record
@@ -211,7 +205,7 @@ class KeystoreTokenStore:
             data = json.loads(self.path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             return None
-        if data.get("token") and (self.path.stat().st_mode & stat.S_IROTH):
+        if data.get("token") and os.name != "nt" and (self.path.stat().st_mode & stat.S_IROTH):
             raise CompanionError("token file is world-readable — revoke the device")
         return data
 
@@ -318,15 +312,9 @@ def connection_snapshot(
     ready = readiness or {}
     loop = loop_health or {}
     gate = loop.get("gate") or {}
-    gate_open = (
-        bool(gate.get("allowed", gate.get("open"))) if isinstance(gate, dict) else False
-    )
+    gate_open = bool(gate.get("allowed", gate.get("open"))) if isinstance(gate, dict) else False
     paper = loop.get("loop") or loop.get("paper") or {}
-    open_n = (
-        int(paper.get("open") or paper.get("live_open") or 0)
-        if isinstance(paper, dict)
-        else 0
-    )
+    open_n = int(paper.get("open") or paper.get("live_open") or 0) if isinstance(paper, dict) else 0
     pending = int(paper.get("pending") or 0) if isinstance(paper, dict) else 0
     level = "offline"
     if connected and not stale:

@@ -374,7 +374,7 @@ async def test_risk_gate_drawdown_limit_enforced(monkeypatch):
     )
 
     with patch.object(live_execution_router, "_get_connector") as mock_conn:
-        with pytest.raises(LiveRiskRejectedError, match="KILL_SWITCH_ENGAGED|RISK_GATE_REJECTED"):
+        with pytest.raises(LiveRiskRejectedError, match=r"KILL_SWITCH_ENGAGED|RISK_GATE_REJECTED"):
             await live_execution_router.execute_live_order(req)
         mock_conn.assert_not_called()
 

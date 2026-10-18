@@ -289,9 +289,7 @@ def format_catalog(payload: dict[str, Any]) -> str:
         "",
     ]
     for item in payload.get("drills") or []:
-        result = next(
-            (r for r in payload.get("results") or [] if r["id"] == item["id"]), None
-        )
+        result = next((r for r in payload.get("results") or [] if r["id"] == item["id"]), None)
         mark = "PASS" if result and result.get("passed") else "OPEN"
         lines.append(f"[{mark}] {item['id']} — {item['title']}")
         for step in item["steps"]:

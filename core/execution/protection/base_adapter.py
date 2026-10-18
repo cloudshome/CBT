@@ -15,11 +15,11 @@ from __future__ import annotations
 import abc
 import time
 from dataclasses import asdict, dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class ProtectionStatus(str, Enum):
+class ProtectionStatus(StrEnum):
     PENDING = "PENDING"
     PROTECTED = "PROTECTED"
     BREAKEVEN_PENDING = "BREAKEVEN_PENDING"

@@ -26,7 +26,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import asdict, dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any, ClassVar
 
 logger = logging.getLogger("sky.execution.testnet.lost_ack_fsm")
@@ -40,7 +40,7 @@ class AmbiguousCancellationForbiddenError(Exception):
     """Raised when cancellation is assumed without authoritative venue confirmation."""
 
 
-class RecoveryState(str, Enum):
+class RecoveryState(StrEnum):
     """
     Formal 10-state recovery lifecycle for handling placement ambiguity.
     """

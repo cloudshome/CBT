@@ -600,7 +600,7 @@ async def get_delta_tolerance(
                                 mark_price=ref_price,
                             )
                         )
-        except Exception as _e:  # noqa: BLE001
+        except Exception as _e:
             logger.debug(f"[DeltaTolerance] Probe error on {exch}: {_e}")
 
     # Fallback simulation leg for isolated sandbox/test runs

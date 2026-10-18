@@ -37,10 +37,7 @@ MINUTE = 60_000
 
 def ms(iso: str) -> int:
     """UTC epoch ms for a naive ISO string interpreted as UTC."""
-    return int(
-        dt.datetime.fromisoformat(iso).replace(tzinfo=dt.UTC).timestamp()
-        * 1000
-    )
+    return int(dt.datetime.fromisoformat(iso).replace(tzinfo=dt.UTC).timestamp() * 1000)
 
 
 # --------------------------------------------------------------------------- #
@@ -320,9 +317,7 @@ def test_crypto_series_health_is_untouched(tmp_path):
             source="rest",
         )
     )
-    health = series_health(
-        store, "binance", "perp", "BTCUSDT", "1m", now_ms=last + MINUTE
-    )
+    health = series_health(store, "binance", "perp", "BTCUSDT", "1m", now_ms=last + MINUTE)
     assert health["calendar"] == "crypto-24x7"
     assert health["market_open"] is True
     assert verdict_for(health)["level"] == "ok"
@@ -341,9 +336,7 @@ def _gold_csv(stamps: list[int]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def test_dukascopy_import_does_not_report_the_gold_weekend_as_gaps(
-    tmp_path, monkeypatch
-):
+def test_dukascopy_import_does_not_report_the_gold_weekend_as_gaps(tmp_path, monkeypatch):
     """The weekend used to inflate `gaps_found` on every real XAU import."""
     monkeypatch.setenv("DEMO_MODE", "0")
     from data.backfill import backfill_from_csv

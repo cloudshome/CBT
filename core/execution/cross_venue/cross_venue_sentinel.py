@@ -256,7 +256,7 @@ class CrossVenueSentinel:
                 real_capital_enabled=False,
             )
 
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error("Fail-closed sandbox caught exception in CrossVenueSentinel: %s", exc)
             return SentinelEvaluationResult(
                 is_approved=False,

@@ -52,7 +52,10 @@ def test_bidirectional_backlinks_indexing(temp_wiki_engine: ResearchWikipediaEng
                 confidence_score=0.92,
             )
         ],
-        wikilinks=["[[Market Regime Transition|Regime Switch]]", "[[Execution Venue Microstructure]]"],
+        wikilinks=[
+            "[[Market Regime Transition|Regime Switch]]",
+            "[[Execution Venue Microstructure]]",
+        ],
         tags=["orderbook", "microstructure"],
         contradictions_detected=[],
         macro_regime_implications="High efficacy during volatile expansion regimes.",
@@ -151,7 +154,9 @@ def test_triage_inbox_merge_lifecycle(temp_wiki_engine: ResearchWikipediaEngine)
     assert any(x["item_id"] == item_id for x in merged_items)
 
 
-def test_rest_endpoints_backlinks_and_merge(temp_wiki_engine: ResearchWikipediaEngine, monkeypatch: pytest.MonkeyPatch):
+def test_rest_endpoints_backlinks_and_merge(
+    temp_wiki_engine: ResearchWikipediaEngine, monkeypatch: pytest.MonkeyPatch
+):
     """
     Phase 4 & 5: Verifies REST routing for /wiki/article/{id}/backlinks and /wiki/triage/{id}/merge.
     """

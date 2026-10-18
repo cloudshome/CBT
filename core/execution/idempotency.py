@@ -127,7 +127,7 @@ class LiveOrderIdempotencyStore:
                     "CREATE INDEX IF NOT EXISTS idx_idemp_status ON live_order_idempotency(status)"
                 )
                 conn.commit()
-        except Exception as e:  # noqa: BLE001 — best-effort schema init
+        except Exception as e:
             logger.error(f"Failed to initialize live_order_idempotency table: {e}")
 
     def reserve_order(

@@ -142,7 +142,9 @@ def _run(api: dict, body: str) -> dict:
         f.write(harness)
         path = f.name
     try:
-        r = subprocess.run([NODE, path], capture_output=True, text=True, encoding="utf-8", timeout=90)
+        r = subprocess.run(
+            [NODE, path], capture_output=True, text=True, encoding="utf-8", timeout=90
+        )
         assert r.returncode == 0, f"harness failed:\n{r.stdout}\n{r.stderr}"
         return json.loads(r.stdout.strip().splitlines()[-1])
     finally:
@@ -586,12 +588,12 @@ def test_ray_runs_to_the_last_bar_and_a_box_draws_both_edges():
     assert len(box) == 2, "a box is drawn as its top and bottom edge"
     tops = sorted({p["value"] for s in box for p in s["points"]})
     assert tops == [63100.0, 63700.0]
-    assert {s["points"][0]["time"] for s in box} == {
-        min(s["points"][0]["time"] for s in box)
-    }, "box edges must start on one bar"
-    assert {s["points"][1]["time"] for s in box} == {
-        max(s["points"][1]["time"] for s in box)
-    }, "box edges must end on one bar"
+    assert {s["points"][0]["time"] for s in box} == {min(s["points"][0]["time"] for s in box)}, (
+        "box edges must start on one bar"
+    )
+    assert {s["points"][1]["time"] for s in box} == {max(s["points"][1]["time"] for s in box)}, (
+        "box edges must end on one bar"
+    )
     assert [d["kind"] for d in out["stored"]] == ["ray", "box"]
     assert "Horizontal ray" in out["list"] and "Box" in out["list"]
 
@@ -1551,9 +1553,7 @@ def test_multi_chart_renders_missing_data_as_an_explicit_empty_slot():
     """,
     )
     assert out["cards"] == 3, "the failed slot still painted a chart"
-    assert any(
-        "no candles for XAUUSD 1h" in t and "unreachable" in t for t in out["empty"]
-    ), out
+    assert any("no candles for XAUUSD 1h" in t and "unreachable" in t for t in out["empty"]), out
 
 
 def test_multi_chart_defaults_fill_four_distinct_slots_and_validate_saves():

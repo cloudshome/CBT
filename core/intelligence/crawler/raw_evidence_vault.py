@@ -249,4 +249,3 @@ class RawEvidenceVault:
             )
             ids = [r[0] for r in cursor.fetchall()]
         return [self.get_evidence(eid) for eid in ids if eid]
-

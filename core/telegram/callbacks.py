@@ -99,7 +99,7 @@ class TelegramCallbackRouter:
                     """
                 )
                 conn.commit()
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.warning(f"Could not initialize telegram_action_tokens table: {e}")
 
     def create_action_token(
@@ -149,7 +149,7 @@ class TelegramCallbackRouter:
                     ),
                 )
                 conn.commit()
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.debug(f"Action token SQLite write: {e}")
 
         return token
@@ -180,7 +180,7 @@ class TelegramCallbackRouter:
                     )
                     self._tokens[token_id] = tok
                     return tok
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.error(f"Error fetching action token {token_id}: {e}")
 
         return None
@@ -192,7 +192,7 @@ class TelegramCallbackRouter:
             with db_manager.get_trading_conn() as conn:
                 conn.execute("DELETE FROM telegram_action_tokens WHERE token_id = ?", (token_id,))
                 conn.commit()
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.warning(f"Error invalidating action token {token_id}: {e}")
 
     # ==============================================================================

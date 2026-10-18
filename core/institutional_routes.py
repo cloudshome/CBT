@@ -41,6 +41,7 @@ async def get_debate_decision(
     """Runs the tri-agent adversarial debate council (Bull, Bear, Skeptic Judge)."""
     try:
         from core.data_streamer import data_streamer
+
         candles = data_streamer.get_candles(symbol, timeframe, limit=limit)
         cur_price = float(candles[-1]["close"]) if candles else 65000.0
     except Exception:
@@ -85,15 +86,18 @@ async def get_whale_radar(
     """Aggregates on-chain whale flows, exchange net flows, and liquidation clusters."""
     try:
         from core.data_streamer import data_streamer
+
         candles = data_streamer.get_candles(symbol, "15m", limit=5)
-        ref_price = price if price and price > 0 else (float(candles[-1]["close"]) if candles else 65000.0)
+        ref_price = (
+            price if price and price > 0 else (float(candles[-1]["close"]) if candles else 65000.0)
+        )
     except Exception:
         ref_price = price if price and price > 0 else 65000.0
 
     # Model high-leverage liquidation clusters relative to ref_price
     is_btc = "BTC" in symbol.upper()
     multiplier = 1.0 if is_btc else 0.04
-    
+
     clusters = [
         {
             "price_level": round(ref_price * 1.018, 2),
@@ -168,6 +172,7 @@ async def run_monte_carlo_stress_test(
     """Runs 10,000-path Monte Carlo bootstrap simulation for ruin and drawdown estimation."""
     try:
         from core.data_streamer import data_streamer
+
         candles = data_streamer.get_candles(symbol, timeframe, limit=100)
         returns = []
         for i in range(1, len(candles)):
@@ -197,7 +202,7 @@ async def get_cross_asset_lead_lag(
         us10y_yield=us10y_val,
     )
     has_shock = any(abs(s.shock_zscore) >= 2.0 for s in signals)
-    
+
     return {
         "signals": [asdict(s) for s in signals],
         "dxy_price": dxy_val,
@@ -213,6 +218,7 @@ async def get_dynamic_hedge(
     """Computes real-time portfolio delta and autonomous micro-hedging recommendations."""
     try:
         from core.data_streamer import data_streamer
+
         candles = data_streamer.get_candles(symbol, "15m", limit=5)
         cur_price = float(candles[-1]["close"]) if candles else 65000.0
     except Exception:

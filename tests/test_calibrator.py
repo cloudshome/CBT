@@ -91,12 +91,8 @@ def test_expectancy_computation(tmp_path):
     db = SignalDB(tmp_path / "t.db")
     _seed_backtests(db)
     stats = compute_expectancy_by_type(db)
-    assert stats["Buy Pullback"]["expectancy"] == pytest.approx(
-        1.4, abs=0.01
-    )  # (2*4 - 1)/5
-    assert stats["Breakout Buy"]["expectancy"] == pytest.approx(
-        -0.7, abs=0.01
-    )  # (0.5 - 4)/5
+    assert stats["Buy Pullback"]["expectancy"] == pytest.approx(1.4, abs=0.01)  # (2*4 - 1)/5
+    assert stats["Breakout Buy"]["expectancy"] == pytest.approx(-0.7, abs=0.01)  # (0.5 - 4)/5
     db.close()
 
 
@@ -162,9 +158,7 @@ def test_pending_reviews(tmp_path):
 
 def test_calibration_save_load(tmp_path):
     db = SignalDB(tmp_path / "t.db")
-    db.save_calibration(
-        {"Buy Pullback": {"multiplier": 1.2, "expectancy": 1.4, "samples": 50}}
-    )
+    db.save_calibration({"Buy Pullback": {"multiplier": 1.2, "expectancy": 1.4, "samples": 50}})
     loaded = db.load_calibration()
     assert loaded["Buy Pullback"]["multiplier"] == 1.2
     db.close()

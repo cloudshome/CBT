@@ -43,7 +43,7 @@ class MultimodalIngestor:
                     raw_text = "".join(chr(b) for b in content if 32 <= b <= 126 or b in (10, 13))
             else:
                 raw_text = f"Binary file: {file_path.name}"
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.error(f"Document parsing error for {file_path}: {e}")
             raw_text = f"Error reading document: {e}"
 

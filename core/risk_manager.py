@@ -38,6 +38,7 @@ class RiskManager:
         """Restores persisted lockout and daily equity state from the database."""
         try:
             from core.database import db_manager
+
             with db_manager.get_brain_conn() as conn:
                 cursor = conn.execute(
                     "SELECT param_key, param_value_json FROM system_parameters WHERE param_key IN ('risk_lockout_until_ms', 'risk_daily_starting_equity', 'risk_last_day_timestamp')"
@@ -45,6 +46,7 @@ class RiskManager:
                 for row in cursor.fetchall():
                     key = row["param_key"]
                     import json
+
                     val = json.loads(row["param_value_json"])
                     if key == "risk_lockout_until_ms" and val is not None:
                         self._lockout_until_ms = int(val)
@@ -53,7 +55,9 @@ class RiskManager:
                     elif key == "risk_last_day_timestamp" and val is not None:
                         self._last_day_timestamp = int(val)
             if self._lockout_until_ms is not None:
-                logger.warning(f"Restored persisted risk lockout active until {self._lockout_until_ms}")
+                logger.warning(
+                    f"Restored persisted risk lockout active until {self._lockout_until_ms}"
+                )
         except Exception as e:
             logger.debug(f"Risk state persistence table not yet initialized or unreadable: {e}")
 
@@ -63,6 +67,7 @@ class RiskManager:
             import json
 
             from core.database import db_manager
+
             now_ms = int(time.time() * 1000)
             val_json = json.dumps(value)
             with db_manager.get_brain_conn() as conn:

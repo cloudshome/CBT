@@ -22,7 +22,7 @@ import logging
 import math
 import time
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 import numpy as np
 from pydantic import BaseModel, Field
@@ -31,7 +31,7 @@ from scipy import stats
 logger = logging.getLogger("ai_quant_sentinel.intelligence.synthetic_basis_engine")
 
 
-class BasisRegime(str, Enum):
+class BasisRegime(StrEnum):
     """Regime classification for spot-perpetual basis."""
 
     CONTANGO = "CONTANGO"  # Perp > Spot (positive basis)
@@ -39,7 +39,7 @@ class BasisRegime(str, Enum):
     FLAT = "FLAT"  # |Basis| < 1.0 bps
 
 
-class EpistemicTag(str, Enum):
+class EpistemicTag(StrEnum):
     """Epistemic taxonomy classification per QUANT_RESEARCH_PROTOCOL.md."""
 
     FACT = "[FACT]"  # Empirically measured observable data

@@ -46,9 +46,7 @@ def _frame_payload():
     from tests.conftest import make_ohlcv
 
     df = make_ohlcv(n=300, seed=13)
-    return analyze_frame(
-        df, symbol="BTCUSDT", timeframe="15m", min_confidence=0
-    ).as_json()
+    return analyze_frame(df, symbol="BTCUSDT", timeframe="15m", min_confidence=0).as_json()
 
 
 def test_mtf_analyze_timeframe_shape():

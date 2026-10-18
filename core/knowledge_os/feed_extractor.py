@@ -67,10 +67,14 @@ class FeedExtractor:
             with urllib.request.urlopen(req, timeout=DEFAULT_TIMEOUT_SECS) as resp:
                 content_bytes = resp.read(MAX_RESPONSE_BYTES + 1)
                 if len(content_bytes) > MAX_RESPONSE_BYTES:
-                    logger.warning("Feed '%s' exceeded %d bytes limit, truncated.", feed_url, MAX_RESPONSE_BYTES)
+                    logger.warning(
+                        "Feed '%s' exceeded %d bytes limit, truncated.",
+                        feed_url,
+                        MAX_RESPONSE_BYTES,
+                    )
                     content_bytes = content_bytes[:MAX_RESPONSE_BYTES]
                 xml_text = content_bytes.decode("utf-8", errors="replace")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error("Failed to fetch feed '%s': %s", feed_url, exc)
             return []
 
@@ -102,7 +106,11 @@ class FeedExtractor:
             entries = root.findall(f"{ns}entry")
             for entry in entries[:max_items]:
                 title_elem = entry.find(f"{ns}title")
-                title = title_elem.text.strip() if title_elem is not None and title_elem.text else "Untitled Entry"
+                title = (
+                    title_elem.text.strip()
+                    if title_elem is not None and title_elem.text
+                    else "Untitled Entry"
+                )
 
                 # Link in atom is typically in attribute href
                 link = ""
@@ -113,13 +121,19 @@ class FeedExtractor:
                         link = link_elem.text.strip()
 
                 summary_elem = entry.find(f"{ns}summary") or entry.find(f"{ns}content")
-                summary = summary_elem.text.strip() if summary_elem is not None and summary_elem.text else ""
+                summary = (
+                    summary_elem.text.strip()
+                    if summary_elem is not None and summary_elem.text
+                    else ""
+                )
 
                 pub_elem = entry.find(f"{ns}published") or entry.find(f"{ns}updated")
                 pub_date = pub_elem.text.strip() if pub_elem is not None and pub_elem.text else ""
 
                 author_elem = entry.find(f"{ns}author/{ns}name")
-                author = author_elem.text.strip() if author_elem is not None and author_elem.text else ""
+                author = (
+                    author_elem.text.strip() if author_elem is not None and author_elem.text else ""
+                )
 
                 items.append(
                     FeedItem(
@@ -138,7 +152,11 @@ class FeedExtractor:
 
             for item in raw_items[:max_items]:
                 title_elem = item.find("title")
-                title = title_elem.text.strip() if title_elem is not None and title_elem.text else "Untitled Entry"
+                title = (
+                    title_elem.text.strip()
+                    if title_elem is not None and title_elem.text
+                    else "Untitled Entry"
+                )
 
                 link_elem = item.find("link")
                 link = link_elem.text.strip() if link_elem is not None and link_elem.text else ""

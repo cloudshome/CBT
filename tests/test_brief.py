@@ -52,10 +52,7 @@ def test_post_trade_review_populated(tmp_path):
         assert rev["outcome"] == "TP_HIT"
         assert rev["rr_achieved"] == 1.5
         assert rev["followed_rules"] == "YES"
-        assert (
-            "TP_HIT · 1.5R · MAE 30.0 · MFE 1200.0 · Followed rules: YES"
-            in rev["headline"]
-        )
+        assert "TP_HIT · 1.5R · MAE 30.0 · MFE 1200.0 · Followed rules: YES" in rev["headline"]
         assert len(rev["takeaways"]) > 0
 
 

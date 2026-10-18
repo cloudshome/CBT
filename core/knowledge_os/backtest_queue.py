@@ -252,6 +252,7 @@ class BacktestQueueManager:
                 # 6. Re-evaluate linked theses
                 try:
                     from core.knowledge_os.thesis_engine import thesis_engine
+
                     # Find if any theses link to this claim
                     t_rows = w_conn.execute(
                         "SELECT DISTINCT thesis_id FROM research_thesis_claims WHERE claim_id = ?;",
@@ -259,10 +260,14 @@ class BacktestQueueManager:
                     ).fetchall()
                     for tr in t_rows:
                         thesis_engine.evaluate_thesis(tr["thesis_id"])
-                except Exception as e:  # noqa: BLE001
+                except Exception as e:
                     logger.debug(f"Thesis re-evaluation skipped: {e}")
 
-        badge = "PASSED ✅ (Qualified for Paper Desk)" if passed else "REJECTED ❌ (Failed Expectancy Hurdle)"
+        badge = (
+            "PASSED ✅ (Qualified for Paper Desk)"
+            if passed
+            else "REJECTED ❌ (Failed Expectancy Hurdle)"
+        )
         summary = (
             f"🧪 **WALK-FORWARD STRATEGY VALIDATION REPORT**\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"

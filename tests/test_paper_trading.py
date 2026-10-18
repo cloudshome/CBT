@@ -126,12 +126,8 @@ def test_immediate_approved_trade_auto_closes_at_target(tmp_path):
     sid = _approve(db, _payload())
     # The active top plan fills on approval. This later candle reaches only
     # TP1, so the result must be a paper win and lifecycle CLOSED.
-    client = CandleClient(
-        [_candle(NOW + 1, low=61_000.0, high=62_300.0, close=62_200.0)]
-    )
-    result = PaperTradingRunner(
-        db, client, clock_ms=lambda: NOW, enforce_gate=False
-    ).run_once()
+    client = CandleClient([_candle(NOW + 1, low=61_000.0, high=62_300.0, close=62_200.0)])
+    result = PaperTradingRunner(db, client, clock_ms=lambda: NOW, enforce_gate=False).run_once()
 
     trade = db.paper_trade_for_scan(sid)
     assert result.enrolled == 1
@@ -153,9 +149,7 @@ def test_waiting_trade_enters_then_closes_on_same_candle(tmp_path):
     # Low reaches the planned pullback entry; high then reaches TP. OHLCV
     # cannot give exact intrabar ordering, but only TP is touched after entry.
     client = CandleClient([_candle(NOW + 1, low=99.5, high=111.0, close=109.0)])
-    result = PaperTradingRunner(
-        db, client, clock_ms=lambda: NOW, enforce_gate=False
-    ).run_once()
+    result = PaperTradingRunner(db, client, clock_ms=lambda: NOW, enforce_gate=False).run_once()
 
     trade = db.paper_trade_for_scan(sid)
     assert result.enrolled == 1
@@ -174,9 +168,7 @@ def test_waiting_trade_stays_approved_until_entry_is_reached(tmp_path):
     # Candle never reaches 100.0, so the scan must remain human-approved, not
     # falsely marked executed.
     client = CandleClient([_candle(NOW + 1, low=101.0, high=106.0, close=104.0)])
-    result = PaperTradingRunner(
-        db, client, clock_ms=lambda: NOW, enforce_gate=False
-    ).run_once()
+    result = PaperTradingRunner(db, client, clock_ms=lambda: NOW, enforce_gate=False).run_once()
 
     trade = db.paper_trade_for_scan(sid)
     assert result.enrolled == 1
@@ -202,9 +194,7 @@ def test_already_executed_conditional_scan_is_treated_as_open(tmp_path):
     assert db.update_status(sid, "EXECUTED", note="manual fill") == "EXECUTED"
     # The monitor must honour the existing fill rather than re-waiting for it.
     client = CandleClient([_candle(NOW + 1, low=101.0, high=106.0, close=104.0)])
-    result = PaperTradingRunner(
-        db, client, clock_ms=lambda: NOW, enforce_gate=False
-    ).run_once()
+    result = PaperTradingRunner(db, client, clock_ms=lambda: NOW, enforce_gate=False).run_once()
 
     trade = db.paper_trade_for_scan(sid)
     assert result.enrolled == 1

@@ -29,14 +29,14 @@ def test_ssrf_blocks_loopback_and_private_ips():
     blocked_targets = [
         "http://localhost:8000/api/health",
         "http://127.0.0.1:8000/api/orders",
-        "http://0.0.0.0:80/status",                   # RFC 1122
+        "http://0.0.0.0:80/status",  # RFC 1122
         "http://10.0.0.1/admin",
         "http://172.16.0.10:8080/metrics",
         "http://192.168.1.1:8080/router",
         "http://169.254.169.254/latest/meta-data/",  # Cloud Metadata endpoint
-        "http://100.64.0.1/cgnat",                   # Carrier-grade NAT
-        "http://224.0.0.1/multicast",                # Multicast
-        "http://240.0.0.1/reserved",                 # Reserved Future Use
+        "http://100.64.0.1/cgnat",  # Carrier-grade NAT
+        "http://224.0.0.1/multicast",  # Multicast
+        "http://240.0.0.1/reserved",  # Reserved Future Use
         "http://metadata.google.internal/computeMetadata/v1/",
     ]
     for url in blocked_targets:
@@ -100,6 +100,7 @@ async def test_web_search_discovery_structure():
 def test_capital_firewall_and_m18_isolation():
     """Verifies that adding the web search agent does NOT touch Milestone 18 or capital firewall."""
     from core.execution.kill_switch import live_kill_switch
+
     # Capital firewall remains active and enforced
     assert hasattr(live_kill_switch, "is_active")
 
@@ -112,7 +113,9 @@ def test_query_planner_worker():
     from core.knowledge_os.web_search_agent import QueryPlannerWorker
 
     planner = QueryPlannerWorker()
-    plan_geo = planner.plan(topic="US Dollar Hegemony & Global Alliances", user_query="De-dollarization trends", limit=3)
+    plan_geo = planner.plan(
+        topic="US Dollar Hegemony & Global Alliances", user_query="De-dollarization trends", limit=3
+    )
     assert plan_geo.category == "Macro Geopolitics & Hegemony"
     assert "De-dollarization trends" in plan_geo.query_variants
     assert len(plan_geo.query_variants) == 3
@@ -290,4 +293,3 @@ def test_rest_web_search_cycle_endpoint():
     assert "cycle_id" in data
     assert data["topic"] == "ETH L2 Rollup Gas Market Microstructure"
     assert "worker_durations_ms" in data
-

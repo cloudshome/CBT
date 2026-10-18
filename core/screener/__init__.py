@@ -14,11 +14,10 @@ from core.screener.opportunity_hunter import (
 )
 
 __all__ = [
-    "OpportunityCategory",
     "AttentionState",
-    "WatchlistState",
-    "OpportunityRecord",
+    "OpportunityCategory",
     "OpportunityHunter",
+    "OpportunityRecord",
+    "WatchlistState",
     "opportunity_hunter",
 ]
-

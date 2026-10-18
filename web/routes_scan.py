@@ -24,9 +24,7 @@ def register(app, ctx):
             if force:
                 _CACHE.update(payload=None, ts=0, ttl=_CACHE.get("ttl", 40))
             return jsonify(
-                _sanitize_for_json(
-                    compute_payload(symbol, tf, save=True, use_cache=not force)
-                )
+                _sanitize_for_json(compute_payload(symbol, tf, save=True, use_cache=not force))
             )
         except ConnectionError as exc:
             return jsonify({"error": str(exc)}), 502
@@ -57,9 +55,7 @@ def register(app, ctx):
                 "history": [],
             }
             return jsonify(
-                _sanitize_for_json(
-                    {"symbol": symbol, "timeframe": tf, "sentiment": sent}
-                )
+                _sanitize_for_json({"symbol": symbol, "timeframe": tf, "sentiment": sent})
             )
         except Exception as exc:
             return jsonify(
@@ -93,9 +89,7 @@ def register(app, ctx):
                     "asset": symbol,
                     "signal": "NO TRADE",
                     "confidence": 0,
-                    "reason": [
-                        f"Insufficient market data: {type(exc).__name__}: {exc}"
-                    ],
+                    "reason": [f"Insufficient market data: {type(exc).__name__}: {exc}"],
                 }
             ), 200
 

@@ -31,7 +31,7 @@ DEFAULT_EXPLORE_LIMIT = 10
 
 def format_duration(seconds: int | float) -> str:
     """Formats seconds into readable MM:SS or HH:MM:SS."""
-    sec = max(0, int(round(seconds)))
+    sec = max(0, round(seconds))
     h = sec // 3600
     m = (sec % 3600) // 60
     s = sec % 60
@@ -76,7 +76,7 @@ class YouTubeDiscoveryEngine:
                     "CREATE INDEX IF NOT EXISTS idx_yt_crawl_status ON youtube_crawl_history (status);"
                 )
                 conn.commit()
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.warning(f"Could not initialize youtube_crawl_history table: {e}")
 
     def normalize_source(
@@ -295,7 +295,7 @@ class YouTubeDiscoveryEngine:
                             playlist_position=idx + 1,
                         )
                     )
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.warning(f"Flat discovery encountered error for '{source.canonical_url}': {e}")
 
         # Record discovered items in crawl memory table
@@ -327,7 +327,7 @@ class YouTubeDiscoveryEngine:
                         ),
                     )
                 conn.commit()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(f"Failed to record discovered videos in crawl memory: {e}")
 
     def filter_unprocessed(
@@ -365,7 +365,7 @@ class YouTubeDiscoveryEngine:
                         match = re.search(r"watch\?v=([a-zA-Z0-9_-]{11})", uri)
                         if match:
                             ingested_ids.add(match.group(1))
-                except Exception:  # noqa: S110,BLE001 — defensive fallback
+                except Exception:
                     pass
 
                 for v in videos:
@@ -373,7 +373,7 @@ class YouTubeDiscoveryEngine:
                         skipped_videos.append(v)
                     else:
                         new_videos.append(v)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(f"Deduplication check error: {e}")
             return videos, []
 
@@ -401,7 +401,7 @@ class YouTubeDiscoveryEngine:
                     (video_id, status, now, now, content_hash),
                 )
                 conn.commit()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(f"Could not update video status for {video_id}: {e}")
 
 

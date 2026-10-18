@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sqlite3
 import stat
 from pathlib import Path
@@ -53,8 +54,10 @@ def test_setup_creates_private_layout(prefix):
     assert paths.setup_stamp.is_file()
     assert paths.backup_dir.is_dir()
     mode = paths.env_file.stat().st_mode
-    assert not (mode & stat.S_IROTH), "sky.env must not be world-readable"
+    if os.name != "nt":
+        assert not (mode & stat.S_IROTH), "sky.env must not be world-readable"
     env = paths.env_file.read_text()
+
     assert "DASHBOARD_HOST=127.0.0.1" in env
     assert "DB_PATH=/var/lib/sky/cryptobrain.db" in env
     assert "SKY_AGENT_MARKET_POLL_SECONDS=" in env
@@ -85,7 +88,8 @@ def test_sqlite_backup_round_trip(prefix):
 
     snap = backup(prefix=prefix, include_store=True, retention_days=30)
     assert snap["ok"] and snap["sha256"]
-    assert not (Path(snap["archive"]).stat().st_mode & stat.S_IROTH)
+    if os.name != "nt":
+        assert not (Path(snap["archive"]).stat().st_mode & stat.S_IROTH)
 
     # wipe live data
     paths.db_path.unlink()
@@ -160,7 +164,7 @@ def test_doctor_and_status_shapes(prefix):
     assert st["live_exchange_execution"] is False
     assert st["host_role"]["role"] == "ubuntu_hub"
     assert st["host_role"]["second_agent"] is False
-    assert "opt/sky" in st["paths"]["opt"]
+    assert "opt/sky" in st["paths"]["opt"].replace("\\", "/")
     doc = doctor(prefix=prefix)
     names = {c["name"] for c in doc["checks"]}
     assert "env_privacy" in names
@@ -205,9 +209,7 @@ def test_systemd_units_are_hardened_and_loopback():
 
 
 def test_proxy_configs_do_not_cache_api():
-    caddy = (
-        Path(__file__).resolve().parent.parent / "ops" / "proxy" / "Caddyfile"
-    ).read_text()
+    caddy = (Path(__file__).resolve().parent.parent / "ops" / "proxy" / "Caddyfile").read_text()
     nginx = (
         Path(__file__).resolve().parent.parent / "ops" / "proxy" / "nginx-sky.conf"
     ).read_text()
@@ -234,18 +236,13 @@ def test_first_night_guide_is_honest():
     payload = first_night()
     assert payload["ok"] and payload["live_exchange_execution"] is False
     assert "port-forward 8050" in payload["forbidden"]
-    assert any(
-        "second" in x.lower() and "agent" in x.lower() for x in payload["forbidden"]
-    )
+    assert any("second" in x.lower() and "agent" in x.lower() for x in payload["forbidden"])
     assert payload["host_role"]["second_agent"] is False
 
 
 def test_dispatch_first_night():
     payload = dispatch("first-night")
-    assert (
-        "hub setup" in payload["guide"].lower()
-        or "first night" in payload["guide"].lower()
-    )
+    assert "hub setup" in payload["guide"].lower() or "first night" in payload["guide"].lower()
 
 
 def test_host_role_is_one_hub_one_agent():

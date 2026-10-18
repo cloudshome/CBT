@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 from core.risk_engine.stress_testing.portfolio_stress_engine import (
     AssetPosition,
@@ -33,7 +33,7 @@ from core.risk_engine.stress_testing.portfolio_stress_engine import (
 logger = logging.getLogger("ai_quant_sentinel.stress_testing.multi_strategy_ensemble")
 
 
-class MarketRegimeClassification(str, Enum):
+class MarketRegimeClassification(StrEnum):
     TRENDING_HIGH_VOL = "TRENDING_HIGH_VOL"
     RANGING_LOW_VOL = "RANGING_LOW_VOL"
     MICROSTRUCTURE_DISLOCATION = "MICROSTRUCTURE_DISLOCATION"

@@ -17,7 +17,7 @@ import json
 import logging
 import sqlite3
 import time
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -29,7 +29,7 @@ from core.intelligence.point_in_time import PointInTimeEventContract
 logger = logging.getLogger("ai_quant_sentinel.intelligence.hypothesis_schema")
 
 
-class CausalHypothesisStatus(str, Enum):
+class CausalHypothesisStatus(StrEnum):
     DRAFT = "DRAFT"
     FIREWALL_VALIDATED = "FIREWALL_VALIDATED"
     REJECTED = "REJECTED"

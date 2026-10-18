@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import stat
 import tarfile
 from pathlib import Path
@@ -99,7 +100,8 @@ def test_support_bundle_is_private_and_minimal(tmp_path):
         },
         hub_doctor={"ok": True, "password": "never2"},
     )
-    assert not (output.stat().st_mode & (stat.S_IRWXG | stat.S_IRWXO))
+    if os.name != "nt":
+        assert not (output.stat().st_mode & (stat.S_IRWXG | stat.S_IRWXO))
     with tarfile.open(output, "r:gz") as archive:
         assert archive.getnames() == ["diagnostics.json"]
         body = archive.extractfile("diagnostics.json").read().decode()
@@ -122,9 +124,7 @@ def test_hub_diagnostics_dispatch(tmp_path, monkeypatch):
     result = diagnostics(prefix=prefix, output=output)
     assert result["ok"] and result["archive"] == str(output)
     assert "secrets" in result["excludes"]
-    via_dispatch = dispatch(
-        "diagnostics", prefix=prefix, archive=str(tmp_path / "second.tar.gz")
-    )
+    via_dispatch = dispatch("diagnostics", prefix=prefix, archive=str(tmp_path / "second.tar.gz"))
     assert via_dispatch["ok"]
 
 
@@ -139,19 +139,17 @@ def test_signing_readiness_reports_names_not_values(monkeypatch):
 
 def test_release_workflow_and_runbook_exist():
     root = Path(__file__).resolve().parent.parent
-    workflow = (root / "ci" / "release.workflow.yml").read_text()
+    workflow = (root / "ci" / "release.workflow.yml").read_text(encoding="utf-8")
     assert "copy this file" in workflow
     assert "permissions:" in workflow and "contents: read" in workflow
     assert "pip-audit" in workflow
     assert "build_release.py" in workflow
-    assert "secrets." not in workflow, (
-        "untrusted PR workflow must never receive signing secrets"
-    )
-    build_deb = (root / "packaging" / "build_deb.sh").read_text()
-    postinst = (root / "packaging" / "debian" / "postinst").read_text()
-    postrm = (root / "packaging" / "debian" / "postrm").read_text()
+    assert "secrets." not in workflow, "untrusted PR workflow must never receive signing secrets"
+    build_deb = (root / "packaging" / "build_deb.sh").read_text(encoding="utf-8")
+    postinst = (root / "packaging" / "debian" / "postinst").read_text(encoding="utf-8")
+    postrm = (root / "packaging" / "debian" / "postrm").read_text(encoding="utf-8")
     assert "${misc:Depends}" in build_deb and "pip install" in postinst
     assert "rm -rf /opt/sky" in postrm
-    runbook = (root / "docs" / "RELEASE_OPERATIONS.md").read_text()
+    runbook = (root / "docs" / "RELEASE_OPERATIONS.md").read_text(encoding="utf-8")
     for phrase in ("lost phone", "certificate expired", "database locked", "rollback"):
         assert phrase in runbook.lower()

@@ -125,8 +125,11 @@ def test_fragile_top_heavy_book_scores_below_diversified_book():
 
 def test_edge_score_maps_net_expectancy_onto_0_100():
     bar = VALIDATION_CRITERIA["expectancy"]
+
     # e_net at 2× bar → 100; at the bar → 50; negative → 0 (all pre-shape).
-    stats_at = lambda e: {"expectancy_net": e, "win_rate_net": 0.8, "pf_net": 2.0}
+    def stats_at(e):
+        return {"expectancy_net": e, "win_rate_net": 0.8, "pf_net": 2.0}
+
     assert edge_score(stats_at(2 * bar))["score"] == 100.0
     assert edge_score(stats_at(bar))["score"] == 50.0
     assert edge_score(stats_at(-0.2))["score"] == 0.0
@@ -135,12 +138,8 @@ def test_edge_score_maps_net_expectancy_onto_0_100():
 def test_edge_shape_discount_when_win_rate_or_pf_miss_the_bar():
     bar = VALIDATION_CRITERIA["expectancy"]
     good = edge_score({"expectancy_net": 2 * bar, "win_rate_net": 0.60, "pf_net": 2.0})
-    low_wr = edge_score(
-        {"expectancy_net": 2 * bar, "win_rate_net": 0.50, "pf_net": 2.0}
-    )
-    low_pf = edge_score(
-        {"expectancy_net": 2 * bar, "win_rate_net": 0.60, "pf_net": 1.2}
-    )
+    low_wr = edge_score({"expectancy_net": 2 * bar, "win_rate_net": 0.50, "pf_net": 2.0})
+    low_pf = edge_score({"expectancy_net": 2 * bar, "win_rate_net": 0.60, "pf_net": 1.2})
     assert good["score"] == 100.0
     assert low_wr["score"] == pytest.approx(85.0)
     assert low_pf["score"] == pytest.approx(85.0)
@@ -196,9 +195,7 @@ def test_sample_score_penalizes_thin_overlap_corrected_books():
 
 def test_sample_score_ci_crossing_zero_gets_half_credit_not_full():
     # CI low at or below -bar → significance 0; size full → sample = 50.
-    s = sample_score(
-        {"n_eff": 60.0, "expectancy_net_ci95": [-0.6, 0.2]}, min_decided=30
-    )
+    s = sample_score({"n_eff": 60.0, "expectancy_net_ci95": [-0.6, 0.2]}, min_decided=30)
     assert s["significance"]["score"] == 0.0
     assert s["score"] == pytest.approx(50.0)
 
@@ -269,9 +266,7 @@ def test_run_quality_sweep_scores_base_book_with_plateau_evidence():
             "meta": {"symbol": "BTCUSDT", "timeframe": "15m"},
         }
 
-    rep = run_quality_sweep(
-        min_confidence=55, min_decided=30, step=3, grade_fn=grade_fn
-    )
+    rep = run_quality_sweep(min_confidence=55, min_decided=30, step=3, grade_fn=grade_fn)
     assert rep["ok"] is True
     assert calls == [50, 55, 60]
     assert len(rep["plateau"]["points"]) == 3
@@ -298,9 +293,7 @@ def test_run_quality_sweep_dedupes_clamped_points():
         return {"ok": True, "rows": _book(conf)}
 
     # min_confidence 40: -5 clamps back to 40 → 2 distinct points only.
-    rep = run_quality_sweep(
-        min_confidence=40, min_decided=30, step=3, grade_fn=grade_fn
-    )
+    rep = run_quality_sweep(min_confidence=40, min_decided=30, step=3, grade_fn=grade_fn)
     assert rep["ok"] is True
     assert calls == [40, 45]
     assert len(rep["plateau"]["points"]) == 2

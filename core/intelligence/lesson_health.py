@@ -26,14 +26,14 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 logger = logging.getLogger("ai_quant_sentinel.intelligence.lesson_health")
 
 REAL_CAPITAL_ENABLED: bool = False
 
 
-class LessonHealthStatus(str, Enum):
+class LessonHealthStatus(StrEnum):
     HEALTHY_ACTIVE = "HEALTHY_ACTIVE"
     MONITORED_DEGRADING = "MONITORED_DEGRADING"
     AUTO_ARCHIVED = "AUTO_ARCHIVED"
@@ -112,7 +112,11 @@ class LessonHealthEngine:
         if lesson.expectancy_r <= 0.0 and lesson.sample_size_n >= 20:
             lesson.health_score = 0.0
             lesson.status = LessonHealthStatus.AUTO_ARCHIVED
-            logger.info("Lesson %s AUTO_ARCHIVED due to negative expectancy (E=%.2fR)", lesson.lesson_id, lesson.expectancy_r)
+            logger.info(
+                "Lesson %s AUTO_ARCHIVED due to negative expectancy (E=%.2fR)",
+                lesson.lesson_id,
+                lesson.expectancy_r,
+            )
             return lesson
 
         health = self.compute_health_score(

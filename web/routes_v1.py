@@ -39,13 +39,9 @@ def register(app, ctx):
                 device_name=str(body.get("name") or "windows"),
             )
         except ValueError as exc:
-            return jsonify(
-                apiv1.envelope_error(apiv1.ErrorCode.VALIDATION_FAILED, str(exc))
-            ), 400
+            return jsonify(apiv1.envelope_error(apiv1.ErrorCode.VALIDATION_FAILED, str(exc))), 400
         except PermissionError as exc:
-            return jsonify(
-                apiv1.envelope_error(apiv1.ErrorCode.FORBIDDEN, str(exc))
-            ), 403
+            return jsonify(apiv1.envelope_error(apiv1.ErrorCode.FORBIDDEN, str(exc))), 403
         auth.audit(
             "companion_paired",
             result.get("name") or "windows",
@@ -72,15 +68,11 @@ def register(app, ctx):
         user = getattr(g, "user", None) or _current_user()
         if user is None:
             return jsonify(
-                apiv1.envelope_error(
-                    apiv1.ErrorCode.UNAUTHENTICATED, "authentication required"
-                )
+                apiv1.envelope_error(apiv1.ErrorCode.UNAUTHENTICATED, "authentication required")
             ), 401
         if not authmod.role_allows(user.get("role"), "operator"):
             return jsonify(
-                apiv1.envelope_error(
-                    apiv1.ErrorCode.FORBIDDEN, "operator role required"
-                )
+                apiv1.envelope_error(apiv1.ErrorCode.FORBIDDEN, "operator role required")
             ), 403
         body = request.get_json(silent=True) or {}
         name = str(body.get("name") or "windows").strip() or "windows"
@@ -143,8 +135,7 @@ def register(app, ctx):
                         "role": "operator" if not auth.is_enabled() else None,
                         "auth_enabled": auth.is_enabled(),
                         "setup_required": (
-                            config.SKY_AUTH_MODE != "disabled"
-                            and not auth.owner_exists()
+                            config.SKY_AUTH_MODE != "disabled" and not auth.owner_exists()
                         ),
                     }
                 )
@@ -182,9 +173,7 @@ def register(app, ctx):
         user = getattr(g, "user", None) or _current_user()
         if user is None:
             return jsonify(
-                apiv1.envelope_error(
-                    apiv1.ErrorCode.UNAUTHENTICATED, "authentication required"
-                )
+                apiv1.envelope_error(apiv1.ErrorCode.UNAUTHENTICATED, "authentication required")
             ), 401
         if not authmod.role_allows(user.get("role"), "operator"):
             return jsonify(
@@ -235,15 +224,11 @@ def register(app, ctx):
         user = getattr(g, "user", None) or _current_user()
         if user is None:
             return jsonify(
-                apiv1.envelope_error(
-                    apiv1.ErrorCode.UNAUTHENTICATED, "authentication required"
-                )
+                apiv1.envelope_error(apiv1.ErrorCode.UNAUTHENTICATED, "authentication required")
             ), 401
         if not authmod.role_allows(user.get("role"), "operator"):
             return jsonify(
-                apiv1.envelope_error(
-                    apiv1.ErrorCode.FORBIDDEN, "operator role required"
-                )
+                apiv1.envelope_error(apiv1.ErrorCode.FORBIDDEN, "operator role required")
             ), 403
         handle = str((request.get_json(silent=True) or {}).get("id") or "").strip()
         if not handle:
@@ -271,9 +256,7 @@ def register(app, ctx):
         user = getattr(g, "user", None) or _current_user()
         if user is not None and not authmod.role_allows(user.get("role"), "operator"):
             return jsonify(
-                apiv1.envelope_error(
-                    apiv1.ErrorCode.FORBIDDEN, "operator role required"
-                )
+                apiv1.envelope_error(apiv1.ErrorCode.FORBIDDEN, "operator role required")
             ), 403
         try:
             limit = int(request.args.get("limit", 100))
@@ -316,9 +299,7 @@ def register(app, ctx):
                 {
                     "jobs": jobs,
                     "count": len(jobs),
-                    "kinds": sorted(
-                        set(jobsmod.JOB_KINDS) | set(jobsmod.COMPOSITE_JOBS)
-                    ),
+                    "kinds": sorted(set(jobsmod.JOB_KINDS) | set(jobsmod.COMPOSITE_JOBS)),
                 }
             )
         )
@@ -345,9 +326,7 @@ def register(app, ctx):
                     str(exc),
                     {
                         "field": "kind",
-                        "allowed": sorted(
-                            set(jobsmod.JOB_KINDS) | set(jobsmod.COMPOSITE_JOBS)
-                        ),
+                        "allowed": sorted(set(jobsmod.JOB_KINDS) | set(jobsmod.COMPOSITE_JOBS)),
                     },
                 )
             ), 400

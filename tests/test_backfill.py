@@ -57,12 +57,8 @@ class FakeBook:
         self.frame = frame.sort_values("ts").reset_index(drop=True)
         self.calls = calls if calls is not None else []
 
-    def __call__(
-        self, start_time=None, end_time=None, limit: int = 1000
-    ) -> pd.DataFrame:
-        self.calls.append(
-            {"start_time": start_time, "end_time": end_time, "limit": limit}
-        )
+    def __call__(self, start_time=None, end_time=None, limit: int = 1000) -> pd.DataFrame:
+        self.calls.append({"start_time": start_time, "end_time": end_time, "limit": limit})
         df = self.frame
         if start_time is not None:
             df = df[df["ts"] >= int(start_time)]

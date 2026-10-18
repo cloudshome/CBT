@@ -43,6 +43,7 @@ logger = logging.getLogger("sky.setup_service")
 
 setup_router = APIRouter(prefix="/api/system", tags=["System Setup & Updates"])
 
+
 def _resolve_repo_root() -> Path:
     env_root = os.getenv("CBT_APP_ROOT")
     if env_root and Path(env_root).exists():
@@ -69,7 +70,7 @@ def _load_env_if_present() -> None:
     if ENV_FILE_PATH.exists():
         try:
             load_dotenv(ENV_FILE_PATH, override=False)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(f"Could not load .env file: {e}")
 
 
@@ -118,8 +119,12 @@ class SingleExchangeConfig(BaseModel):
 
 
 class GDriveSaveRequest(BaseModel):
-    credentials_json: str = Field(..., description="Raw Service Account JSON or OAuth Client Secret or Token JSON")
-    root_folder_id: str | None = Field(default=None, description="Optional Google Drive Root Folder ID")
+    credentials_json: str = Field(
+        ..., description="Raw Service Account JSON or OAuth Client Secret or Token JSON"
+    )
+    root_folder_id: str | None = Field(
+        default=None, description="Optional Google Drive Root Folder ID"
+    )
     target_email: str = Field(default="ypelectronics11@gmail.com", description="Target user email")
 
 
@@ -140,10 +145,7 @@ class FirstRunSaveRequest(BaseModel):
     gdrive_root_folder_id: str | None = Field(
         default=None, description="Google Drive Root Folder ID"
     )
-    gdrive_user_email: str | None = Field(
-        default=None, description="Target Google Drive Email"
-    )
-
+    gdrive_user_email: str | None = Field(default=None, description="Target Google Drive Email")
 
 
 class MasterPasswordVerifyRequest(BaseModel):
@@ -179,7 +181,7 @@ def _write_env_safely(new_entries: dict[str, str]) -> None:
         try:
             with open(ENV_FILE_PATH, encoding="utf-8") as f:
                 existing_lines = f.readlines()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(f"Failed to read existing .env: {e}")
 
     updated_lines: list[str] = []
@@ -212,7 +214,7 @@ def _write_env_safely(new_entries: dict[str, str]) -> None:
         if temp_env.exists():
             try:
                 temp_env.unlink()
-            except Exception:  # noqa: BLE001, S110
+            except Exception:
                 pass
 
 
@@ -318,7 +320,7 @@ def _probe_gdrive_status() -> dict[str, Any]:
                 "client_secret_exists": client_secret_exists,
                 "message": f"Connected to Google Drive ({email}). Storage: {round(used_gb, 2)} GB used.",
             }
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return {
                 "is_live": False,
                 "status": "ERROR",
@@ -350,7 +352,6 @@ def _probe_gdrive_status() -> dict[str, Any]:
         }
 
 
-
 # ===========================================================================
 # Setup Status & Verification Endpoints
 # ===========================================================================
@@ -376,11 +377,11 @@ async def get_setup_status() -> dict[str, Any]:
                             setup_done = True
                             os.environ["SETUP_COMPLETED"] = "true"
                             break
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug("Failed reading .env for setup status: %s", exc)
 
     has_gemini = bool(os.getenv("GEMINI_API_KEY", "").strip())
-    
+
     # Check if master vault passphrase is actually configured by user
     has_master_pwd = bool(os.getenv("VAULT_PASSPHRASE", "").strip())
     if not has_master_pwd and ENV_FILE_PATH.exists():
@@ -393,7 +394,7 @@ async def get_setup_status() -> dict[str, Any]:
                         if val:
                             has_master_pwd = True
                             break
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug("Failed reading .env for vault passphrase: %s", exc)
 
     configured_exchanges: list[dict[str, Any]] = []
@@ -409,9 +410,9 @@ async def get_setup_status() -> dict[str, Any]:
                             "masked_api_key": mask_secret(cred.api_key),
                             "is_active": cred.is_active,
                             "updated_at": cred.updated_at,
-                            }
+                        }
                     )
-            except Exception:  # noqa: BLE001, S110
+            except Exception:
                 pass
 
     wallets = [w.to_safe_dict() for w in credential_vault.get_web3_wallets()]
@@ -476,7 +477,7 @@ async def verify_gemini_api_key(req: GeminiVerifyRequest) -> dict[str, Any]:
                         "status_code": status_code,
                         "message": "Google rejected the API key or quota exceeded.",
                     }
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         latency_ms = (time.perf_counter() - t_start) * 1000.0
         return {
             "valid": False,
@@ -687,7 +688,7 @@ async def complete_first_run_setup(req: FirstRunSaveRequest) -> dict[str, Any]:
                 target_email=req.gdrive_user_email or "ypelectronics11@gmail.com",
             )
             gdrive_saved = True
-        except Exception as g_err:  # noqa: BLE001
+        except Exception as g_err:
             logger.warning("Could not persist Google Drive credentials: %s", g_err)
 
     # Persist all provided exchange credentials into encrypted vault
@@ -748,7 +749,7 @@ async def verify_master_password(req: MasterPasswordVerifyRequest) -> dict[str, 
                         stored = stripped.split("=", 1)[1].strip().strip("'\"")
                         os.environ["VAULT_PASSPHRASE"] = stored
                         break
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug("Failed reading .env for vault passphrase: %s", exc)
 
     if not stored:
@@ -829,7 +830,6 @@ async def start_gdrive_oauth_flow() -> dict[str, Any]:
         ) from exc
 
 
-
 # ===========================================================================
 # Software Auto-Updater Endpoints (Git-Based)
 # ===========================================================================
@@ -847,7 +847,7 @@ def _run_git_command(args: list[str]) -> tuple[int, str, str]:
             check=False,
         )
         return res.returncode, res.stdout.strip(), res.stderr.strip()
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return -1, "", str(e)
 
 
@@ -858,7 +858,7 @@ async def check_software_update() -> dict[str, Any]:
     Returns current commit, remote commit, commits behind, and changelog.
     """
     ret, curr_commit, _ = _run_git_command(["rev-parse", "HEAD"])
-    ret_branch, curr_branch, _ = _run_git_command(["rev-parse", "--abbrev-ref", "HEAD"])
+    _ret_branch, curr_branch, _ = _run_git_command(["rev-parse", "--abbrev-ref", "HEAD"])
 
     if ret != 0 or not curr_commit:
         return {
@@ -962,7 +962,7 @@ async def apply_software_update(req: ApplyUpdateRequest) -> dict[str, Any]:
         }
         with open(BACKUPS_DIR / f"{snapshot_id}.json", "w", encoding="utf-8") as f:
             json.dump(snapshot_meta, f, indent=2)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         logger.warning(f"Could not write snapshot metadata: {e}")
 
     # 4. Pull changes
@@ -982,7 +982,7 @@ async def apply_software_update(req: ApplyUpdateRequest) -> dict[str, Any]:
 
     # 6. Verify preflight
     logger.info("Running post-update verification preflight...")
-    ret_preflight, preflight_out, preflight_err = _run_git_command(
+    _ret_preflight, _preflight_out, _preflight_err = _run_git_command(
         ["status"]  # Basic integrity check
     )
 

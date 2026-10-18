@@ -26,7 +26,7 @@ import json
 import logging
 import sqlite3
 import time
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any, Literal
 
@@ -40,7 +40,7 @@ from core.intelligence.forward_validation.qualification_freeze import (
 logger = logging.getLogger("ai_quant_sentinel.execution.strategy_gateway.allocator")
 
 
-class AllocatorMode(str, Enum):
+class AllocatorMode(StrEnum):
     """Execution modes for the ensemble allocator."""
 
     RESEARCH_MODE = "RESEARCH_MODE"  # Frozen weights, zero adaptive learning

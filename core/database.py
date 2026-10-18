@@ -10,13 +10,12 @@ import json
 import logging
 import os
 import sqlite3
+import sys
 import time
 from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger("ai_quant_sentinel.database")
-
-import sys
 
 
 # Ensure data directory exists

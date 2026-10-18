@@ -219,9 +219,7 @@ def test_kelly_empty_book_suggests_nothing(tmp_path):
 def test_mc_and_business_reads_ignore_research_books(tmp_path):
     db = SignalDB(tmp_path / "d.db")
     for i in range(8):
-        _paper(
-            db, 1100 + i, rr=-1.0, source_key=RESEARCH_KEY, ts=_NOW, mae=0.5, mfe=1.5
-        )
+        _paper(db, 1100 + i, rr=-1.0, source_key=RESEARCH_KEY, ts=_NOW, mae=0.5, mfe=1.5)
     assert monte_carlo_ruin_table(db, samples=20, seed=1)["available"] is False
     assert monte_carlo_equity(db, samples=20, seed=1)["available"] is False
     assert mae_mfe_summary(db)["available"] is False

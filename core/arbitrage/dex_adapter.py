@@ -17,7 +17,7 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from core.arbitrage.clmm_math import (
@@ -32,7 +32,7 @@ from core.arbitrage.clmm_math import (
 logger = logging.getLogger("sky.arbitrage.dex_adapter")
 
 
-class RpcConsensusStatus(str, Enum):
+class RpcConsensusStatus(StrEnum):
     """Cryptographic consensus classification across independent RPC nodes (Gate 4)."""
 
     CONSENSUS = "CONSENSUS"
@@ -42,7 +42,7 @@ class RpcConsensusStatus(str, Enum):
     UNAVAILABLE = "UNAVAILABLE"
 
 
-class StateFreshness(str, Enum):
+class StateFreshness(StrEnum):
     """Temporal freshness classification based on local arrival vs on-chain timestamp."""
 
     FRESH = "FRESH"  # age < 3,000 ms

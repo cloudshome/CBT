@@ -195,9 +195,7 @@ def test_execution_slip_never_betters_per_trade(monkeypatch):
         g_net = getattr(g, "rr_net", g.rr_achieved)
         if g_net is not None and b_net is not None and g_net > b_net + 1e-9:
             violations.append((ts, "rr_net", b_net, g_net))
-    assert not violations, (
-        f"{len(violations)} trades improved under slip — first: {violations[0]}"
-    )
+    assert not violations, f"{len(violations)} trades improved under slip — first: {violations[0]}"
 
 
 def test_execution_slip_never_betters_window_expectancy(monkeypatch):

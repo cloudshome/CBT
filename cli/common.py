@@ -74,9 +74,7 @@ def run_scan(
     from brain.full_pipeline import analyze_full
 
     symbol = _sym(symbol)
-    payload = analyze_full(
-        symbol, timeframe, bars, with_context=with_context, with_memory=True
-    )
+    payload = analyze_full(symbol, timeframe, bars, with_context=with_context, with_memory=True)
 
     if with_llm:
         from ai.llm_brain import LLMBrain
@@ -117,9 +115,7 @@ def run_scan(
                 status = "PENDING_REVIEW" if reviewable(sig) and desk_ok else "CREATED"
             payload["scan_id"] = scan_id
             if auto_approve and reviewable(sig) and desk_ok:
-                db.update_status(
-                    scan_id, "APPROVED", note="auto-approve", reviewer="auto"
-                )
+                db.update_status(scan_id, "APPROVED", note="auto-approve", reviewer="auto")
                 payload["lifecycle"] = {
                     "status": "APPROVED",
                     "note": "auto-approved (--auto-approve)",
@@ -132,8 +128,7 @@ def run_scan(
                         if status == "PENDING_REVIEW"
                         else "monitor-only signal (no action required)"
                         if status == "CREATED" and not decision.get("blocked_by")
-                        else "DESK BLOCKED — "
-                        + "; ".join(decision.get("blocked_by", []))
+                        else "DESK BLOCKED — " + "; ".join(decision.get("blocked_by", []))
                         if status == "CREATED" and decision.get("blocked_by")
                         else f"current state: {status}"
                     ),

@@ -105,7 +105,9 @@ class TelegramToolGateway:
             created_at=now,
             expires_at=now + ttl_seconds,
         )
-        logger.info(f"Registered pending action [{token}] for user {identity.user_id}: {description}")
+        logger.info(
+            f"Registered pending action [{token}] for user {identity.user_id}: {description}"
+        )
         return token
 
     def get_pending_action(self, token: str) -> PendingAction | None:
@@ -125,7 +127,8 @@ class TelegramToolGateway:
         """Finds the most recent non-expired pending action for a user."""
         now = time.time()
         candidates = [
-            a for a in self._pending_actions.values()
+            a
+            for a in self._pending_actions.values()
             if str(a.user_id) == str(user_id) and a.expires_at > now
         ]
         if not candidates:
@@ -145,19 +148,27 @@ class TelegramToolGateway:
         """
         Executes or plans a tool under strict governance checks.
         """
-        logger.info(f"[ToolGateway] Dispatching {tool_name} for user {identity.user_id} ({identity.role.value})")
+        logger.info(
+            f"[ToolGateway] Dispatching {tool_name} for user {identity.user_id} ({identity.role.value})"
+        )
 
         # ---------------------------------------------------------------------
         # CLASS D: PERMANENTLY BLOCKED LIVE CAPITAL
         # -------------------------------------------------------------------------
-        if tool_name.startswith("live_") or "real_money" in tool_name or tool_name == "execute_live_order":
+        if (
+            tool_name.startswith("live_")
+            or "real_money" in tool_name
+            or tool_name == "execute_live_order"
+        ):
             TelegramAuditLogger.log_command_execution(
                 identity=identity,
                 command=tool_name,
                 args=json.dumps(arguments),
                 risk_result="BLOCKED",
                 execution_result="BLOCKED",
-                details={"reason": "Constitutional Rule: REAL_CAPITAL_ENABLED = False permanently locked."},
+                details={
+                    "reason": "Constitutional Rule: REAL_CAPITAL_ENABLED = False permanently locked."
+                },
             )
             return ToolResult(
                 success=False,
@@ -343,7 +354,9 @@ class TelegramToolGateway:
                     f"  Current: `${p.get('current_price', p['entry_price']):,.2f}` | PnL: **{pnl_str}** | SL: `${p['stop_loss']:,.2f}`"
                 )
             lines.append("━━━━━━━━━━━━━━━━━━━━━━")
-            lines.append(f"📊 **Total Unrealized PnL:** `${accounting['total_unrealized_pnl']:+,.2f}`")
+            lines.append(
+                f"📊 **Total Unrealized PnL:** `${accounting['total_unrealized_pnl']:+,.2f}`"
+            )
             text = "\n".join(lines)
 
         return ToolResult(
@@ -354,7 +367,9 @@ class TelegramToolGateway:
             data={"positions": positions, "accounting": accounting},
         )
 
-    async def _tool_query_research_wiki(self, query: str, identity: TelegramUserIdentity) -> ToolResult:
+    async def _tool_query_research_wiki(
+        self, query: str, identity: TelegramUserIdentity
+    ) -> ToolResult:
         from core.knowledge_os.research_wikipedia import research_wikipedia_engine
 
         articles = research_wikipedia_engine.list_articles(search_query=query, limit=4)
@@ -385,14 +400,19 @@ class TelegramToolGateway:
             data={"articles": articles},
         )
 
-    async def _tool_get_macro_flash(self, event_name: str, identity: TelegramUserIdentity) -> ToolResult:
+    async def _tool_get_macro_flash(
+        self, event_name: str, identity: TelegramUserIdentity
+    ) -> ToolResult:
         from core.macro_event_reporter import macro_event_reporter
 
         recent = macro_event_reporter.get_recent_releases(limit=5)
         selected = recent[0] if recent else None
         if event_name and recent:
             for r in recent:
-                if event_name.upper() in r.get("event_name", "").upper() or event_name.upper() in r.get("event_id", "").upper():
+                if (
+                    event_name.upper() in r.get("event_name", "").upper()
+                    or event_name.upper() in r.get("event_id", "").upper()
+                ):
                     selected = r
                     break
 
@@ -420,7 +440,9 @@ class TelegramToolGateway:
             output_text=report,
         )
 
-    async def _tool_get_market_state(self, symbol: str, identity: TelegramUserIdentity) -> ToolResult:
+    async def _tool_get_market_state(
+        self, symbol: str, identity: TelegramUserIdentity
+    ) -> ToolResult:
         from core.market_providers import market_gateway
 
         ticker = await market_gateway.get_ticker(symbol)
@@ -488,7 +510,9 @@ class TelegramToolGateway:
         bias = "BULLISH EXPANSION" if chg >= 0 else "BEARISH RETRACEMENT"
         confluence = 82 if chg >= 0 else 74
 
-        open_pos = [p for p in portfolio_shadow.get_open_positions() if p.get("symbol") == clean_sym]
+        open_pos = [
+            p for p in portfolio_shadow.get_open_positions() if p.get("symbol") == clean_sym
+        ]
         if open_pos:
             pos = open_pos[0]
             pos_text_en = f"{pos.get('direction', 'LONG')} from ${pos.get('entry_price', price):,.2f} (PnL: +${pos.get('unrealized_pnl', 0.0):,.2f})"
@@ -541,6 +565,7 @@ class TelegramToolGateway:
         self, language: str, identity: TelegramUserIdentity
     ) -> ToolResult:
         import asyncio
+
         from core.event_shock_engine import event_shock_engine
         from core.market_providers import market_gateway
         from core.portfolio_shadow import portfolio_shadow
@@ -564,7 +589,11 @@ class TelegramToolGateway:
         accounting = portfolio_shadow.get_portfolio_accounting()
         event_st = event_shock_engine.evaluate_risk_state()
         mins_away = event_st.minutes_until_event
-        ev_title = event_st.nearest_event.title if event_st.nearest_event else "No high-impact catalyst < 24h"
+        ev_title = (
+            event_st.nearest_event.title
+            if event_st.nearest_event
+            else "No high-impact catalyst < 24h"
+        )
         lockout = event_st.trading_lockout
 
         if language == "bn":
@@ -614,9 +643,7 @@ class TelegramToolGateway:
             },
         )
 
-    async def _tool_get_account_risk_overview(
-        self, identity: TelegramUserIdentity
-    ) -> ToolResult:
+    async def _tool_get_account_risk_overview(self, identity: TelegramUserIdentity) -> ToolResult:
         from core.portfolio_shadow import portfolio_shadow
 
         accounting = portfolio_shadow.get_portfolio_accounting()
@@ -646,9 +673,7 @@ class TelegramToolGateway:
             data=accounting,
         )
 
-    async def _tool_get_concept_intelligence(
-        self, identity: TelegramUserIdentity
-    ) -> ToolResult:
+    async def _tool_get_concept_intelligence(self, identity: TelegramUserIdentity) -> ToolResult:
         text = (
             "🏛️ **CBT / SKY TRADING CONCEPT INTELLIGENCE (M32 VERIFIED)**\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -688,7 +713,9 @@ class TelegramToolGateway:
                 "━━━━━━━━━━━━━━━━━━━━━━",
             ]
             for r in rows:
-                lines.append(f"• `{r['candidate_id']}` | **{r.get('strategy_name', 'Candidate')}** | Stage: `[{r['validation_stage']}]`")
+                lines.append(
+                    f"• `{r['candidate_id']}` | **{r.get('strategy_name', 'Candidate')}** | Stage: `[{r['validation_stage']}]`"
+                )
             lines.append("━━━━━━━━━━━━━━━━━━━━━━")
             lines.append("💡 _Use `/test <id>` to run walk-forward validation._")
             text = "\n".join(lines)
@@ -797,7 +824,9 @@ class TelegramToolGateway:
                     f"  _{edge.get('description', '')[:90]}_"
                 )
             lines.append("━━━━━━━━━━━━━━━━━━━━━━")
-            lines.append("💡 _Relational causal network across assets, macro indicators, and SMC concepts._")
+            lines.append(
+                "💡 _Relational causal network across assets, macro indicators, and SMC concepts._"
+            )
             text = "\n".join(lines)
 
         return ToolResult(
@@ -808,7 +837,9 @@ class TelegramToolGateway:
             data=subgraph,
         )
 
-    async def _tool_query_project_rag(self, query: str, identity: TelegramUserIdentity) -> ToolResult:
+    async def _tool_query_project_rag(
+        self, query: str, identity: TelegramUserIdentity
+    ) -> ToolResult:
         from core.knowledge_os.project_rag import project_rag
         from core.market_providers import market_gateway
         from core.portfolio_shadow import portfolio_shadow
@@ -833,14 +864,14 @@ class TelegramToolGateway:
             data=dossier.to_dict(),
         )
 
-    async def _tool_get_mastermind_swarm_status(
-        self, identity: TelegramUserIdentity
-    ) -> ToolResult:
+    async def _tool_get_mastermind_swarm_status(self, identity: TelegramUserIdentity) -> ToolResult:
         """Returns live status of all 5 Specialist Swarm nodes and recent Arbiter decisions."""
         from core.mastermind.mastermind_arbiter import mastermind_arbiter
         from core.portfolio_shadow import portfolio_shadow
 
-        accounting = portfolio_shadow.get_portfolio_accounting(starting_capital=mastermind_arbiter.account_equity_usd)
+        accounting = portfolio_shadow.get_portfolio_accounting(
+            starting_capital=mastermind_arbiter.account_equity_usd
+        )
         current_eq = float(accounting.get("virtual_equity", mastermind_arbiter.account_equity_usd))
         open_pos = portfolio_shadow.get_open_positions()
         recent_decisions = mastermind_arbiter.get_recent_decisions(limit=5)
@@ -879,7 +910,11 @@ class TelegramToolGateway:
             tool_name="get_mastermind_swarm_status",
             tool_class=ToolClass.CLASS_A_READONLY,
             output_text="\n".join(lines),
-            data={"equity": current_eq, "open_positions": len(open_pos), "decisions": recent_decisions},
+            data={
+                "equity": current_eq,
+                "open_positions": len(open_pos),
+                "decisions": recent_decisions,
+            },
         )
 
     async def _tool_get_autonomous_collector_status(
@@ -904,7 +939,9 @@ class TelegramToolGateway:
         ]
         for s in sources:
             items = s.get("total_items_ingested", 0)
-            lines.append(f"• **{s.get('name')}** (`{s.get('source_type')}`): `{items}` items ingested")
+            lines.append(
+                f"• **{s.get('name')}** (`{s.get('source_type')}`): `{items}` items ingested"
+            )
 
         lines.append("━━━━━━━━━━━━━━━━━━━━━━")
         if articles:
@@ -922,11 +959,11 @@ class TelegramToolGateway:
             data={"total_articles": total_articles, "sources_count": len(sources)},
         )
 
-    async def _tool_trigger_autonomous_crawl(
-        self, identity: TelegramUserIdentity
-    ) -> ToolResult:
+    async def _tool_trigger_autonomous_crawl(self, identity: TelegramUserIdentity) -> ToolResult:
         """Triggers immediate online crawl and returns ingested count."""
-        from core.knowledge_os.research_automation_orchestrator import research_automation_orchestrator
+        from core.knowledge_os.research_automation_orchestrator import (
+            research_automation_orchestrator,
+        )
 
         res = await research_automation_orchestrator.trigger_pipeline("research_feed_crawler")
         details = res.get("result", {})
@@ -953,11 +990,19 @@ class TelegramToolGateway:
     # -------------------------------------------------------------------------
     # IMPLEMENTATIONS: CLASS B (RESEARCH & ANALYSIS)
     # -------------------------------------------------------------------------
-    async def _tool_ingest_research_url(self, url: str, identity: TelegramUserIdentity) -> ToolResult:
+    async def _tool_ingest_research_url(
+        self, url: str, identity: TelegramUserIdentity
+    ) -> ToolResult:
         from core.knowledge_os.universal_ingestor import universal_ingestor
 
-        res = universal_ingestor.ingest_url(url=url, options={"author": identity.username or str(identity.user_id)})
-        badge = "🟢 SUCCESS" if res.status == "SUCCESS" else ("🟡 PARTIAL" if res.status == "PARTIAL" else "⚠️ ACCESS BLOCKED")
+        res = universal_ingestor.ingest_url(
+            url=url, options={"author": identity.username or str(identity.user_id)}
+        )
+        badge = (
+            "🟢 SUCCESS"
+            if res.status == "SUCCESS"
+            else ("🟡 PARTIAL" if res.status == "PARTIAL" else "⚠️ ACCESS BLOCKED")
+        )
 
         text = (
             f"🔬 **EVIDENCE RESEARCH OS INGESTION RESULT**\n"
@@ -985,7 +1030,9 @@ class TelegramToolGateway:
             data=res.to_dict(),
         )
 
-    async def _tool_run_candidate_backtest(self, candidate_id: str, identity: TelegramUserIdentity) -> ToolResult:
+    async def _tool_run_candidate_backtest(
+        self, candidate_id: str, identity: TelegramUserIdentity
+    ) -> ToolResult:
         from core.telegram.handlers import handle_test
 
         out = await handle_test(args=candidate_id, identity=identity)
@@ -996,7 +1043,9 @@ class TelegramToolGateway:
             output_text=out,
         )
 
-    async def _tool_verify_claims(self, claim_id: str | None, identity: TelegramUserIdentity) -> ToolResult:
+    async def _tool_verify_claims(
+        self, claim_id: str | None, identity: TelegramUserIdentity
+    ) -> ToolResult:
         from core.knowledge_os.claim_verifier import claim_verifier
 
         if claim_id:
@@ -1015,11 +1064,15 @@ class TelegramToolGateway:
                 if res.corroborating_evidence:
                     lines.append("\n✅ **Corroborating Evidence:**")
                     for c in res.corroborating_evidence:
-                        lines.append(f"• `{c.evidence_type}` ({c.source_reference}): {c.citation_text}")
+                        lines.append(
+                            f"• `{c.evidence_type}` ({c.source_reference}): {c.citation_text}"
+                        )
                 if res.contradictions_detected:
                     lines.append("\n❌ **Contradictions Flagged:**")
                     for c in res.contradictions_detected:
-                        lines.append(f"• `{c.evidence_type}` ({c.source_reference}): {c.citation_text}")
+                        lines.append(
+                            f"• `{c.evidence_type}` ({c.source_reference}): {c.citation_text}"
+                        )
                 lines.append("━━━━━━━━━━━━━━━━━━━━━━")
                 text = "\n".join(lines)
             return ToolResult(
@@ -1038,7 +1091,9 @@ class TelegramToolGateway:
             "━━━━━━━━━━━━━━━━━━━━━━",
         ]
         for r in results[:5]:
-            lines.append(f"• `{r.claim_id}`: **[{r.new_status}]** (Conf: {r.confidence_score:.2f}) — {r.original_claim_text[:80]}...")
+            lines.append(
+                f"• `{r.claim_id}`: **[{r.new_status}]** (Conf: {r.confidence_score:.2f}) — {r.original_claim_text[:80]}..."
+            )
         lines.append("━━━━━━━━━━━━━━━━━━━━━━")
         text = "\n".join(lines)
 
@@ -1050,7 +1105,9 @@ class TelegramToolGateway:
             data={"verified_count": len(results)},
         )
 
-    async def _tool_synthesize_strategy(self, claim_id: str, identity: TelegramUserIdentity) -> ToolResult:
+    async def _tool_synthesize_strategy(
+        self, claim_id: str, identity: TelegramUserIdentity
+    ) -> ToolResult:
         from core.knowledge_os.strategy_bridge import strategy_bridge
 
         target_cid = claim_id
@@ -1105,7 +1162,9 @@ class TelegramToolGateway:
     # -------------------------------------------------------------------------
     # IMPLEMENTATIONS: CLASS C (TWO-PHASE CONFIRMATION REQUIRED)
     # -------------------------------------------------------------------------
-    async def _tool_plan_trade_signal(self, symbol: str, identity: TelegramUserIdentity) -> ToolResult:
+    async def _tool_plan_trade_signal(
+        self, symbol: str, identity: TelegramUserIdentity
+    ) -> ToolResult:
         """
         Phase 1: Plans the trade setup, verifies risk clearance, and requests user confirmation.
         """
@@ -1172,7 +1231,9 @@ class TelegramToolGateway:
             data={"token": token, "symbol": symbol, "size": size, "entry": price},
         )
 
-    async def _tool_plan_close_position(self, symbol: str, identity: TelegramUserIdentity) -> ToolResult:
+    async def _tool_plan_close_position(
+        self, symbol: str, identity: TelegramUserIdentity
+    ) -> ToolResult:
         """
         Phase 1: Plans the position close and requests confirmation.
         """
@@ -1243,7 +1304,9 @@ class TelegramToolGateway:
                 error="Action expired or not found",
             )
 
-        logger.info(f"[Two-Phase Confirmation] Committing {pending.tool_name} [{pending.token}] for user {identity.user_id}")
+        logger.info(
+            f"[Two-Phase Confirmation] Committing {pending.tool_name} [{pending.token}] for user {identity.user_id}"
+        )
 
         if pending.tool_name == "open_paper_trade":
             from core.portfolio_shadow import portfolio_shadow

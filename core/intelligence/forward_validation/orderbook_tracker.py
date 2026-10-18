@@ -15,14 +15,14 @@ from __future__ import annotations
 
 import logging
 import time
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger("ai_quant_sentinel.intelligence.orderbook_tracker")
 
 
-class FeedQualityState(str, Enum):
+class FeedQualityState(StrEnum):
     """Integrity state of the incoming market data feed."""
 
     HEALTHY = "HEALTHY"

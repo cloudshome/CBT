@@ -34,7 +34,9 @@ logger = logging.getLogger("sky.knowledge_os.claim_verifier")
 class EvidenceRecord:
     evidence_id: str
     claim_id: str
-    evidence_type: str  # EMPIRICAL_BENCHMARK, HISTORICAL_LEDGER, CROSS_SOURCE_CORROBORATION, CONTRADICTION
+    evidence_type: (
+        str  # EMPIRICAL_BENCHMARK, HISTORICAL_LEDGER, CROSS_SOURCE_CORROBORATION, CONTRADICTION
+    )
     source_reference: str
     citation_text: str
     data_ledger: str
@@ -105,9 +107,10 @@ class ClaimVerifier:
         """Queries historical macro event releases recorded in CBT SQLite."""
         try:
             from core.macro_event_reporter import macro_event_reporter
+
             recs = macro_event_reporter.list_recent_releases(limit=50)
             return [r.to_dict() for r in recs]
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.debug(f"Could not fetch macro releases from macro_event_reporter: {e}")
             return []
 
@@ -171,7 +174,8 @@ class ClaimVerifier:
         # A: Inflation / CPI Checks
         if any(w in claim_lower for w in ("cpi", "inflation", "price index")):
             cpi_events = [
-                m for m in macro_releases
+                m
+                for m in macro_releases
                 if "cpi" in m.get("event_id", "").lower() or "cpi" in m.get("title", "").lower()
             ]
             for cpi_ev in cpi_events:
@@ -180,10 +184,30 @@ class ClaimVerifier:
                 surprise_dir = cpi_ev.get("surprise_direction", "")
 
                 # Check if claim asserts inflation is rising / surging vs falling / cooling
-                claim_says_rising = any(w in claim_lower for w in ("rise", "rising", "surge", "surging", "spike", "accelerat", "higher"))
-                claim_says_cooling = any(w in claim_lower for w in ("cool", "cooling", "drop", "dropping", "fell", "decelerat", "lower", "slow", "disinflation"))
+                claim_says_rising = any(
+                    w in claim_lower
+                    for w in ("rise", "rising", "surge", "surging", "spike", "accelerat", "higher")
+                )
+                claim_says_cooling = any(
+                    w in claim_lower
+                    for w in (
+                        "cool",
+                        "cooling",
+                        "drop",
+                        "dropping",
+                        "fell",
+                        "decelerat",
+                        "lower",
+                        "slow",
+                        "disinflation",
+                    )
+                )
 
-                if surprise_dir == "DOVISH_SURPRISE" or (actual_val is not None and forecast_val is not None and actual_val < forecast_val):
+                if surprise_dir == "DOVISH_SURPRISE" or (
+                    actual_val is not None
+                    and forecast_val is not None
+                    and actual_val < forecast_val
+                ):
                     # Actual CPI cooled below forecast
                     if claim_says_cooling:
                         corroborating.append(
@@ -213,7 +237,11 @@ class ClaimVerifier:
                             )
                         )
                         break
-                elif surprise_dir == "HAWKISH_SURPRISE" or (actual_val is not None and forecast_val is not None and actual_val > forecast_val):
+                elif surprise_dir == "HAWKISH_SURPRISE" or (
+                    actual_val is not None
+                    and forecast_val is not None
+                    and actual_val > forecast_val
+                ):
                     # Actual CPI surged above forecast
                     if claim_says_rising:
                         corroborating.append(
@@ -243,8 +271,15 @@ class ClaimVerifier:
                             )
                         )
                         break
-                elif surprise_dir == "IN_LINE" or (actual_val is not None and forecast_val is not None and actual_val == forecast_val):
-                    if any(w in claim_lower for w in ("in line", "expected", "consensus", "disinflation")):
+                elif surprise_dir == "IN_LINE" or (
+                    actual_val is not None
+                    and forecast_val is not None
+                    and actual_val == forecast_val
+                ):
+                    if any(
+                        w in claim_lower
+                        for w in ("in line", "expected", "consensus", "disinflation")
+                    ):
                         corroborating.append(
                             EvidenceRecord(
                                 evidence_id=f"ev_{uuid.uuid4().hex[:10]}",
@@ -261,7 +296,10 @@ class ClaimVerifier:
 
         # B: Fed Funds / Rate Cuts / Hikes
         if any(w in claim_lower for w in ("fed", "fomc", "rate cut", "interest rate", "powell")):
-            if any(w in claim_lower for w in ("100% chance", "guarantee", "certain to cut", "zero risk")):
+            if any(
+                w in claim_lower
+                for w in ("100% chance", "guarantee", "certain to cut", "zero risk")
+            ):
                 contradictions.append(
                     EvidenceRecord(
                         evidence_id=f"ev_{uuid.uuid4().hex[:10]}",
@@ -280,7 +318,18 @@ class ClaimVerifier:
         # ---------------------------------------------------------------------
         other_claims = self._fetch_all_claims(exclude_claim_id=claim_id)
         claim_keywords = set(re.findall(r"\b[a-zA-Z]{4,}\b", claim_lower)) - {
-            "this", "that", "with", "from", "have", "will", "been", "were", "what", "more", "also", "than"
+            "this",
+            "that",
+            "with",
+            "from",
+            "have",
+            "will",
+            "been",
+            "were",
+            "what",
+            "more",
+            "also",
+            "than",
         }
 
         for oc in other_claims:
@@ -291,8 +340,26 @@ class ClaimVerifier:
             # If at least 3 domain keywords match
             if len(shared) >= 3:
                 # Check directional alignment
-                bull_words = {"bullish", "expansion", "pump", "rise", "increase", "higher", "gain", "inflow"}
-                bear_words = {"bearish", "contraction", "dump", "fall", "decrease", "lower", "loss", "outflow"}
+                bull_words = {
+                    "bullish",
+                    "expansion",
+                    "pump",
+                    "rise",
+                    "increase",
+                    "higher",
+                    "gain",
+                    "inflow",
+                }
+                bear_words = {
+                    "bearish",
+                    "contraction",
+                    "dump",
+                    "fall",
+                    "decrease",
+                    "lower",
+                    "loss",
+                    "outflow",
+                }
 
                 c_is_bull = bool(claim_keywords.intersection(bull_words))
                 c_is_bear = bool(claim_keywords.intersection(bear_words))
@@ -308,7 +375,9 @@ class ClaimVerifier:
                             source_reference=oc.get("source_id", "PEER_CLAIM"),
                             citation_text=f"Corroborated by independent claim ({oc.get('claim_id')}): '{oc.get('speaker_claim')[:100]}...'",
                             data_ledger="research_claims",
-                            confidence=round(min(0.85, float(oc.get("confidence_score", 0.5)) * 0.9), 2),
+                            confidence=round(
+                                min(0.85, float(oc.get("confidence_score", 0.5)) * 0.9), 2
+                            ),
                             created_at=now_ms,
                         )
                     )
@@ -334,20 +403,35 @@ class ClaimVerifier:
         rationale_parts = []
 
         if contradictions:
-            if any(c.evidence_type == "EMPIRICAL_BENCHMARK" or c.confidence >= 0.90 for c in contradictions):
+            if any(
+                c.evidence_type == "EMPIRICAL_BENCHMARK" or c.confidence >= 0.90
+                for c in contradictions
+            ):
                 new_status = EpistemicStatus.CONTRADICTED.value
                 new_conf = max(0.15, current_conf - 0.40)
-                rationale_parts.append(f"Contradicted by {len(contradictions)} benchmark evidence record(s).")
+                rationale_parts.append(
+                    f"Contradicted by {len(contradictions)} benchmark evidence record(s)."
+                )
             else:
-                new_status = EpistemicStatus.REFUTED.value if len(contradictions) > len(corroborating) else EpistemicStatus.HYPOTHESIS.value
+                new_status = (
+                    EpistemicStatus.REFUTED.value
+                    if len(contradictions) > len(corroborating)
+                    else EpistemicStatus.HYPOTHESIS.value
+                )
                 new_conf = max(0.25, current_conf - 0.20)
                 rationale_parts.append(f"Contested by {len(contradictions)} peer claim(s).")
         elif corroborating:
             has_benchmark = any(c.evidence_type == "EMPIRICAL_BENCHMARK" for c in corroborating)
             if has_benchmark or len(corroborating) >= 2:
-                new_status = EpistemicStatus.EMPIRICALLY_SUPPORTED.value if has_benchmark else EpistemicStatus.SUPPORTED.value
+                new_status = (
+                    EpistemicStatus.EMPIRICALLY_SUPPORTED.value
+                    if has_benchmark
+                    else EpistemicStatus.SUPPORTED.value
+                )
                 new_conf = min(0.95, current_conf + 0.25)
-                rationale_parts.append(f"Corroborated by {len(corroborating)} empirical/peer evidence record(s).")
+                rationale_parts.append(
+                    f"Corroborated by {len(corroborating)} empirical/peer evidence record(s)."
+                )
             else:
                 new_status = EpistemicStatus.SUPPORTED.value
                 new_conf = min(0.85, current_conf + 0.15)
@@ -356,7 +440,9 @@ class ClaimVerifier:
             # No fresh evidence found; default to HYPOTHESIS or retain current
             if prev_status in ("SOURCE_ONLY", "EXTRACTED"):
                 new_status = EpistemicStatus.UNVERIFIED.value
-            rationale_parts.append("No independent macro or peer corroboration found yet; retains provisional status.")
+            rationale_parts.append(
+                "No independent macro or peer corroboration found yet; retains provisional status."
+            )
 
         rationale = " ".join(rationale_parts)
 

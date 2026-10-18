@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import logging
 import time
-from enum import Enum
+from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -31,7 +31,7 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger("ai_quant_sentinel.intelligence.validation_result")
 
 
-class ResearchValidationStatus(str, Enum):
+class ResearchValidationStatus(StrEnum):
     INCONCLUSIVE = "INCONCLUSIVE"
     PRELIMINARY_SUPPORT = "PRELIMINARY_SUPPORT"
     FALSIFIED = "FALSIFIED"

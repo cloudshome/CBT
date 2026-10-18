@@ -26,14 +26,16 @@ def _generate_synthetic_candles(base_price=60000.0, count=30, trend=0.001):
     price = base_price
     for i in range(count):
         price = price * (1.0 + trend)
-        candles.append({
-            "timestamp": ts + (i * 15 * 60 * 1000),
-            "open": price * 0.999,
-            "high": price * 1.002,
-            "low": price * 0.998,
-            "close": price,
-            "volume": 100.0,
-        })
+        candles.append(
+            {
+                "timestamp": ts + (i * 15 * 60 * 1000),
+                "open": price * 0.999,
+                "high": price * 1.002,
+                "low": price * 0.998,
+                "close": price,
+                "volume": 100.0,
+            }
+        )
     return candles
 
 
@@ -59,7 +61,7 @@ async def test_meme_specialist_volume_spike_detection():
     # Build candles with a massive 5x volume spike on the last candle
     candles = _generate_synthetic_candles(0.15, 25)
     candles[-1]["volume"] = 1000.0  # 10x normal volume
-    candles[-1]["close"] = 0.18    # Breakout above prev high
+    candles[-1]["close"] = 0.18  # Breakout above prev high
     candles[-1]["high"] = 0.185
 
     meme_spec = MemeMomentumSpecialist("DOGE/USDT")

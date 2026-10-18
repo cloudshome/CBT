@@ -14,10 +14,10 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 
-class EntityType(str, Enum):
+class EntityType(StrEnum):
     CRYPTO_ASSET = "CRYPTO_ASSET"
     EQUITY_TICKER = "EQUITY_TICKER"
     ETF_PRODUCT = "ETF_PRODUCT"

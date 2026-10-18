@@ -200,8 +200,8 @@ class TestnetLatencyTelemetryEngine:
         if n == 1:
             return sorted_data[0]
         idx = q * (n - 1)
-        low = int(math.floor(idx))
-        high = int(math.ceil(idx))
+        low = math.floor(idx)
+        high = math.ceil(idx)
         fraction = idx - low
         return sorted_data[low] + fraction * (sorted_data[high] - sorted_data[low])
 

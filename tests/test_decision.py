@@ -72,9 +72,7 @@ def test_playbook_veto_gold_news(tmp_path):
     db = SignalDB(tmp_path / "d.db")
     payload = _payload("BUY")
     payload["context"] = {"macro": {"high_impact_imminent": True, "available": True}}
-    d = build_decision(
-        payload, "XAUUSD", db, now=datetime(2026, 8, 9, 14, 0, tzinfo=UTC)
-    )
+    d = build_decision(payload, "XAUUSD", db, now=datetime(2026, 8, 9, 14, 0, tzinfo=UTC))
     assert d["action"] == "NO TRADE"
     assert any("playbook" in b.lower() for b in d["blocked_by"])
     assert "us_data_countdown" in str(d["gates"]["playbook"]["blocked_by"])

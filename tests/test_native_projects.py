@@ -33,18 +33,13 @@ def test_android_project_tree_is_present():
 
 def test_sources_refuse_order_path_and_live_flag():
     win = (WINDOWS_ROOT / "HubClient.cs").read_text()
-    droid = (
-        ANDROID_ROOT / "app/src/main/java/app/sky/companion/HubClient.kt"
-    ).read_text()
+    droid = (ANDROID_ROOT / "app/src/main/java/app/sky/companion/HubClient.kt").read_text()
     for text in (win, droid):
         assert "placeOrder" not in text
         assert "/api/v3/order" not in text
+        assert "live_exchange_execution" in text.lower() or "LiveExchangeExecution" in text
         assert (
-            "live_exchange_execution" in text.lower() or "LiveExchangeExecution" in text
-        )
-        assert (
-            "true" not in text.lower().split("live_exchange_execution")[-1][:40]
-            or "false" in text
+            "true" not in text.lower().split("live_exchange_execution")[-1][:40] or "false" in text
         )
 
 
@@ -70,9 +65,7 @@ def test_lint_fails_closed_when_file_missing(tmp_path):
 def test_lint_catches_order_endpoint(tmp_path):
     (tmp_path / "SkyCompanion.csproj").write_text("<Project/>")
     (tmp_path / "Program.cs").write_text("class P {}")
-    (tmp_path / "HubClient.cs").write_text(
-        'var url = "https://api.binance.com/api/v3/order";'
-    )
+    (tmp_path / "HubClient.cs").write_text('var url = "https://api.binance.com/api/v3/order";')
     (tmp_path / "AppConfig.cs").write_text("class C {}")
     (tmp_path / "README.md").write_text("x")
     report = inspect_windows(tmp_path)

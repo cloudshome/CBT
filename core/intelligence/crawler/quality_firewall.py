@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 from core.intelligence.crawler.conflict_ledger import ConflictLedger
 from core.intelligence.crawler.event_identity import CanonicalEvent
@@ -25,7 +25,7 @@ from core.intelligence.crawler.source_registry import SourceRegistry
 logger = logging.getLogger("ai_quant_sentinel.intelligence.crawler.quality_firewall")
 
 
-class FirewallVerdict(str, Enum):
+class FirewallVerdict(StrEnum):
     APPROVED = "APPROVED"
     QUARANTINED = "QUARANTINED"
     REJECTED = "REJECTED"

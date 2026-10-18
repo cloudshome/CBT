@@ -5,8 +5,9 @@ Comprehensive verification suite for Telegram Bot natural language conversationa
 live ticker dossier, bilingual English/Bengali market overview, and fault-tolerant telemetry synthesis.
 """
 
-import pytest
 import time
+
+import pytest
 
 from core.telegram.agent_planner import telegram_agent_planner
 from core.telegram.rbac import TelegramRole, TelegramUserIdentity, rbac_registry
@@ -28,7 +29,22 @@ def superadmin_identity():
 
 def test_intent_resolution_standalone_tickers():
     """Verifies that single symbol mentions immediately resolve to live ticker dossiers."""
-    tickers = ["BTC", "btc", "bitcoin", "ETH", "eth", "ethereum", "SOL", "sol", "solana", "GOLD", "gold", "xau", "বিটকয়েন", "ইথেরিয়াম"]
+    tickers = [
+        "BTC",
+        "btc",
+        "bitcoin",
+        "ETH",
+        "eth",
+        "ethereum",
+        "SOL",
+        "sol",
+        "solana",
+        "GOLD",
+        "gold",
+        "xau",
+        "বিটকয়েন",
+        "ইথেরিয়াম",
+    ]
     for t in tickers:
         dec = telegram_agent_planner.resolve_intent(t, "user_1")
         assert dec.intent == "GET_PRICE_OR_DOSSIER", f"Failed for {t}: {dec.intent}"
@@ -173,27 +189,45 @@ async def test_end_to_end_webhook_natural_language_pipeline():
     # 1. Test "BTC"
     up_btc = {
         "update_id": int(time.time() * 1000) + 1,
-        "message": {"text": "BTC", "chat": {"id": uid}, "from": {"id": uid, "username": "test_trader"}},
+        "message": {
+            "text": "BTC",
+            "chat": {"id": uid},
+            "from": {"id": uid, "username": "test_trader"},
+        },
     }
     res_btc = await telegram_bot.handle_webhook_update(up_btc)
     assert res_btc["status"] == "AI_CONVERSATION_EXECUTED"
     assert "LIVE DOSSIER" in res_btc["response"]
-    assert "I am monitoring live telemetry. Our risk desk is enforcing strict Half-Kelly" not in res_btc["response"]
+    assert (
+        "I am monitoring live telemetry. Our risk desk is enforcing strict Half-Kelly"
+        not in res_btc["response"]
+    )
 
     # 2. Test "btc price"
     up_price = {
         "update_id": int(time.time() * 1000) + 2,
-        "message": {"text": "btc price", "chat": {"id": uid}, "from": {"id": uid, "username": "test_trader"}},
+        "message": {
+            "text": "btc price",
+            "chat": {"id": uid},
+            "from": {"id": uid, "username": "test_trader"},
+        },
     }
     res_price = await telegram_bot.handle_webhook_update(up_price)
     assert res_price["status"] == "AI_CONVERSATION_EXECUTED"
     assert "LIVE DOSSIER" in res_price["response"]
-    assert "I am monitoring live telemetry. Our risk desk is enforcing strict Half-Kelly" not in res_price["response"]
+    assert (
+        "I am monitoring live telemetry. Our risk desk is enforcing strict Half-Kelly"
+        not in res_price["response"]
+    )
 
     # 3. Test Bengali "বিটকয়েনের দাম কত"
     up_bn = {
         "update_id": int(time.time() * 1000) + 3,
-        "message": {"text": "বিটকয়েনের দাম কত", "chat": {"id": uid}, "from": {"id": uid, "username": "test_trader"}},
+        "message": {
+            "text": "বিটকয়েনের দাম কত",
+            "chat": {"id": uid},
+            "from": {"id": uid, "username": "test_trader"},
+        },
     }
     res_bn = await telegram_bot.handle_webhook_update(up_bn)
     assert res_bn["status"] == "AI_CONVERSATION_EXECUTED"
@@ -215,7 +249,7 @@ async def test_intent_resolution_swarm_and_collector():
 
 @pytest.mark.asyncio
 async def test_typed_commands_swarm_collector_crawl():
-    from core.telegram.handlers import handle_swarm, handle_collector, handle_crawl
+    from core.telegram.handlers import handle_collector, handle_crawl, handle_swarm
     from core.telegram.rbac import TelegramUserIdentity
 
     identity = TelegramUserIdentity(user_id=999004, chat_id=999004, role=TelegramRole.SUPER_ADMIN)
@@ -234,5 +268,3 @@ async def test_typed_commands_swarm_collector_crawl():
     # 3. /crawl
     crawl_res = await handle_crawl("", identity=identity)
     assert "AUTONOMOUS CRAWL CYCLE COMPLETE" in crawl_res
-
-

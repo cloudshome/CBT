@@ -83,7 +83,7 @@ class PanicCloseEngine:
         env_norm = environment.upper().strip()
         try:
             cred = credential_vault.get_credential(ex_norm, env_norm)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning(
                 f"[PanicClose] Could not retrieve credential for {ex_norm} {env_norm}: {exc}"
             )
@@ -143,7 +143,7 @@ class PanicCloseEngine:
 
         try:
             conn = connector or await self._get_connector(ex_norm, env_norm)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             latency_ms = round((time.perf_counter() - t_start) * 1000.0, 2)
             msg = sanitize_text(str(exc))
             logger.error(f"[PanicClose] Credentials/Connector initialization failed: {msg}")
@@ -180,7 +180,7 @@ class PanicCloseEngine:
             cancelled_res = await conn.cancel_all_orders(clean_symbol)
             cancelled_count = len(cancelled_res) if isinstance(cancelled_res, list) else 1
             steps.append(f"CANCELLED_ORDERS_{cancelled_count}")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning(
                 f"[PanicClose] Error during cancel_all_orders (proceeding to balance check): {exc}"
             )
@@ -215,7 +215,7 @@ class PanicCloseEngine:
                         break
 
             steps.append(f"POSITION_DISCOVERED_{pos_qty:.6f}")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             latency_ms = round((time.perf_counter() - t_start) * 1000.0, 2)
             msg = sanitize_text(str(exc))
             logger.error(f"[PanicClose] Failed to query exchange balance: {msg}")
@@ -295,7 +295,7 @@ class PanicCloseEngine:
                 client_order_id=client_panic_id,
             )
             steps.append(f"MARKET_ORDER_PLACED_{market_res.exchange_order_id}")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             latency_ms = round((time.perf_counter() - t_start) * 1000.0, 2)
             msg = sanitize_text(str(exc))
             logger.critical(f"[PanicClose] Market dump order failed: {msg}")
@@ -351,7 +351,7 @@ class PanicCloseEngine:
                 if remaining_qty <= dust_thresh:
                     verified = True
                     break
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.warning(
                     f"[PanicClose] Error checking post-flatten balance round #{check_round}: {exc}"
                 )

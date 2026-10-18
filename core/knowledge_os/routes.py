@@ -181,7 +181,7 @@ async def get_research_advisor() -> dict[str, Any]:
 # -----------------------------------------------------------------------------
 @router.post("/library/ingest-book")
 async def ingest_book(
-    file: UploadFile = File(...),  # noqa: B008
+    file: UploadFile = File(...),
     max_pages: int = Query(default=1500, ge=1, le=5000),
 ) -> dict[str, Any]:
     """
@@ -203,7 +203,7 @@ async def ingest_book(
         from core.storage.heavy_data_sync import heavy_data_sync_manager
 
         heavy_data_sync_manager.sync_file_to_drive(temp_path)
-    except Exception as drive_err:  # noqa: BLE001
+    except Exception as drive_err:
         logger.warning("Auto Google Drive sync deferred: %s", drive_err)
 
     # Process streaming generator
@@ -520,7 +520,9 @@ async def view_or_download_research_file(filename: str):
         raise HTTPException(status_code=400, detail="Malformed file path.")
 
     if not target_path.exists() or not target_path.is_file():
-        raise HTTPException(status_code=404, detail=f"File '{safe_basename}' not found in research uploads.")
+        raise HTTPException(
+            status_code=404, detail=f"File '{safe_basename}' not found in research uploads."
+        )
 
     media_type = "application/octet-stream"
     if safe_basename.lower().endswith(".pdf"):
@@ -575,10 +577,10 @@ async def get_wiki_article(article_id: str) -> dict[str, Any]:
                 if s_dict.get("real_life_summary"):
                     try:
                         s_dict["real_life_summary"] = json.loads(s_dict["real_life_summary"])
-                    except Exception:  # noqa: BLE001, S110
+                    except Exception:
                         pass
                 res_dict["source"] = s_dict
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         logger.debug(f"Source lookup skipped: {e}")
 
     return res_dict
@@ -606,7 +608,9 @@ async def ingest_wiki_article(payload: WikiIngestRequest) -> dict[str, Any]:
             "status": result.status,
             "source": result.source.to_dict(),
             "article": result.wiki_article.to_dict() if result.wiki_article else None,
-            "real_life_summary": result.real_life_summary.to_dict() if result.real_life_summary else None,
+            "real_life_summary": result.real_life_summary.to_dict()
+            if result.real_life_summary
+            else None,
             "message": result.message,
         }
 
@@ -806,7 +810,12 @@ async def get_wiki_article_backlinks_endpoint(article_id: str) -> dict[str, Any]
     art = research_wikipedia_engine.get_article(article_id)
     target = art.title if art else article_id
     backlinks = research_wikipedia_engine.get_backlinks(target)
-    return {"article_id": article_id, "target": target, "backlinks": backlinks, "count": len(backlinks)}
+    return {
+        "article_id": article_id,
+        "target": target,
+        "backlinks": backlinks,
+        "count": len(backlinks),
+    }
 
 
 @router.get("/wiki/contradictions")
@@ -821,7 +830,9 @@ async def list_wiki_contradictions_endpoint(
 
 
 @router.post("/wiki/contradictions")
-async def create_wiki_contradiction_endpoint(payload: WikiContradictionCreatePayload) -> dict[str, Any]:
+async def create_wiki_contradiction_endpoint(
+    payload: WikiContradictionCreatePayload,
+) -> dict[str, Any]:
     """Registers a newly discovered empirical contradiction between two claims."""
     from core.knowledge_os.research_wikipedia import research_wikipedia_engine
 
@@ -905,7 +916,9 @@ async def verify_claim_endpoint(claim_id: str) -> dict[str, Any]:
 
 
 @router.post("/claims/verify-all")
-async def verify_all_claims_endpoint(limit: int = Query(default=50, ge=1, le=200)) -> dict[str, Any]:
+async def verify_all_claims_endpoint(
+    limit: int = Query(default=50, ge=1, le=200),
+) -> dict[str, Any]:
     """Batch verifies pending unverified claims across research sources."""
     from core.knowledge_os.claim_verifier import claim_verifier
 

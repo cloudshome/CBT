@@ -185,7 +185,7 @@ class MultiVenueTestnetBridge:
                 ):
                     found_order = query_res
                     break
-            except Exception as q_err:  # noqa: BLE001
+            except Exception as q_err:
                 logger.warning(f"[Bridge] Query attempt {attempt} failed: {q_err}")
 
             if attempt < self.max_recovery_query_retries:

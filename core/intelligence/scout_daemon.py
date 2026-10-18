@@ -13,7 +13,7 @@ import logging
 import random
 import time
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from core.intelligence.evidence_classifier import EvidenceClassifier, global_evidence_classifier
@@ -30,7 +30,7 @@ from integrations.agent_reach.policy import SecurityPolicy, global_security_poli
 logger = logging.getLogger("ai_quant_sentinel.intelligence.scout_daemon")
 
 
-class ScoutState(str, Enum):
+class ScoutState(StrEnum):
     STOPPED = "STOPPED"
     RUNNING = "RUNNING"
     PAUSED = "PAUSED"
@@ -320,7 +320,7 @@ class AutonomousWebScout:
                 else:
                     result["status"] = "fetch_failed"
 
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(f"Error during scout step for {target.url}: {e}")
             self._error_count += 1
             result["status"] = "error"
@@ -347,7 +347,7 @@ class AutonomousWebScout:
                 await self.step()
             except asyncio.CancelledError:
                 break
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.error(f"Unexpected exception in scout loop: {e}")
                 self._error_count += 1
 

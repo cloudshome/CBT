@@ -202,13 +202,8 @@ def test_bias_components_exact_neutral_opposite():
 
 
 def test_decision_missed_vs_overruled():
-    miss = score_attempt(
-        _read(decision="no_trade", entry=None, stop=None, target=None), _desk()
-    )
-    assert (
-        miss["components"][1]["points"] == 15
-        and "missed" in miss["components"][1]["detail"]
-    )
+    miss = score_attempt(_read(decision="no_trade", entry=None, stop=None, target=None), _desk())
+    assert miss["components"][1]["points"] == 15 and "missed" in miss["components"][1]["detail"]
     over = score_attempt(
         _read(decision="buy", entry=None, stop=None, target=None),
         _desk(action="NO TRADE"),
@@ -326,9 +321,7 @@ def test_scorecard_perfect_agreement_claims_no_weakest(db):
 def test_scorecard_window_excludes_old_attempts(db):
     now = int(time.time() * 1000)
     submit_attempt(db, _read_raw(), _desk(), now_ms=now - 45 * DAY)
-    submit_attempt(
-        db, _read_raw(bias="bearish", decision="no_trade"), _desk(), now_ms=now
-    )
+    submit_attempt(db, _read_raw(bias="bearish", decision="no_trade"), _desk(), now_ms=now)
     card = practice_scorecard(db, days=30, now_ms=now)
     assert card["n"] == 1
 
@@ -462,9 +455,7 @@ def _bar(ts, o, h, low, c):
 def _series(start=1_780_000_000_000, n=30, step=900_000, close=100.0):
     """Flat series: enough history to commit in the middle and still have
     a forward window."""
-    return [
-        _bar(start + i * step, close, close + 0.2, close - 0.2, close) for i in range(n)
-    ]
+    return [_bar(start + i * step, close, close + 0.2, close - 0.2, close) for i in range(n)]
 
 
 def _rising_after(commit_i=10, n=30, start=1_780_000_000_000, step=900_000):
@@ -514,9 +505,7 @@ def test_tape_rejects_missing_commit_and_bad_horizon():
 
 def test_tape_rejects_wrong_side_ladder():
     with pytest.raises(ValueError, match="BUY paper trade requires"):
-        validate_tape_request(
-            _read_raw(commit_time=1_780_000_000, stop=101.5, target=103.0)
-        )
+        validate_tape_request(_read_raw(commit_time=1_780_000_000, stop=101.5, target=103.0))
 
 
 def test_locate_commit_accepts_seconds_or_ms():
@@ -573,9 +562,7 @@ def test_walk_expired_window_partial_when_mfe_is_real(db):
     # future bars tick up 0.4 (never reach 102.5) so the window expires
     start, step = 1_780_000_000_000, 900_000
     commit = _bar(start, 100.0, 100.3, 99.8, 100.0)
-    future = [
-        _bar(start + (i + 1) * step, 100.1, 101.2, 100.0, 100.4) for i in range(16)
-    ]
+    future = [_bar(start + (i + 1) * step, 100.1, 101.2, 100.0, 100.4) for i in range(16)]
     walk = walk_tape(user, future, commit)
     assert walk["outcome"] == "EXPIRED"
     assert walk["mfe"] >= 1.0

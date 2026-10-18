@@ -52,8 +52,14 @@ class CandidateProposal:
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
-        d["direction"] = self.direction.value if isinstance(self.direction, DecisionAction) else self.direction
-        d["archetype"] = self.archetype.value if isinstance(self.archetype, SpecialistArchetype) else self.archetype
+        d["direction"] = (
+            self.direction.value if isinstance(self.direction, DecisionAction) else self.direction
+        )
+        d["archetype"] = (
+            self.archetype.value
+            if isinstance(self.archetype, SpecialistArchetype)
+            else self.archetype
+        )
         return d
 
 
@@ -62,7 +68,9 @@ class BaseSpecialistAgent(ABC):
     Abstract Base Class for Mastermind Specialists.
     """
 
-    def __init__(self, specialist_id: str, archetype: SpecialistArchetype, target_symbol: str) -> None:
+    def __init__(
+        self, specialist_id: str, archetype: SpecialistArchetype, target_symbol: str
+    ) -> None:
         self.specialist_id = specialist_id
         self.archetype = archetype
         self.target_symbol = target_symbol

@@ -122,7 +122,7 @@ class WalkForwardEvaluator:
         eval_bars = config.eval_days * bpd
         step_bars = config.step_days * bpd
         purge_bars = config.horizon_bars
-        embargo_bars = int(math.ceil(config.horizon_bars * config.embargo_multiplier))
+        embargo_bars = math.ceil(config.horizon_bars * config.embargo_multiplier)
 
         total_bars = len(candles)
         required_min = train_bars + purge_bars + eval_bars

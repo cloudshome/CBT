@@ -31,10 +31,10 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 
-class StressScenarioId(str, Enum):
+class StressScenarioId(StrEnum):
     BLACK_THURSDAY_2020 = "BLACK_THURSDAY_2020"
     FTX_CONTAGION_2022 = "FTX_CONTAGION_2022"
     FLASH_CRASH_CASCADE = "FLASH_CRASH_CASCADE"

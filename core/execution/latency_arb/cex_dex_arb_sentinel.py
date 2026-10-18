@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 from core.execution.latency_arb.amm_pool_math import (
     ConcentratedLiquidityPool,
@@ -46,7 +46,7 @@ from core.execution.latency_arb.mev_bundle_simulator import (
 logger = logging.getLogger("ai_quant_sentinel.latency_arb.cex_dex_sentinel")
 
 
-class ArbOpportunityDirection(str, Enum):
+class ArbOpportunityDirection(StrEnum):
     CEX_TO_DEX = "CEX_TO_DEX"  # Buy on CEX, Sell on DEX
     DEX_TO_CEX = "DEX_TO_CEX"  # Buy on DEX, Sell on CEX
     NO_ARBITRAGE = "NO_ARBITRAGE"

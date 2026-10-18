@@ -73,9 +73,7 @@ def artifact_record(
     if not path.is_file():
         raise FileNotFoundError(path)
     if signed and not signature:
-        raise ReleaseError(
-            "signed artifacts require a detached signature or verifier record"
-        )
+        raise ReleaseError("signed artifacts require a detached signature or verifier record")
     record: dict[str, Any] = {
         "name": path.name,
         "kind": _artifact_kind(path),
@@ -100,9 +98,7 @@ def release_manifest(
     channel = (channel or "").strip().lower()
     if channel not in CHANNELS:
         raise ReleaseError(f"channel must be one of {CHANNELS}")
-    records = sorted(
-        (artifact_record(p) for p in artifacts), key=lambda row: row["name"]
-    )
+    records = sorted((artifact_record(p) for p in artifacts), key=lambda row: row["name"])
     names = [row["name"] for row in records]
     if len(names) != len(set(names)):
         raise ReleaseError("artifact names must be unique")
@@ -137,18 +133,14 @@ def write_release_manifest(
         commit=commit,
         created_at=created_at,
     )
-    output.write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return output
 
 
 def write_checksums(output: Path | str, artifacts: Iterable[Path | str]) -> Path:
     output = Path(output)
     rows = sorted((Path(p).name, sha256_file(p)) for p in artifacts)
-    output.write_text(
-        "".join(f"{digest}  {name}\n" for name, digest in rows), encoding="utf-8"
-    )
+    output.write_text("".join(f"{digest}  {name}\n" for name, digest in rows), encoding="utf-8")
     return output
 
 
@@ -218,8 +210,7 @@ def spdx_sbom(
     for row in dependency_inventory(requirements):
         packages.append(
             {
-                "SPDXID": "SPDXRef-Package-"
-                + re.sub(r"[^A-Za-z0-9.-]", "-", row["name"]),
+                "SPDXID": "SPDXRef-Package-" + re.sub(r"[^A-Za-z0-9.-]", "-", row["name"]),
                 "name": row["name"],
                 "versionInfo": row["installed"],
                 "licenseConcluded": "NOASSERTION",
@@ -236,17 +227,13 @@ def spdx_sbom(
                     {
                         "annotationType": "OTHER",
                         "annotator": "Tool: SKY-P22",
-                        "annotationDate": time.strftime(
-                            "%Y-%m-%dT%H:%M:%SZ", time.gmtime(created)
-                        ),
+                        "annotationDate": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(created)),
                         "comment": f"Declared requirement: {row['declared']}",
                     }
                 ],
             }
         )
-    namespace_hash = hashlib.sha256(f"SKY:{version}:{created}".encode()).hexdigest()[
-        :24
-    ]
+    namespace_hash = hashlib.sha256(f"SKY:{version}:{created}".encode()).hexdigest()[:24]
     return {
         "spdxVersion": "SPDX-2.3",
         "dataLicense": "CC0-1.0",
@@ -272,9 +259,7 @@ def write_sbom(
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(
         json.dumps(
-            spdx_sbom(
-                requirements=requirements, version=version, created_at=created_at
-            ),
+            spdx_sbom(requirements=requirements, version=version, created_at=created_at),
             indent=2,
             sort_keys=True,
         )
@@ -297,16 +282,12 @@ def redact(value: Any, key: str = "") -> Any:
         return [redact(item) for item in value]
     if isinstance(value, str):
         # Bearer-like values and URL credentials must never survive a bundle.
-        value = re.sub(
-            r"(?i)bearer\s+[A-Za-z0-9._~+/=-]+", "Bearer ***REDACTED***", value
-        )
+        value = re.sub(r"(?i)bearer\s+[A-Za-z0-9._~+/=-]+", "Bearer ***REDACTED***", value)
         value = re.sub(r"(https?://)[^/@:\s]+:[^/@\s]+@", r"\1***REDACTED***@", value)
     return value
 
 
-def support_snapshot(
-    *, hub_status: dict[str, Any], hub_doctor: dict[str, Any]
-) -> dict[str, Any]:
+def support_snapshot(*, hub_status: dict[str, Any], hub_doctor: dict[str, Any]) -> dict[str, Any]:
     return redact(
         {
             "schema": SCHEMA_VERSION,
@@ -336,9 +317,7 @@ def write_support_bundle(
     snapshot = support_snapshot(hub_status=hub_status, hub_doctor=hub_doctor)
     with tempfile.TemporaryDirectory(prefix="sky-support-") as tmp:
         report = Path(tmp) / "diagnostics.json"
-        report.write_text(
-            json.dumps(snapshot, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
+        report.write_text(json.dumps(snapshot, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         with tarfile.open(output, "w:gz") as archive:
             info = archive.gettarinfo(str(report), arcname="diagnostics.json")
             info.mtime = 0

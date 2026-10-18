@@ -45,7 +45,7 @@ class TelegramIdempotencyManager:
                     "CREATE INDEX IF NOT EXISTS idx_tg_idem_exp ON telegram_idempotency_keys (expires_at);"
                 )
                 conn.commit()
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.warning(f"Could not initialize telegram_idempotency_keys table: {e}")
 
     def build_key(
@@ -116,7 +116,7 @@ class TelegramIdempotencyManager:
                 logger.info(f"Idempotency blocked duplicate Telegram action: {idempotency_key}")
                 return False
 
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.error(f"Idempotency check error for {idempotency_key}: {e}")
             # Fail-safe: if database fails, allow first execution
             return True
@@ -134,7 +134,7 @@ class TelegramIdempotencyManager:
                     (result_summary[:255], idempotency_key),
                 )
                 conn.commit()
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.warning(f"Failed marking idempotency key completed: {e}")
 
     def release(self, idempotency_key: str) -> None:
@@ -150,7 +150,7 @@ class TelegramIdempotencyManager:
                     (idempotency_key,),
                 )
                 conn.commit()
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.warning(f"Failed releasing idempotency key: {e}")
 
 

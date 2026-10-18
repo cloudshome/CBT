@@ -166,7 +166,7 @@ class LiquiditySurfaceSentinel:
                 real_capital_enabled=False,
             )
 
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error("Surface Sentinel unhandled anomaly caught: %s", exc)
             return ProtectiveExecutionAdjustment(
                 symbol=symbol,

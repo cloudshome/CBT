@@ -182,7 +182,7 @@ class MacroNetworkEngine:
                 absorption_ratio_top2=round(absorption_top2, 4),
                 market_synchronization_regime=regime,
             )
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.warning("PCA absorption calculation error: %s", e)
             return PCASystemicAbsorption(
                 eigenvalues=[1.0],
@@ -249,7 +249,7 @@ class MacroNetworkEngine:
                                 best_f = f_stat
                                 best_lag = lag
                                 best_p = p_val
-                    except Exception:  # noqa: BLE001, S110 — best-effort fallback, never raise
+                    except Exception:
                         pass
 
                 is_sig = best_p < self.significance_alpha or best_f > 3.84

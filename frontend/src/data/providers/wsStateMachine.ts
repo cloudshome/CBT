@@ -59,6 +59,10 @@ export class WSStateMachine {
     return this.reconnectAttempt;
   }
 
+  public getLastMessageTime(): number {
+    return this.lastMessageTime;
+  }
+
   public setUrl(newUrl: string): void {
     if (this.url !== newUrl) {
       this.url = newUrl;

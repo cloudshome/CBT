@@ -189,7 +189,7 @@ async def get_delta_exposure(
                                 mark_price=ref_price,
                             )
                         )
-        except Exception as _e:  # noqa: BLE001
+        except Exception as _e:
             logger.debug(f"Balance probe note for {exch}: {_e}")
 
     # Fallback simulation leg if no balances exist in sandbox test

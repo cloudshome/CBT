@@ -225,7 +225,7 @@ async def get_history(
             )
             for row in cursor.fetchall():
                 shadow_records.append(dict(row))
-    except Exception:  # noqa: BLE001
+    except Exception:
         shadow_records = []
 
     return {

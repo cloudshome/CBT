@@ -76,7 +76,9 @@ class ThesisEngine:
                 """
             )
             conn.execute("CREATE INDEX IF NOT EXISTS idx_theses_status ON research_theses(status);")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_theses_asset ON research_theses(asset_class);")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_theses_asset ON research_theses(asset_class);"
+            )
 
             conn.execute(
                 """
@@ -92,8 +94,12 @@ class ThesisEngine:
                 );
                 """
             )
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_tc_thesis ON research_thesis_claims(thesis_id);")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_tc_claim ON research_thesis_claims(claim_id);")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_tc_thesis ON research_thesis_claims(thesis_id);"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_tc_claim ON research_thesis_claims(claim_id);"
+            )
             conn.commit()
 
     def _seed_canonical_theses(self) -> None:
@@ -239,7 +245,9 @@ class ThesisEngine:
         and transitions epistemic lifecycle status.
         """
         with self._get_connection() as conn:
-            t_row = conn.execute("SELECT * FROM research_theses WHERE thesis_id = ?;", (thesis_id,)).fetchone()
+            t_row = conn.execute(
+                "SELECT * FROM research_theses WHERE thesis_id = ?;", (thesis_id,)
+            ).fetchone()
             if not t_row:
                 return None
 
@@ -263,8 +271,12 @@ class ThesisEngine:
             # Score computation
             base_score = 0.50
             if sup_count + con_count > 0:
-                sup_weight = sum(float(lnk["confidence_score"]) * float(lnk["weight"]) for lnk in supporting)
-                con_weight = sum(float(lnk["confidence_score"]) * float(lnk["weight"]) for lnk in contradicting)
+                sup_weight = sum(
+                    float(lnk["confidence_score"]) * float(lnk["weight"]) for lnk in supporting
+                )
+                con_weight = sum(
+                    float(lnk["confidence_score"]) * float(lnk["weight"]) for lnk in contradicting
+                )
                 net = sup_weight - con_weight
                 base_score = max(0.10, min(0.95, 0.50 + (net * 0.12)))
 
@@ -312,19 +324,38 @@ class ThesisEngine:
         linked_theses: list[str] = []
 
         # Check M2 / Liquidity thesis
-        if any(w in text_lower for w in ("liquidity", "m2", "money supply", "balance sheet", "inflow")):
-            rel = "SUPPORTS" if any(w in text_lower for w in ("expand", "grow", "boost", "support", "bull")) else "CONTRADICTS"
+        if any(
+            w in text_lower for w in ("liquidity", "m2", "money supply", "balance sheet", "inflow")
+        ):
+            rel = (
+                "SUPPORTS"
+                if any(w in text_lower for w in ("expand", "grow", "boost", "support", "bull"))
+                else "CONTRADICTS"
+            )
             self.link_claim("thesis_liquidity_m2", claim_id, relationship=rel)
             linked_theses.append("thesis_liquidity_m2")
 
         # Check DXY / Rates thesis
-        if any(w in text_lower for w in ("dxy", "dollar", "treasury yield", "us10y", "interest rate", "fed hike")):
-            rel = "SUPPORTS" if any(w in text_lower for w in ("pressure", "suppress", "drain", "fall", "dump", "bear")) else "CONTRADICTS"
+        if any(
+            w in text_lower
+            for w in ("dxy", "dollar", "treasury yield", "us10y", "interest rate", "fed hike")
+        ):
+            rel = (
+                "SUPPORTS"
+                if any(
+                    w in text_lower
+                    for w in ("pressure", "suppress", "drain", "fall", "dump", "bear")
+                )
+                else "CONTRADICTS"
+            )
             self.link_claim("thesis_dxy_yield_pressure", claim_id, relationship=rel)
             linked_theses.append("thesis_dxy_yield_pressure")
 
         # Check SMC / Liquidity sweep thesis
-        if any(w in text_lower for w in ("fvg", "order block", "fair value gap", "liquidity sweep", "orderflow", "smc")):
+        if any(
+            w in text_lower
+            for w in ("fvg", "order block", "fair value gap", "liquidity sweep", "orderflow", "smc")
+        ):
             self.link_claim("thesis_institutional_smc", claim_id, relationship="SUPPORTS")
             linked_theses.append("thesis_institutional_smc")
 
@@ -360,7 +391,9 @@ class ThesisEngine:
     def get_thesis_dossier(self, thesis_id: str) -> dict[str, Any] | None:
         """Returns complete thesis details with all linked supporting and contradicting claims."""
         with self._get_connection() as conn:
-            t_row = conn.execute("SELECT * FROM research_theses WHERE thesis_id = ?;", (thesis_id,)).fetchone()
+            t_row = conn.execute(
+                "SELECT * FROM research_theses WHERE thesis_id = ?;", (thesis_id,)
+            ).fetchone()
             if not t_row:
                 return None
 

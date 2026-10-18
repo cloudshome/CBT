@@ -104,8 +104,7 @@ def test_next_scheduled_agent_picks_most_overdue(tmp_path):
         db.record_agent_run("morning_brief", "COMPLETED", summary="fresh")
         # Backdate weekly_review far past its 168h cadence.
         db.conn.execute(
-            "INSERT INTO agent_runs(agent, status, summary, payload_json, ts) "
-            "VALUES(?,?,?,?,?)",
+            "INSERT INTO agent_runs(agent, status, summary, payload_json, ts) VALUES(?,?,?,?,?)",
             ("weekly_review", "COMPLETED", "stale", "{}", now - 200 * 3600),
         )
         db.conn.commit()

@@ -522,6 +522,18 @@ class ProvenanceEngine:
                         (f"KV_{cid}", cid, domain, title, desc, tags, created_at),
                     )
 
+            # Ensure anchor knowledge_id K-929438AA exists in provenance ledger before candidates/evidence
+            now_ms = int(time.time() * 1000)
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO research_provenance_ledger (
+                    knowledge_id, source_type, source_uri, title, author_creator,
+                    ingested_at, raw_content_preview, confidence_score, status
+                ) VALUES ('K-929438AA', 'SYNTHESIS', 'system://knowledge_sync', 'SMC & Order Flow Core Research', 'SKY Quantitative Research', ?, 'SMC Fair Value Gap & OFI Core Research', 95.0, 'VERIFIED');
+                """,
+                (now_ms,),
+            )
+
             # Seed initial strategy candidates if empty
             c_cnt = conn.execute("SELECT COUNT(*) FROM strategy_candidates;").fetchone()[0]
             if c_cnt == 0:
@@ -531,7 +543,9 @@ class ProvenanceEngine:
                         "K-929438AA",
                         "SMC Fair Value Gap & Liquidity Sweep 15m",
                         "Liquidity sweeps preceding fair value gap fill provide positive Net EV edge on 15m.",
-                        json.dumps({"action": "BUY on pullback to unmitigated FVG", "confirmation": "MSS"}),
+                        json.dumps(
+                            {"action": "BUY on pullback to unmitigated FVG", "confirmation": "MSS"}
+                        ),
                         json.dumps({"sl_ticks": 24, "tp1_r": 1.5, "tp2_r": 2.5}),
                         json.dumps({"fvg_tolerance": 0.002, "max_hold_bars": 16}),
                         "15m",
@@ -614,7 +628,7 @@ class ProvenanceEngine:
                 d = dict(r)
                 try:
                     d["tags"] = json.loads(d["tags"]) if d.get("tags") else []
-                except Exception:  # noqa: BLE001 — defensive fallback
+                except Exception:
                     d["tags"] = []
                 knowledge_items.append(d)
 
@@ -629,7 +643,7 @@ class ProvenanceEngine:
                 ]:
                     try:
                         d[json_field] = json.loads(d[json_field]) if d.get(json_field) else {}
-                    except Exception:  # noqa: BLE001 — defensive fallback
+                    except Exception:
                         d[json_field] = {}
                 candidate_items.append(d)
 
@@ -640,7 +654,7 @@ class ProvenanceEngine:
                     d["evidence_details"] = (
                         json.loads(d["evidence_details"]) if d.get("evidence_details") else {}
                     )
-                except Exception:  # noqa: BLE001 — defensive fallback
+                except Exception:
                     d["evidence_details"] = {}
                 evidence_items.append(d)
 

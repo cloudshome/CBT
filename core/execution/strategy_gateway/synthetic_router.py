@@ -23,7 +23,7 @@ import logging
 import sqlite3
 import time
 from collections.abc import Callable
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 from pydantic import BaseModel, Field
@@ -38,7 +38,7 @@ from core.risk_engine.basis_governor import (
 logger = logging.getLogger("ai_quant_sentinel.execution.strategy_gateway.synthetic_router")
 
 
-class DualLegState(str, Enum):
+class DualLegState(StrEnum):
     """Finite state machine for atomic dual-leg synthetic execution."""
 
     INITIATED = "INITIATED"
@@ -54,7 +54,7 @@ class DualLegState(str, Enum):
     LEG_RISK_EMERGENCY_HALT = "LEG_RISK_EMERGENCY_HALT"
 
 
-class LegSide(str, Enum):
+class LegSide(StrEnum):
     BUY = "BUY"
     SELL = "SELL"
 
@@ -399,7 +399,7 @@ class SyntheticRouter:
 
                 unwind_executor = _default_unwind_exec
 
-            unwind_success, unwind_fill_price, _ = unwind_executor(unwind_leg)
+            unwind_success, _unwind_fill_price, _ = unwind_executor(unwind_leg)
 
             final_state = (
                 DualLegState.LEG_RISK_FAILSAFE_UNWOUND

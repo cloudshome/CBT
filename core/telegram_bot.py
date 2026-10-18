@@ -195,9 +195,13 @@ class DeskStateMind:
         if raw_id:
             raw_upper = raw_id.upper()
             # 1. Match by exact position_id or partial match
-            target = next((p for p in open_positions if p["position_id"].upper() == raw_upper), None)
+            target = next(
+                (p for p in open_positions if p["position_id"].upper() == raw_upper), None
+            )
             if not target:
-                target = next((p for p in open_positions if raw_upper in p["position_id"].upper()), None)
+                target = next(
+                    (p for p in open_positions if raw_upper in p["position_id"].upper()), None
+                )
 
             # 2. Match by symbol
             if not target:
@@ -208,14 +212,18 @@ class DeskStateMind:
                     (
                         p
                         for p in open_positions
-                        if p["symbol"].upper() == sym or p["symbol"].replace("/", "").upper() == raw_upper
+                        if p["symbol"].upper() == sym
+                        or p["symbol"].replace("/", "").upper() == raw_upper
                     ),
                     None,
                 )
 
             if not target:
                 pos_list = "\n".join(
-                    [f"• `{p['position_id']}` ({p['symbol']} {p['direction']})" for p in open_positions]
+                    [
+                        f"• `{p['position_id']}` ({p['symbol']} {p['direction']})"
+                        for p in open_positions
+                    ]
                 )
                 return (
                     f"⚠️ Position or symbol `{identifier}` not found.\n\n"
@@ -227,7 +235,10 @@ class DeskStateMind:
                 target = open_positions[0]
             else:
                 pos_list = "\n".join(
-                    [f"• `/close {p['position_id']}` ({p['symbol']} {p['direction']})" for p in open_positions]
+                    [
+                        f"• `/close {p['position_id']}` ({p['symbol']} {p['direction']})"
+                        for p in open_positions
+                    ]
                 )
                 return (
                     f"⚠️ Multiple active positions open. Please specify which one to close:\n\n"
@@ -329,7 +340,7 @@ class DeskStateMind:
                 f"━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"⏱️ _Adversarial Tri-Agent Consensus Engine_"
             )
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.error(f"Error running debate council: {e}")
             return (
                 f"🏛️ **ADVERSARIAL DEBATE COUNCIL: `{symbol}`**\n"
@@ -418,6 +429,7 @@ class DeskStateMind:
             logger.error(f"Error handling conversational AI query in Telegram: {e}", exc_info=True)
             try:
                 from core.market_providers import market_gateway
+
                 btc_t = await market_gateway.get_ticker("BTC/USDT")
                 btc_p = float(btc_t.get("price", 0.0))
                 btc_chg = float(btc_t.get("change_24h_pct", 0.0))
@@ -605,7 +617,7 @@ class SmartBrainNotificationEngine:
                     )
                     await self.bot.send_message(msg)
 
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.error(f"SmartNotifier macro milestone error: {e}")
 
     async def check_volatility_expansion(self) -> None:
@@ -662,7 +674,7 @@ class SmartBrainNotificationEngine:
                 else:
                     # Slow exponential smoothing to update baseline reference price
                     self._last_price_tracker[sym] = last * 0.98 + cur * 0.02
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.debug(f"SmartNotifier volatility error: {e}")
 
     async def check_scheduled_briefings(self) -> None:
@@ -719,7 +731,7 @@ class SmartBrainNotificationEngine:
                     await self.bot.send_message(text)
                     macro_event_reporter.mark_notified(event_id)
                     logger.info(f"SmartNotifier: Dispatched macro flash alert for {event_id}")
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.error(f"SmartNotifier macro event release check error: {e}")
 
     async def dispatch_unique_news_digest(self) -> bool:
@@ -765,7 +777,7 @@ class SmartBrainNotificationEngine:
                     "is_synthetic"
                 ):
                     self._last_price_tracker[sym] = float(ticker.get("price", 0.0))
-        except Exception:  # noqa: BLE001, S110 — best-effort fallback, never raise
+        except Exception:
             pass
 
         while self._is_monitoring:
@@ -784,7 +796,7 @@ class SmartBrainNotificationEngine:
 
             except asyncio.CancelledError:
                 break
-            except Exception as e:  # noqa: BLE001 — defensive fallback
+            except Exception as e:
                 logger.error(f"Error in SmartBrainNotificationEngine: {e}")
 
             await asyncio.sleep(check_interval_seconds)
@@ -931,7 +943,7 @@ class TelegramBotDispatcher:
                             return s1 and s2
                         return False
                     return True
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.error(f"Telegram dispatch failed: {e}")
             return False
 
@@ -1019,7 +1031,7 @@ class TelegramBotDispatcher:
                         logger.warning(f"Telegram sendPhoto failed ({resp.status}): {err}")
                         return False
                     return True
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.error(f"Telegram sendPhoto exception: {e}")
             return False
 
@@ -1045,7 +1057,7 @@ class TelegramBotDispatcher:
                     url, json=payload, timeout=aiohttp.ClientTimeout(total=5)
                 ) as resp:
                     return resp.status == 200
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.debug(f"answerCallbackQuery error: {e}")
             return False
 
@@ -1140,9 +1152,9 @@ class TelegramBotDispatcher:
         pos_id = trade.get("position_id", "N/A")
         reason = trade.get("entry_reason") or "SMC Order Flow & Liquidity Mitigation"
         opened_at = trade.get("opened_at", int(time.time() * 1000))
-        dt_str = datetime.datetime.fromtimestamp(
-            opened_at / 1000.0, tz=datetime.UTC
-        ).strftime("%Y-%m-%d %H:%M:%S UTC")
+        dt_str = datetime.datetime.fromtimestamp(opened_at / 1000.0, tz=datetime.UTC).strftime(
+            "%Y-%m-%d %H:%M:%S UTC"
+        )
 
         notional_usd = entry * size
         sl_dist = abs(entry - sl) if sl > 0 else 0.0
@@ -1204,15 +1216,15 @@ class TelegramBotDispatcher:
         closed_at = trade.get("closed_at", int(time.time() * 1000))
 
         opened_str = (
-            datetime.datetime.fromtimestamp(
-                opened_at / 1000.0, tz=datetime.UTC
-            ).strftime("%Y-%m-%d %H:%M:%S UTC")
+            datetime.datetime.fromtimestamp(opened_at / 1000.0, tz=datetime.UTC).strftime(
+                "%Y-%m-%d %H:%M:%S UTC"
+            )
             if opened_at
             else "N/A"
         )
-        closed_str = datetime.datetime.fromtimestamp(
-            closed_at / 1000.0, tz=datetime.UTC
-        ).strftime("%Y-%m-%d %H:%M:%S UTC")
+        closed_str = datetime.datetime.fromtimestamp(closed_at / 1000.0, tz=datetime.UTC).strftime(
+            "%Y-%m-%d %H:%M:%S UTC"
+        )
 
         pnl_pct = ((exit_p - entry) / entry * 100.0) if entry > 0 else 0.0
         if direction in ("SHORT", "SELL"):
@@ -1253,7 +1265,7 @@ class TelegramBotDispatcher:
         except RuntimeError:
             try:
                 asyncio.run(self.send_trade_entry_alert(trade))
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.debug(f"Could not dispatch trade entry alert: {e}")
 
     def notify_trade_exit_sync(self, trade: dict[str, Any]) -> None:
@@ -1265,7 +1277,7 @@ class TelegramBotDispatcher:
         except RuntimeError:
             try:
                 asyncio.run(self.send_trade_exit_alert(trade))
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.debug(f"Could not dispatch trade exit alert: {e}")
 
     async def send_market_update(self, data: dict[str, Any]) -> bool:
@@ -1526,7 +1538,7 @@ class TelegramBotDispatcher:
                 f"Asian Session & Global Macro Radar • BD Time [UTC+6]"
             )
             return briefing
-        except Exception:  # noqa: BLE001 — defensive fallback
+        except Exception:
             return "Global markets steady. Risk limits active."
 
     async def generate_midday_pulse_text(self) -> str:
@@ -1559,7 +1571,7 @@ class TelegramBotDispatcher:
                 f"Institutional Midday Radar • BD Time [UTC+6]"
             )
             return pulse
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.error(f"Error generating midday pulse: {e}")
             return "Midday market active. Risk gates fully operational."
 
@@ -1597,7 +1609,7 @@ class TelegramBotDispatcher:
                 f"New York Inflow Sentinel • BD Time [UTC+6]"
             )
             return watch
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.error(f"Error generating US session watch: {e}")
             return "US Session open. Gating mechanisms armed."
 
@@ -1607,7 +1619,7 @@ class TelegramBotDispatcher:
             from core.daily_learning_reporter import daily_learning_reporter
 
             return daily_learning_reporter.generate_what_ai_learned_today_report()
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.error(f"Error generating what AI learned today: {e}")
             return "Nightly AI learning synthesis completed. Knowledge ledger synchronized."
 
@@ -1615,7 +1627,7 @@ class TelegramBotDispatcher:
         """Generates daily evening performance & loss autopsy summary."""
         try:
             return self.state_mind.get_latest_autopsy()
-        except Exception:  # noqa: BLE001 — defensive fallback
+        except Exception:
             return "Daily desk closed. All risk limits preserved."
 
     # ==============================================================================
@@ -1630,7 +1642,7 @@ class TelegramBotDispatcher:
             from core.data_streamer import data_streamer
 
             price = await data_streamer.get_live_ticker(symbol)
-        except Exception:  # noqa: BLE001 — defensive fallback
+        except Exception:
             price = data_streamer._last_known_prices.get(
                 symbol, 79000.0 if "BTC" in symbol else 2500.0
             )
@@ -1693,7 +1705,7 @@ class TelegramBotDispatcher:
 
             dxy = macro.dxy_price
             gri = macro.global_risk_index
-        except Exception:  # noqa: BLE001 — defensive fallback
+        except Exception:
             from core.data_streamer import data_streamer
 
             btc = data_streamer._last_known_prices.get("BTC/USDT", 79000.0)
@@ -1726,7 +1738,7 @@ class TelegramBotDispatcher:
             from core.data_streamer import data_streamer
 
             cur_price = await data_streamer.get_live_ticker(symbol)
-        except Exception:  # noqa: BLE001 — defensive fallback
+        except Exception:
             from core.data_streamer import data_streamer
 
             cur_price = data_streamer._last_known_prices.get(
@@ -1772,7 +1784,7 @@ class TelegramBotDispatcher:
                     "size_mult": 0.50 if is_active else 1.0,
                     "trading_lockout": state.trading_lockout,
                 }
-        except Exception:  # noqa: BLE001, S110 — best-effort fallback, never raise
+        except Exception:
             pass
 
         return {
@@ -1851,7 +1863,7 @@ class TelegramBotDispatcher:
                         return await resp2.read()
                     logger.error(f"Telegram file download returned {resp2.status}")
                     return None
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.error(f"Failed downloading file from Telegram: {e}")
             return None
 
@@ -2117,7 +2129,7 @@ class TelegramBotDispatcher:
                 )
                 wiki_card = self._format_wikipedia_telegram_card(wiki_article)
                 await self.send_message(wiki_card, chat_id=chat_id)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.warning(f"PDF Research Wikipedia entry creation failed: {e}")
             res = await universal_ingestor.ingest(
                 content=text_content,
@@ -2175,7 +2187,7 @@ class TelegramBotDispatcher:
                 )
                 wiki_card = self._format_wikipedia_telegram_card(wiki_article)
                 await self.send_message(wiki_card, chat_id=chat_id)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.error(f"Error in research_wikipedia_engine Telegram ingest: {e}")
 
             # Also pass to universal_ingestor for potential trading candidate extraction
@@ -2190,7 +2202,7 @@ class TelegramBotDispatcher:
                 if res.get("strategy_candidates"):
                     reply = self._format_research_summary_telegram(res)
                     await self.send_message(reply, chat_id=chat_id)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.warning(f"Universal ingestor secondary pass skipped/failed: {e}")
 
             return {
@@ -2243,7 +2255,9 @@ class TelegramBotDispatcher:
             from core.portfolio_shadow import portfolio_shadow
 
             open_pos = portfolio_shadow.get_open_positions()
-            target = next((p for p in open_pos if p["position_id"] == pos_id or p["symbol"] == pos_id), None)
+            target = next(
+                (p for p in open_pos if p["position_id"] == pos_id or p["symbol"] == pos_id), None
+            )
             if target:
                 portfolio_shadow.update_stop_loss(target["position_id"], target["entry_price"])
                 telegram_audit.log_callback_action(
@@ -2251,7 +2265,10 @@ class TelegramBotDispatcher:
                     "MOVE_TO_BE_1CLICK",
                     target["position_id"],
                     "EXECUTED",
-                    details={"position_id": target["position_id"], "entry_price": target["entry_price"]},
+                    details={
+                        "position_id": target["position_id"],
+                        "entry_price": target["entry_price"],
+                    },
                 )
                 be_msg = (
                     f"🛡️ **BREAKEVEN SHIELD APPLIED**\n"
@@ -2395,7 +2412,11 @@ class TelegramBotDispatcher:
             close_text = self.state_mind.close_position_by_symbol(pos_id or sym)
             callback_router.invalidate_token(token_id)
             telegram_audit.log_callback_action(
-                identity, "CLOSE_POSITION", token_id, "EXECUTED", details={"symbol": sym, "position_id": pos_id}
+                identity,
+                "CLOSE_POSITION",
+                token_id,
+                "EXECUTED",
+                details={"symbol": sym, "position_id": pos_id},
             )
             await self.send_message(close_text, chat_id=chat_id)
             await self.answer_callback_query(cb_id, "Position closed.")
@@ -2554,7 +2575,7 @@ class TelegramBotDispatcher:
                         identity, typed_cmd.name, args, execution_result="EXECUTED"
                     )
                     return {"status": "EXECUTED", "command": cmd, "response": response_text}
-                except Exception as e:  # noqa: BLE001 — defensive fallback
+                except Exception as e:
                     logger.error(f"Error handling typed command '{cmd}': {e}")
                     telegram_audit.log_command_execution(
                         identity, typed_cmd.name, args, execution_result="ERROR", error=str(e)
@@ -2578,7 +2599,7 @@ class TelegramBotDispatcher:
                         identity, cmd, args, execution_result="EXECUTED"
                     )
                     return {"status": "EXECUTED", "command": cmd, "response": response_text}
-                except Exception as e:  # noqa: BLE001 — defensive fallback
+                except Exception as e:
                     logger.error(f"Error handling Telegram command '{cmd}': {e}")
                     telegram_audit.log_command_execution(
                         identity, cmd, args, execution_result="ERROR", error=str(e)
@@ -2588,7 +2609,18 @@ class TelegramBotDispatcher:
             # Check if command is an asset/symbol query (e.g. /XAU 15m, /BTC, /ETH 1h, /SOL 15m)
             raw_sym = cmd.lstrip("/").upper()
             known_assets = {
-                "XAU", "GOLD", "PAXG", "BTC", "BITCOIN", "ETH", "ETHEREUM", "SOL", "SOLANA", "BNB", "AVAX", "DOGE"
+                "XAU",
+                "GOLD",
+                "PAXG",
+                "BTC",
+                "BITCOIN",
+                "ETH",
+                "ETHEREUM",
+                "SOL",
+                "SOLANA",
+                "BNB",
+                "AVAX",
+                "DOGE",
             }
             if raw_sym in known_assets or raw_sym.endswith("USDT") or raw_sym.endswith("USD"):
                 asset_prompt = f"{raw_sym} {' '.join(args)} trading plan".strip()
@@ -2601,10 +2633,13 @@ class TelegramBotDispatcher:
                     ):
                         await self.send_message(ai_reply)
                     telegram_audit.log_command_execution(
-                        identity, f"ASSET_COMMAND_{raw_sym}", " ".join(args), execution_result="EXECUTED"
+                        identity,
+                        f"ASSET_COMMAND_{raw_sym}",
+                        " ".join(args),
+                        execution_result="EXECUTED",
                     )
                     return {"status": "EXECUTED", "command": cmd, "response": ai_reply}
-                except Exception as e:  # noqa: BLE001 — defensive fallback
+                except Exception as e:
                     logger.error(f"Error handling asset command '{cmd}': {e}")
 
             # Intelligent natural language fallback: if user typed a question with a leading slash
@@ -2622,7 +2657,7 @@ class TelegramBotDispatcher:
                         identity, "SLASH_NL_FALLBACK", clean_query, execution_result="EXECUTED"
                     )
                     return {"status": "EXECUTED", "command": cmd, "response": ai_reply}
-                except Exception as e:  # noqa: BLE001 — defensive fallback
+                except Exception as e:
                     logger.debug(f"Conversational fallback for '{cmd}' failed: {e}")
 
             default_reply = (
@@ -2635,14 +2670,16 @@ class TelegramBotDispatcher:
 
         # 6. Natural Language Conversational AI Query
         try:
-            ai_reply = await self.state_mind.handle_conversational_query(text, chat_id=chat_id, identity=identity)
+            ai_reply = await self.state_mind.handle_conversational_query(
+                text, chat_id=chat_id, identity=identity
+            )
             if ai_reply and (not self.chat_id or str(chat_id) == str(self.chat_id) or not chat_id):
                 await self.send_message(ai_reply)
             telegram_audit.log_command_execution(
                 identity, "NATURAL_LANGUAGE", text, execution_result="AI_CONVERSATION_EXECUTED"
             )
             return {"status": "AI_CONVERSATION_EXECUTED", "query": text, "response": ai_reply}
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.error(f"Error processing conversational query: {e}")
             return {"status": "ERROR", "error": str(e)}
 
@@ -2664,7 +2701,7 @@ class TelegramBotDispatcher:
             import fcntl
 
             lock_path = "/tmp/cbt_telegram_polling_supervisor.lock"
-            lock_fd = open(lock_path, "w")  # noqa: SIM115
+            lock_fd = open(lock_path, "w")
             fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:
             logger.info(
@@ -2674,7 +2711,7 @@ class TelegramBotDispatcher:
             if lock_fd is not None:
                 lock_fd.close()
             return
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass
 
         self._is_polling = True
@@ -2725,7 +2762,7 @@ class TelegramBotDispatcher:
                             await asyncio.sleep(10)
             except asyncio.CancelledError:
                 break
-            except Exception as e:  # noqa: BLE001 — defensive fallback
+            except Exception as e:
                 logger.error(f"Error in Telegram polling loop: {e}")
                 await asyncio.sleep(10)
 

@@ -53,14 +53,14 @@ def clean_vault_db():
         for env in ("TESTNET", "PRODUCTION"):
             try:
                 credential_vault.revoke_credential(exch, env)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 _ = exc
     yield
     for exch in ("BINANCE", "BYBIT"):
         for env in ("TESTNET", "PRODUCTION"):
             try:
                 credential_vault.revoke_credential(exch, env)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 _ = exc
 
 
@@ -167,7 +167,6 @@ class TestPermissionNormalization:
         prod_profile = normalize_binance_permissions(testnet_account_raw, environment="PRODUCTION")
         assert prod_profile.withdrawal is True
         assert prod_profile.is_strictly_safe_for_trading()[0] is False
-
 
     def test_bybit_positive_withdrawal_disabled_proof(self):
         """Bybit must provide positive proof that Wallet permissions do not contain Withdraw."""

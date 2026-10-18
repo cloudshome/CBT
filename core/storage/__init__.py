@@ -16,4 +16,3 @@ __all__ = [
     "HeavySyncReport",
     "heavy_data_sync_manager",
 ]
-

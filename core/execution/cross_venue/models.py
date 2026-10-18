@@ -17,7 +17,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 
-class VenueType(str, enum.Enum):
+class VenueType(enum.StrEnum):
     """Classification of execution venues across centralized and decentralized finance."""
 
     CEX_SPOT = "CEX_SPOT"
@@ -26,7 +26,7 @@ class VenueType(str, enum.Enum):
     CROSS_CHAIN_SOLVER = "CROSS_CHAIN_SOLVER"
 
 
-class ArbitrageType(str, enum.Enum):
+class ArbitrageType(enum.StrEnum):
     """Topology classification of cross-venue arbitrage paths."""
 
     SPATIAL_TWO_WAY = "SPATIAL_TWO_WAY"

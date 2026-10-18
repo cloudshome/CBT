@@ -174,9 +174,7 @@ def test_root_mcp_tradestate_roundtrip(env):
         assert gate["allowed"] is False
         assert any("trader state" in b for b in gate["blocked_by"])
 
-        resp = client.send(
-            "tools/call", {"name": "tradestate", "arguments": {"action": "clear"}}
-        )
+        resp = client.send("tools/call", {"name": "tradestate", "arguments": {"action": "clear"}})
         state = json.loads(resp["result"]["content"][0]["text"])
         assert state["any"] is False
     finally:
@@ -211,7 +209,7 @@ def test_root_mcp_channels_tool(env):
         data = json.loads(resp["result"]["content"][0]["text"])
         assert "channels" in data
         assert set(data["channels"].keys()) == {"cryptodada", "discord", "news", "llm"}
-        for name, ch in data["channels"].items():
+        for _name, ch in data["channels"].items():
             assert "active" in ch
             assert "status" in ch
             assert "backends" in ch
@@ -267,9 +265,7 @@ def test_root_mcp_hidden_analytics_mae_tool(env):
     try:
         client.send("initialize")
         # No args — should use defaults and return gracefully
-        resp = client.send(
-            "tools/call", {"name": "hidden_analytics_mae", "arguments": {}}
-        )
+        resp = client.send("tools/call", {"name": "hidden_analytics_mae", "arguments": {}})
         data = json.loads(resp["result"]["content"][0]["text"])
         # mae_mfe_summary returns a dict; in an empty DB it has note/available
         assert "available" in data or "note" in data or "rows" in data
@@ -375,8 +371,7 @@ def test_root_mcp_deny_list_still_enforced(env):
             "transfer",
         ):
             assert forbidden not in tool_names, (
-                f"forbidden tool {forbidden!r} appears in tools/list — "
-                f"permission map regression"
+                f"forbidden tool {forbidden!r} appears in tools/list — permission map regression"
             )
         # And direct calls must be rejected
         for forbidden in ("place_order", "approve", "execute", "withdraw"):

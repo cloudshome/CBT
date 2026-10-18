@@ -29,7 +29,15 @@ class ForexDepartmentService:
         st: ForexSessionStatus = self.session_clock.get_status(now_utc)
         return {
             "utc_time": now_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),
-            "day_of_week": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][st.day_of_week],
+            "day_of_week": [
+                "Monday",
+                "Tuesday",
+                "Wednesday",
+                "Thursday",
+                "Friday",
+                "Saturday",
+                "Sunday",
+            ][st.day_of_week],
             "is_market_open": st.is_market_open,
             "active_sessions": [s.value for s in st.active_sessions],
             "is_killzone_active": st.is_killzone_active,

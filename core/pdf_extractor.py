@@ -233,7 +233,7 @@ class PDFBookExtractor:
                 res = self.vision_transcriber_override(image_bytes, mime_type)
                 if res:
                     return str(res).strip(), "VISION_OVERRIDE"
-            except Exception as e:  # noqa: BLE001 — defensive fallback
+            except Exception as e:
                 logger.warning(f"Vision transcriber override failed: {e}")
 
         if not image_bytes:
@@ -259,7 +259,7 @@ class PDFBookExtractor:
                 text = (response.text or "").strip()
                 if text:
                     return text, "GEMINI_VISION"
-            except Exception as e:  # noqa: BLE001 — defensive fallback
+            except Exception as e:
                 logger.warning(f"Gemini Vision OCR extraction failed: {e}")
 
         return "", "OFFLINE_FALLBACK"
@@ -384,7 +384,7 @@ class PDFBookExtractor:
                             page_num = 1
                             try:
                                 page_num = reader.get_destination_page_number(it) + 1
-                            except Exception:  # noqa: S110,BLE001 — defensive fallback
+                            except Exception:
                                 pass
                             toc_items.append(
                                 {
@@ -394,7 +394,7 @@ class PDFBookExtractor:
                             )
 
                 _traverse(outline)
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.debug(f"Could not extract outline TOC: {e}")
 
         return toc_items
@@ -418,7 +418,7 @@ class PDFBookExtractor:
 
         try:
             reader = pypdf.PdfReader(str(file_path))
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.error(f"pypdf reader failed for {file_path}: {e}")
             return {"error": f"Corrupted or invalid PDF: {e}", "success": False}
 
@@ -432,7 +432,7 @@ class PDFBookExtractor:
             try:
                 t = reader.pages[i].extract_text() or ""
                 front_matter_texts.append(t)
-            except Exception:  # noqa: S110,BLE001 — defensive fallback
+            except Exception:
                 pass
         raw_front_matter = "\n".join(front_matter_texts)
 
@@ -464,7 +464,7 @@ class PDFBookExtractor:
             page_obj = reader.pages[page_idx]
             try:
                 page_text = page_obj.extract_text() or ""
-            except Exception as e:  # noqa: BLE001 — defensive fallback
+            except Exception as e:
                 logger.debug(f"Error extracting page {page_num}: {e}")
                 page_text = ""
 
@@ -492,7 +492,7 @@ class PDFBookExtractor:
                                 page_is_ocr = True
                                 ocr_pages_recovered += 1
                                 ocr_provider_used = prov
-                    except Exception as img_err:  # noqa: BLE001 — defensive fallback
+                    except Exception as img_err:
                         logger.debug(
                             f"Could not extract scanned image from page {page_num}: {img_err}"
                         )

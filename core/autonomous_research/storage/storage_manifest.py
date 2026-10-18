@@ -452,7 +452,7 @@ class StorageManifest:
         if "metadata_json" in row.keys() and row["metadata_json"]:
             try:
                 metadata = json.loads(row["metadata_json"])
-            except Exception:  # noqa: BLE001
+            except Exception:
                 metadata = {}
 
         return ArchiveManifestRecord(

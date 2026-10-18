@@ -40,9 +40,7 @@ def _payload(
     headlines: list[str] | None = None,
     fng: float = 72,
 ) -> dict:
-    headlines = (
-        headlines if headlines is not None else ["bullish", "bullish", "neutral"]
-    )
+    headlines = headlines if headlines is not None else ["bullish", "bullish", "neutral"]
     return {
         "signal": {"action": action, "confidence": confidence},
         "snapshot": {
@@ -231,7 +229,9 @@ def test_colour_deepens_with_intensity():
     assert bright_red.startswith("hsl(0,")
     import re
 
-    light = lambda c: int(re.search(r",(\d+)%\)", c).group(1))
+    def light(c):
+        return int(re.search(r",(\d+)%\)", c).group(1))
+
     assert light(deep_green) < light(bright_green)
     assert light(deep_red) < light(bright_red)
 

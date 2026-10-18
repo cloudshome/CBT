@@ -43,9 +43,7 @@ def _seed_scan(db: SignalDB, sig_id: str = "SIG-P1") -> int:
                 "risk_reward": 1.0,
                 "confidence": 70,
             },
-            "plans": [
-                {"type": "Buy Pullback", "entry": 100.0, "stop": 99.0, "tps": [101.0]}
-            ],
+            "plans": [{"type": "Buy Pullback", "entry": 100.0, "stop": 99.0, "tps": [101.0]}],
             "snapshot": {"features": {}},
         }
     )
@@ -337,9 +335,7 @@ def test_simulator_and_research_debt_do_not_hold(client, monkeypatch):
 
 
 def _cli_args(scan_id, **kw):
-    base = dict(
-        scan_id=scan_id, note="", force=False, acknowledge_journal=False, json=False
-    )
+    base = dict(scan_id=scan_id, note="", force=False, acknowledge_journal=False, json=False)
     base.update(kw)
     return SimpleNamespace(**base)
 

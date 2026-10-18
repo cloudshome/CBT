@@ -54,16 +54,12 @@ def _health(*, mode="live", ages=None, cross=True):
             "exchanges": {
                 "kucoin": {
                     "ok": True,
-                    "symbols": {
-                        symbol: {"deviation_pct": 0.1, "flag": False}
-                        for symbol in probes
-                    },
+                    "symbols": {symbol: {"deviation_pct": 0.1, "flag": False} for symbol in probes},
                 },
                 "okx": {
                     "ok": True,
                     "symbols": {
-                        symbol: {"deviation_pct": -0.1, "flag": False}
-                        for symbol in probes
+                        symbol: {"deviation_pct": -0.1, "flag": False} for symbol in probes
                     },
                 },
             },
@@ -107,9 +103,7 @@ def test_demo_requires_explicit_rehearsal_flag(safe_config):
     assert strict["ready"] is False
     assert _row(strict, "data_mode")["status"] == FAIL
 
-    rehearsal = preflight_report(
-        health=_health(mode="demo", cross=False), allow_demo=True
-    )
+    rehearsal = preflight_report(health=_health(mode="demo", cross=False), allow_demo=True)
     assert rehearsal["ready"] is True
     assert rehearsal["profile"] == "paper-rehearsal"
     assert _row(rehearsal, "data_mode")["status"] == WARN

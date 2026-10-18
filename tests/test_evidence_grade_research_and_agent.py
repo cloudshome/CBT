@@ -22,16 +22,46 @@ from core.telegram.rbac import TelegramRole, TelegramUserIdentity
 
 def test_source_type_detection():
     """Confirms deterministic source classification for 10+ URL patterns."""
-    assert universal_ingestor.detect_source_type("https://www.facebook.com/share/v/1EkkpUZaDe/") == SourceType.FACEBOOK_VIDEO
-    assert universal_ingestor.detect_source_type("https://www.facebook.com/reel/123456789") == SourceType.FACEBOOK_REEL
-    assert universal_ingestor.detect_source_type("https://www.instagram.com/reel/C8xyz/") == SourceType.INSTAGRAM_REEL
-    assert universal_ingestor.detect_source_type("https://www.youtube.com/watch?v=dQw4w9WgXcQ") == SourceType.YOUTUBE_VIDEO
-    assert universal_ingestor.detect_source_type("https://youtu.be/dQw4w9WgXcQ") == SourceType.YOUTUBE_VIDEO
-    assert universal_ingestor.detect_source_type("https://arxiv.org/abs/2301.00001") == SourceType.ARXIV
-    assert universal_ingestor.detect_source_type("https://github.com/Azimshawon/SKY") == SourceType.GITHUB
-    assert universal_ingestor.detect_source_type("https://www.tradingview.com/chart/BTCUSDT/") == SourceType.TRADINGVIEW
-    assert universal_ingestor.detect_source_type("https://sec.gov/edgar/data/12345") == SourceType.SEC_DOCUMENT
-    assert universal_ingestor.detect_source_type("https://coindesk.com/markets/2026/01/01/btc-news") == SourceType.NEWS
+    assert (
+        universal_ingestor.detect_source_type("https://www.facebook.com/share/v/1EkkpUZaDe/")
+        == SourceType.FACEBOOK_VIDEO
+    )
+    assert (
+        universal_ingestor.detect_source_type("https://www.facebook.com/reel/123456789")
+        == SourceType.FACEBOOK_REEL
+    )
+    assert (
+        universal_ingestor.detect_source_type("https://www.instagram.com/reel/C8xyz/")
+        == SourceType.INSTAGRAM_REEL
+    )
+    assert (
+        universal_ingestor.detect_source_type("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+        == SourceType.YOUTUBE_VIDEO
+    )
+    assert (
+        universal_ingestor.detect_source_type("https://youtu.be/dQw4w9WgXcQ")
+        == SourceType.YOUTUBE_VIDEO
+    )
+    assert (
+        universal_ingestor.detect_source_type("https://arxiv.org/abs/2301.00001")
+        == SourceType.ARXIV
+    )
+    assert (
+        universal_ingestor.detect_source_type("https://github.com/Azimshawon/SKY")
+        == SourceType.GITHUB
+    )
+    assert (
+        universal_ingestor.detect_source_type("https://www.tradingview.com/chart/BTCUSDT/")
+        == SourceType.TRADINGVIEW
+    )
+    assert (
+        universal_ingestor.detect_source_type("https://sec.gov/edgar/data/12345")
+        == SourceType.SEC_DOCUMENT
+    )
+    assert (
+        universal_ingestor.detect_source_type("https://coindesk.com/markets/2026/01/01/btc-news")
+        == SourceType.NEWS
+    )
 
 
 def test_link_persistence_invariant_facebook_url():
@@ -81,7 +111,11 @@ def test_link_persistence_invariant_broken_or_404():
     assert res.source is not None
     assert res.source.original_url == broken_url
     assert res.source.extraction_status == ExtractionStatus.FAILED.value
-    assert "404" in res.source.failure_reason or "unreachable" in res.source.failure_reason.lower() or "error" in res.source.failure_reason.lower()
+    assert (
+        "404" in res.source.failure_reason
+        or "unreachable" in res.source.failure_reason.lower()
+        or "error" in res.source.failure_reason.lower()
+    )
 
     # Even on complete HTTP failure, Wiki placeholder exists
     assert res.wiki_article is not None
@@ -90,7 +124,11 @@ def test_link_persistence_invariant_broken_or_404():
             "SELECT * FROM research_sources WHERE source_id = ?;", (res.source.source_id,)
         ).fetchone()
         assert src_row is not None
-        assert src_row["access_status"] in (AccessStatus.PARTIAL.value, AccessStatus.ACCESS_BLOCKED.value, AccessStatus.FAILED.value)
+        assert src_row["access_status"] in (
+            AccessStatus.PARTIAL.value,
+            AccessStatus.ACCESS_BLOCKED.value,
+            AccessStatus.FAILED.value,
+        )
 
 
 def test_source_idempotency_and_no_duplication():
@@ -111,14 +149,16 @@ def test_source_idempotency_and_no_duplication():
 @pytest.mark.asyncio
 async def test_telegram_wiki_handler_link_guarantee():
     """Verifies Telegram /wiki <url> returns the Source ID badge, Wiki summary, and RealLifeSummary."""
-    test_identity = TelegramUserIdentity(user_id=123456, chat_id=999, username="quant_architect", role=TelegramRole.SUPER_ADMIN)
+    test_identity = TelegramUserIdentity(
+        user_id=123456, chat_id=999, username="quant_architect", role=TelegramRole.SUPER_ADMIN
+    )
     test_url = "https://www.facebook.com/share/v/1EkkpUZaDe/"
 
     with patch("core.telegram_bot.telegram_bot.send_message", new_callable=AsyncMock):
         reply = await handle_wiki(args=test_url, chat_id=999, identity=test_identity)
         assert "Source:" in reply
         assert "src_" in reply
-        assert ("PARTIAL" in reply or "SUCCESS" in reply or "ACCESS BLOCKED" in reply)
+        assert "PARTIAL" in reply or "SUCCESS" in reply or "ACCESS BLOCKED" in reply
         assert "বাস্তব জীবনের সারসংক্ষেপ" in reply
         assert "সহজ বাংলায় মূল কথা" in reply
 
@@ -186,8 +226,14 @@ def test_phase3_audio_extraction_and_transcription_pipeline(tmp_path):
         provider="GEMINI_CLOUD",
     )
 
-    with patch("core.knowledge_os.transcription.social_video_extractor.extract_audio", return_value=(True, fake_audio_file, mock_meta)):
-        with patch("core.knowledge_os.transcription.gemini_audio_provider.transcribe_audio", return_value=mock_transcript):
+    with patch(
+        "core.knowledge_os.transcription.social_video_extractor.extract_audio",
+        return_value=(True, fake_audio_file, mock_meta),
+    ):
+        with patch(
+            "core.knowledge_os.transcription.gemini_audio_provider.transcribe_audio",
+            return_value=mock_transcript,
+        ):
             test_url = "https://www.facebook.com/watch/?v=9876543210"
             res = universal_ingestor.ingest_url(test_url)
 
@@ -200,7 +246,8 @@ def test_phase3_audio_extraction_and_transcription_pipeline(tmp_path):
             # Verify both AUDIO and TRANSCRIPT artifacts exist
             with universal_ingestor._get_connection() as conn:
                 types = [
-                    r[0] for r in conn.execute(
+                    r[0]
+                    for r in conn.execute(
                         "SELECT artifact_type FROM research_artifacts WHERE source_id = ?;",
                         (res.source.source_id,),
                     ).fetchall()
@@ -296,7 +343,9 @@ async def test_agent_planner_intent_resolution_and_bengali_routing():
     assert d3.tool_name == "get_ai_learned_today"
 
     # 4. Ingest Link
-    d4 = telegram_agent_planner.resolve_intent("এই লিংকটা রিসার্চ ল্যাবে রাখো https://arxiv.org/abs/1706.03762", user_id=999)
+    d4 = telegram_agent_planner.resolve_intent(
+        "এই লিংকটা রিসার্চ ল্যাবে রাখো https://arxiv.org/abs/1706.03762", user_id=999
+    )
     assert d4.intent == "INGEST_URL"
     assert d4.tool_name == "ingest_research_url"
 
@@ -467,7 +516,13 @@ def test_evidence_timeline_generation_and_narrative_drift():
     timeline = evidence_timeline_engine.build_timeline(topic="CPI", limit=20)
     assert timeline is not None
     assert timeline.total_events >= 1
-    assert timeline.narrative_trend in ("STABLE_CONSENSUS", "SHIFTING_BULLISH", "SHIFTING_BEARISH", "HIGHLY_CONTESTED", "INSUFFICIENT_DATA")
+    assert timeline.narrative_trend in (
+        "STABLE_CONSENSUS",
+        "SHIFTING_BULLISH",
+        "SHIFTING_BEARISH",
+        "HIGHLY_CONTESTED",
+        "INSUFFICIENT_DATA",
+    )
 
     # Verify Markdown export
     md = timeline.to_markdown()
@@ -584,7 +639,9 @@ async def test_telegram_agent_routing_for_theses_timeline_graph():
     assert "EVIDENCE TIMELINE" in resp2
 
     # 3. Knowledge Graph in Bengali
-    d3 = telegram_agent_planner.resolve_intent("বিটকয়েনের সাথে কিসের সম্পর্ক? নলেজ গ্রাফ দেখাও", user_id=777)
+    d3 = telegram_agent_planner.resolve_intent(
+        "বিটকয়েনের সাথে কিসের সম্পর্ক? নলেজ গ্রাফ দেখাও", user_id=777
+    )
     assert d3.intent == "QUERY_GRAPH"
     assert d3.tool_name == "query_knowledge_graph"
     resp3 = await telegram_agent_planner.handle_user_message("বিটকয়েনের গ্রাফ দেখাও", 777, identity)
@@ -689,7 +746,11 @@ def test_backtest_queue_bidirectional_feedback():
             "SELECT verification_status, confidence_score FROM research_claims WHERE claim_id = ?;",
             (cid,),
         ).fetchone()
-        assert claim_after["verification_status"] in ("EMPIRICALLY_SUPPORTED", "CONTRADICTED", "REFUTED")
+        assert claim_after["verification_status"] in (
+            "EMPIRICALLY_SUPPORTED",
+            "CONTRADICTED",
+            "REFUTED",
+        )
 
         ev_row = conn.execute(
             "SELECT * FROM research_evidence WHERE claim_id = ?;", (cid,)
@@ -744,7 +805,9 @@ async def test_telegram_agent_routing_for_strategy_and_backtest():
         )
         conn.commit()
 
-    resp1 = await telegram_agent_planner.handle_user_message("এই ক্লেইম থেকে স্ট্র্যাটেজি বানাও C-05", 777, identity)
+    resp1 = await telegram_agent_planner.handle_user_message(
+        "এই ক্লেইম থেকে স্ট্র্যাটেজি বানাও C-05", 777, identity
+    )
     assert "SYNTHESIZED STRATEGY CANDIDATE" in resp1
 
     # 2. Backtest Intent
@@ -757,7 +820,9 @@ async def test_telegram_agent_routing_for_strategy_and_backtest():
     assert d2.tool_name == "run_candidate_backtest"
     assert d2.tool_args["candidate_id"] == cand_id
 
-    resp2 = await telegram_agent_planner.handle_user_message(f"এই ক্যান্ডিডেট ব্যাকটেস্ট করো {cand_id}", 777, identity)
+    resp2 = await telegram_agent_planner.handle_user_message(
+        f"এই ক্যান্ডিডেট ব্যাকটেস্ট করো {cand_id}", 777, identity
+    )
     assert "WALK-FORWARD STRATEGY VALIDATION REPORT" in resp2
 
 
@@ -814,10 +879,7 @@ async def test_telegram_agent_routing_for_project_rag():
     assert "CURRENT MARKET VITALS" in resp
 
     # 2. Conversational grounded answer via QuantMentor
-    resp_mentor = await telegram_agent_planner.handle_user_message("আমাদের রিসার্চে কী আছে?", 777, identity)
+    resp_mentor = await telegram_agent_planner.handle_user_message(
+        "আমাদের রিসার্চে কী আছে?", 777, identity
+    )
     assert "CBT INSTITUTIONAL GROUNDED RESEARCH DOSSIER" in resp_mentor or "রিসার্চ" in resp_mentor
-
-
-
-
-

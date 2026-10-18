@@ -20,7 +20,7 @@ import os
 import sqlite3
 import time
 from dataclasses import asdict, dataclass
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -52,7 +52,7 @@ from core.intelligence.validation_result import (
 logger = logging.getLogger("ai_quant_sentinel.intelligence.crawler.replay_autopsy_bridge")
 
 
-class QuarantineLevel(str, Enum):
+class QuarantineLevel(StrEnum):
     """Graduated quarantine escalation ladder for failed causal mechanisms."""
 
     NO_QUARANTINE = "NO_QUARANTINE"  # 0 or 1 failure: normal discovery permitted

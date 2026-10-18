@@ -18,3 +18,4 @@ echo  All systems active!
 echo  Open your browser at: http://localhost:5173
 echo ============================================================
 pause
+

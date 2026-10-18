@@ -136,7 +136,7 @@ class ConservativeKellyAllocator:
         max_notional_by_budget = account_equity * self.max_notional_pct
         effective_notional_ceiling = min(max_notional_by_leverage, max_notional_by_budget)
         max_units_allowed = effective_notional_ceiling / (entry_price + 1e-5)
-        
+
         position_units = min(position_units, max_units_allowed)
         notional_usd = position_units * entry_price
         effective_lev = notional_usd / account_equity if account_equity > 0 else 1.0

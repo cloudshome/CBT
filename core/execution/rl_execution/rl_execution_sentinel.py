@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 from core.execution.rl_execution.execution_environment import (
     MicrostructureExecutionState,
@@ -38,7 +38,7 @@ from core.execution.rl_execution.ppo_execution_policy import (
 logger = logging.getLogger("ai_quant_sentinel.rl_execution.sentinel")
 
 
-class ExecutionStrategyMode(str, Enum):
+class ExecutionStrategyMode(StrEnum):
     PPO_REINFORCEMENT_LEARNING = "PPO_REINFORCEMENT_LEARNING"
     ALMGREN_CHRISS_FALLBACK = "ALMGREN_CHRISS_FALLBACK"
     TOXICITY_HALT_DEFENSE = "TOXICITY_HALT_DEFENSE"

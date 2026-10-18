@@ -44,6 +44,9 @@ export interface IMarketDataProvider {
   ): Unsubscribe;
   getConnectionState(): WSConnectionState;
   onConnectionStateChange(callback: (state: WSConnectionState, attempt: number) => void): Unsubscribe;
+  getLastLatency(): number;
+  getLastMessageTime(): number;
+  onLatencyChange(callback: (latencyMs: number) => void): Unsubscribe;
 }
 
 /**
@@ -55,6 +58,8 @@ export class BinanceMarketDataProvider implements IMarketDataProvider {
   private depthSubscribers = new Set<(depth: OrderBookDepth) => void>();
   private tickerSubscribers = new Set<(ticker: TickerData) => void>();
   private stateListeners = new Set<(state: WSConnectionState, attempt: number) => void>();
+  private latencyListeners = new Set<(latencyMs: number) => void>();
+  private lastLatencyMs: number = 0;
 
   private activeSymbol = '';
   private activeTimeframe = '';
@@ -118,6 +123,22 @@ export class BinanceMarketDataProvider implements IMarketDataProvider {
     };
   }
 
+  getLastLatency(): number {
+    return this.lastLatencyMs;
+  }
+
+  getLastMessageTime(): number {
+    return this.stateMachine ? this.stateMachine.getLastMessageTime() : 0;
+  }
+
+  onLatencyChange(callback: (latencyMs: number) => void): Unsubscribe {
+    this.latencyListeners.add(callback);
+    callback(this.lastLatencyMs);
+    return () => {
+      this.latencyListeners.delete(callback);
+    };
+  }
+
   private buildStreamUrl(cleanSymbol: string, binanceTF: string): string {
     const isGold = cleanSymbol.includes('paxg') || cleanSymbol.includes('xau');
     const streamSymbol = isGold ? 'paxgusdt' : cleanSymbol;
@@ -161,6 +182,12 @@ export class BinanceMarketDataProvider implements IMarketDataProvider {
           const payload = JSON.parse(event.data);
           const data = payload.data;
           const stream = payload.stream as string;
+
+          if (data && data.E) {
+            const lat = Math.max(0, Date.now() - Number(data.E));
+            this.lastLatencyMs = lat;
+            this.latencyListeners.forEach((cb) => cb(lat));
+          }
 
           if (stream.includes('@kline')) {
             const k = data.k;

@@ -45,6 +45,13 @@ export const InstitutionalMasterTerminal: React.FC<InstitutionalMasterTerminalPr
     }
   }, [initialSymbol]);
 
+  // Synchronize internal timeframe state with parent initialTimeframe prop changes
+  useEffect(() => {
+    if (initialTimeframe && initialTimeframe !== timeframe) {
+      setTimeframe(initialTimeframe);
+    }
+  }, [initialTimeframe]);
+
   const handleSelectSymbol = (newSym: string) => {
     setSymbol(newSym);
     if (onSymbolChange) {

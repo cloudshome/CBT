@@ -12,16 +12,16 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class MBOSide(str, Enum):
+class MBOSide(StrEnum):
     BID = "BID"
     ASK = "ASK"
 
 
-class MBOAction(str, Enum):
+class MBOAction(StrEnum):
     ADD = "ADD"
     MODIFY = "MODIFY"
     CANCEL = "CANCEL"
@@ -29,7 +29,7 @@ class MBOAction(str, Enum):
     TRADE = "TRADE"
 
 
-class ToxicityRegime(str, Enum):
+class ToxicityRegime(StrEnum):
     LOW = "LOW"
     MODERATE = "MODERATE"
     ELEVATED = "ELEVATED"

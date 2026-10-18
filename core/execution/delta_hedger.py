@@ -33,7 +33,7 @@ import logging
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from core.database import db_manager
@@ -45,7 +45,7 @@ from core.portfolio_risk_matrix import portfolio_risk_matrix
 logger = logging.getLogger("sky.execution.delta_hedger")
 
 
-class DeltaToleranceTier(str, Enum):
+class DeltaToleranceTier(StrEnum):
     """3-tier classification of portfolio unhedged delta urgency."""
 
     NEUTRAL = "NEUTRAL"
@@ -53,7 +53,7 @@ class DeltaToleranceTier(str, Enum):
     ACTIVE_TAKER = "ACTIVE_TAKER"
 
 
-class HedgeState(str, Enum):
+class HedgeState(StrEnum):
     NEUTRAL = "NEUTRAL"
     BREACH_DETECTED = "BREACH_DETECTED"
     HEDGE_PROPOSED = "HEDGE_PROPOSED"
@@ -223,7 +223,7 @@ class DeltaHedger:
                     """
                 )
                 conn.commit()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug(f"Delta hedger schema notice: {exc}")
 
     def compute_net_delta(self, asset: str, legs: list[PositionDeltaLeg]) -> NetDeltaExposure:
@@ -549,7 +549,7 @@ class DeltaHedger:
                     ),
                 )
                 conn.commit()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug(f"Failed to record hedge event: {exc}")
 
     def _update_hedge_state(self, hedge_id: str, new_state: HedgeState, reasons: list[str]) -> None:
@@ -570,7 +570,7 @@ class DeltaHedger:
                     ),
                 )
                 conn.commit()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug(f"Failed to update hedge state: {exc}")
 
 

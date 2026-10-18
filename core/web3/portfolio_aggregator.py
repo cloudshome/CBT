@@ -116,7 +116,7 @@ class PortfolioAggregator:
                             if price > 0:
                                 self._price_cache[asset] = price
                     self._last_price_fetch_ms = now
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.debug(f"Public ticker fetch warning (using cached prices): {e}")
         finally:
             if own_session:
@@ -169,7 +169,7 @@ class PortfolioAggregator:
                             "quorum_status": tok_res.quorum_status.value,
                         }
                         tokens_usd += tok_usd
-                    except Exception as _e:  # noqa: BLE001
+                    except Exception as _e:
                         logger.debug("Failed to query token balance for %s: %s", t_sym, _e)
 
             total_usd = native_usd + tokens_usd

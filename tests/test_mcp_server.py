@@ -79,9 +79,7 @@ class RawMcpClient:
         self.proc.stdin.write(json.dumps(msg) + "\n")
         self.proc.stdin.flush()
         line = self.proc.stdout.readline()
-        assert line.strip(), (
-            "server closed stdout — stderr: " + self.proc.stderr.read()[-500:]
-        )
+        assert line.strip(), "server closed stdout — stderr: " + self.proc.stderr.read()[-500:]
         resp = json.loads(line)
         assert resp.get("id") == self._id, resp
         assert "error" not in resp, resp
@@ -169,9 +167,7 @@ def test_mcp_unknown_tool_returns_error(server_env):
     client = RawMcpClient(server_env)
     try:
         client.initialize()
-        result = client._send(
-            "tools/call", {"name": "cryptobrain_nope", "arguments": {}}
-        )
+        result = client._send("tools/call", {"name": "cryptobrain_nope", "arguments": {}})
         text = result["content"][0]["text"]
         assert "unknown tool" in json.loads(text)["error"]
     finally:
@@ -198,9 +194,7 @@ def test_mcp_server_starts_without_sdk(server_env):
     assert "pip install mcp" in proc.stderr
 
 
-@pytest.mark.skipif(
-    importlib.util.find_spec("mcp") is None, reason="mcp SDK not installed"
-)
+@pytest.mark.skipif(importlib.util.find_spec("mcp") is None, reason="mcp SDK not installed")
 def test_mcp_official_sdk_client(server_env):
     """The REAL MCP client test: official SDK over stdio."""
     import asyncio

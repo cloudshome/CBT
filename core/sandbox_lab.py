@@ -253,11 +253,7 @@ class SandboxLab:
         # Note: ret_arr contains per-trade returns, not daily returns.
         # Computing unannualized per-trade Sharpe / return-to-volatility ratio
         # to avoid severe statistical overinflation.
-        sr = (
-            float(np.mean(ret_arr) / (np.std(ret_arr) + 1e-6))
-            if len(ret_arr) > 1
-            else 0.0
-        )
+        sr = float(np.mean(ret_arr) / (np.std(ret_arr) + 1e-6)) if len(ret_arr) > 1 else 0.0
 
         return BacktestReport(
             symbol=symbol,

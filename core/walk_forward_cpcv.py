@@ -82,13 +82,13 @@ class DynamicEmbargoCalibrator:
         """
         n = len(returns)
         if n < 30:
-            return max(3, int(math.ceil(average_holding_bars)))
+            return max(3, math.ceil(average_holding_bars))
 
         bartlett_threshold = 1.96 / math.sqrt(n)
         mean_r = float(np.mean(returns))
         var_r = float(np.var(returns))
         if var_r <= 1e-12:
-            return max(3, int(math.ceil(average_holding_bars)))
+            return max(3, math.ceil(average_holding_bars))
 
         q_cutoff = 0
         for lag in range(1, min(max_lag, n // 3)):
@@ -99,7 +99,7 @@ class DynamicEmbargoCalibrator:
             elif lag > q_cutoff + 2:
                 break
 
-        dynamic_h = int(math.ceil(average_holding_bars + q_cutoff))
+        dynamic_h = math.ceil(average_holding_bars + q_cutoff)
         return max(2, min(dynamic_h, n // 10))
 
 
@@ -305,7 +305,7 @@ class WalkForwardCPCVRunner:
         )
 
         # 2. Generate C(N, k) combinatorial purged folds
-        label_horizon = max(1, int(round(average_holding_bars)))
+        label_horizon = max(1, round(average_holding_bars))
         folds = self.splitter.split(
             n_samples=n_samples,
             label_horizon_bars=label_horizon,

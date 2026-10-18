@@ -40,20 +40,20 @@ MAX_RESPONSE_BYTES = 2 * 1024 * 1024  # 2MB strict content payload limit
 DEFAULT_TIMEOUT_SECS = 8.0
 
 BLOCKED_IP_NETWORKS = [
-    ipaddress.ip_network("0.0.0.0/8"),        # This host on this network (RFC 1122)
-    ipaddress.ip_network("127.0.0.0/8"),      # Loopback
-    ipaddress.ip_network("10.0.0.0/8"),       # RFC 1918 Private
-    ipaddress.ip_network("172.16.0.0/12"),    # RFC 1918 Private
-    ipaddress.ip_network("192.168.0.0/16"),   # RFC 1918 Private
-    ipaddress.ip_network("169.254.0.0/16"),   # Link-Local / Cloud Metadata (AWS/GCP)
-    ipaddress.ip_network("100.64.0.0/10"),    # Carrier-grade NAT
-    ipaddress.ip_network("198.18.0.0/15"),    # Benchmark testing (RFC 2544)
-    ipaddress.ip_network("224.0.0.0/4"),      # Multicast (RFC 5771)
-    ipaddress.ip_network("240.0.0.0/4"),      # Reserved for future use (RFC 1112)
-    ipaddress.ip_network("::/128"),           # IPv6 Unspecified
-    ipaddress.ip_network("::1/128"),          # IPv6 Loopback
-    ipaddress.ip_network("fc00::/7"),         # IPv6 Unique Local
-    ipaddress.ip_network("fe80::/10"),        # IPv6 Link-Local
+    ipaddress.ip_network("0.0.0.0/8"),  # This host on this network (RFC 1122)
+    ipaddress.ip_network("127.0.0.0/8"),  # Loopback
+    ipaddress.ip_network("10.0.0.0/8"),  # RFC 1918 Private
+    ipaddress.ip_network("172.16.0.0/12"),  # RFC 1918 Private
+    ipaddress.ip_network("192.168.0.0/16"),  # RFC 1918 Private
+    ipaddress.ip_network("169.254.0.0/16"),  # Link-Local / Cloud Metadata (AWS/GCP)
+    ipaddress.ip_network("100.64.0.0/10"),  # Carrier-grade NAT
+    ipaddress.ip_network("198.18.0.0/15"),  # Benchmark testing (RFC 2544)
+    ipaddress.ip_network("224.0.0.0/4"),  # Multicast (RFC 5771)
+    ipaddress.ip_network("240.0.0.0/4"),  # Reserved for future use (RFC 1112)
+    ipaddress.ip_network("::/128"),  # IPv6 Unspecified
+    ipaddress.ip_network("::1/128"),  # IPv6 Loopback
+    ipaddress.ip_network("fc00::/7"),  # IPv6 Unique Local
+    ipaddress.ip_network("fe80::/10"),  # IPv6 Link-Local
 ]
 
 
@@ -279,11 +279,13 @@ class QueryPlannerWorker:
         variants = []
         if user_query and user_query.strip():
             variants.append(user_query.strip())
-        variants.extend([
-            f"{topic} empirical market structure",
-            f"{topic} quantitative research alpha",
-            f"{topic} liquidity order flow analysis",
-        ])
+        variants.extend(
+            [
+                f"{topic} empirical market structure",
+                f"{topic} quantitative research alpha",
+                f"{topic} liquidity order flow analysis",
+            ]
+        )
         unique_variants = list(dict.fromkeys(variants))[:3]
 
         t_lower = topic.lower()
@@ -293,7 +295,9 @@ class QueryPlannerWorker:
             category = "Monetary & Debt"
         elif any(k in t_lower for k in ["liquidity", "ethena", "basis", "funding", "perp", "amm"]):
             category = "Crypto Liquidity"
-        elif any(k in t_lower for k in ["microstructure", "fvg", "order book", "vpin", "l2", "slippage"]):
+        elif any(
+            k in t_lower for k in ["microstructure", "fvg", "order book", "vpin", "l2", "slippage"]
+        ):
             category = "Market Structure"
         else:
             category = "Alpha Factor"
@@ -320,7 +324,11 @@ class SecureFetchWorker:
             initial_parsed = urllib.parse.urlparse(url.strip())
             initial_domain = (initial_parsed.hostname or initial_parsed.netloc or "").lower()
             now = time.time()
-            if initial_domain and initial_domain in self._domain_cooldowns and self._domain_cooldowns[initial_domain] > now:
+            if (
+                initial_domain
+                and initial_domain in self._domain_cooldowns
+                and self._domain_cooldowns[initial_domain] > now
+            ):
                 return SecureFetchResult(
                     url=url,
                     canonical_url=url,
@@ -386,7 +394,9 @@ class SecureFetchWorker:
 
                 raw_bytes = resp.read(MAX_RESPONSE_BYTES + 1024)
                 if len(raw_bytes) > MAX_RESPONSE_BYTES:
-                    logger.warning(f"Payload from '{url}' exceeded max budget ({MAX_RESPONSE_BYTES} bytes). Truncating.")
+                    logger.warning(
+                        f"Payload from '{url}' exceeded max budget ({MAX_RESPONSE_BYTES} bytes). Truncating."
+                    )
                     raw_bytes = raw_bytes[:MAX_RESPONSE_BYTES]
 
             content_hash = hashlib.sha256(raw_bytes).hexdigest()
@@ -396,7 +406,7 @@ class SecureFetchWorker:
                 if "charset=" in content_type:
                     charset = content_type.split("charset=")[-1].split(";")[0].strip()
                 html_text = raw_bytes.decode(charset, errors="replace")
-            except Exception:  # noqa: BLE001
+            except Exception:
                 html_text = raw_bytes.decode("utf-8", errors="replace")
 
             extractor = SafeHTMLTextExtractor()
@@ -433,7 +443,7 @@ class SecureFetchWorker:
                 success=False,
                 error=f"HTTP {e.code}: {e.reason}",
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             self._record_domain_failure(domain)
             return SecureFetchResult(
                 url=url,
@@ -461,8 +471,18 @@ class ExtractionWorker:
         raw_text = fetch_res.text_content
         lines = [line.strip() for line in raw_text.splitlines() if len(line.strip()) > 0]
         meaningful_lines = [
-            line for line in lines
-            if not any(b in line.lower() for b in ["cookie policy", "terms of service", "all rights reserved", "subscribe now", "accept cookies"])
+            line
+            for line in lines
+            if not any(
+                b in line.lower()
+                for b in [
+                    "cookie policy",
+                    "terms of service",
+                    "all rights reserved",
+                    "subscribe now",
+                    "accept cookies",
+                ]
+            )
         ]
         clean_markdown = "\n\n".join(meaningful_lines)
         word_count = len(clean_markdown.split())
@@ -506,9 +526,23 @@ class ClaimExtractionWorker:
         claims: list[dict[str, Any]] = []
 
         quant_keywords = [
-            "%", "bps", "basis point", "sharpe", "win rate", "alpha", "drawdown",
-            "liquidity", "imbalance", "ratio", "correlation", "volatility",
-            "premium", "discount", "order flow", "spread", "reserve"
+            "%",
+            "bps",
+            "basis point",
+            "sharpe",
+            "win rate",
+            "alpha",
+            "drawdown",
+            "liquidity",
+            "imbalance",
+            "ratio",
+            "correlation",
+            "volatility",
+            "premium",
+            "discount",
+            "order flow",
+            "spread",
+            "reserve",
         ]
 
         for s in sentences:
@@ -518,10 +552,33 @@ class ClaimExtractionWorker:
 
             s_lower = s_clean.lower()
             if any(kw in s_lower for kw in quant_keywords):
-                if any(w in s_lower for w in ["historically", "measured", "according to", "fred", "sec filing", "data shows", "index"]):
+                if any(
+                    w in s_lower
+                    for w in [
+                        "historically",
+                        "measured",
+                        "according to",
+                        "fred",
+                        "sec filing",
+                        "data shows",
+                        "index",
+                    ]
+                ):
                     epistemic = "FACT"
                     conf = 0.90
-                elif any(w in s_lower for w in ["strategy", "signal", "expect", "predict", "indicates", "suggests", "opportunity", "edge"]):
+                elif any(
+                    w in s_lower
+                    for w in [
+                        "strategy",
+                        "signal",
+                        "expect",
+                        "predict",
+                        "indicates",
+                        "suggests",
+                        "opportunity",
+                        "edge",
+                    ]
+                ):
                     epistemic = "HYPOTHESIS"
                     conf = 0.65
                 elif any(w in s_lower for w in ["assume", "assuming", "baseline fee", "slippage"]):
@@ -534,15 +591,17 @@ class ClaimExtractionWorker:
                     epistemic = "UNVERIFIED"
                     conf = 0.50
 
-                claims.append({
-                    "claim_id": f"claim_{doc.source_sha256[:8]}_{len(claims) + 1:02d}",
-                    "speaker_claim": s_clean,
-                    "epistemic_status": epistemic,
-                    "confidence_score": conf,
-                    "verbatim_quote": s_clean,
-                    "source_url": doc.url,
-                    "source_domain": doc.domain,
-                })
+                claims.append(
+                    {
+                        "claim_id": f"claim_{doc.source_sha256[:8]}_{len(claims) + 1:02d}",
+                        "speaker_claim": s_clean,
+                        "epistemic_status": epistemic,
+                        "confidence_score": conf,
+                        "verbatim_quote": s_clean,
+                        "source_url": doc.url,
+                        "source_domain": doc.domain,
+                    }
+                )
 
             if len(claims) >= 10:
                 break
@@ -569,9 +628,11 @@ class ResearchCriticWorker:
         existing_claims = []
         try:
             with research_wikipedia_engine._get_connection() as conn:
-                rows = conn.execute("SELECT speaker_claim, claim_type FROM research_claims LIMIT 100;").fetchall()
+                rows = conn.execute(
+                    "SELECT speaker_claim, claim_type FROM research_claims LIMIT 100;"
+                ).fetchall()
                 existing_claims = [dict(r) for r in rows]
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass
 
         novel_claims_count = len(claim_set.claims)
@@ -584,12 +645,22 @@ class ResearchCriticWorker:
                 ec_text_lower = ec.get("speaker_claim", "").lower()
                 common_words = set(c_text_lower.split()) & set(ec_text_lower.split())
                 if len(common_words) >= 4:
-                    if ("bullish" in c_text_lower and "bearish" in ec_text_lower) or ("positive" in c_text_lower and "negative" in ec_text_lower):
-                        contradictions.append({"new_claim": c["speaker_claim"], "existing_claim": ec["speaker_claim"]})
+                    if ("bullish" in c_text_lower and "bearish" in ec_text_lower) or (
+                        "positive" in c_text_lower and "negative" in ec_text_lower
+                    ):
+                        contradictions.append(
+                            {"new_claim": c["speaker_claim"], "existing_claim": ec["speaker_claim"]}
+                        )
                     else:
-                        corroborations.append({"new_claim": c["speaker_claim"], "existing_claim": ec["speaker_claim"]})
+                        corroborations.append(
+                            {"new_claim": c["speaker_claim"], "existing_claim": ec["speaker_claim"]}
+                        )
 
-        summary = (doc.clean_markdown[:280] + "...") if len(doc.clean_markdown) > 280 else doc.clean_markdown
+        summary = (
+            (doc.clean_markdown[:280] + "...")
+            if len(doc.clean_markdown) > 280
+            else doc.clean_markdown
+        )
         triage_id = research_wikipedia_engine.add_to_triage_inbox(
             candidate_title=doc.title,
             candidate_summary=summary or "Autonomous research discovery candidate.",
@@ -619,7 +690,9 @@ class AutonomousWebSearchAgent:
     """
 
     def __init__(self):
-        self.default_user_agent = "SKY-Institutional-Intelligence-Bot/4.0 (Quantitative Research; Linux x64)"
+        self.default_user_agent = (
+            "SKY-Institutional-Intelligence-Bot/4.0 (Quantitative Research; Linux x64)"
+        )
         # Instantiate 5 Bounded Workers
         self.query_planner = QueryPlannerWorker()
         self.secure_fetcher = SecureFetchWorker(user_agent=self.default_user_agent)
@@ -700,7 +773,7 @@ class AutonomousWebSearchAgent:
                 if len([c for c in candidates if c.is_safe]) >= limit:
                     break
 
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(f"DuckDuckGo Lite search failed for '{query}': {e}")
 
         return candidates
@@ -720,7 +793,7 @@ class AutonomousWebSearchAgent:
         try:
             candidates = await loop.run_in_executor(None, self.search_duckduckgo_lite, query, limit)
             provider_status["DUCKDUCKGO"] = "HEALTHY" if candidates else "ZERO_RESULTS"
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             candidates = []
             provider_status["DUCKDUCKGO"] = f"ERROR: {e}"
 
@@ -757,7 +830,7 @@ class AutonomousWebSearchAgent:
             try:
                 cands = await loop.run_in_executor(None, self.search_duckduckgo_lite, q, limit)
                 all_candidates.extend(cands)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 pass
         durations["discovery_ms"] = round((time.time() - t1) * 1000, 2)
 
@@ -861,7 +934,11 @@ class AutonomousWebSearchAgent:
 
         triage_id = research_wikipedia_engine.add_to_triage_inbox(
             candidate_title=ingest_options["title"],
-            candidate_summary=(fetch_res.text_content[:300] if fetch_res.text_content else "Autonomous web research candidate."),
+            candidate_summary=(
+                fetch_res.text_content[:300]
+                if fetch_res.text_content
+                else "Autonomous web research candidate."
+            ),
             source_url=candidate_url,
             source_domain=fetch_res.source_domain,
             proposed_category=custom_topic,

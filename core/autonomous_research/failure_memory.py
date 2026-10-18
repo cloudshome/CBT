@@ -147,7 +147,7 @@ class FailureMemoryEngine:
                 historical_occurrences_tested=int(metrics.get("sample_size", 0)),
                 rejection_autopsy=autopsy_text,
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(f"Could not cross-register to rejected_claims_vault: {e}")
 
         logger.info(

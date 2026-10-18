@@ -16,11 +16,11 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from decimal import Decimal
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class CanonicalOrderStatus(str, Enum):
+class CanonicalOrderStatus(StrEnum):
     """
     Canonical, venue-agnostic lifecycle states for order tracking.
     """
@@ -42,28 +42,28 @@ class CanonicalOrderStatus(str, Enum):
     ANOMALY_HALTED = "ANOMALY_HALTED"
 
 
-class OrderSide(str, Enum):
+class OrderSide(StrEnum):
     """Order side enumeration."""
 
     BUY = "BUY"
     SELL = "SELL"
 
 
-class OrderType(str, Enum):
+class OrderType(StrEnum):
     """Supported order type enumeration."""
 
     LIMIT = "LIMIT"
     MARKET = "MARKET"
 
 
-class SlicingStrategy(str, Enum):
+class SlicingStrategy(StrEnum):
     """Supported algorithmic execution slicing strategies."""
 
     TWAP = "TWAP"
     ICEBERG = "ICEBERG"
 
 
-class VenueType(str, Enum):
+class VenueType(StrEnum):
     """Approved venue types under strict endpoint isolation."""
 
     BINANCE_SPOT_TESTNET = "BINANCE_SPOT_TESTNET"
@@ -71,7 +71,7 @@ class VenueType(str, Enum):
     DETERMINISTIC_MOCK = "DETERMINISTIC_MOCK"
 
 
-class EpistemicClassification(str, Enum):
+class EpistemicClassification(StrEnum):
     """
     Epistemic boundaries for testnet execution claims.
     Enforces that testnet performance is never conflated with live alpha.

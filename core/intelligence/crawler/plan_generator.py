@@ -134,7 +134,7 @@ class PreregisteredPlanGenerator:
                 holding_period_bars=12,
                 trial_budget=1,
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             return PlanGenerationResult(
                 success=False,
                 plan=None,

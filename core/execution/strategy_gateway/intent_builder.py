@@ -155,7 +155,7 @@ class IntentBuilder:
                     ON strategy_execution_intents(strategy_id);
                     """
                 )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error(f"[IntentBuilder] Failed to initialize SQLite schema: {exc}")
 
     def calculate_shrunk_half_kelly(
@@ -362,7 +362,7 @@ class IntentBuilder:
                 created_monotonic_ns=int(row[12]),
                 intent_hash=row[13],
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error(f"[IntentBuilder] Error looking up existing intent: {exc}")
             return None
 
@@ -396,5 +396,5 @@ class IntentBuilder:
                         intent.intent_hash,
                     ),
                 )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error(f"[IntentBuilder] Failed to persist intent '{intent.intent_id}': {exc}")

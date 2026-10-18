@@ -87,7 +87,7 @@ class LeaseManager:
             with open(self.lease_file, encoding="utf-8") as f:
                 data = json.load(f)
             return ExecutionLease.from_dict(data)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning("Failed to load execution lease: %s", exc)
             return None
 

@@ -556,9 +556,7 @@ def test_sentiment_fallback_renders_without_backend_block():
         path = f.name
     try:
         r = subprocess.run([NODE, path], capture_output=True, text=True)
-        assert r.returncode == 0, (
-            f"fallback sentiment render failed:\n{r.stdout}\n{r.stderr}"
-        )
+        assert r.returncode == 0, f"fallback sentiment render failed:\n{r.stdout}\n{r.stderr}"
         out = json.loads(r.stdout.strip().splitlines()[-1])
     finally:
         Path(path).unlink(missing_ok=True)

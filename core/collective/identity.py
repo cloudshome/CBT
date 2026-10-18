@@ -89,7 +89,7 @@ class NodeIdentity:
             data = message.encode("utf-8") if isinstance(message, str) else message
             pub_key.verify(sig_bytes, data)
             return True
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug(f"Signature verification failed: {exc}")
             return False
 
@@ -274,7 +274,7 @@ class NodeIdentityManager:
                 sync_policy=data.get("sync_policy", default_sync),
                 _private_key=priv_key,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error(f"Failed to load node identity from {self.identity_file}: {exc}")
             return None
 

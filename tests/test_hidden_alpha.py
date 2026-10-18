@@ -73,10 +73,7 @@ def expansion_frame(n: int = 400, seed: int = 9) -> pd.DataFrame:
 
 
 def _probs(r: dict) -> dict:
-    return {
-        k: r[k]
-        for k in ("bull_trend", "bear_trend", "mean_reverting", "volatile_expansion")
-    }
+    return {k: r[k] for k in ("bull_trend", "bear_trend", "mean_reverting", "volatile_expansion")}
 
 
 # ── 1. latent regime probabilities ────────────────────────────────────────
@@ -156,9 +153,7 @@ def _flow_frame() -> pd.DataFrame:
         v[i] = 1000.0
     # last bar: absorption — huge volume, tiny body, close >= open
     o[55], h[55], l[55], c[55], v[55] = 100.0, 100.3, 99.9, 100.05, 5000.0
-    return pd.DataFrame(
-        {"ts": ts, "open": o, "high": h, "low": l, "close": c, "volume": v}
-    )
+    return pd.DataFrame({"ts": ts, "open": o, "high": h, "low": l, "close": c, "volume": v})
 
 
 def test_cvd_negative_on_sell_pressure():

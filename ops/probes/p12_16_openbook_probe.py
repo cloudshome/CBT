@@ -231,9 +231,7 @@ def case_reported_counts(db: SignalDB) -> dict:
     _open_paper(db, 40, symbol="BTCUSDT", action="BUY", source_key=LIVE)
     for i in range(4):
         _open_paper(db, 41 + i, symbol="XAUUSD", action="BUY", source_key=RESEARCH)
-    _open_paper(
-        db, 50, symbol="ETHUSDT", action="BUY", sim_key="ETHUSDT:15m:3:Buy Pullback:BUY"
-    )
+    _open_paper(db, 50, symbol="ETHUSDT", action="BUY", sim_key="ETHUSDT:15m:3:Buy Pullback:BUY")
     return {
         "canonical_reality": "the desk carries exactly 1 live position",
         "pooled_open_pre_P12_16": _pooled_open(db),  # 6 → overstated

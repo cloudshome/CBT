@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import stat
 from pathlib import Path
 
@@ -89,13 +90,12 @@ def test_keystore_store_private_file(tmp_path, monkeypatch):
         name="phone",
     )
     assert rec["stored"] == "file"
-    mode = store.path.stat().st_mode
-    assert not (mode & stat.S_IROTH)
+    if os.name != "nt":
+        mode = store.path.stat().st_mode
+        assert not (mode & stat.S_IROTH)
     loaded = store.load()
     assert loaded["token"] == "secret-token-value"
-    assert "secret-token-value" not in json.dumps(
-        {k: v for k, v in rec.items() if k != "token"}
-    )
+    assert "secret-token-value" not in json.dumps({k: v for k, v in rec.items() if k != "token"})
 
 
 def test_pair_round_trip(tmp_path, monkeypatch):
@@ -174,12 +174,7 @@ def test_spec_is_unsigned():
 
 
 def test_no_order_path_in_companion():
-    src = (
-        Path(__file__)
-        .resolve()
-        .parent.parent.joinpath("ops/android_companion.py")
-        .read_text()
-    )
+    src = Path(__file__).resolve().parent.parent.joinpath("ops/android_companion.py").read_text()
     for banned in ("create_order", "newOrder", "/api/v3/order", "place_order"):
         assert banned not in src
 

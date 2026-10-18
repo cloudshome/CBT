@@ -317,7 +317,7 @@ def test_07_unverified_freeze_token_rejected(freeze_registry_with_two_strategies
         visible_depth_units=10.0,
     )
 
-    with pytest.raises(QualificationFreezeViolationError, match="not found in M31.5 registry"):
+    with pytest.raises(QualificationFreezeViolationError, match=r"not found in M31\.5 registry"):
         allocator.allocate(
             strategy_freeze_tokens=["FAKE_TOKEN_XYZ"],
             requested_units=0.01,

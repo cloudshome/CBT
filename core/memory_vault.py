@@ -54,7 +54,7 @@ class SemanticVectorStore:
                     "CREATE INDEX IF NOT EXISTS idx_vec_created ON semantic_vectors (created_at);"
                 )
                 conn.commit()
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.warning(f"Could not initialize semantic_vectors table: {e}")
 
     def _load(self) -> None:
@@ -95,7 +95,7 @@ class SemanticVectorStore:
                 # Archive legacy file
                 migrated_file = self.storage_path / "vectors.json.migrated"
                 legacy_file.rename(migrated_file)
-            except Exception as e:  # noqa: BLE001 — defensive fallback
+            except Exception as e:
                 logger.warning(f"Legacy vector migration notice: {e}")
 
         # 2. Load from SQLite
@@ -120,7 +120,7 @@ class SemanticVectorStore:
                 self.embeddings_matrix = np.vstack(self.embeddings)
             else:
                 self.embeddings_matrix = None
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.error(f"Failed loading vectors from SQLite: {e}")
 
     def save(self) -> None:
@@ -160,7 +160,7 @@ class SemanticVectorStore:
                     (doc_id, text, json.dumps(meta), vec.tobytes(), time.time()),
                 )
                 conn.commit()
-        except Exception as e:  # noqa: BLE001 — defensive fallback
+        except Exception as e:
             logger.error(f"Failed persisting vector {doc_id} to SQLite: {e}")
 
         # 2. In-memory index update
