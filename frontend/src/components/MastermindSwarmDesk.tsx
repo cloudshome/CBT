@@ -421,32 +421,65 @@ export const MastermindSwarmDesk: React.FC<MastermindSwarmDeskProps> = ({
                   .map((opp) => (
                     <tr key={opp.symbol} className="hover:bg-[#131b2e] transition-colors">
                       <td className="py-2.5 px-3 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() => onSelectSymbol?.(opp.symbol.replace('/', ''))}
-                            className="font-bold text-white text-xs hover:text-cyan-400 hover:underline transition-colors flex items-center gap-1 text-left"
-                            title="Click to load into CBT Cockpit Chart"
-                          >
-                            <span>{opp.symbol}</span>
-                            <Crosshair size={11} className="text-slate-500 hover:text-cyan-400" />
-                          </button>
-                          <span className="text-[9px] bg-slate-800 text-slate-400 px-1 py-0.5 rounded font-mono">
-                            {opp.base_asset}
-                          </span>
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => onSelectSymbol?.(opp.symbol.replace('/', ''))}
+                              className="font-bold text-white text-xs hover:text-cyan-400 hover:underline transition-colors flex items-center gap-1 text-left"
+                              title="Click to load into CBT Cockpit Chart"
+                            >
+                              <span>{opp.symbol}</span>
+                              <Crosshair size={11} className="text-slate-500 hover:text-cyan-400" />
+                            </button>
+                            <span className="text-[9px] bg-slate-800 text-slate-400 px-1 py-0.5 rounded font-mono">
+                              {opp.base_asset}
+                            </span>
+                            <a
+                              href={
+                                opp.tradingview_url ||
+                                `https://www.tradingview.com/chart/?symbol=BINANCE:${opp.symbol.replace('/', '')}${
+                                  opp.futures_eligible ? '.P' : ''
+                                }`
+                              }
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-cyan-400 hover:text-cyan-300 transition-colors p-0.5"
+                              title="Open TradingView Chart in new tab"
+                            >
+                              <ExternalLink size={11} />
+                            </a>
+                          </div>
+
+                          {/* 1-Click Direct Venue Badges right in Column 1 */}
+                          <PairVenueLinks symbol={opp.symbol} size="xs" isFutures={opp.futures_eligible} />
                         </div>
                       </td>
 
                       <td className="py-2.5 px-3 whitespace-nowrap">
                         <div className="flex items-center gap-1">
                           {opp.spot_eligible && (
-                            <span className="text-[9px] bg-blue-500/10 text-blue-400 border border-blue-500/30 px-1.5 py-0.2 rounded font-semibold">
-                              SPOT
-                            </span>
+                            <a
+                              href={opp.binance_url || `https://www.binance.com/en/trade/${opp.base_asset}_USDT`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[9px] bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 border border-blue-500/30 px-1.5 py-0.5 rounded font-semibold transition-all inline-flex items-center gap-0.5"
+                              title="Open Binance Spot Market"
+                            >
+                              <span>SPOT</span>
+                              <ExternalLink size={8} />
+                            </a>
                           )}
                           {opp.futures_eligible && (
-                            <span className="text-[9px] bg-purple-500/10 text-purple-400 border border-purple-500/30 px-1.5 py-0.2 rounded font-semibold">
-                              FUTURES
-                            </span>
+                            <a
+                              href={opp.binance_url || `https://www.binance.com/en/futures/${opp.base_asset}USDT`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[9px] bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 hover:text-purple-300 border border-purple-500/30 px-1.5 py-0.5 rounded font-semibold transition-all inline-flex items-center gap-0.5"
+                              title="Open Binance Futures Market"
+                            >
+                              <span>FUTURES</span>
+                              <ExternalLink size={8} />
+                            </a>
                           )}
                         </div>
                       </td>
