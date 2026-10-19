@@ -26,9 +26,10 @@ os.environ["SECURITY_DB_PATH"] = str(_temp_path / "security_test.db")
 os.environ["TELEGRAM_CHAT_ID"] = "12345678"
 os.environ["TELEGRAM_TRADER_IDS"] = "12345678"
 
-# 4. Rate limiter test isolation: raise limit so full test suite is not throttled
+# 4. Rate limiter and portfolio limit test isolation: raise limits so full test suite is not throttled or locked out
 os.environ["RATE_LIMIT_MAX"] = "100000"
 os.environ["RATE_LIMIT_AUTH_MAX"] = "100000"
+os.environ["MAX_PAPER_OPEN_POSITIONS"] = "1000"
 
 
 def _init_test_subsystem_schemas() -> None:
@@ -42,11 +43,13 @@ def _init_test_subsystem_schemas() -> None:
         db_manager.experiment_db_path = Path(os.environ["EXPERIMENT_DB_PATH"])
         db_manager.init_all_schemas()
 
-        # 1. Execution Idempotency & Reconciliation
+        # 1. Execution Idempotency & Reconciliation & Kill Switch State
         try:
             from core.execution.idempotency import LiveOrderIdempotencyStore
+            from core.execution.kill_switch import live_kill_switch
 
             LiveOrderIdempotencyStore()._init_table()
+            live_kill_switch._ensure_schema()
         except Exception:
             pass
 

@@ -120,6 +120,7 @@ def test_orchestrator_get_status(orch):
         "youtube_crawler",
         "knowledge_audit",
         "drive_sync",
+        "research_feed_crawler",
     }
     assert set(status.keys()) == expected
     for name, ps in status.items():

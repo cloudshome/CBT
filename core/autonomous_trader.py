@@ -405,7 +405,6 @@ class AutonomousTrader:
             return
         try:
             from core.auth.credential_vault import credential_vault
-            from core.execution.connectors.binance_connector import BinanceSpotConnector
             from core.execution.live_canary_runner import CanaryRunRequest, live_canary_runner
 
             cred = credential_vault.get_credential("BINANCE", "TESTNET")

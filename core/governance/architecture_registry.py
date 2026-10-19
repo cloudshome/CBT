@@ -129,6 +129,7 @@ MODULE_LAYER_RULES: Final[list[tuple[str, ArchitectureLayer]]] = [
     ("core.strategist_routes", ArchitectureLayer.LAYER_3_GATEWAY_API),
     ("core.heatmap_routes", ArchitectureLayer.LAYER_3_GATEWAY_API),
     ("core.knowledge_os.routes", ArchitectureLayer.LAYER_3_GATEWAY_API),
+    ("core.execution.paper_routes", ArchitectureLayer.LAYER_3_GATEWAY_API),
     ("core.telegram", ArchitectureLayer.LAYER_3_GATEWAY_API),
     ("core.telegram_bot", ArchitectureLayer.LAYER_3_GATEWAY_API),
     ("core.telegram_live_desk", ArchitectureLayer.LAYER_3_GATEWAY_API),
@@ -178,6 +179,7 @@ MODULE_AUTHORITY_RULES: Final[list[tuple[str, ModuleAuthority]]] = [
     ("core.execution.strategy_gateway", ModuleAuthority.SIMULATION_RESEARCH_ONLY),
     ("core.research", ModuleAuthority.SIMULATION_RESEARCH_ONLY),
     ("core.collective", ModuleAuthority.SIMULATION_RESEARCH_ONLY),
+    ("core.execution.paper_routes", ModuleAuthority.GATEWAY_ADAPTER),
     # Read-Only Telemetry
     ("core.mbo", ModuleAuthority.READ_ONLY_TELEMETRY),
     ("core.volatility", ModuleAuthority.READ_ONLY_TELEMETRY),
@@ -277,6 +279,9 @@ EXPLICIT_ALLOWED_EDGES: Final[set[tuple[str, str]]] = {
     ("core.knowledge_os.research_automation_orchestrator", "core.telegram_bot"),
     ("core.youtube.agent", "core.telegram.jobs"),
     ("core.youtube.agent", "core.telegram_bot"),
+    # Operational Trade & Execution Alerting to Telegram Bot
+    ("core.portfolio_shadow", "core.telegram_bot"),
+    ("core.mastermind.mastermind_arbiter", "core.telegram_bot"),
 }
 
 

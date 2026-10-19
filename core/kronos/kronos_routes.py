@@ -80,7 +80,15 @@ async def get_kronos_forecast(
             "4h": 14400,
             "1d": 86400,
         }.get(timeframe, 900)
-        last_candle_ts = candles[-1][0] if candles else int(time.time() * 1000)
+        if candles:
+            last_c = candles[-1]
+            last_candle_ts = (
+                last_c.get("timestamp", int(time.time() * 1000))
+                if isinstance(last_c, dict)
+                else last_c[0]
+            )
+        else:
+            last_candle_ts = int(time.time() * 1000)
         p50 = domain_fc.quantile_bands.get("p50", [])
         horizon_count = len(p50) if p50 else horizon
         pred_timestamps = [

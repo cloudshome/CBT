@@ -119,10 +119,10 @@ def test_paper_trade_buy_and_sell_order_flow(client):
             "entryPrice": 65000.0,
             "sl": 64000.0,
             "tp": 67000.0,
-            "size": 0.5,
+            "size": 0.1,
         },
     )
-    assert res_long.status_code == 200
+    assert res_long.status_code == 200, res_long.text
     long_data = res_long.json()
     assert long_data["message"] == "Simulated order filled successfully"
     pos_id = long_data["trade"]["id"]
@@ -147,7 +147,7 @@ def test_paper_trade_buy_and_sell_order_flow(client):
             "entryPrice": 65000.0,
             "sl": 66000.0,
             "tp": 63000.0,
-            "size": 0.5,
+            "size": 0.1,
         },
     )
     assert res_short.status_code == 200
