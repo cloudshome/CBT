@@ -405,7 +405,7 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
               </h2>
             </div>
             <span className="text-xs font-mono text-slate-400">
-              Auto-Breakeven at +1.5R | Strict Risk Cap: {summary.maxRiskCapPct}%
+              Two-Tier Partial Exit Engine (+1.5R Profit Lock & BE) | Strict Risk Cap: {summary.maxRiskCapPct}%
             </span>
           </div>
 
@@ -556,20 +556,58 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
                             )}
                           </td>
                           <td className="py-3 px-3 text-right font-bold text-sm">
-                            <span className={pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                            <div className={pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
                               {sign}${pnl.toFixed(2)} ({sign}{pos.pnlPct.toFixed(2)}%)
-                            </span>
+                            </div>
+                            {pos.partialProfitLockedUsd && pos.partialProfitLockedUsd > 0 ? (
+                              <div className="text-[10px] text-amber-300 font-mono mt-0.5 flex items-center justify-end">
+                                <span className="px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-300 font-bold">
+                                  💰 +${pos.partialProfitLockedUsd.toFixed(2)} BANKED
+                                </span>
+                              </div>
+                            ) : null}
                           </td>
-                          <td className="py-3 px-3">
+                          <td className="py-3 px-3 min-w-[170px]">
                             {pos.breakevenTriggered ? (
-                              <span className="text-[10px] px-2 py-0.5 rounded bg-sky-950 text-sky-300 border border-sky-500/40 font-bold flex items-center gap-1 w-max">
-                                <ShieldCheck className="w-3 h-3 text-sky-400" />
-                                BREAKEVEN ARMED
-                              </span>
+                              <div className="flex flex-col gap-1">
+                                <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 font-bold flex items-center gap-1 w-max">
+                                  <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                                  PROTECTED (BE + 50% BANKED)
+                                </span>
+                                <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1.5">
+                                  <span className="text-emerald-400 font-semibold">🔒 50% Secured</span>
+                                  {pos.trailingStop && (
+                                    <span className="text-sky-300">• Trail: ${Number(pos.trailingStop).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                                  )}
+                                </div>
+                              </div>
                             ) : (
-                              <span className="text-[10px] text-slate-400 font-mono">
-                                Arming at +1.5R
-                              </span>
+                              <div className="flex flex-col gap-1 w-full max-w-[160px]">
+                                <div className="flex items-center justify-between text-[10px] font-mono">
+                                  <span className="text-slate-400 flex items-center gap-1">
+                                    <Clock className="w-2.5 h-2.5 text-sky-400" />
+                                    +1.5R Target
+                                  </span>
+                                  <span className={`font-bold ${(pos.currentR ?? 0) >= 1.0 ? 'text-emerald-400' : (pos.currentR ?? 0) > 0 ? 'text-sky-300' : 'text-slate-400'}`}>
+                                    {(pos.currentR ?? 0).toFixed(2)}R / 1.5R
+                                  </span>
+                                </div>
+                                <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden border border-slate-700/60">
+                                  <div
+                                    className={`h-full transition-all duration-500 ${
+                                      (pos.currentR ?? 0) >= 1.2
+                                        ? 'bg-gradient-to-r from-sky-400 to-emerald-400'
+                                        : (pos.currentR ?? 0) > 0
+                                        ? 'bg-sky-400'
+                                        : 'bg-slate-600'
+                                    }`}
+                                    style={{ width: `${Math.min(100, Math.max(0, pos.twoTierProgressPct ?? (((pos.currentR ?? 0) / 1.5) * 100)))}%` }}
+                                  />
+                                </div>
+                                <span className="text-[9px] text-slate-500 font-mono">
+                                  Locks 50% &amp; arms BE at +1.5R
+                                </span>
+                              </div>
                             )}
                           </td>
                           <td className="py-3 px-3 text-right">
@@ -832,7 +870,7 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
                       return { text: '🛑 Stop-Loss Hit', style: 'bg-rose-950/80 text-rose-300 border-rose-500/40' };
                     }
                     if (r === 'BREAKEVEN_TRIGGERED') {
-                      return { text: '⚖️ Breakeven Exit', style: 'bg-sky-950/80 text-sky-300 border-sky-500/40' };
+                      return { text: '🛡️ Breakeven (+50% Banked)', style: 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40' };
                     }
                     return { text: '✋ Manual Close', style: 'bg-slate-800 text-slate-300 border-slate-700' };
                   })();

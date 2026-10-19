@@ -88,6 +88,11 @@ export interface PaperTrade {
   pnl?: number;
   exitPrice?: number;
   breakevenTriggered?: boolean;
+  trailingStop?: number | null;
+  currentR?: number;
+  milestoneR?: number;
+  twoTierProgressPct?: number;
+  partialProfitLockedUsd?: number;
   createdAt: string;
   closedAt?: string;
 }
@@ -130,6 +135,10 @@ export interface PaperDeskOverviewResponse {
     status: string;
     breakevenTriggered: boolean;
     trailingStop?: number | null;
+    currentR?: number;
+    milestoneR?: number;
+    twoTierProgressPct?: number;
+    partialProfitLockedUsd?: number;
     openedAt?: number | string;
     notionalUsd?: number;
     effectiveLeverage?: number;

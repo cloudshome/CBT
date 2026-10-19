@@ -338,13 +338,27 @@ export const PaperTradingPanel: React.FC<PaperTradingPanelProps> = ({
                           </td>
                           <td className="py-1.5 px-2">
                             {pos.breakevenTriggered ? (
-                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-900/60 text-sky-300 border border-sky-500/40">
-                                🛡️ BE ACTIVE
-                              </span>
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 font-bold whitespace-nowrap">
+                                  🛡️ BE + 50% BANKED
+                                </span>
+                                {pos.partialProfitLockedUsd && pos.partialProfitLockedUsd > 0 && (
+                                  <span className="text-[9px] text-amber-300 font-mono">
+                                    +${pos.partialProfitLockedUsd.toFixed(2)}
+                                  </span>
+                                )}
+                              </div>
                             ) : (
-                              <span className="text-[9px] px-1 py-0.5 rounded bg-slate-800 text-slate-300">
-                                {pos.status}
-                              </span>
+                              <div className="flex flex-col gap-0.5 min-w-[70px]">
+                                <span className="text-[9px] px-1 py-0.5 rounded bg-slate-800 text-slate-300">
+                                  {pos.status}
+                                </span>
+                                {pos.currentR !== undefined && (
+                                  <span className="text-[8px] text-slate-400 font-mono">
+                                    {pos.currentR.toFixed(1)}R / 1.5R
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </td>
                           {onClosePosition && (

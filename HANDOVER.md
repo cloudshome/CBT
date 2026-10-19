@@ -19,6 +19,11 @@ Last updated: **2026-10-19 · Quantitative Alpha Optimization, Two-Tier Partial 
 - **Screener Router Monolith Modularization (`core/screener/screener_routes.py`, `app.py`):**
   - Extracted `/api/screener/opportunities`, `/api/screener/watchlist`, and `/api/screener/health` into dedicated FastAPI `APIRouter`.
   - Cleaned up monolith `app.py` and mounted router cleanly via `app.include_router(screener_router)`.
+- **Two-Tier Exits UI Visualization (`DedicatedPaperTradingDesk.tsx`, `PaperTradingPanel.tsx`, `paper_routes.py`):**
+  - Integrated live Two-Tier Exit progress bars (`currentR / 1.5R`) directly into active position rows.
+  - Added `PROTECTED (BE + 50% BANKED)` badges with dollar amount secured (`+$XX.XX`) and active trailing stop indicators.
+  - Updated past trade history badges to highlight `🛡️ Breakeven (+50% Banked)`.
+  - Frontend production bundle built with 0 errors (`dist/assets/index-CqUQ56nW.js`).
 - **Test Suite Verification:**
   - 100% green across all new and regression test suites:
     - `tests/test_dynamic_atr_and_two_tier_exits.py` (4/4 PASS)

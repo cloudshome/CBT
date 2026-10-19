@@ -226,6 +226,15 @@ async def get_paper_desk_overview():
         )
         entry_reason_val = p.get("entry_reason") or thesis
 
+        # Two-Tier Exit Calculations
+        be_trig = bool(p.get("breakeven_triggered", 0))
+        current_r = 0.0
+        if sl_dist > 0:
+            current_r = round(((cur - entry) / sl_dist) if side == "BUY" else ((entry - cur) / sl_dist), 2)
+        milestone_r = 1.5
+        progress_pct = 100.0 if be_trig else round(min(100.0, max(0.0, (current_r / milestone_r) * 100.0)), 1)
+        partial_pnl = round(float(p.get("realized_pnl") or 0.0), 2)
+
         current.append(
             {
                 "id": p.get("position_id", ""),
@@ -239,8 +248,12 @@ async def get_paper_desk_overview():
                 "pnlUsd": round(pnl, 2),
                 "pnlPct": round(pnl_pct, 2),
                 "status": "OPEN",
-                "breakevenTriggered": bool(p.get("breakeven_triggered", 0)),
+                "breakevenTriggered": be_trig,
                 "trailingStop": p.get("trailing_stop"),
+                "currentR": current_r,
+                "milestoneR": milestone_r,
+                "twoTierProgressPct": progress_pct,
+                "partialProfitLockedUsd": partial_pnl,
                 "openedAt": opened_at_ts,
                 "openedAtFormatted": opened_at_fmt,
                 "entryReason": entry_reason_val,
@@ -495,6 +508,16 @@ async def get_paper_positions():
             agent_mgr = "Intraday Strategist (Multi-Concept Structure)"
             strat_name = "Intraday Structural Volatility Expansion"
 
+        sl_val = float(p.get("stop_loss", 0.0))
+        sl_dist = abs(entry - sl_val) if sl_val > 0 else 0.0
+        be_trig = bool(p.get("breakeven_triggered", 0))
+        current_r = 0.0
+        if sl_dist > 0:
+            current_r = round(((cur - entry) / sl_dist) if side == "BUY" else ((entry - cur) / sl_dist), 2)
+        milestone_r = 1.5
+        progress_pct = 100.0 if be_trig else round(min(100.0, max(0.0, (current_r / milestone_r) * 100.0)), 1)
+        partial_pnl = round(float(p.get("realized_pnl") or 0.0), 2)
+
         mapped.append(
             {
                 "id": p.get("position_id", ""),
@@ -502,12 +525,17 @@ async def get_paper_positions():
                 "side": side,
                 "entryPrice": entry,
                 "currentPrice": cur,
-                "sl": p.get("stop_loss", 0.0),
+                "sl": sl_val,
                 "tp": p.get("take_profit", 0.0),
                 "size": p.get("size", 1.0),
                 "status": p.get("status", "OPEN"),
                 "pnl": round(pnl, 2),
-                "breakevenTriggered": bool(p.get("breakeven_triggered", 0)),
+                "breakevenTriggered": be_trig,
+                "trailingStop": p.get("trailing_stop"),
+                "currentR": current_r,
+                "milestoneR": milestone_r,
+                "twoTierProgressPct": progress_pct,
+                "partialProfitLockedUsd": partial_pnl,
                 "createdAt": str(p.get("opened_at", "")),
                 "horizon": horizon,
                 "agentManager": agent_mgr,
