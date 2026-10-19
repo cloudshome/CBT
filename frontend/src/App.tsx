@@ -963,6 +963,7 @@ export const App: React.FC = () => {
                     loading={loadingMarket}
                   />
                   <SMCScanPanel
+                    symbol={symbol}
                     fvgs={fvgs}
                     orderBlocks={orderBlocks}
                     setups={setups}

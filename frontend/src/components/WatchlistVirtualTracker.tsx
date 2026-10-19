@@ -1,6 +1,7 @@
 import React, { useState, useEffect, memo } from 'react';
 import { Star, TrendingUp, TrendingDown, Search } from 'lucide-react';
 import { api } from '../services/api';
+import { PairVenueLinks } from './PairVenueLinks';
 
 interface WatchlistVirtualTrackerProps {
   currentSymbol: string;
@@ -268,54 +269,72 @@ const WatchlistVirtualTrackerComponent: React.FC<WatchlistVirtualTrackerProps> =
           const isPos = (item.change || 0) >= 0;
           const price = Number(item.price || 0);
           return (
-            <button
+            <div
               key={item.symbol}
+              role="button"
+              tabIndex={0}
               onClick={() => onSelectSymbol(item.symbol)}
-              className={`p-2 rounded-lg flex items-center justify-between text-xs transition border ${
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onSelectSymbol(item.symbol);
+                }
+              }}
+              className={`p-2 rounded-lg flex flex-col gap-1.5 text-xs transition border cursor-pointer ${
                 isSelected
                   ? 'bg-sky-500/15 border-sky-400 text-slate-100 shadow-sm shadow-sky-500/20'
                   : 'bg-[#0b101b] border-[#1e293b]/70 hover:bg-[#0f172a] hover:border-slate-700 text-slate-400'
               }`}
             >
-              <div className="flex flex-col items-start gap-0.5">
-                <div className="flex items-center gap-1.5">
-                  <span className={`font-bold ${isSelected ? 'text-white' : 'text-slate-200'}`}>
-                    {item.symbol}
-                  </span>
-                  {item.isGold ? (
-                    <span className="text-[9px] px-1 py-0.2 rounded bg-amber-400/20 text-amber-300 font-bold border border-amber-400/40">
-                      GOLD
+              <div className="flex items-center justify-between w-full">
+                <div className="flex flex-col items-start gap-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className={`font-bold ${isSelected ? 'text-white' : 'text-slate-200'}`}>
+                      {item.symbol}
                     </span>
-                  ) : (
-                    <span className="text-[9px] px-1 py-0.2 rounded bg-sky-500/20 text-sky-300 font-bold border border-sky-500/40">
-                      CORE
+                    {item.isGold ? (
+                      <span className="text-[9px] px-1 py-0.2 rounded bg-amber-400/20 text-amber-300 font-bold border border-amber-400/40">
+                        GOLD
+                      </span>
+                    ) : (
+                      <span className="text-[9px] px-1 py-0.2 rounded bg-sky-500/20 text-sky-300 font-bold border border-sky-500/40">
+                        CORE
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-slate-500">
+                    {item.name || item.symbol} {item.volume !== '...' && `• Vol: ${item.volume}`}
+                  </span>
+                </div>
+
+                <div className="flex flex-col items-end gap-0.5">
+                  <span className="font-semibold text-slate-100 font-mono">
+                    {price > 0
+                      ? `$${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      : 'Loading...'}
+                  </span>
+                  {price > 0 && (
+                    <span
+                      className={`text-[10px] font-bold flex items-center gap-0.5 ${
+                        isPos ? 'text-emerald-400' : 'text-rose-400'
+                      }`}
+                    >
+                      {isPos ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
+                      {isPos ? '+' : ''}
+                      {Number(item.change || 0).toFixed(2)}%
                     </span>
                   )}
                 </div>
-                <span className="text-[10px] text-slate-500">
-                  {item.name || item.symbol} {item.volume !== '...' && `• Vol: ${item.volume}`}
-                </span>
               </div>
 
-              <div className="flex flex-col items-end gap-0.5">
-                <span className="font-semibold text-slate-100 font-mono">
-                  {price > 0
-                    ? `$${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                    : 'Loading...'}
-                </span>
-                {price > 0 && (
-                  <span
-                    className={`text-[10px] font-bold flex items-center gap-0.5 ${
-                      isPos ? 'text-emerald-400' : 'text-rose-400'
-                    }`}
-                  >
-                    {isPos ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
-                    {isPos ? '+' : ''}
-                    {Number(item.change || 0).toFixed(2)}%
-                  </span>
-                )}
+              {/* 1-Click External Deep-Links */}
+              <div
+                className="pt-1 border-t border-slate-800/60 flex items-center justify-between"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <PairVenueLinks symbol={item.symbol} size="xs" isFutures={true} />
               </div>
-            </button>
+            </div>
           );
         })}
       </div>

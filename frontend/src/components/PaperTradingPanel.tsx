@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ShieldAlert, ShieldCheck, Play, RefreshCw, Layers } from 'lucide-react';
 import { PaperTrade, RiskConfig } from '../types';
+import { PairVenueLinks } from './PairVenueLinks';
 
 interface PaperTradingPanelProps {
   symbol: string;
@@ -101,6 +102,7 @@ export const PaperTradingPanel: React.FC<PaperTradingPanelProps> = ({
           <h3 className="text-xs font-mono font-bold text-slate-200 uppercase">
             PAPER TRADING &amp; RISK GATE
           </h3>
+          <PairVenueLinks symbol={symbol} size="xs" isFutures={true} />
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
@@ -300,7 +302,12 @@ export const PaperTradingPanel: React.FC<PaperTradingPanelProps> = ({
                           <td className="py-1.5 px-2 text-slate-400 font-mono text-[10px]">
                             {idStr.length > 14 ? `#${idStr.slice(-8)}` : `#${idStr}`}
                           </td>
-                          <td className="py-1.5 px-2 font-bold text-white">{pos.symbol}</td>
+                          <td className="py-1.5 px-2 font-bold text-white whitespace-nowrap">
+                            <div className="flex items-center gap-1.5">
+                              <span>{pos.symbol}</span>
+                              <PairVenueLinks symbol={pos.symbol} size="xs" isFutures={true} />
+                            </div>
+                          </td>
                           <td className="py-1.5 px-2">
                             <span
                               className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${

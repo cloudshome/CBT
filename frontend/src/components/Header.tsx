@@ -2,6 +2,7 @@ import React from 'react';
 import { RefreshCw, Activity, Zap, TrendingUp, TrendingDown, BellOff, BellRing, Send, Layers, Cpu } from 'lucide-react';
 import { SupportedTimeframe } from '../types';
 import { api } from '../services/api';
+import { PairVenueLinks } from './PairVenueLinks';
 
 interface HeaderProps {
   symbol: string;
@@ -243,6 +244,13 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 {safeTrend.split(' ')[0] || 'NEUTRAL'}
               </span>
+            </div>
+
+            <div className="h-6 w-[1px] bg-border hidden md:block" />
+
+            {/* 1-Click External Venue Links */}
+            <div className="hidden md:flex items-center">
+              <PairVenueLinks symbol={symbol} size="xs" isFutures={true} />
             </div>
           </div>
 

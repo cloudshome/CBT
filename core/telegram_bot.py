@@ -1065,6 +1065,36 @@ class TelegramBotDispatcher:
     # INSTITUTIONAL FORMATTERS & DISPATCHERS
     # ==============================================================================
 
+    @staticmethod
+    def build_venue_buttons(symbol: str, is_futures: bool = True) -> list[dict[str, str]]:
+        """
+        Builds authoritative 1-click external deep-link buttons for TradingView, Binance, and Bybit.
+        """
+        clean = symbol.upper().replace("/", "").replace("-", "").replace("_", "")
+        base = clean.replace("USDT", "").replace("USDC", "").replace("BUSD", "") or "BTC"
+
+        if "XAU" in clean or "GOLD" in clean or "PAXG" in clean:
+            tv_symbol = "OANDA:XAUUSD"
+            binance_url = "https://www.binance.com/en/trade/PAXG_USDT"
+            bybit_url = "https://www.bybit.com/trade/usdt/PAXGUSDT"
+        else:
+            tv_suffix = ".P" if is_futures else ""
+            tv_symbol = f"BINANCE:{clean}{tv_suffix}"
+            binance_url = (
+                f"https://www.binance.com/en/futures/{base}USDT"
+                if is_futures
+                else f"https://www.binance.com/en/trade/{base}_USDT"
+            )
+            bybit_url = f"https://www.bybit.com/trade/usdt/{base}USDT"
+
+        tv_url = f"https://www.tradingview.com/chart/?symbol={tv_symbol}"
+
+        return [
+            {"text": "📈 TradingView", "url": tv_url},
+            {"text": "🟡 Binance", "url": binance_url},
+            {"text": "🟠 Bybit", "url": bybit_url},
+        ]
+
     async def send_trade_signal(self, signal: dict[str, Any]) -> bool:
         """
         Dispatches a high-conviction quantitative trade signal and automatically
@@ -1131,7 +1161,9 @@ class TelegramBotDispatcher:
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
             f"⏱️ _{now_str}_ | SKY Quantitative Terminal"
         )
-        return await self.send_message(msg)
+        venue_row = self.build_venue_buttons(sym, is_futures=True)
+        reply_markup = {"inline_keyboard": [venue_row]}
+        return await self.send_message(msg, reply_markup=reply_markup)
 
     async def send_trade_entry_alert(self, trade: dict[str, Any]) -> bool:
         """
@@ -1184,16 +1216,16 @@ class TelegramBotDispatcher:
             f"🆔 **Position ID:** `{pos_id}`\n"
             f"🛡️ **Desk:** `Paper Trading Desk (Live Shadow Ledger)`"
         )
-        reply_markup = None
+        venue_row = self.build_venue_buttons(sym, is_futures=True)
+        keyboard = [venue_row]
         if pos_id and pos_id != "N/A":
-            reply_markup = {
-                "inline_keyboard": [
-                    [
-                        {"text": "🛑 Close Trade Now", "callback_data": f"close:{pos_id}"},
-                        {"text": "⚖️ Move SL to Breakeven", "callback_data": f"be:{pos_id}"},
-                    ]
+            keyboard.append(
+                [
+                    {"text": "🛑 Close Trade Now", "callback_data": f"close:{pos_id}"},
+                    {"text": "⚖️ Move SL to Breakeven", "callback_data": f"be:{pos_id}"},
                 ]
-            }
+            )
+        reply_markup = {"inline_keyboard": keyboard}
         return await self.send_message(msg, reply_markup=reply_markup)
 
     async def send_trade_exit_alert(self, trade: dict[str, Any]) -> bool:
@@ -1254,7 +1286,9 @@ class TelegramBotDispatcher:
             f"📅 **Exit Time (প্রস্থান সময়):** `{closed_str}`\n"
             f"🆔 **Position ID:** `{pos_id}`"
         )
-        return await self.send_message(msg)
+        venue_row = self.build_venue_buttons(sym, is_futures=True)
+        reply_markup = {"inline_keyboard": [venue_row]}
+        return await self.send_message(msg, reply_markup=reply_markup)
 
     def notify_trade_entry_sync(self, trade: dict[str, Any]) -> None:
         """Synchronously schedules async trade entry notification."""
@@ -1362,7 +1396,9 @@ class TelegramBotDispatcher:
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
             f"⏱️ _{now_str}_ | SKY SMC Engine"
         )
-        return await self.send_message(msg)
+        venue_row = self.build_venue_buttons(sym, is_futures=True)
+        reply_markup = {"inline_keyboard": [venue_row]}
+        return await self.send_message(msg, reply_markup=reply_markup)
 
     async def send_event_alert(self, event: dict[str, Any]) -> bool:
         """

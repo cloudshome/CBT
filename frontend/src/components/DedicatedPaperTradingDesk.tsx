@@ -19,6 +19,7 @@ import {
 import { PaperDeskOverviewResponse, HalfKellySizingResponse } from '../types';
 import { api } from '../services/api';
 import { AgentConceptTournamentPanel } from './AgentConceptTournamentPanel';
+import { PairVenueLinks } from './PairVenueLinks';
 
 interface DedicatedPaperTradingDeskProps {
   onClosePosition: (positionId: string) => Promise<void>;
@@ -501,6 +502,9 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
                                 </span>
                               )}
                             </div>
+                            <div className="mt-1">
+                              <PairVenueLinks symbol={pos.symbol} size="xs" isFutures={true} />
+                            </div>
                             {pos.agentManager && (
                               <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1 mt-0.5">
                                 <Bot className="w-3 h-3 text-slate-500" />
@@ -663,6 +667,10 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
                       </span>
                     </div>
 
+                    <div className="mb-2">
+                      <PairVenueLinks symbol={item.symbol} size="xs" isFutures={true} />
+                    </div>
+
                     <h3 className="text-xs font-mono font-bold text-slate-200">
                       {item.setupName}
                     </h3>
@@ -737,6 +745,7 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
                           <span className="px-2 py-0.5 rounded bg-sky-950 text-sky-300 border border-sky-500/40 text-[10px] font-bold">
                             {plan.bias}
                           </span>
+                          <PairVenueLinks symbol={plan.symbol} size="xs" isFutures={true} />
                         </div>
                         {plan.macroAlignment && (
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 ${
@@ -833,8 +842,11 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
                       <td className="py-3 px-3 text-slate-400 font-bold">
                         #{trade.id.slice(-10)}
                       </td>
-                      <td className="py-3 px-3 font-bold text-white">
-                        {trade.symbol}
+                      <td className="py-3 px-3 font-bold text-white whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <span>{trade.symbol}</span>
+                          <PairVenueLinks symbol={trade.symbol} size="xs" isFutures={true} />
+                        </div>
                       </td>
                       <td className="py-3 px-3">
                         <span

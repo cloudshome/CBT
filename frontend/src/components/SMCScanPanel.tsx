@@ -2,8 +2,10 @@ import React from 'react';
 import { Target, Zap, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { FVGItem, OrderBlockItem, SetupSuggestion } from '../types';
 import { LoadingSkeleton } from './LoadingSkeleton';
+import { PairVenueLinks } from './PairVenueLinks';
 
 interface SMCScanPanelProps {
+  symbol?: string;
   fvgs?: FVGItem[];
   orderBlocks?: OrderBlockItem[];
   setups?: SetupSuggestion[];
@@ -12,6 +14,7 @@ interface SMCScanPanelProps {
 }
 
 export const SMCScanPanel: React.FC<SMCScanPanelProps> = ({
+  symbol,
   fvgs = [],
   orderBlocks = [],
   setups = [],
@@ -34,6 +37,7 @@ export const SMCScanPanel: React.FC<SMCScanPanelProps> = ({
           <h3 className="text-xs font-mono font-bold text-slate-200 uppercase">
             SMC SCAN &amp; TRADE SETUPS
           </h3>
+          {symbol && <PairVenueLinks symbol={symbol} size="xs" isFutures={true} />}
         </div>
         <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-terminal-cyan/10 text-terminal-cyan border border-terminal-cyan/30">
           AUTO-SCANNER
@@ -112,15 +116,18 @@ export const SMCScanPanel: React.FC<SMCScanPanelProps> = ({
                           </span>
                         </div>
 
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onSelectSetup(setup);
-                          }}
-                          className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 flex items-center gap-1"
-                        >
-                          <Zap className="w-2.5 h-2.5 text-terminal-amber" /> Use Setup
-                        </button>
+                        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                          {symbol && <PairVenueLinks symbol={symbol} size="xs" isFutures={true} />}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSelectSetup(setup);
+                            }}
+                            className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 flex items-center gap-1"
+                          >
+                            <Zap className="w-2.5 h-2.5 text-terminal-amber" /> Use Setup
+                          </button>
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-3 gap-1 mt-2 text-[11px] font-mono">

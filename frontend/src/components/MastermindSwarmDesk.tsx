@@ -18,6 +18,7 @@ import {
   Crosshair,
 } from 'lucide-react';
 import { api } from '../services/api';
+import { PairVenueLinks } from './PairVenueLinks';
 
 interface SpecialistInfo {
   specialist_id: string;
@@ -276,8 +277,8 @@ export const MastermindSwarmDesk: React.FC<MastermindSwarmDeskProps> = ({
               </div>
 
               <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-[10px]">
-                <span className="text-slate-500">Allocation:</span>
-                <span className="text-slate-300 font-semibold">Half-Kelly Dynamic</span>
+                <span className="text-slate-500">Venue:</span>
+                <PairVenueLinks symbol={spec.symbol} size="xs" isFutures={true} />
               </div>
             </div>
           ))}
@@ -688,7 +689,10 @@ export const MastermindSwarmDesk: React.FC<MastermindSwarmDeskProps> = ({
                       {dec.specialist_id}
                     </td>
                     <td className="py-2.5 px-3 font-bold text-white whitespace-nowrap">
-                      {dec.symbol}
+                      <div className="flex items-center gap-2">
+                        <span>{dec.symbol}</span>
+                        <PairVenueLinks symbol={dec.symbol} size="xs" isFutures={true} />
+                      </div>
                     </td>
                     <td className="py-2.5 px-3 whitespace-nowrap">
                       {dec.direction === 'LONG' ? (
