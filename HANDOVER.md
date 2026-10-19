@@ -2,7 +2,24 @@
 
 **Read this first if you are the next coding session (Windows or Ubuntu).**
 
-Last updated: **2026-10-17 · Dynamic Market Opportunity Hunter & Dual Spot/Futures Testnet Mirroring Shipped** (Commits `2d7cd94`, `4534ff2`, `392a484`).
+Last updated: **2026-10-19 · Full Multi-PC Sync with Windows & SSH Crontab Hardening Shipped** (Commits `865e15b`, `6edb6c7`).
+- **Full Windows & GitHub Synchronization (13 Commits Integrated):**
+  - **Universal 1-Click Venue Links (`PairVenueLinks.tsx`, `venueLinks.ts`):** Embedded direct TradingView, Binance, and Bybit trading links across all desks, Opportunity Radar, and Telegram alerts.
+  - **Dynamic Opportunity Swarm (`core/specialists/opportunity_specialists.py`, `MastermindSwarmDesk.tsx`):** Long/Short dynamic opportunity specialists with automated deployment and arbiter voting.
+  - **Execution & Breakeven Race Hardening (`tests/test_breakeven_alert_race.py`):** Eliminated breakeven race condition, purged mock remnants, and grounded trading queue in live prices.
+  - **Cockpit & Concept Generalization:** Multi-timeframe 1m/3m selectors, live stream latency telemetry, and generalized UI headers across all 15 concept families.
+  - **Unified Cross-Platform Launchers:** Added `start_terminal.sh`, `start_terminal.ps1`, and `start_terminal.bat` with auto-virtualenv resolution.
+- **Ubuntu Scheduled Crontab Hardening (`scripts/ubuntu_git_sync.sh`, `deploy/crontab_ubuntu_sync.cron`):**
+  - Resolved `Permission denied (publickey)` under cron: script now dynamically detects and exports the active user runtime SSH socket (`/run/user/1000/gcr/ssh` or `keyring/ssh`).
+  - Added automated safe-stashing of uncommitted local working tree changes (e.g. background crawler data), preventing fast-forward merges from being blocked.
+- **Frontend & Service Verification:**
+  - Production Vite bundle built in 14.91s with 0 errors (`dist/assets/index-BJlLLQ69.js`).
+  - All 3 systemd daemons active: `cbt-fastapi.service`, `cbt-frontend.service`, `cbt-express.service`.
+  - 17/17 pytest suite 100% green.
+
+---
+
+**Previous:** 2026-10-17 · **Dynamic Market Opportunity Hunter & Dual Spot/Futures Testnet Mirroring Shipped** (Commits `2d7cd94`, `4534ff2`, `392a484`).
 - **Dynamic Market Opportunity Hunter (`core/screener/opportunity_hunter.py`, `app.py`):**
   - Continuous discovery across 3,732 Binance Spot pairs and 793 USDⓈ-M Futures pairs with async non-blocking execution and 3-minute TTL memory caching.
   - Institutional Liquidity & Spread Gates: Enforces $15M Spot / $25M Futures 24h volume minimums and 12 bps max spread.
