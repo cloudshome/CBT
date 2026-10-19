@@ -2,6 +2,33 @@
 
 **Read this first if you are the next coding session (Windows or Ubuntu).**
 
+Last updated: **2026-10-19 · Quantitative Alpha Optimization, Two-Tier Partial Exits & Screener Decomposition Shipped** (Commits `core/portfolio_shadow.py`, `core/autonomous_trader.py`, `core/screener/screener_routes.py`).
+- **Two-Tier Partial Exit Engine (`core/portfolio_shadow.py`):**
+  - When open positions hit $+1.5R$ milestone, automatically closes 50% (`size * 0.5`) to lock in $+1.5R$ profit into `realized_pnl`.
+  - Adjusts remaining position Stop Loss to Breakeven (entry price) and ratchets trailing stop to lock in $+0.5R$ minimum on the remaining half.
+  - Guarantees asymmetric payoff and prevents winning $+1.5R$ trades from retracing into losses.
+  - Added instant spike guard (`is_hitting_tp`) ensuring direct Take Profit gap spikes execute 100% at TP limit price.
+  - Updated `get_portfolio_accounting()` to correctly accumulate partial realized profits on still-open positions.
+- **Dynamic ATR Volatility Stop & Asymmetric TP (`core/autonomous_trader.py`):**
+  - Replaced heuristic static 1.5% stop loss with dynamic $2.0 \times \text{ATR}_{14}$ anchored to true volatility.
+  - Sets asymmetric Take Profit target to at least $2.0R$ (and $\ge 3.0 \times \text{ATR}$), guaranteeing positive mathematical expectancy.
+- **Trend Regime Filter & Rolling Asset Gate (`core/autonomous_trader.py`):**
+  - **ADX Regime Gate:** Rejects `SETUP_B_PULLBACK_FVG` and `SETUP_C_BREAKOUT_EXPANSION` setups if ADX $< 20.0$ during consolidation/compression.
+  - **Rolling Asset Performance Gate:** Monitors rolling closed trades per symbol; if empirical Profit Factor $< 0.70$ over $\ge 20$ trades (e.g. historical ETH chop), blocks entries unless setup confluence score $\ge 85.0$.
+  - **Dynamic Universe Integration:** Ingests Top 5 qualified opportunities from `opportunity_hunter.scan_and_rank()` alongside blue-chip assets.
+- **Screener Router Monolith Modularization (`core/screener/screener_routes.py`, `app.py`):**
+  - Extracted `/api/screener/opportunities`, `/api/screener/watchlist`, and `/api/screener/health` into dedicated FastAPI `APIRouter`.
+  - Cleaned up monolith `app.py` and mounted router cleanly via `app.include_router(screener_router)`.
+- **Test Suite Verification:**
+  - 100% green across all new and regression test suites:
+    - `tests/test_dynamic_atr_and_two_tier_exits.py` (4/4 PASS)
+    - `tests/test_regime_filter_and_asset_gate.py` (2/2 PASS)
+    - `tests/test_opportunity_hunter.py` & `test_opportunity_swarm.py` (12/12 PASS)
+    - `tests/test_portfolio_accounting.py` & `test_breakeven_alert_race.py` (16/16 PASS)
+    - Milestone 18 execution certification gates: 149/149 PASS.
+
+---
+
 Last updated: **2026-10-19 · Full Multi-PC Sync with Windows & SSH Crontab Hardening Shipped** (Commits `865e15b`, `6edb6c7`).
 - **Full Windows & GitHub Synchronization (13 Commits Integrated):**
   - **Universal 1-Click Venue Links (`PairVenueLinks.tsx`, `venueLinks.ts`):** Embedded direct TradingView, Binance, and Bybit trading links across all desks, Opportunity Radar, and Telegram alerts.

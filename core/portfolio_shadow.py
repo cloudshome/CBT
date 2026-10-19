@@ -274,8 +274,10 @@ class PortfolioShadowManager:
                 (current_price - entry_p) * size if is_long else (entry_p - current_price) * size
             )
 
-            # 2. Check Breakeven Trigger (+1.5R Milestone)
-            if not be_trig and risk_dist > 0:
+            # 2. Check Breakeven Trigger (+1.5R Milestone) & Two-Tier Partial Exit
+            is_hitting_tp = (current_price >= tp_p) if is_long else (current_price <= tp_p)
+
+            if not be_trig and risk_dist > 0 and not is_hitting_tp:
                 current_r = (
                     ((current_price - entry_p) / risk_dist)
                     if is_long
@@ -287,12 +289,41 @@ class PortfolioShadowManager:
                     trailing_stop = (
                         entry_p + (0.5 * risk_dist) if is_long else entry_p - (0.5 * risk_dist)
                     )
+
+                    # Two-Tier Partial Exit Engine: Secure 50% profit at +1.5R milestone
+                    closed_half_size = round(size * 0.5, 6)
+                    remaining_size = round(size - closed_half_size, 6)
+                    partial_profit_usd = (
+                        (current_price - entry_p) * closed_half_size
+                        if is_long
+                        else (entry_p - current_price) * closed_half_size
+                    )
+                    acc_realized_pnl = float(r["realized_pnl"] or 0.0) + partial_profit_usd
+
+                    with db_manager.get_trading_conn() as conn:
+                        conn.execute(
+                            """
+                            UPDATE shadow_positions SET
+                                size = ?,
+                                realized_pnl = ?,
+                                stop_loss = ?,
+                                trailing_stop = ?,
+                                breakeven_triggered = 1
+                            WHERE position_id = ?;
+                            """,
+                            (remaining_size, acc_realized_pnl, sl_p, trailing_stop, pos_id),
+                        )
+                        conn.commit()
+
+                    size = remaining_size
                     events.append(
                         {
                             "event": "BREAKEVEN_TRIGGERED",
                             "position_id": pos_id,
                             "new_stop_loss": sl_p,
-                            "message": f"🛡️ {symbol} reached +1.5R! Stop Loss automatically adjusted to Breakeven (${sl_p:,.2f}).",
+                            "partial_realized_pnl": partial_profit_usd,
+                            "remaining_size": remaining_size,
+                            "message": f"🛡️ {symbol} reached +1.5R! 50% profit secured (+${partial_profit_usd:,.2f}), Stop Loss adjusted to Breakeven (${sl_p:,.2f}), remaining {remaining_size:g} units trailing.",
                         }
                     )
 
@@ -327,9 +358,11 @@ class PortfolioShadowManager:
 
             exit_fill_price = current_price
             if is_closed:
+                prior_realized_pnl = float(r["realized_pnl"] or 0.0)
                 if close_reason == "TAKE_PROFIT_HIT":
                     exit_fill_price = tp_p
-                    final_pnl = ((tp_p - entry_p) * size) if is_long else ((entry_p - tp_p) * size)
+                    remaining_pnl = ((tp_p - entry_p) * size) if is_long else ((entry_p - tp_p) * size)
+                    final_pnl = prior_realized_pnl + remaining_pnl
                 elif close_reason == "STOP_LOSS_HIT":
                     # Realistic Exchange Stop-Loss Fill Model:
                     # On an exchange, a resting stop loss triggers at active_sl with institutional slippage (max 15 bps adverse gap).
@@ -342,7 +375,7 @@ class PortfolioShadowManager:
                             if current_price > 0
                             else active_sl
                         )
-                        final_pnl = (exit_fill_price - entry_p) * size
+                        remaining_pnl = (exit_fill_price - entry_p) * size
                     else:
                         sl_with_slippage = round(active_sl * (1.0 + slippage_buffer), 6)
                         exit_fill_price = (
@@ -350,7 +383,8 @@ class PortfolioShadowManager:
                             if current_price > 0
                             else active_sl
                         )
-                        final_pnl = (entry_p - exit_fill_price) * size
+                        remaining_pnl = (entry_p - exit_fill_price) * size
+                    final_pnl = prior_realized_pnl + remaining_pnl
 
             # Update database
             with db_manager.get_trading_conn() as conn:
@@ -638,15 +672,15 @@ class PortfolioShadowManager:
         all_positions = self.get_all_positions(limit=500)
         closed_positions = [p for p in all_positions if p.get("status") == "CLOSED"]
 
-        total_realized_pnl = sum(float(p.get("realized_pnl", 0.0)) for p in closed_positions)
+        total_realized_pnl = sum(float(p.get("realized_pnl", 0.0)) for p in all_positions)
         total_unrealized_pnl = sum(float(p.get("unrealized_pnl", 0.0)) for p in open_positions)
 
         now_ms = int(time.time() * 1000)
         utc_day_start_ms = (now_ms // 86_400_000) * 86_400_000
         daily_realized_pnl = sum(
             float(p.get("realized_pnl", 0.0))
-            for p in closed_positions
-            if int(p.get("closed_at") or 0) >= utc_day_start_ms
+            for p in all_positions
+            if int(p.get("closed_at") or p.get("opened_at") or 0) >= utc_day_start_ms
         )
 
         settled_cash = starting_capital + total_realized_pnl

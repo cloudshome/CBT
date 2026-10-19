@@ -17,9 +17,11 @@ from typing import Any
 from core.api_health_guard import api_health_guard
 from core.audit_bus import audit_bus
 from core.data_streamer import data_streamer
+from core.database import db_manager
 from core.portfolio_shadow import portfolio_shadow
 from core.sky_intelligence.orchestrator import sky_orchestrator
 from core.sky_intelligence.types import DecisionAction, SetupType, SKYSetup
+from core.sky_intelligence.volatility_engine import volatility_engine
 
 logger = logging.getLogger("ai_quant_sentinel.autonomous_trader")
 
@@ -121,7 +123,25 @@ class AutonomousTrader:
         executed_actions: list[dict[str, Any]] = []
         self.last_scan_time = time.time()
 
-        for sym in self.active_symbols:
+        # Dynamic Opportunity Hunter Expansion: incorporate Top 5 qualified opportunities
+        scan_symbols = list(self.active_symbols)
+        try:
+            from core.screener.opportunity_hunter import opportunity_hunter
+
+            hunter_opps = await opportunity_hunter.scan_and_rank()
+            for opp in hunter_opps:
+                if (
+                    opp.trade_quality_score >= 75.0
+                    and opp.market_attention_score >= 65.0
+                    and opp.symbol not in scan_symbols
+                ):
+                    scan_symbols.append(opp.symbol)
+                if len(scan_symbols) >= len(self.active_symbols) + 5:
+                    break
+        except Exception as hunter_err:
+            logger.debug(f"Opportunity hunter discovery deferred: {hunter_err}")
+
+        for sym in scan_symbols:
             try:
                 # 2. Fetch/Refresh Live MTF Candlesticks from market gateway
                 try:
@@ -209,6 +229,46 @@ class AutonomousTrader:
                     cur_price = live_price if live_price > 0 else float(candles_15m[-1]["close"])
                     setup = decision_out.setup_qualified
 
+                    # Guard 2a: Institutional Trend Regime Filter (ADX & Chop Protection)
+                    regime_dossier = decision_out.explanation_dossier.get("regime_state", {})
+                    adx_val = float(regime_dossier.get("trend_strength_adx", 25.0))
+                    regime_name = str(regime_dossier.get("regime_type", ""))
+                    st_type = getattr(setup, "setup_type", None)
+                    st_val = getattr(st_type, "value", str(st_type)) if st_type else ""
+
+                    if adx_val < 20.0 and regime_name in ("RANGING_CONSOLIDATION", "COMPRESSION_SQUEEZE"):
+                        if st_val in ("SETUP_B_PULLBACK_FVG", "SETUP_C_BREAKOUT_EXPANSION"):
+                            logger.info(
+                                f"Trend Regime Filter: Rejecting {sym} breakout setup in low-ADX chop (ADX={adx_val:.1f}, Regime={regime_name})."
+                            )
+                            continue
+
+                    # Guard 2b: Rolling Asset Performance Gate (Cap Bleed on Negative PF Assets)
+                    with db_manager.get_trading_conn() as conn:
+                        p_cur = conn.execute(
+                            """
+                            SELECT 
+                                SUM(CASE WHEN realized_pnl > 0 THEN realized_pnl ELSE 0 END) as gross_win,
+                                SUM(CASE WHEN realized_pnl < 0 THEN ABS(realized_pnl) ELSE 0 END) as gross_loss,
+                                COUNT(*) as trade_count
+                            FROM shadow_positions
+                            WHERE symbol = ? AND status = 'CLOSED';
+                            """,
+                            (sym,),
+                        )
+                        p_row = p_cur.fetchone()
+                        if p_row and p_row["trade_count"] and p_row["trade_count"] >= 20:
+                            g_win = float(p_row["gross_win"] or 0.0)
+                            g_loss = float(p_row["gross_loss"] or 0.0)
+                            asset_pf = (g_win / g_loss) if g_loss > 0 else 1.0
+                            if asset_pf < 0.70:
+                                confluence = float(getattr(setup, "confluence_score", 0.0) or 0.0)
+                                if confluence < 85.0:
+                                    logger.info(
+                                        f"Asset Performance Gate: Skipping {sym} trade (Historical PF={asset_pf:.2f} < 0.70 across {p_row['trade_count']} trades, Confluence={confluence:.1f} < 85.0)."
+                                    )
+                                    continue
+
                     # If setup entry is missing or divergent (>1.5% away from live price), anchor to live market
                     if (
                         setup
@@ -219,22 +279,31 @@ class AutonomousTrader:
                     else:
                         entry_price = cur_price
 
-                    sl = (
-                        setup.invalidation_sl
-                        if setup and setup.invalidation_sl > 0
-                        else (
-                            cur_price
-                            * (0.985 if decision_out.decision == DecisionAction.LONG else 1.015)
+                    # Dynamic ATR Volatility Sizing Anchor (No Arbitrary Static Percentages)
+                    vol_state = volatility_engine.compute_volatility(candles_15m)
+                    atr_val = vol_state.atr if vol_state and vol_state.atr > 0 else (cur_price * 0.015)
+
+                    if setup and setup.invalidation_sl > 0:
+                        sl = setup.invalidation_sl
+                    else:
+                        sl = (
+                            round(cur_price - 2.0 * atr_val, 6)
+                            if decision_out.decision == DecisionAction.LONG
+                            else round(cur_price + 2.0 * atr_val, 6)
                         )
-                    )
-                    tp = (
-                        setup.target_tp
-                        if setup and setup.target_tp > 0
-                        else (
-                            cur_price
-                            * (1.03 if decision_out.decision == DecisionAction.LONG else 0.97)
+
+                    risk_dist = abs(entry_price - sl)
+                    min_tp_dist = max(risk_dist * 2.0, 3.0 * atr_val)
+
+                    if setup and setup.target_tp > 0 and abs(setup.target_tp - entry_price) >= risk_dist * 1.5:
+                        tp = setup.target_tp
+                    else:
+                        # Target at least 2.0R to guarantee asymmetric positive mathematical expectancy
+                        tp = (
+                            round(entry_price + min_tp_dist, 6)
+                            if decision_out.decision == DecisionAction.LONG
+                            else round(entry_price - min_tp_dist, 6)
                         )
-                    )
 
                     # Guard 3: Invalidate expired setups where market has already breached target or stop
                     if decision_out.decision == DecisionAction.LONG:

@@ -64,6 +64,7 @@ from core.autonomous_research.storage.storage_manager import storage_manager
 from core.autonomous_research.storage.storage_manifest import storage_manifest
 from core.autonomous_trader import autonomous_trader
 from core.collective.routes import router as collective_router
+from core.screener import screener_router
 from core.screener.opportunity_hunter import opportunity_hunter
 from core.collective.sync_daemon import cluster_sync_daemon
 from core.command_executor import command_executor
@@ -284,6 +285,7 @@ app.include_router(institutional_suite_router)
 app.include_router(testnet_router)
 app.include_router(risk_engine_router)
 app.include_router(paper_router)
+app.include_router(screener_router)
 
 # CORS — fail closed in production: CORS_ORIGIN must be an explicit allowlist.
 _cors_origin = os.getenv("CORS_ORIGIN", "").strip()
@@ -1625,40 +1627,7 @@ async def force_autonomous_trader_scan():
     }
 
 
-# ------------------------------------------------------------------------------
-# DYNAMIC MARKET OPPORTUNITY HUNTER & DISCOVERY RADAR
-# ------------------------------------------------------------------------------
 
-@app.get("/api/screener/opportunities")
-async def get_market_opportunities(category: str | None = None, force_refresh: bool = False):
-    """
-    Returns real-time ranked opportunities discovered across 700+ Binance Spot and Futures pairs,
-    filtered by the Institutional Liquidity Gate and classified into the 6 quantitative opportunity categories.
-    """
-    records = await opportunity_hunter.scan_market(force_refresh=force_refresh)
-    if category and category.upper() != "ALL":
-        records = [r for r in records if r.opportunity_category.value == category.upper()]
-    return {
-        "status": "SUCCESS",
-        "total_opportunities": len(records),
-        "health": opportunity_hunter.get_health(),
-        "opportunities": [r.to_dict() for r in records],
-    }
-
-
-@app.get("/api/screener/watchlist")
-async def get_dynamic_watchlist():
-    """Returns the dynamic universe watchlist with lifecycle states (DISCOVERED, QUALIFIED, ACTIVE, RETIRED)."""
-    return {
-        "status": "SUCCESS",
-        "watchlist": opportunity_hunter.get_watchlist(),
-    }
-
-
-@app.get("/api/screener/health")
-async def get_screener_health():
-    """Returns telemetry health metrics for the opportunity hunter scanner."""
-    return opportunity_hunter.get_health()
 
 
 @app.post("/api/command/parse", dependencies=[Depends(require_api_key)])

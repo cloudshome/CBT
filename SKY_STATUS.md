@@ -1,13 +1,14 @@
 # SKY — Project Status & Agent Handoff Document
 
 > **Last Updated:** 2026-10-19  
-> **Release Tag:** `v4.2.0-swarm-venues` (Dynamic Opportunity Swarm, 1-Click Venues & Hardened Crontab Active 🚀)  
+> **Release Tag:** `v4.3.0-quant-alpha` (Two-Tier Partial Exits, Dynamic ATR Stops, Regime/Asset Gates & Screener Decomposition 🚀)  
 > **Branch:** `main`  
 > **Remote:** `https://github.com/cloudshome/CBT.git`  
 > **Lead Agent:** Antigravity  
 > **Milestone 18 Status:** PRODUCTION PASS (Certified & Active — 149/149 Tests)  
 > **Multi-PC Status:** 100% SYNCHRONIZED (Ubuntu Hub & Windows Office PC aligned at `origin/main`)  
 > **Dynamic Screener & Swarm:** PRODUCTION ACTIVE (Scanning 3,732 Spot & 793 Futures Pairs, Long/Short Swarm Specialists Active)  
+> **Execution & Exit Engine:** TWO-TIER PARTIAL EXITS ACTIVE (+1.5R 50% Profit Lock, Breakeven SL, Dynamic ATR Volatility Anchors)  
 > **Autonomous Trader Status:** DUAL-TESTNET ACTIVE (Binance Spot & Futures Mirroring with Native Resting SL)  
 > **Circuit Breaker Status:** NORMAL (Autonomous Trading Active)  
 > **Milestone 46 Status:** COMPLETED & CERTIFIED (Central Trading Mind & Unified Execution Governance — 6 Invariants Enforced, 100% Green 🧠)  

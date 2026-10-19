@@ -12,6 +12,7 @@ from core.screener.opportunity_hunter import (
     WatchlistState,
     opportunity_hunter,
 )
+from core.screener.screener_routes import screener_router
 
 __all__ = [
     "AttentionState",
@@ -20,4 +21,6 @@ __all__ = [
     "OpportunityRecord",
     "WatchlistState",
     "opportunity_hunter",
+    "screener_router",
 ]
+
