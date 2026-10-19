@@ -11,6 +11,11 @@ import {
   Terminal,
   Radar,
   Activity,
+  ExternalLink,
+  Eye,
+  Zap,
+  Bot,
+  Crosshair,
 } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -65,9 +70,26 @@ export interface OpportunityRecord {
   primary_rationale: string;
   invalidation_level: number | null;
   observation_timestamp_ms: number;
+  timing_stage?: string;
+  reward_to_risk?: number;
+  distance_to_invalidation_pct?: number;
+  tradingview_url?: string;
+  binance_url?: string;
+  bybit_url?: string;
+  has_active_specialist?: boolean;
 }
 
-export const MastermindSwarmDesk: React.FC = () => {
+export interface MastermindSwarmDeskProps {
+  onSelectSymbol?: (symbol: string) => void;
+  onPrepareTrade?: (opp: OpportunityRecord) => void;
+  addToast?: (type: 'success' | 'error' | 'info' | 'warning', title: string, message: string) => void;
+}
+
+export const MastermindSwarmDesk: React.FC<MastermindSwarmDeskProps> = ({
+  onSelectSymbol,
+  onPrepareTrade,
+  addToast,
+}) => {
   const [status, setStatus] = useState<SwarmStatus | null>(null);
   const [decisions, setDecisions] = useState<DecisionRecord[]>([]);
   const [opportunities, setOpportunities] = useState<OpportunityRecord[]>([]);
@@ -75,6 +97,7 @@ export const MastermindSwarmDesk: React.FC = () => {
   const [screenerHealth, setScreenerHealth] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [deployingSymbol, setDeployingSymbol] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = async () => {
@@ -83,7 +106,7 @@ export const MastermindSwarmDesk: React.FC = () => {
       const [sRes, dRes, oppRes] = await Promise.allSettled([
         api.getMastermindStatus(),
         api.getMastermindDecisions(30),
-        api.getMarketOpportunities(),
+        api.getMastermindOpportunitySignals(),
       ]);
 
       let hasSuccess = false;
@@ -96,10 +119,23 @@ export const MastermindSwarmDesk: React.FC = () => {
         setDecisions(dRes.value.decisions);
         hasSuccess = true;
       }
+
       if (oppRes.status === 'fulfilled' && oppRes.value?.opportunities) {
         setOpportunities(oppRes.value.opportunities);
         setScreenerHealth(oppRes.value.health);
         hasSuccess = true;
+      } else {
+        // Fallback to screener opportunities if signals endpoint fails
+        try {
+          const fallbackOpp = await api.getMarketOpportunities();
+          if (fallbackOpp?.opportunities) {
+            setOpportunities(fallbackOpp.opportunities);
+            setScreenerHealth(fallbackOpp.health);
+            hasSuccess = true;
+          }
+        } catch {
+          // ignore fallback error
+        }
       }
 
       if (hasSuccess) {
@@ -113,6 +149,34 @@ export const MastermindSwarmDesk: React.FC = () => {
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  const handleDeploySpecialist = async (opp: OpportunityRecord) => {
+    try {
+      setDeployingSymbol(opp.symbol);
+      const res = await api.deployMastermindSpecialist({
+        symbol: opp.symbol,
+        category: opp.opportunity_category,
+        direction: opp.recommended_direction,
+        invalidation_level: opp.invalidation_level,
+        primary_rationale: opp.primary_rationale,
+        market_attention_score: opp.market_attention_score,
+        timing_stage: opp.timing_stage,
+      });
+
+      if (res?.status === 'DEPLOYED') {
+        addToast?.('success', 'Swarm Node Deployed', `Deployed Dynamic Specialist Node for ${opp.symbol}`);
+        setOpportunities((prev) =>
+          prev.map((o) => (o.symbol === opp.symbol ? { ...o, has_active_specialist: true } : o))
+        );
+        fetchData();
+      }
+    } catch (err: unknown) {
+      console.error('Failed to deploy specialist:', err);
+      addToast?.('error', 'Deployment Failed', `Failed to deploy specialist for ${opp.symbol}`);
+    } finally {
+      setDeployingSymbol(null);
     }
   };
 
@@ -271,6 +335,11 @@ export const MastermindSwarmDesk: React.FC = () => {
           {[
             { id: 'ALL', label: 'All Qualified', count: opportunities.length },
             {
+              id: 'PRE_BREAKOUT_COMPRESSION',
+              label: '⏳ Pre-Breakout Long',
+              count: opportunities.filter((o) => o.opportunity_category === 'PRE_BREAKOUT_COMPRESSION').length,
+            },
+            {
               id: 'EMERGING_MOMENTUM',
               label: '🚀 Momentum Gainers',
               count: opportunities.filter((o) => o.opportunity_category === 'EMERGING_MOMENTUM').length,
@@ -289,6 +358,11 @@ export const MastermindSwarmDesk: React.FC = () => {
               id: 'BLOW_OFF_EXHAUSTION',
               label: '🔻 Exhaustion Shorts',
               count: opportunities.filter((o) => o.opportunity_category === 'BLOW_OFF_EXHAUSTION').length,
+            },
+            {
+              id: 'BEARISH_CONTINUATION',
+              label: '📉 Breakdown Shorts',
+              count: opportunities.filter((o) => o.opportunity_category === 'BEARISH_CONTINUATION').length,
             },
           ].map((tab) => {
             const isSelected = selectedCategory === tab.id;
@@ -322,31 +396,39 @@ export const MastermindSwarmDesk: React.FC = () => {
               <tr className="border-b border-[#1e293b] bg-slate-950/60 text-slate-400 text-[10px] uppercase">
                 <th className="py-2 px-3">Symbol / Base</th>
                 <th className="py-2 px-3">Venues</th>
-                <th className="py-2 px-3">Direction</th>
+                <th className="py-2 px-3">Direction & Stage</th>
                 <th className="py-2 px-3">Price / 24h Change</th>
                 <th className="py-2 px-3">24h Vol / RVOL</th>
-                <th className="py-2 px-3">Spread</th>
+                <th className="py-2 px-3">Spread & Risk</th>
                 <th className="py-2 px-3">Market Attention</th>
                 <th className="py-2 px-3">Category & Rationale</th>
                 <th className="py-2 px-3">Invalidation</th>
+                <th className="py-2 px-3 text-right">Direct Links & Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1e293b]/60">
               {opportunities.filter((o) => selectedCategory === 'ALL' || o.opportunity_category === selectedCategory).length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-slate-500 text-xs">
+                  <td colSpan={10} className="py-8 text-center text-slate-500 text-xs">
                     {loading ? 'Discovering active market opportunities...' : 'No opportunities matching selected category.'}
                   </td>
                 </tr>
               ) : (
                 opportunities
                   .filter((o) => selectedCategory === 'ALL' || o.opportunity_category === selectedCategory)
-                  .slice(0, 15)
+                  .slice(0, 20)
                   .map((opp) => (
                     <tr key={opp.symbol} className="hover:bg-[#131b2e] transition-colors">
                       <td className="py-2.5 px-3 whitespace-nowrap">
                         <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-white text-xs">{opp.symbol}</span>
+                          <button
+                            onClick={() => onSelectSymbol?.(opp.symbol.replace('/', ''))}
+                            className="font-bold text-white text-xs hover:text-cyan-400 hover:underline transition-colors flex items-center gap-1 text-left"
+                            title="Click to load into CBT Cockpit Chart"
+                          >
+                            <span>{opp.symbol}</span>
+                            <Crosshair size={11} className="text-slate-500 hover:text-cyan-400" />
+                          </button>
                           <span className="text-[9px] bg-slate-800 text-slate-400 px-1 py-0.5 rounded font-mono">
                             {opp.base_asset}
                           </span>
@@ -369,19 +451,34 @@ export const MastermindSwarmDesk: React.FC = () => {
                       </td>
 
                       <td className="py-2.5 px-3 whitespace-nowrap">
-                        {opp.recommended_direction === 'LONG' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded text-[10px] font-bold">
-                            <TrendingUp size={11} /> LONG
+                        <div className="flex flex-col gap-1 items-start">
+                          {opp.recommended_direction === 'LONG' ? (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded text-[9px] font-bold">
+                              <TrendingUp size={10} /> LONG
+                            </span>
+                          ) : opp.recommended_direction === 'SHORT' ? (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-rose-500/10 text-rose-400 border border-rose-500/30 rounded text-[9px] font-bold">
+                              <TrendingDown size={10} /> SHORT
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded text-[9px] font-bold">
+                              <Activity size={10} /> WATCH
+                            </span>
+                          )}
+                          <span
+                            className={`inline-flex items-center px-1.5 py-0.2 rounded text-[8px] font-bold uppercase tracking-wider ${
+                              opp.timing_stage === 'PRE_SPIKE'
+                                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                                : opp.timing_stage === 'EARLY'
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                : opp.timing_stage === 'EXHAUSTED'
+                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                : 'bg-slate-800 text-slate-300 border border-slate-700'
+                            }`}
+                          >
+                            {opp.timing_stage || 'ACTIVE'}
                           </span>
-                        ) : opp.recommended_direction === 'SHORT' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-500/10 text-rose-400 border border-rose-500/30 rounded text-[10px] font-bold">
-                            <TrendingDown size={11} /> SHORT
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded text-[10px] font-bold">
-                            <Activity size={11} /> WATCH
-                          </span>
-                        )}
+                        </div>
                       </td>
 
                       <td className="py-2.5 px-3 whitespace-nowrap">
@@ -410,8 +507,15 @@ export const MastermindSwarmDesk: React.FC = () => {
                         </div>
                       </td>
 
-                      <td className="py-2.5 px-3 whitespace-nowrap text-[11px] font-mono text-slate-300">
-                        {opp.estimated_spread_bps.toFixed(1)} bps
+                      <td className="py-2.5 px-3 whitespace-nowrap">
+                        <div className="flex flex-col">
+                          <span className="text-[11px] font-mono text-slate-300">
+                            {opp.estimated_spread_bps.toFixed(1)} bps
+                          </span>
+                          <span className="text-[10px] text-slate-500 font-mono">
+                            Dist: {opp.distance_to_invalidation_pct ? `${opp.distance_to_invalidation_pct.toFixed(1)}%` : '—'}
+                          </span>
+                        </div>
                       </td>
 
                       <td className="py-2.5 px-3 whitespace-nowrap">
@@ -440,6 +544,95 @@ export const MastermindSwarmDesk: React.FC = () => {
 
                       <td className="py-2.5 px-3 whitespace-nowrap font-mono text-[11px] text-rose-300">
                         {opp.invalidation_level ? `$${opp.invalidation_level >= 1 ? opp.invalidation_level.toFixed(opp.invalidation_level >= 1000 ? 2 : 4) : opp.invalidation_level.toFixed(6)}` : '—'}
+                      </td>
+
+                      <td className="py-2.5 px-3 whitespace-nowrap text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {/* TradingView Chart Link */}
+                          <a
+                            href={
+                              opp.tradingview_url ||
+                              `https://www.tradingview.com/chart/?symbol=BINANCE:${opp.symbol.replace('/', '')}${
+                                opp.futures_eligible ? '.P' : ''
+                              }`
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-2 py-1 bg-[#1e293b] hover:bg-[#334155] text-cyan-300 hover:text-cyan-200 border border-slate-700 hover:border-cyan-500/40 rounded text-[10px] font-bold flex items-center gap-1 transition-all shadow-sm"
+                            title="Open TradingView Chart in new tab"
+                          >
+                            <ExternalLink size={10} />
+                            <span>TV</span>
+                          </a>
+
+                          {/* Binance Exchange Market Link */}
+                          <a
+                            href={
+                              opp.binance_url ||
+                              (opp.futures_eligible
+                                ? `https://www.binance.com/en/futures/${opp.base_asset}USDT`
+                                : `https://www.binance.com/en/trade/${opp.base_asset}_USDT`)
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-2 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 hover:text-amber-200 border border-amber-500/30 rounded text-[10px] font-bold flex items-center gap-1 transition-all shadow-sm"
+                            title="Open Binance Exchange in new tab"
+                          >
+                            <ExternalLink size={10} />
+                            <span>Binance</span>
+                          </a>
+
+                          {/* Bybit Secondary Venue Link */}
+                          <a
+                            href={opp.bybit_url || `https://www.bybit.com/trade/usdt/${opp.base_asset}USDT`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-1.5 py-1 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 rounded text-[10px] font-semibold flex items-center gap-1 transition-all"
+                            title="Open Bybit Market in new tab"
+                          >
+                            <ExternalLink size={10} />
+                            <span>Bybit</span>
+                          </a>
+
+                          {/* Cockpit Load Action */}
+                          <button
+                            onClick={() => onSelectSymbol?.(opp.symbol.replace('/', ''))}
+                            className="px-2 py-1 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 rounded text-[10px] font-bold flex items-center gap-1 transition-all"
+                            title="Load pair into CBT Cockpit Chart"
+                          >
+                            <Eye size={10} />
+                            <span>Cockpit</span>
+                          </button>
+
+                          {/* Pre-fill Trade Ticket */}
+                          <button
+                            onClick={() => onPrepareTrade?.(opp)}
+                            className="px-2 py-1 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded text-[10px] font-bold flex items-center gap-1 transition-all"
+                            title="Pre-fill Risk-First Trade Ticket"
+                          >
+                            <Zap size={10} />
+                            <span>Ticket</span>
+                          </button>
+
+                          {/* Deploy Dynamic Specialist */}
+                          <button
+                            onClick={() => handleDeploySpecialist(opp)}
+                            disabled={deployingSymbol === opp.symbol || opp.has_active_specialist}
+                            className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all border ${
+                              opp.has_active_specialist
+                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 cursor-default'
+                                : 'bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border-indigo-500/30'
+                            }`}
+                            title={
+                              opp.has_active_specialist
+                                ? 'Specialist Active in Swarm'
+                                : 'Deploy Dynamic Specialist Node into Swarm'
+                            }
+                          >
+                            <Bot size={10} className={deployingSymbol === opp.symbol ? 'animate-spin' : ''} />
+                            <span>{opp.has_active_specialist ? 'Active' : 'Deploy'}</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))

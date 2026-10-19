@@ -28,12 +28,14 @@ logger = logging.getLogger("sky.screener.opportunity_hunter")
 
 
 class OpportunityCategory(StrEnum):
+    PRE_BREAKOUT_COMPRESSION = "PRE_BREAKOUT_COMPRESSION"
     EMERGING_MOMENTUM = "EMERGING_MOMENTUM"
     CONFIRMED_BREAKOUT = "CONFIRMED_BREAKOUT"
     CAPITULATION_RECOVERY = "CAPITULATION_RECOVERY"
     BEARISH_CONTINUATION = "BEARISH_CONTINUATION"
     BLOW_OFF_EXHAUSTION = "BLOW_OFF_EXHAUSTION"
     CATALYST_OPPORTUNITY = "CATALYST_OPPORTUNITY"
+    NO_TRADE_QUARANTINE = "NO_TRADE_QUARANTINE"
 
 
 class AttentionState(StrEnum):
@@ -46,11 +48,35 @@ class AttentionState(StrEnum):
     REJECTED = "REJECTED"
 
 
+class TimingStage(StrEnum):
+    PRE_SPIKE = "PRE_SPIKE"
+    EARLY = "EARLY"
+    ACTIVE = "ACTIVE"
+    LATE = "LATE"
+    EXHAUSTED = "EXHAUSTED"
+    INVALIDATED = "INVALIDATED"
+
+
 class WatchlistState(StrEnum):
     DISCOVERED = "DISCOVERED"
     QUALIFIED = "QUALIFIED"
     ACTIVE = "ACTIVE"
     RETIRED = "RETIRED"
+
+
+def build_tradingview_url(base_asset: str, quote_asset: str = "USDT", is_futures: bool = True) -> str:
+    sym = f"{base_asset.upper()}{quote_asset.upper()}"
+    return f"https://www.tradingview.com/chart/?symbol=BINANCE:{sym}.P" if is_futures else f"https://www.tradingview.com/chart/?symbol=BINANCE:{sym}"
+
+
+def build_binance_url(base_asset: str, quote_asset: str = "USDT", is_futures: bool = True) -> str:
+    base = base_asset.upper()
+    quote = quote_asset.upper()
+    return f"https://www.binance.com/en/futures/{base}{quote}" if is_futures else f"https://www.binance.com/en/trade/{base}_{quote}"
+
+
+def build_bybit_url(base_asset: str, quote_asset: str = "USDT") -> str:
+    return f"https://www.bybit.com/trade/usdt/{base_asset.upper()}{quote_asset.upper()}"
 
 
 @dataclass
@@ -75,6 +101,12 @@ class OpportunityRecord:
     primary_rationale: str
     invalidation_level: float | None
     observation_timestamp_ms: int
+    timing_stage: str = "ACTIVE"  # PRE_SPIKE, EARLY, ACTIVE, LATE, EXHAUSTED
+    reward_to_risk: float = 2.0
+    distance_to_invalidation_pct: float = 0.0
+    tradingview_url: str = ""
+    binance_url: str = ""
+    bybit_url: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -279,6 +311,33 @@ class OpportunityHunter:
                 )
             )
 
+            # Timing stage determination
+            if category == OpportunityCategory.PRE_BREAKOUT_COMPRESSION:
+                timing_stage = TimingStage.PRE_SPIKE.value
+            elif category in (OpportunityCategory.EMERGING_MOMENTUM, OpportunityCategory.CAPITULATION_RECOVERY):
+                timing_stage = TimingStage.EARLY.value
+            elif category == OpportunityCategory.BLOW_OFF_EXHAUSTION:
+                timing_stage = TimingStage.EXHAUSTED.value
+            elif category in (OpportunityCategory.CONFIRMED_BREAKOUT, OpportunityCategory.BEARISH_CONTINUATION):
+                timing_stage = TimingStage.ACTIVE.value
+            else:
+                timing_stage = TimingStage.ACTIVE.value
+
+            # Distance to invalidation percentage
+            if inv_lvl and inv_lvl > 0 and price > 0:
+                dist_pct = round(abs(price - inv_lvl) / price * 100.0, 2)
+            else:
+                dist_pct = 2.5
+
+            # Target reward-to-risk ratio (higher for early/pre-spike setups)
+            target_rr = 2.5 if timing_stage in (TimingStage.PRE_SPIKE.value, TimingStage.EARLY.value) else 2.0
+
+            # Verified venue URLs
+            is_fut = futures_eligible
+            tv_url = build_tradingview_url(base, "USDT", is_futures=is_fut)
+            bin_url = build_binance_url(base, "USDT", is_futures=is_fut)
+            byb_url = build_bybit_url(base, "USDT")
+
             rec = OpportunityRecord(
                 symbol=symbol_slash,
                 base_asset=base,
@@ -300,6 +359,12 @@ class OpportunityHunter:
                 primary_rationale=rationale,
                 invalidation_level=inv_lvl,
                 observation_timestamp_ms=now_ms,
+                timing_stage=timing_stage,
+                reward_to_risk=target_rr,
+                distance_to_invalidation_pct=dist_pct,
+                tradingview_url=tv_url,
+                binance_url=bin_url,
+                bybit_url=byb_url,
             )
             qualified_records.append(rec)
 
@@ -321,7 +386,7 @@ class OpportunityHunter:
         futures_eligible: bool,
         attention_score: float,
     ) -> tuple[OpportunityCategory, AttentionState, str, str, str, float, float | None]:
-        """Maps quantitative market behavior to the 6 opportunity categories."""
+        """Maps quantitative market behavior to the opportunity categories."""
 
         # 1. Blow-off Exhaustion (Extreme Surge with potential reversal)
         if price_change >= 22.0 and rvol >= 2.0:
@@ -347,6 +412,21 @@ class OpportunityHunter:
             rationale = f"High-volume breakout near 24h highs (+{price_change:.1f}%). Bullish structure expansion."
             quality = 82.0
             invalidation = round(low_24h if low_24h > 0 else price * 0.96, 4)
+            return category, state, venue, direction, rationale, quality, invalidation
+
+        # 2b. Pre-Breakout Compression (Early LONG: coiling near resistance with rising RVOL before the spike)
+        if 0.5 <= price_change < 10.0 and rvol >= 1.3 and (price >= high_24h * 0.97):
+            category = OpportunityCategory.PRE_BREAKOUT_COMPRESSION
+            state = AttentionState.BREAKOUT_CANDIDATE
+            venue = (
+                "SPOT_OR_FUTURES"
+                if (spot_eligible and futures_eligible)
+                else ("FUTURES" if futures_eligible else "SPOT")
+            )
+            direction = "LONG"
+            rationale = f"Pre-breakout volatility compression ({price_change:+.1f}%) near 24h highs with rising volume ({rvol:.1f}x RVOL). Early expansion candidate."
+            quality = 85.0
+            invalidation = round(low_24h if low_24h > 0 else price * 0.98, 4)
             return category, state, venue, direction, rationale, quality, invalidation
 
         # 3. Emerging Momentum

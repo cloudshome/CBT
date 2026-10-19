@@ -21,6 +21,7 @@ from core.database import db_manager
 from core.mastermind.specialist_base import BaseSpecialistAgent, CandidateProposal
 from core.mastermind.specialists import (
     BtcMacroSpecialist,
+    DynamicOpportunitySpecialist,
     EthSpecialist,
     LowCapBreakoutSpecialist,
     MemeMomentumSpecialist,
@@ -71,7 +72,89 @@ class MastermindArbiterCouncil:
             MemeMomentumSpecialist("DOGE/USDT"),
             LowCapBreakoutSpecialist("PEPE/USDT"),
         ]
+        self.dynamic_specialists: dict[str, BaseSpecialistAgent] = {}
         self._ensure_tables()
+
+    def get_all_specialists(self) -> list[BaseSpecialistAgent]:
+        """Returns unified list of active static and dynamic opportunity specialists."""
+        return self.specialists + list(self.dynamic_specialists.values())
+
+    def deploy_dynamic_specialist(
+        self,
+        symbol: str,
+        category: str = "CONFIRMED_BREAKOUT",
+        direction: str = "LONG",
+        invalidation_level: float | None = None,
+        primary_rationale: str = "",
+        market_attention_score: float = 75.0,
+        timing_stage: str = "ACTIVE",
+    ) -> BaseSpecialistAgent:
+        """Instantiates and registers a dynamic opportunity specialist node into the live Swarm."""
+        spec = DynamicOpportunitySpecialist(
+            target_symbol=symbol,
+            category=category,
+            recommended_direction=direction,
+            invalidation_level=invalidation_level,
+            primary_rationale=primary_rationale,
+            market_attention_score=market_attention_score,
+            timing_stage=timing_stage,
+        )
+        self.dynamic_specialists[symbol] = spec
+        logger.info(
+            "Mastermind Arbiter: Deployed dynamic specialist %s for %s (%s %s, %s)",
+            spec.specialist_id,
+            symbol,
+            direction,
+            category,
+            timing_stage,
+        )
+        return spec
+
+    async def sync_top_market_opportunities(
+        self, max_top_longs: int = 3, max_top_shorts: int = 3
+    ) -> list[str]:
+        """Synchronizes top qualified Longs and Shorts from OpportunityHunter into dynamic specialists."""
+        from core.screener.opportunity_hunter import opportunity_hunter
+
+        try:
+            opps = await opportunity_hunter.scan_market()
+        except Exception as e:
+            logger.warning("Could not scan market for opportunities: %s", e)
+            return []
+
+        deployed: list[str] = []
+        long_count = 0
+        short_count = 0
+
+        for opp in opps:
+            if opp.recommended_direction == "LONG" and long_count < max_top_longs:
+                if opp.symbol not in self.dynamic_specialists:
+                    self.deploy_dynamic_specialist(
+                        symbol=opp.symbol,
+                        category=opp.opportunity_category.value,
+                        direction="LONG",
+                        invalidation_level=opp.invalidation_level,
+                        primary_rationale=opp.primary_rationale,
+                        market_attention_score=opp.market_attention_score,
+                        timing_stage=opp.timing_stage,
+                    )
+                    deployed.append(opp.symbol)
+                long_count += 1
+            elif opp.recommended_direction == "SHORT" and short_count < max_top_shorts:
+                if opp.symbol not in self.dynamic_specialists:
+                    self.deploy_dynamic_specialist(
+                        symbol=opp.symbol,
+                        category=opp.opportunity_category.value,
+                        direction="SHORT",
+                        invalidation_level=opp.invalidation_level,
+                        primary_rationale=opp.primary_rationale,
+                        market_attention_score=opp.market_attention_score,
+                        timing_stage=opp.timing_stage,
+                    )
+                    deployed.append(opp.symbol)
+                short_count += 1
+
+        return deployed
 
     def _ensure_tables(self) -> None:
         """Creates mastermind_decisions audit table in brain_memory.db."""
@@ -130,7 +213,7 @@ class MastermindArbiterCouncil:
         existing_symbols = {p.get("symbol") for p in open_positions}
 
         # 2. Collect Proposals from Specialists
-        for spec in self.specialists:
+        for spec in self.get_all_specialists():
             sym = spec.target_symbol
             sym_data = market_data_by_symbol.get(sym, {})
             candles_15m = sym_data.get("15m", [])
@@ -352,11 +435,20 @@ class MastermindArbiterCouncil:
         )
         await asyncio.sleep(15.0)  # Initial boot stagger
 
+        loop_counter = 0
         while True:
             try:
-                # Gather market data for all active specialists
+                loop_counter += 1
+                # Periodically sync top qualified opportunities every 5 iterations (~5 mins)
+                if loop_counter % 5 == 1:
+                    try:
+                        await self.sync_top_market_opportunities(max_top_longs=3, max_top_shorts=3)
+                    except Exception as sync_err:
+                        logger.warning("Automatic opportunity sync warning: %s", sync_err)
+
+                # Gather market data for all active specialists (static + dynamic)
                 market_data: dict[str, dict[str, Any]] = {}
-                for spec in self.specialists:
+                for spec in self.get_all_specialists():
                     sym = spec.target_symbol
                     try:
                         candles_15m = await data_streamer.fetch_external_ohlcv(sym, "15m", limit=30)

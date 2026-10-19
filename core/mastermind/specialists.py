@@ -385,3 +385,108 @@ class LowCapBreakoutSpecialist(BaseSpecialistAgent):
             suggested_notional_usd=0.0,
             telemetry={"obi": obi},
         )
+
+
+class DynamicOpportunitySpecialist(BaseSpecialistAgent):
+    """
+    Autonomous Specialist Agent dynamically tracking high-momentum breakouts,
+    pre-spike compression, and blow-off exhaustion reversals discovered across
+    the 700+ coin universe by the Opportunity Hunter.
+    """
+
+    def __init__(
+        self,
+        target_symbol: str,
+        category: str = "CONFIRMED_BREAKOUT",
+        recommended_direction: str = "LONG",
+        invalidation_level: float | None = None,
+        primary_rationale: str = "",
+        market_attention_score: float = 75.0,
+        timing_stage: str = "ACTIVE",
+    ) -> None:
+        clean_id = target_symbol.replace("/", "_").lower()
+        super().__init__(
+            specialist_id=f"spec_opp_{clean_id}",
+            archetype=SpecialistArchetype.DYNAMIC_OPPORTUNITY_HUNTER,
+            target_symbol=target_symbol,
+        )
+        self.category = category
+        self.recommended_direction = recommended_direction.upper()
+        self.invalidation_level = invalidation_level
+        self.primary_rationale = primary_rationale
+        self.market_attention_score = market_attention_score
+        self.timing_stage = timing_stage
+
+    async def evaluate_market(
+        self,
+        candles_15m: list[dict[str, Any]],
+        multi_tf_candles: dict[str, list[dict[str, Any]]],
+        order_book: dict[str, Any] | None = None,
+        macro_context: dict[str, Any] | None = None,
+    ) -> CandidateProposal:
+        if not candles_15m:
+            cur_price = 1.0
+        else:
+            cur_price = float(candles_15m[-1]["close"])
+
+        # Determine direction
+        if self.recommended_direction == "SHORT":
+            direction = DecisionAction.SHORT
+            # Exhaustion / Breakdown SHORT
+            # Invalidation above 24h high or invalidation level
+            sl = (
+                self.invalidation_level
+                if (self.invalidation_level and self.invalidation_level > cur_price)
+                else round(cur_price * 1.035, 6)
+            )
+            risk = abs(sl - cur_price)
+            tp = round(max(0.000001, cur_price - (risk * 2.2)), 6)
+            rr = round((cur_price - tp) / risk, 2) if risk > 0 else 2.0
+            conf = min(0.90, max(0.55, self.market_attention_score / 100.0))
+            ev = round(0.35 + (conf * 0.4), 2)
+            thesis = f"Opportunity Hunter [{self.category}]: {self.primary_rationale or 'Exhaustion/Breakdown short setup'}"
+        elif self.recommended_direction == "LONG":
+            direction = DecisionAction.LONG
+            # Pre-Breakout / Momentum / Capitulation Reclaim LONG
+            sl = (
+                self.invalidation_level
+                if (self.invalidation_level and 0 < self.invalidation_level < cur_price)
+                else round(cur_price * 0.965, 6)
+            )
+            risk = abs(cur_price - sl)
+            tp = round(cur_price + (risk * 2.2), 6)
+            rr = round((tp - cur_price) / risk, 2) if risk > 0 else 2.0
+            conf = min(0.92, max(0.55, self.market_attention_score / 100.0))
+            ev = round(0.40 + (conf * 0.45), 2)
+            thesis = f"Opportunity Hunter [{self.category}]: {self.primary_rationale or 'Pre-breakout/Momentum long setup'}"
+        else:
+            direction = DecisionAction.NO_TRADE
+            sl = cur_price * 0.98
+            tp = cur_price * 1.04
+            rr = 2.0
+            conf = 0.25
+            ev = 0.0
+            thesis = f"Opportunity Hunter [{self.category}]: Monitoring in progress (Watch state)."
+
+        return CandidateProposal(
+            proposal_id=f"prop_opp_{uuid.uuid4().hex[:8]}",
+            specialist_id=self.specialist_id,
+            archetype=self.archetype,
+            symbol=self.target_symbol,
+            direction=direction,
+            thesis=thesis,
+            entry_price=cur_price,
+            stop_loss=sl,
+            take_profit=tp,
+            risk_reward_ratio=rr,
+            expected_value_r=ev,
+            confidence_score=conf,
+            invalidation_condition=f"Price crosses invalidation boundary ${sl:.6f} or volume exhaustion.",
+            suggested_notional_usd=250.0,
+            telemetry={
+                "category": self.category,
+                "attention_score": self.market_attention_score,
+                "timing_stage": self.timing_stage,
+                "invalidation_level": self.invalidation_level,
+            },
+        )

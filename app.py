@@ -4108,13 +4108,14 @@ async def get_mastermind_swarm_status() -> dict[str, Any]:
     from core.portfolio_shadow import portfolio_shadow
 
     accounting = portfolio_shadow.get_portfolio_accounting(starting_capital=mastermind_arbiter.account_equity_usd)
+    all_specs = mastermind_arbiter.get_all_specialists()
     specialist_cards = [
         {
             "specialist_id": s.specialist_id,
             "symbol": s.target_symbol,
             "archetype": s.archetype.value,
         }
-        for s in mastermind_arbiter.specialists
+        for s in all_specs
     ]
 
     return {
@@ -4136,6 +4137,82 @@ async def get_mastermind_recent_decisions(
 
     decisions = mastermind_arbiter.get_recent_decisions(limit=limit)
     return {"decisions": decisions, "count": len(decisions)}
+
+
+@app.get("/api/mastermind/opportunities/signals")
+async def get_mastermind_opportunity_signals(
+    category: str | None = None,
+    direction: str | None = None,
+    force_refresh: bool = False,
+) -> dict[str, Any]:
+    """
+    Returns live qualified market opportunities enriched with dynamic specialist signals,
+    earlyness/timing classification, risk-reward ratios, and multi-venue links.
+    """
+    from core.screener.opportunity_hunter import opportunity_hunter
+    from core.mastermind.mastermind_arbiter import mastermind_arbiter
+
+    opps = await opportunity_hunter.scan_market(force_refresh=force_refresh)
+
+    # Optional filtering
+    if category and category.upper() != "ALL":
+        opps = [o for o in opps if o.opportunity_category.value == category.upper()]
+    if direction and direction.upper() in ("LONG", "SHORT", "WATCH"):
+        opps = [o for o in opps if o.recommended_direction == direction.upper()]
+
+    # Collect active dynamic specialist coverage
+    active_dyn_symbols = set(mastermind_arbiter.dynamic_specialists.keys())
+
+    enriched_list = []
+    for o in opps:
+        d = o.to_dict()
+        d["has_active_specialist"] = o.symbol in active_dyn_symbols
+        enriched_list.append(d)
+
+    return {
+        "count": len(enriched_list),
+        "opportunities": enriched_list,
+        "health": opportunity_hunter.get_health(),
+    }
+
+
+@app.post("/api/mastermind/specialists/deploy")
+async def deploy_mastermind_specialist(payload: dict[str, Any]) -> dict[str, Any]:
+    """
+    Deploys a dedicated Dynamic Opportunity Specialist agent into the live Mastermind Swarm.
+    Permits tracking of emerging breakout or exhaustion setups from the 700+ universe.
+    """
+    from core.mastermind.mastermind_arbiter import mastermind_arbiter
+
+    symbol = payload.get("symbol")
+    if not symbol or not isinstance(symbol, str):
+        raise HTTPException(status_code=400, detail="Missing or invalid symbol")
+
+    category = payload.get("category", "CONFIRMED_BREAKOUT")
+    direction = payload.get("direction", "LONG")
+    invalidation_level = payload.get("invalidation_level")
+    primary_rationale = payload.get("primary_rationale", "")
+    attention_score = float(payload.get("market_attention_score", 75.0))
+    timing_stage = payload.get("timing_stage", "ACTIVE")
+
+    spec = mastermind_arbiter.deploy_dynamic_specialist(
+        symbol=symbol,
+        category=category,
+        direction=direction,
+        invalidation_level=float(invalidation_level) if invalidation_level is not None else None,
+        primary_rationale=primary_rationale,
+        market_attention_score=attention_score,
+        timing_stage=timing_stage,
+    )
+
+    return {
+        "status": "DEPLOYED",
+        "specialist_id": spec.specialist_id,
+        "symbol": spec.target_symbol,
+        "direction": direction,
+        "archetype": spec.archetype.value,
+        "active_specialists_count": len(mastermind_arbiter.get_all_specialists()),
+    }
 
 
 if __name__ == "__main__":

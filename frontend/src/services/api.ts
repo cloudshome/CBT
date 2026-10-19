@@ -217,6 +217,14 @@ export const api = {
     return getMarketOpportunities(category, forceRefresh);
   },
 
+  async deployMastermindSpecialist(payload: any): Promise<any> {
+    return deployMastermindSpecialist(payload);
+  },
+
+  async getMastermindOpportunitySignals(category?: string, direction?: string, forceRefresh = false): Promise<any> {
+    return getMastermindOpportunitySignals(category, direction, forceRefresh);
+  },
+
   async getDynamicWatchlist(): Promise<any> {
     return getDynamicWatchlist();
   },
@@ -5658,6 +5666,37 @@ export async function getScreenerHealth(): Promise<any> {
   const res = await authFetch('/api/screener/health');
   return await handleResponse<any>(res);
 }
+
+export async function deployMastermindSpecialist(payload: {
+  symbol: string;
+  category?: string;
+  direction?: string;
+  invalidation_level?: number | null;
+  primary_rationale?: string;
+  market_attention_score?: number;
+  timing_stage?: string;
+}): Promise<any> {
+  const res = await authFetch('/api/mastermind/specialists/deploy', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return await handleResponse<any>(res);
+}
+
+export async function getMastermindOpportunitySignals(
+  category?: string,
+  direction?: string,
+  forceRefresh: boolean = false
+): Promise<any> {
+  const q = new URLSearchParams();
+  if (category && category !== 'ALL') q.append('category', category);
+  if (direction) q.append('direction', direction);
+  if (forceRefresh) q.append('force_refresh', 'true');
+  const res = await authFetch(`/api/mastermind/opportunities/signals?${q.toString()}`);
+  return await handleResponse<any>(res);
+}
+
 
 
 

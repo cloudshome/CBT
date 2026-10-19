@@ -603,7 +603,21 @@ export const App: React.FC = () => {
           />
         </div>
       ) : activeMainView === 'MASTERMIND_SWARM' ? (
-        <MastermindSwarmDesk />
+        <MastermindSwarmDesk
+          onSelectSymbol={(sym) => {
+            const clean = sym.replace('/', '').toUpperCase();
+            setSymbol(clean);
+            setActiveMainView('TERMINAL');
+            addToast('info', 'Cockpit Synced', `Switched Cockpit to ${clean}`);
+          }}
+          onPrepareTrade={(opp) => {
+            const clean = opp.symbol.replace('/', '').toUpperCase();
+            setSymbol(clean);
+            setActiveMainView('TERMINAL');
+            addToast('info', 'Trade Ticket Ready', `Loaded ${clean} (${opp.recommended_direction}) in Terminal`);
+          }}
+          addToast={addToast}
+        />
       ) : (
         <>
           {/* Institutional Quantitative HUD Control Bar */}
