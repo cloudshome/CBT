@@ -759,7 +759,7 @@ export const App: React.FC = () => {
                   }`}
                 >
                   <BarChart2 size={13} />
-                  <span>MTF Confluence & SMC Scans</span>
+                  <span>Multi-Timeframe & Structure Radar</span>
                 </button>
                 <button
                   onClick={() => setActiveBottomTab('FRONTIERS')}

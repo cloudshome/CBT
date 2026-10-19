@@ -204,40 +204,19 @@ async def get_paper_desk_overview():
             thesis = entry_reason_val
         elif sl_pct < 1.5:
             horizon = "SCALP"
-            agent_mgr = "Microstructure & L2 OBI Engine"
-            if "ETH" in sym:
-                strat_name = "SMC H4 Demand + 15m MSS"
-                thesis = f"Bullish expansion targeting ${tp_val:,.2f} liquidity pool. Invalidation strictly below ${sl_val:,.2f} swing low."
-            elif "BTC" in sym:
-                strat_name = "Judas Swing Sweep + FVG Expansion"
-                thesis = f"Long liquidity run towards ${tp_val:,.2f}. Breakeven arms automatically at +1.5R."
-            else:
-                strat_name = "Multi-Timeframe SMC Breakout"
-                thesis = f"Momentum continuation targeting ${tp_val:,.2f}."
+            agent_mgr = "Apex Scalper (Microstructure & L2 OBI)"
+            strat_name = "Sub-Hourly L2 Liquidity Imbalance"
+            thesis = f"Microstructure order-flow execution targeting ${tp_val:,.2f}. Invalidation strictly at ${sl_val:,.2f}."
         elif sl_pct <= 5.0:
             horizon = "DAY"
-            agent_mgr = "Autonomous Trader (SMC Order Flow)"
-            if "ETH" in sym:
-                strat_name = "SMC H4 Demand + 15m MSS"
-                thesis = f"Bullish expansion targeting ${tp_val:,.2f} liquidity pool. Invalidation strictly below ${sl_val:,.2f} swing low."
-            elif "BTC" in sym:
-                strat_name = "Judas Swing Sweep + FVG Expansion"
-                thesis = f"Long liquidity run towards ${tp_val:,.2f}. Breakeven arms automatically at +1.5R."
-            else:
-                strat_name = "Multi-Timeframe SMC Breakout"
-                thesis = f"Momentum continuation targeting ${tp_val:,.2f}."
+            agent_mgr = "Intraday Strategist (Multi-Concept Structure)"
+            strat_name = "Intraday Structural Volatility Expansion"
+            thesis = f"Multi-timeframe expansion targeting ${tp_val:,.2f}. Breakeven arms automatically at +1.5R."
         else:
             horizon = "SWING"
-            agent_mgr = "Macro Regime & Strategy League"
-            if "ETH" in sym:
-                strat_name = "SMC H4 Demand + 15m MSS"
-                thesis = f"Bullish expansion targeting ${tp_val:,.2f} liquidity pool. Invalidation strictly below ${sl_val:,.2f} swing low."
-            elif "BTC" in sym:
-                strat_name = "Judas Swing Sweep + FVG Expansion"
-                thesis = f"Long liquidity run towards ${tp_val:,.2f}. Breakeven arms automatically at +1.5R."
-            else:
-                strat_name = "Multi-Timeframe SMC Breakout"
-                thesis = f"Momentum continuation targeting ${tp_val:,.2f}."
+            agent_mgr = "Macro Trend & Carry Specialist"
+            strat_name = "Macro Regime Trend & Funding Carry"
+            thesis = f"Multi-day regime trend continuation targeting ${tp_val:,.2f}."
 
         opened_at_ts = p.get("opened_at")
         opened_at_fmt = (
@@ -513,8 +492,8 @@ async def get_paper_positions():
             strat_name = f"{asset_matched} {style_matched.title()} Execution"
         else:
             horizon = "DAY"
-            agent_mgr = "Autonomous Trader (SMC Order Flow)"
-            strat_name = "Multi-Timeframe SMC Breakout"
+            agent_mgr = "Intraday Strategist (Multi-Concept Structure)"
+            strat_name = "Intraday Structural Volatility Expansion"
 
         mapped.append(
             {

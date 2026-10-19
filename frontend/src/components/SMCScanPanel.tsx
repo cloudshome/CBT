@@ -35,7 +35,7 @@ export const SMCScanPanel: React.FC<SMCScanPanelProps> = ({
         <div className="flex items-center gap-2">
           <Target className="w-4 h-4 text-terminal-cyan" />
           <h3 className="text-xs font-mono font-bold text-slate-200 uppercase">
-            SMC SCAN &amp; TRADE SETUPS
+            MARKET STRUCTURE &amp; TRADE SETUPS
           </h3>
           {symbol && <PairVenueLinks symbol={symbol} size="xs" isFutures={true} />}
         </div>

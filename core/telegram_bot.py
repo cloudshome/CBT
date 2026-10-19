@@ -1115,7 +1115,7 @@ class TelegramBotDispatcher:
         tp2 = signal.get("tp2", 0.0)
         tp3 = signal.get("tp3", 0.0)
         rr = signal.get("risk_reward", "1:3.2")
-        setup_name = signal.get("setup", "SMC Liquidity Sweep + MSS")
+        setup_name = signal.get("setup", "Multi-Timeframe Structure & Momentum Expansion")
         kelly = signal.get("kelly_allocation_pct", 2.15)
         confluence = signal.get("confluence_score", 88)
         regime = signal.get("regime", "TRENDING_BULL")
@@ -1182,7 +1182,7 @@ class TelegramBotDispatcher:
         sl = float(trade.get("stop_loss", 0.0))
         tp = float(trade.get("take_profit", 0.0))
         pos_id = trade.get("position_id", "N/A")
-        reason = trade.get("entry_reason") or "SMC Order Flow & Liquidity Mitigation"
+        reason = trade.get("entry_reason") or "Quantitative Multi-Concept Structure & Liquidity Inflow"
         opened_at = trade.get("opened_at", int(time.time() * 1000))
         dt_str = datetime.datetime.fromtimestamp(opened_at / 1000.0, tz=datetime.UTC).strftime(
             "%Y-%m-%d %H:%M:%S UTC"
@@ -1243,7 +1243,7 @@ class TelegramBotDispatcher:
         pnl = float(trade.get("realized_pnl", 0.0))
         pos_id = trade.get("position_id", "N/A")
         exit_reason = trade.get("exit_reason", "MANUAL_CLOSE")
-        entry_reason = trade.get("entry_reason", "SMC Setup")
+        entry_reason = trade.get("entry_reason", "Quantitative Multi-Concept Setup")
         opened_at = trade.get("opened_at", 0)
         closed_at = trade.get("closed_at", int(time.time() * 1000))
 
@@ -1394,7 +1394,7 @@ class TelegramBotDispatcher:
             f"_{bear_scenario}_\n\n"
             f"💡 **Desk Note:** `{key_note}`\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"⏱️ _{now_str}_ | SKY SMC Engine"
+            f"⏱️ _{now_str}_ | SKY Mastermind Quantitative Engine"
         )
         venue_row = self.build_venue_buttons(sym, is_futures=True)
         reply_markup = {"inline_keyboard": [venue_row]}
