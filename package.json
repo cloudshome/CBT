@@ -22,7 +22,11 @@
     "pack:windows": "python scripts/build_windows_app.py",
     "pack:linux": "python scripts/build_linux_app.py",
     "package:win": "electron-builder --win --x64",
-    "package:linux": "electron-builder --linux --x64 AppImage deb"
+    "package:linux": "electron-builder --linux --x64 AppImage deb",
+    "start:terminal:win": "start_terminal.bat",
+    "start:terminal:linux": "bash start_terminal.sh",
+    "preflight": "python scripts/system_preflight.py",
+    "verify:m18": "python scripts/verify_m18_certification.py"
   },
   "dependencies": {
     "@google/genai": "^2.19.0",

@@ -22,6 +22,17 @@ if sys.stdout and hasattr(sys.stdout, "reconfigure"):
         pass
 
 
+def get_python_executable() -> str:
+    """Finds active or local virtualenv python executable on Windows or Linux."""
+    if os.name == "nt":
+        venv_py = PROJECT_ROOT / ".venv" / "Scripts" / "python.exe"
+    else:
+        venv_py = PROJECT_ROOT / ".venv" / "bin" / "python"
+    if venv_py.exists():
+        return str(venv_py)
+    return sys.executable
+
+
 def run_check(name, fn):
     print(f"[*] Running: {name}...", end=" ", flush=True)
     try:
@@ -29,9 +40,11 @@ def run_check(name, fn):
         print("[PASS]")
         return True
     # A preflight failure must not prevent the remaining independent gates from running.
-    except Exception as e:  # noqa: BLE001
-        err_msg = str(e).encode(sys.stdout.encoding or "utf-8", errors="replace").decode(
-            sys.stdout.encoding or "utf-8", errors="replace"
+    except Exception as e:
+        err_msg = (
+            str(e)
+            .encode(sys.stdout.encoding or "utf-8", errors="replace")
+            .decode(sys.stdout.encoding or "utf-8", errors="replace")
         )
         print(f"[FAIL] -> {err_msg}")
         return False
@@ -54,7 +67,7 @@ def check_pytest():
     env["PYTHONUTF8"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"
     res = subprocess.run(
-        [sys.executable, "-m", "pytest", "-q"],
+        [get_python_executable(), "-m", "pytest", "-q"],
         cwd=PROJECT_ROOT,
         capture_output=True,
         text=True,
@@ -110,7 +123,7 @@ def check_m18_certification():
     if not verify_script.exists():
         return
     res = subprocess.run(
-        [sys.executable, str(verify_script)],
+        [get_python_executable(), str(verify_script)],
         cwd=PROJECT_ROOT,
         capture_output=True,
         text=True,
@@ -123,25 +136,29 @@ def check_m18_certification():
 def check_ruff():
     # 1. Ruff lint check on core/ and tests/ matching CI
     res_lint = subprocess.run(
-        [sys.executable, "-m", "ruff", "check", "core/", "tests/"],
+        [get_python_executable(), "-m", "ruff", "check", "core/", "tests/"],
         cwd=PROJECT_ROOT,
         capture_output=True,
         text=True,
         encoding="utf-8",
         errors="replace",
     )
-    assert res_lint.returncode == 0, f"Ruff lint check failed:\n{res_lint.stdout}\n{res_lint.stderr}"
+    assert res_lint.returncode == 0, (
+        f"Ruff lint check failed:\n{res_lint.stdout}\n{res_lint.stderr}"
+    )
 
     # 2. Ruff formatting check on core/ and tests/ matching CI
     res_fmt = subprocess.run(
-        [sys.executable, "-m", "ruff", "format", "--check", "core/", "tests/"],
+        [get_python_executable(), "-m", "ruff", "format", "--check", "core/", "tests/"],
         cwd=PROJECT_ROOT,
         capture_output=True,
         text=True,
         encoding="utf-8",
         errors="replace",
     )
-    assert res_fmt.returncode == 0, f"Ruff formatting check failed:\n{res_fmt.stdout}\n{res_fmt.stderr}"
+    assert res_fmt.returncode == 0, (
+        f"Ruff formatting check failed:\n{res_fmt.stdout}\n{res_fmt.stderr}"
+    )
 
 
 def check_eslint():
