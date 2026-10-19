@@ -15,6 +15,17 @@ export HOME="/home/cloudslover"
 export PATH="/home/cloudslover/CBT/.venv/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 export GIT_TERMINAL_PROMPT=0
 
+# Resolve SSH authentication socket if running non-interactively (e.g. from cron)
+if [ -z "${SSH_AUTH_SOCK:-}" ]; then
+    CURRENT_UID="$(id -u)"
+    for candidate_sock in "/run/user/${CURRENT_UID}/gcr/ssh" "/run/user/${CURRENT_UID}/keyring/ssh" "/run/user/1000/gcr/ssh"; do
+        if [ -S "$candidate_sock" ]; then
+            export SSH_AUTH_SOCK="$candidate_sock"
+            break
+        fi
+    done
+fi
+
 mkdir -p "$LOG_DIR"
 
 log() {
@@ -44,16 +55,33 @@ log "Incoming changes detected: ${LOCAL_HASH:0:7} -> ${REMOTE_HASH:0:7}"
 # 2. Inspect changed files between local and remote
 CHANGED_FILES=$(git diff --name-only "$LOCAL_HASH" "$REMOTE_HASH")
 
-# 3. Fast-forward pull
+# 3. Handle uncommitted local modifications (e.g. crawler cache) safely via stash
+STASHED=0
+if [ -n "$(git status --porcelain -uno)" ]; then
+    log "Local tracked changes detected. Stashing before fast-forward..."
+    git stash push --quiet -m "cbt-auto-sync-pre-pull-$(date +%s)"
+    STASHED=1
+fi
+
+# 4. Fast-forward pull
 if ! git pull --ff-only origin main; then
     log "ERROR: git pull --ff-only failed. Local branch may have diverged."
+    if [ "$STASHED" -eq 1 ]; then
+        git stash pop --quiet || true
+    fi
     exit 1
+fi
+
+# Reapply local stash if created
+if [ "$STASHED" -eq 1 ]; then
+    log "Reapplying stashed local modifications..."
+    git stash pop --quiet || log "WARNING: Stash pop reported conflicts; stashed changes preserved."
 fi
 
 NEW_HASH=$(git rev-parse --short HEAD)
 log "Successfully pulled latest code (now at ${NEW_HASH})."
 
-# 4. Dependency checks
+# 5. Dependency checks
 if echo "$CHANGED_FILES" | grep -qE "(^|/)requirements.*\.txt$"; then
     log "Python dependencies changed. Updating virtualenv..."
     "${REPO_DIR}/.venv/bin/pip" install -r "${REPO_DIR}/requirements.txt" --quiet || log "WARNING: pip install encountered warnings."
@@ -64,7 +92,7 @@ if echo "$CHANGED_FILES" | grep -qE "(^|/)package(-lock)?\.json$"; then
     npm install --silent || log "WARNING: npm install encountered warnings."
 fi
 
-# 5. Frontend rebuild if frontend files changed
+# 6. Frontend rebuild if frontend files changed
 RESTART_FRONTEND=0
 if echo "$CHANGED_FILES" | grep -qE "(^|/)frontend/"; then
     log "Frontend source changed. Rebuilding Vite production bundle..."
@@ -72,7 +100,7 @@ if echo "$CHANGED_FILES" | grep -qE "(^|/)frontend/"; then
     RESTART_FRONTEND=1
 fi
 
-# 6. Service reload / restart
+# 7. Service reload / restart
 RESTART_BACKEND=0
 if echo "$CHANGED_FILES" | grep -qE "(^|/)(app\.py|core/|web/|src/|\.env)"; then
     RESTART_BACKEND=1
