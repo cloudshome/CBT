@@ -263,3 +263,4 @@ class CognitivePredictionLedger:
             rows = conn.execute(query, tuple(params)).fetchall()
 
         return [TradingExperienceRecord.model_validate_json(r["raw_record_json"]) for r in rows]
+

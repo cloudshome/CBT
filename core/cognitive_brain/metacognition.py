@@ -156,3 +156,4 @@ class MetacognitiveMonitor:
             rationale=rationale,
             can_execute=can_execute,
         )
+

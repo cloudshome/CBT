@@ -272,3 +272,4 @@ class DeterministicOutcomeResolver:
             DiagnosticCategory.DIRECTION_FAILURE,
             f"Forecast failed: price hit invalidation ({net:.1f} bps net loss).",
         )
+

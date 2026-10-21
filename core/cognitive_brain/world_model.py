@@ -186,3 +186,4 @@ class CognitiveWorldModel:
             state_vector_hash=state_hash,
             summary_thesis=f"World Model State: {primary_regime.value} (confidence={max_prob:.1%}, uncertainty={uncertainty:.2f})",
         )
+
