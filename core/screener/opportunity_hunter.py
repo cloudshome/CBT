@@ -19,10 +19,13 @@ import asyncio
 import logging
 import time
 from dataclasses import asdict, dataclass
+import uuid
 from enum import StrEnum
 from typing import Any
 
 import aiohttp
+
+from core.database import db_manager
 
 logger = logging.getLogger("sky.screener.opportunity_hunter")
 
@@ -107,6 +110,8 @@ class OpportunityRecord:
     tradingview_url: str = ""
     binance_url: str = ""
     bybit_url: str = ""
+    stress_friction_bps: float = 0.0
+    is_tradable_under_stress: bool = True
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -144,6 +149,267 @@ class OpportunityHunter:
 
         # Core Benchmark Anchors that are always preserved in the universe
         self.core_anchors = ["BTC/USDT", "ETH/USDT", "SOL/USDT"]
+        self._ensure_tables()
+
+    def _ensure_tables(self) -> None:
+        """Creates opportunity_attrition_ledger in brain_memory.db."""
+        with db_manager.get_brain_conn() as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS opportunity_attrition_ledger (
+                    opportunity_id TEXT PRIMARY KEY,
+                    symbol TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    direction TEXT NOT NULL,
+                    timing_stage TEXT NOT NULL,
+                    entry_price REAL NOT NULL,
+                    invalidation_level REAL,
+                    target_price REAL,
+                    market_attention_score REAL NOT NULL,
+                    trade_quality_score REAL NOT NULL,
+                    stress_friction_bps REAL NOT NULL,
+                    is_tradable_under_stress INTEGER NOT NULL,
+                    discovered_at_ms INTEGER NOT NULL,
+                    status_15m TEXT,
+                    status_1h TEXT,
+                    status_4h TEXT,
+                    resolved_at_ms INTEGER
+                );
+            """)
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_opp_attr_sym ON opportunity_attrition_ledger (symbol, discovered_at_ms);"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_opp_attr_cat ON opportunity_attrition_ledger (category, timing_stage);"
+            )
+            conn.commit()
+
+    def evaluate_tradability_stress(
+        self,
+        price: float,
+        spread_bps: float,
+        quote_vol: float,
+        dist_to_invalidation_pct: float,
+        rr: float,
+    ) -> tuple[bool, float, float]:
+        """
+        Evaluates discovered candidate against the 2.5x Stress Trading Friction Gate.
+        Computes 2.5x base fees + bid/ask spread + depth-walking impact slippage.
+        Returns:
+            (is_tradable, stress_friction_bps, target_move_pct)
+        """
+        if price <= 0:
+            return False, 999.0, 0.0
+
+        # Baseline Round-Trip Frictions:
+        # 1. Exchange taker fees: 5.0 bps per leg = 10.0 bps round trip
+        fee_bps = 10.0
+        # 2. Bid-ask spread: full spread entry/exit
+        actual_spread = max(1.0, spread_bps)
+        # 3. Depth-walking impact slippage based on 24h quote volume liquidity
+        vol_factor = max(1_000_000.0, quote_vol)
+        impact_bps = max(1.5, min(15.0, (50_000_000.0 / vol_factor) * 3.0))
+
+        base_friction_bps = fee_bps + actual_spread + impact_bps
+        stress_friction_bps = round(base_friction_bps * 2.5, 2)
+        stress_friction_pct = stress_friction_bps / 100.0
+
+        # Expected target expansion move
+        target_move_pct = round(dist_to_invalidation_pct * rr, 3)
+
+        # Tradability Invariant: Expected target move MUST clear 2.5x stress frictions
+        is_tradable = target_move_pct >= stress_friction_pct
+
+        return is_tradable, stress_friction_bps, target_move_pct
+
+    def record_discovered_opportunity(self, rec: OpportunityRecord) -> str:
+        """Persists newly discovered opportunity to SQLite attrition ledger."""
+        opp_id = f"opp_{rec.symbol.replace('/', '_')}_{rec.observation_timestamp_ms}_{uuid.uuid4().hex[:6]}"
+        risk_dist = abs(rec.current_price - (rec.invalidation_level or rec.current_price * 0.98))
+        target_price = (
+            rec.current_price + (risk_dist * rec.reward_to_risk)
+            if rec.recommended_direction == "LONG"
+            else max(0.000001, rec.current_price - (risk_dist * rec.reward_to_risk))
+        )
+
+        with db_manager.get_brain_conn() as conn:
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO opportunity_attrition_ledger
+                    (opportunity_id, symbol, category, direction, timing_stage,
+                     entry_price, invalidation_level, target_price, market_attention_score,
+                     trade_quality_score, stress_friction_bps, is_tradable_under_stress,
+                     discovered_at_ms, status_15m, status_1h, status_4h, resolved_at_ms)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL);
+                """,
+                (
+                    opp_id,
+                    rec.symbol,
+                    rec.opportunity_category.value,
+                    rec.recommended_direction,
+                    rec.timing_stage,
+                    rec.current_price,
+                    rec.invalidation_level,
+                    round(target_price, 6),
+                    rec.market_attention_score,
+                    rec.trade_quality_score,
+                    rec.stress_friction_bps,
+                    1 if rec.is_tradable_under_stress else 0,
+                    rec.observation_timestamp_ms,
+                ),
+            )
+            conn.commit()
+        return opp_id
+
+    def update_attrition_lifecycle(
+        self, current_prices: dict[str, float]
+    ) -> dict[str, int]:
+        """
+        Evaluates active un-resolved opportunities against elapsed time windows (15m, 1h, 4h)
+        and updates their survival / decay status in the attrition ledger.
+        """
+        now_ms = int(time.time() * 1000)
+        updated_counts = {"15m": 0, "1h": 0, "4h": 0, "resolved": 0}
+
+        with db_manager.get_brain_conn() as conn:
+            rows = conn.execute(
+                """
+                SELECT opportunity_id, symbol, direction, entry_price, invalidation_level,
+                       target_price, discovered_at_ms, status_15m, status_1h, status_4h
+                FROM opportunity_attrition_ledger
+                WHERE resolved_at_ms IS NULL;
+                """
+            ).fetchall()
+
+            for r in rows:
+                sym = r["symbol"]
+                cur_p = current_prices.get(sym)
+                if not cur_p or cur_p <= 0:
+                    continue
+
+                opp_id = r["opportunity_id"]
+                direction = r["direction"]
+                entry_p = float(r["entry_price"])
+                inv_p = float(r["invalidation_level"]) if r["invalidation_level"] else (entry_p * 0.98 if direction == "LONG" else entry_p * 1.02)
+                tgt_p = float(r["target_price"]) if r["target_price"] else (entry_p * 1.05 if direction == "LONG" else entry_p * 0.95)
+                age_ms = now_ms - int(r["discovered_at_ms"])
+
+                # Check terminal target / invalidation hits
+                is_target_hit = (cur_p >= tgt_p) if direction == "LONG" else (cur_p <= tgt_p)
+                is_invalidated = (cur_p <= inv_p) if direction == "LONG" else (cur_p >= inv_p)
+
+                if is_target_hit:
+                    conn.execute(
+                        "UPDATE opportunity_attrition_ledger SET resolved_at_ms = ?, status_15m = COALESCE(status_15m, 'TARGET_HIT'), status_1h = COALESCE(status_1h, 'TARGET_HIT'), status_4h = COALESCE(status_4h, 'TARGET_HIT') WHERE opportunity_id = ?;",
+                        (now_ms, opp_id),
+                    )
+                    updated_counts["resolved"] += 1
+                    continue
+                elif is_invalidated:
+                    conn.execute(
+                        "UPDATE opportunity_attrition_ledger SET resolved_at_ms = ?, status_15m = COALESCE(status_15m, 'INVALIDATED'), status_1h = COALESCE(status_1h, 'INVALIDATED'), status_4h = COALESCE(status_4h, 'INVALIDATED') WHERE opportunity_id = ?;",
+                        (now_ms, opp_id),
+                    )
+                    updated_counts["resolved"] += 1
+                    continue
+
+                # 15 minute interval (900s = 900,000ms)
+                if age_ms >= 900_000 and r["status_15m"] is None:
+                    # Check if moved in expected direction
+                    favorable = (cur_p > entry_p) if direction == "LONG" else (cur_p < entry_p)
+                    stat_15 = "SURVIVED" if favorable else "ATROPHIED"
+                    conn.execute(
+                        "UPDATE opportunity_attrition_ledger SET status_15m = ? WHERE opportunity_id = ?;",
+                        (stat_15, opp_id),
+                    )
+                    updated_counts["15m"] += 1
+
+                # 1 hour interval (3600s = 3,600,000ms)
+                if age_ms >= 3_600_000 and r["status_1h"] is None:
+                    favorable = (cur_p > entry_p) if direction == "LONG" else (cur_p < entry_p)
+                    stat_1h = "SURVIVED" if favorable else "ATROPHIED"
+                    conn.execute(
+                        "UPDATE opportunity_attrition_ledger SET status_1h = ? WHERE opportunity_id = ?;",
+                        (stat_1h, opp_id),
+                    )
+                    updated_counts["1h"] += 1
+
+                # 4 hour interval (14400s = 14,400,000ms)
+                if age_ms >= 14_400_000 and r["status_4h"] is None:
+                    favorable = (cur_p > entry_p) if direction == "LONG" else (cur_p < entry_p)
+                    stat_4h = "SURVIVED" if favorable else "ATROPHIED"
+                    conn.execute(
+                        "UPDATE opportunity_attrition_ledger SET status_4h = ?, resolved_at_ms = ? WHERE opportunity_id = ?;",
+                        (stat_4h, now_ms, opp_id),
+                    )
+                    updated_counts["4h"] += 1
+                    updated_counts["resolved"] += 1
+
+            conn.commit()
+        return updated_counts
+
+    def get_attrition_funnel_metrics(self) -> dict[str, Any]:
+        """
+        Returns empirical survival / decay funnel metrics across all tracked opportunities.
+        """
+        with db_manager.get_brain_conn() as conn:
+            total_count = conn.execute(
+                "SELECT COUNT(*) FROM opportunity_attrition_ledger;"
+            ).fetchone()[0]
+
+            if total_count == 0:
+                return {
+                    "total_discovered": 0,
+                    "survival_rate_15m": 0.0,
+                    "survival_rate_1h": 0.0,
+                    "survival_rate_4h": 0.0,
+                    "atrophy_rate": 0.0,
+                    "by_category": {},
+                }
+
+            s15_surv = conn.execute(
+                "SELECT COUNT(*) FROM opportunity_attrition_ledger WHERE status_15m IN ('SURVIVED', 'TARGET_HIT');"
+            ).fetchone()[0]
+            s15_eval = conn.execute(
+                "SELECT COUNT(*) FROM opportunity_attrition_ledger WHERE status_15m IS NOT NULL;"
+            ).fetchone()[0]
+
+            s1h_surv = conn.execute(
+                "SELECT COUNT(*) FROM opportunity_attrition_ledger WHERE status_1h IN ('SURVIVED', 'TARGET_HIT');"
+            ).fetchone()[0]
+            s1h_eval = conn.execute(
+                "SELECT COUNT(*) FROM opportunity_attrition_ledger WHERE status_1h IS NOT NULL;"
+            ).fetchone()[0]
+
+            s4h_surv = conn.execute(
+                "SELECT COUNT(*) FROM opportunity_attrition_ledger WHERE status_4h IN ('SURVIVED', 'TARGET_HIT');"
+            ).fetchone()[0]
+            s4h_eval = conn.execute(
+                "SELECT COUNT(*) FROM opportunity_attrition_ledger WHERE status_4h IS NOT NULL;"
+            ).fetchone()[0]
+
+            atrophied_count = conn.execute(
+                "SELECT COUNT(*) FROM opportunity_attrition_ledger WHERE status_15m = 'ATROPHIED' OR status_1h = 'ATROPHIED';"
+            ).fetchone()[0]
+
+            cat_rows = conn.execute(
+                "SELECT category, COUNT(*) as cnt FROM opportunity_attrition_ledger GROUP BY category;"
+            ).fetchall()
+
+            by_cat = {r["category"]: r["cnt"] for r in cat_rows}
+
+        rate_15m = round(s15_surv / max(1, s15_eval), 3) if s15_eval > 0 else 1.0
+        rate_1h = round(s1h_surv / max(1, s1h_eval), 3) if s1h_eval > 0 else 1.0
+        rate_4h = round(s4h_surv / max(1, s4h_eval), 3) if s4h_eval > 0 else 1.0
+        atrophy_rate = round(atrophied_count / max(1, total_count), 3)
+
+        return {
+            "total_discovered": total_count,
+            "survival_rate_15m": rate_15m,
+            "survival_rate_1h": rate_1h,
+            "survival_rate_4h": rate_4h,
+            "atrophy_rate": atrophy_rate,
+            "by_category": by_cat,
+        }
 
     async def scan_market(self, force_refresh: bool = False) -> list[OpportunityRecord]:
         """
@@ -332,6 +598,23 @@ class OpportunityHunter:
             # Target reward-to-risk ratio (higher for early/pre-spike setups)
             target_rr = 2.5 if timing_stage in (TimingStage.PRE_SPIKE.value, TimingStage.EARLY.value) else 2.0
 
+            # Tradability Stress Gate Check (2.5x trading fees + spread + depth-impact slippage)
+            is_tradable, stress_fric_bps, target_move_pct = self.evaluate_tradability_stress(
+                price=price,
+                spread_bps=spread_bps,
+                quote_vol=quote_vol,
+                dist_to_invalidation_pct=dist_pct,
+                rr=target_rr,
+            )
+
+            if not is_tradable and symbol_slash not in self.core_anchors:
+                category = OpportunityCategory.NO_TRADE_QUARANTINE
+                direction = "WATCH"
+                rationale = (
+                    f"[UNTRADABLE: 2.5x STRESS FRICTION GATE] Expected move {target_move_pct:.2f}% < "
+                    f"2.5x friction ({stress_fric_bps / 100.0:.2f}%). Spread: {spread_bps:.1f} bps."
+                )
+
             # Verified venue URLs
             is_fut = futures_eligible
             tv_url = build_tradingview_url(base, "USDT", is_futures=is_fut)
@@ -365,6 +648,8 @@ class OpportunityHunter:
                 tradingview_url=tv_url,
                 binance_url=bin_url,
                 bybit_url=byb_url,
+                stress_friction_bps=stress_fric_bps,
+                is_tradable_under_stress=is_tradable,
             )
             qualified_records.append(rec)
 
@@ -489,8 +774,13 @@ class OpportunityHunter:
         current_symbols = {r.symbol for r in records}
         now_ms = int(time.time() * 1000)
 
-        # Update active and qualified
+        # Update active and qualified, and persist to attrition ledger
         for r in records[:30]:  # Top 30 qualified
+            if r.recommended_direction in ("LONG", "SHORT") and r.is_tradable_under_stress:
+                try:
+                    self.record_discovered_opportunity(r)
+                except Exception as rec_err:
+                    logger.debug("Opportunity record persist error: %s", rec_err)
             if r.symbol not in self._cached_watchlist:
                 self._cached_watchlist[r.symbol] = {
                     "symbol": r.symbol,

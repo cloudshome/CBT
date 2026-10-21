@@ -18,6 +18,7 @@ from core.screener.opportunity_hunter import (
     AttentionState,
     OpportunityCategory,
     OpportunityHunter,
+    OpportunityRecord,
     WatchlistState,
 )
 
@@ -253,3 +254,168 @@ def test_pre_spike_long_and_post_spike_short_rules(hunter: OpportunityHunter):
     assert dir_short == "SHORT"
     assert inv_short is not None and inv_short > 0.7255
     assert qual_short >= 70.0
+
+
+def test_tradability_stress_gate_quarantines_high_friction_candidate(hunter: OpportunityHunter):
+    """
+    Phase 3 Tradability Gate Test:
+    When a candidate coin has high spread and tiny expected target move such that
+    expected move < 2.5x stress frictions, the candidate MUST be quarantined into
+    NO_TRADE_QUARANTINE with direction WATCH.
+    """
+    # Price: 1.0, Spread: 11.0 bps, 24h Vol: $16M (low liquidity -> higher impact),
+    # Invalidation distance: 0.10% (tight stop) with RR=2.0 -> target move = 0.20%
+    # Base friction = 10 (fees) + 11 (spread) + ~9.3 (impact) = ~30.3 bps
+    # 2.5x Stress friction = ~75.7 bps = 0.757% > 0.20%
+    is_tradable, stress_bps, target_move = hunter.evaluate_tradability_stress(
+        price=1.0,
+        spread_bps=11.0,
+        quote_vol=16_000_000.0,
+        dist_to_invalidation_pct=0.10,
+        rr=2.0,
+    )
+    assert is_tradable is False
+    assert stress_bps > 60.0  # > 0.60%
+    assert target_move == 0.20
+
+    # Test within _process_and_rank_tickers
+    fake_spot = [
+        {
+            "symbol": "TIGHTSTOPUSDT",
+            "lastPrice": "1.0",
+            "priceChangePercent": "12.0",
+            "quoteVolume": "80000000.0",
+            "count": 50000,
+            "bidPrice": "0.9989",
+            "askPrice": "1.0000",  # 11 bps spread
+            "highPrice": "1.01",
+            "lowPrice": "0.999",  # tight range -> tight invalidation (0.10%)
+        }
+    ]
+    records = hunter._process_and_rank_tickers(fake_spot, [])
+    assert len(records) == 1
+    rec = records[0]
+    assert rec.is_tradable_under_stress is False
+    assert rec.opportunity_category == OpportunityCategory.NO_TRADE_QUARANTINE
+    assert rec.recommended_direction == "WATCH"
+    assert "[UNTRADABLE: 2.5x STRESS FRICTION GATE]" in rec.primary_rationale
+
+
+def test_tradability_stress_gate_approves_wide_target_liquid_candidate(hunter: OpportunityHunter):
+    """
+    Phase 3 Tradability Gate Test:
+    A high-volume breakout with a healthy expansion target (> 2.0%) easily clears
+    2.5x stress frictions (~0.35%) and remains an active tradeable LONG candidate.
+    """
+    is_tradable, stress_bps, target_move = hunter.evaluate_tradability_stress(
+        price=50.0,
+        spread_bps=2.0,
+        quote_vol=120_000_000.0,
+        dist_to_invalidation_pct=2.5,
+        rr=2.5,
+    )
+    assert is_tradable is True
+    assert stress_bps < 40.0  # ~0.35%
+    assert target_move == 6.25  # 6.25% >> 0.35%
+
+
+def test_attrition_ledger_recording_and_funnel_metrics(hunter: OpportunityHunter):
+    """
+    Phase 3 Attrition Funnel Test:
+    Verifies that discovered opportunities are persisted into the SQLite attrition ledger,
+    and lifecycle updates accurately resolve targets and calculate survival rates.
+    """
+    import time
+
+    now_ms = int(time.time() * 1000)
+
+    # Fabricate a qualified OpportunityRecord
+    rec = OpportunityRecord(
+        symbol="TESTCOIN/USDT",
+        base_asset="TESTCOIN",
+        quote_asset="USDT",
+        spot_eligible=True,
+        futures_eligible=True,
+        current_price=10.0,
+        price_change_24h_pct=8.5,
+        quote_volume_24h_usd=45_000_000.0,
+        trade_count_24h=120_000,
+        estimated_spread_bps=3.0,
+        relative_volume_ratio=2.2,
+        market_attention_score=82.0,
+        trade_quality_score=85.0,
+        attention_state=AttentionState.BREAKOUT_CANDIDATE,
+        opportunity_category=OpportunityCategory.PRE_BREAKOUT_COMPRESSION,
+        recommended_venue="SPOT_OR_FUTURES",
+        recommended_direction="LONG",
+        primary_rationale="Pre-breakout coiling near resistance.",
+        invalidation_level=9.70,
+        observation_timestamp_ms=now_ms,
+        timing_stage="PRE_SPIKE",
+        reward_to_risk=2.5,
+        distance_to_invalidation_pct=3.0,
+        stress_friction_bps=35.0,
+        is_tradable_under_stress=True,
+    )
+
+    opp_id = hunter.record_discovered_opportunity(rec)
+    assert opp_id.startswith("opp_TESTCOIN_USDT_")
+
+    # Update lifecycle with price that triggers target (target is 10.0 + (0.3 * 2.5) = 10.75)
+    counts = hunter.update_attrition_lifecycle({"TESTCOIN/USDT": 10.80})
+    assert counts["resolved"] >= 1
+
+    # Check Funnel Metrics
+    metrics = hunter.get_attrition_funnel_metrics()
+    assert metrics["total_discovered"] >= 1
+    assert metrics["survival_rate_15m"] >= 0.50
+    assert OpportunityCategory.PRE_BREAKOUT_COMPRESSION.value in metrics["by_category"]
+
+
+def test_attrition_ledger_identifies_atrophied_breakout(hunter: OpportunityHunter):
+    """
+    Phase 3 Attrition Funnel Test:
+    When a pre-spike compression candidate sits past 15 minutes and sags below entry price,
+    the attrition tracker correctly marks status_15m as ATROPHIED.
+    """
+    import time
+
+    # Discovered 20 minutes ago (1200s = 1,200,000ms ago)
+    old_time_ms = int(time.time() * 1000) - 1_200_000
+
+    rec = OpportunityRecord(
+        symbol="SAGCOIN/USDT",
+        base_asset="SAGCOIN",
+        quote_asset="USDT",
+        spot_eligible=True,
+        futures_eligible=True,
+        current_price=2.0,
+        price_change_24h_pct=5.0,
+        quote_volume_24h_usd=30_000_000.0,
+        trade_count_24h=80_000,
+        estimated_spread_bps=4.0,
+        relative_volume_ratio=1.8,
+        market_attention_score=75.0,
+        trade_quality_score=80.0,
+        attention_state=AttentionState.BREAKOUT_CANDIDATE,
+        opportunity_category=OpportunityCategory.PRE_BREAKOUT_COMPRESSION,
+        recommended_venue="SPOT_OR_FUTURES",
+        recommended_direction="LONG",
+        primary_rationale="Pre-breakout candidate that failed to expand.",
+        invalidation_level=1.92,
+        observation_timestamp_ms=old_time_ms,
+        timing_stage="PRE_SPIKE",
+        reward_to_risk=2.5,
+        distance_to_invalidation_pct=4.0,
+        stress_friction_bps=40.0,
+        is_tradable_under_stress=True,
+    )
+
+    hunter.record_discovered_opportunity(rec)
+
+    # Current price has sagged to 1.96 (below entry 2.0, but above invalidation 1.92)
+    counts = hunter.update_attrition_lifecycle({"SAGCOIN/USDT": 1.96})
+    assert counts["15m"] >= 1
+
+    metrics = hunter.get_attrition_funnel_metrics()
+    assert metrics["atrophy_rate"] > 0.0
