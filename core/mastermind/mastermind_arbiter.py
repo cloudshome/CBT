@@ -33,6 +33,24 @@ from core.sky_intelligence.types import DecisionAction
 
 logger = logging.getLogger("sky.mastermind.arbiter")
 
+# Empirical Cross-Asset Correlation Priors (rho)
+CORRELATION_PRIORS: dict[tuple[str, str], float] = {
+    ("BTC/USDT", "ETH/USDT"): 0.85,
+    ("ETH/USDT", "BTC/USDT"): 0.85,
+    ("BTC/USDT", "SOL/USDT"): 0.78,
+    ("SOL/USDT", "BTC/USDT"): 0.78,
+    ("ETH/USDT", "SOL/USDT"): 0.82,
+    ("SOL/USDT", "ETH/USDT"): 0.82,
+    ("BTC/USDT", "DOGE/USDT"): 0.68,
+    ("DOGE/USDT", "BTC/USDT"): 0.68,
+    ("BTC/USDT", "PEPE/USDT"): 0.65,
+    ("PEPE/USDT", "BTC/USDT"): 0.65,
+    ("ETH/USDT", "PEPE/USDT"): 0.70,
+    ("PEPE/USDT", "ETH/USDT"): 0.70,
+    ("SOL/USDT", "PEPE/USDT"): 0.68,
+    ("PEPE/USDT", "SOL/USDT"): 0.68,
+}
+
 
 @dataclass
 class MastermindDecisionRecord:
@@ -48,6 +66,8 @@ class MastermindDecisionRecord:
     expected_value_r: float
     portfolio_equity_usd: float
     timestamp_ms: int
+    correlation_discount: float = 1.0
+    calibration_weight: float = 1.0
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -157,7 +177,7 @@ class MastermindArbiterCouncil:
         return deployed
 
     def _ensure_tables(self) -> None:
-        """Creates mastermind_decisions audit table in brain_memory.db."""
+        """Creates mastermind_decisions audit table and specialist_track_record in brain_memory.db."""
         with db_manager.get_brain_conn() as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS mastermind_decisions (
@@ -181,7 +201,179 @@ class MastermindArbiterCouncil:
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_mm_decisions_sym ON mastermind_decisions (symbol, is_approved);"
             )
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS specialist_track_record (
+                    record_id TEXT PRIMARY KEY,
+                    specialist_id TEXT NOT NULL,
+                    proposal_id TEXT NOT NULL,
+                    symbol TEXT NOT NULL,
+                    direction TEXT NOT NULL,
+                    confidence_score REAL NOT NULL,
+                    expected_value_r REAL NOT NULL,
+                    outcome REAL,
+                    pnl_usd REAL,
+                    brier_error REAL,
+                    created_at_ms INTEGER NOT NULL,
+                    resolved_at_ms INTEGER
+                );
+            """)
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_spec_tr_spec ON specialist_track_record (specialist_id, outcome);"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_spec_tr_prop ON specialist_track_record (proposal_id);"
+            )
             conn.commit()
+
+    def calculate_pairwise_correlation(self, sym_a: str, sym_b: str) -> float:
+        """
+        Calculates or retrieves empirical correlation prior between two assets.
+        Returns float in [-1.0, 1.0].
+        """
+        if sym_a == sym_b:
+            return 1.0
+        if (sym_a, sym_b) in CORRELATION_PRIORS:
+            return CORRELATION_PRIORS[(sym_a, sym_b)]
+        if (sym_b, sym_a) in CORRELATION_PRIORS:
+            return CORRELATION_PRIORS[(sym_b, sym_a)]
+        # Default broad crypto beta correlation for USDT pairs
+        if "/USDT" in sym_a and "/USDT" in sym_b:
+            return 0.60
+        return 0.0
+
+    def compute_information_overlap_discount(
+        self, proposals: list[CandidateProposal]
+    ) -> dict[str, float]:
+        """
+        Calculates Information Overlap Sizing Discount per proposal based on directional clustering.
+        If N proposals share the same direction with average pairwise correlation rho:
+            N_eff = N / (1 + (N - 1) * rho)
+            discount = N_eff / N = 1 / (1 + (N - 1) * rho)
+        Prevents multiple correlated specialist votes from over-leveraging the same beta factor.
+        """
+        discounts: dict[str, float] = {p.proposal_id: 1.0 for p in proposals}
+
+        by_direction: dict[Any, list[CandidateProposal]] = {}
+        for p in proposals:
+            if p.direction in (DecisionAction.LONG, DecisionAction.SHORT):
+                by_direction.setdefault(p.direction, []).append(p)
+
+        for direction, group in by_direction.items():
+            n = len(group)
+            if n <= 1:
+                continue
+
+            for p in group:
+                other_corrs = [
+                    self.calculate_pairwise_correlation(p.symbol, other.symbol)
+                    for other in group
+                    if other.proposal_id != p.proposal_id
+                ]
+                avg_rho = sum(other_corrs) / max(1, len(other_corrs)) if other_corrs else 0.0
+                factor = 1.0 / (1.0 + (n - 1) * avg_rho)
+                discounts[p.proposal_id] = max(0.35, min(1.0, round(factor, 3)))
+
+        return discounts
+
+    def record_proposal_for_calibration(self, proposal: CandidateProposal) -> str:
+        """
+        Logs a specialist proposal into the calibration track record ledger.
+        """
+        rec_id = f"tr_{uuid.uuid4().hex[:12]}"
+        now_ms = int(time.time() * 1000)
+        dir_str = (
+            proposal.direction.value
+            if isinstance(proposal.direction, DecisionAction)
+            else str(proposal.direction)
+        )
+        with db_manager.get_brain_conn() as conn:
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO specialist_track_record
+                    (record_id, specialist_id, proposal_id, symbol, direction,
+                     confidence_score, expected_value_r, outcome, pnl_usd, brier_error,
+                     created_at_ms, resolved_at_ms)
+                VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, NULL);
+                """,
+                (
+                    rec_id,
+                    proposal.specialist_id,
+                    proposal.proposal_id,
+                    proposal.symbol,
+                    dir_str,
+                    float(proposal.confidence_score),
+                    float(proposal.expected_value_r),
+                    now_ms,
+                ),
+            )
+            conn.commit()
+        return rec_id
+
+    def resolve_proposal_outcome(
+        self, proposal_id: str, outcome: float, pnl_usd: float = 0.0
+    ) -> None:
+        """
+        Resolves an existing specialist proposal outcome (1.0 = Win / Target Hit, 0.0 = Loss / Stopped Out).
+        Computes the quadratic Brier error: (confidence_score - outcome)^2.
+        """
+        now_ms = int(time.time() * 1000)
+        with db_manager.get_brain_conn() as conn:
+            row = conn.execute(
+                "SELECT confidence_score FROM specialist_track_record WHERE proposal_id = ?;",
+                (proposal_id,),
+            ).fetchone()
+            if not row:
+                return
+            conf = float(row["confidence_score"])
+            brier_error = round((conf - outcome) ** 2, 4)
+            conn.execute(
+                """
+                UPDATE specialist_track_record
+                SET outcome = ?, pnl_usd = ?, brier_error = ?, resolved_at_ms = ?
+                WHERE proposal_id = ?;
+                """,
+                (outcome, pnl_usd, brier_error, now_ms, proposal_id),
+            )
+            conn.commit()
+
+    def get_specialist_calibration(self, specialist_id: str) -> dict[str, Any]:
+        """
+        Computes empirical Brier score calibration and dynamic voting weight for a specialist.
+        Returns:
+            brier_score: average quadratic error [0.0, 1.0]
+            weight: dynamic sizing multiplier [0.25, 1.25]
+            sample_size: count of resolved trades
+            win_rate: empirical win rate [0.0, 1.0]
+        """
+        with db_manager.get_brain_conn() as conn:
+            rows = conn.execute(
+                """
+                SELECT confidence_score, outcome, brier_error
+                FROM specialist_track_record
+                WHERE specialist_id = ? AND outcome IS NOT NULL;
+                """,
+                (specialist_id,),
+            ).fetchall()
+
+        if not rows or len(rows) < 5:
+            return {
+                "brier_score": 0.25,
+                "weight": 1.0,
+                "sample_size": len(rows),
+                "win_rate": 0.50,
+            }
+
+        m = len(rows)
+        avg_brier = sum(float(r["brier_error"]) for r in rows) / m
+        win_rate = sum(float(r["outcome"]) for r in rows) / m
+        weight = max(0.25, min(1.25, round(1.0 + 2.0 * (0.25 - avg_brier), 3)))
+
+        return {
+            "brier_score": round(avg_brier, 4),
+            "weight": weight,
+            "sample_size": m,
+            "win_rate": round(win_rate, 3),
+        }
 
     async def evaluate_swarm(
         self,
@@ -190,6 +382,7 @@ class MastermindArbiterCouncil:
     ) -> list[MastermindDecisionRecord]:
         """
         Polls all active specialists, collects CandidateProposals, arbitrates conflicts,
+        applies Information Overlap and Brier Score Calibration adjustments,
         verifies deterministic risk clearance, and submits approved candidates to PortfolioShadow.
         """
         decisions: list[MastermindDecisionRecord] = []
@@ -212,7 +405,8 @@ class MastermindArbiterCouncil:
         open_positions = portfolio_shadow.get_open_positions()
         existing_symbols = {p.get("symbol") for p in open_positions}
 
-        # 2. Collect Proposals from Specialists
+        # 2. Collect Proposals from All Active Specialists
+        raw_candidates: list[tuple[BaseSpecialistAgent, CandidateProposal]] = []
         for spec in self.get_all_specialists():
             sym = spec.target_symbol
             sym_data = market_data_by_symbol.get(sym, {})
@@ -229,15 +423,47 @@ class MastermindArbiterCouncil:
                     multi_tf_candles=multi_tf,
                     order_book=order_book,
                 )
+                raw_candidates.append((spec, proposal))
             except Exception as e:
                 logger.error("Specialist %s evaluation failed: %s", spec.specialist_id, e)
                 continue
 
-            # 3. Arbitrate Proposal Quality & Risk Clearance
+        # 3. Macro Regime Anchor & Directional Conflict Detection
+        btc_direction: DecisionAction | None = None
+        for spec, prop in raw_candidates:
+            if spec.specialist_id == "spec_btc_macro" and prop.direction in (
+                DecisionAction.LONG,
+                DecisionAction.SHORT,
+            ):
+                btc_direction = prop.direction
+                break
+
+        # 4. Information Overlap Sizing Discount Analysis
+        overlap_discounts = self.compute_information_overlap_discount(
+            [p for _, p in raw_candidates]
+        )
+
+        # 5. Arbitrate Proposals & Apply Calibration / Correlation Adjustments
+        for spec, proposal in raw_candidates:
+            sym = spec.target_symbol
             decision_id = f"mm_dec_{uuid.uuid4().hex[:12]}"
             is_approved = False
             rejection_reason = None
             approved_notional = 0.0
+
+            # Record proposal into calibration track record ledger
+            self.record_proposal_for_calibration(proposal)
+
+            # Retrieve specialist calibration weighting
+            calib = self.get_specialist_calibration(spec.specialist_id)
+            calib_weight = calib["weight"]
+            effective_confidence = round(proposal.confidence_score * calib_weight, 3)
+
+            # Cross-Asset Macro Conflict Adjustment:
+            # If BTC specialist is SHORT, an altcoin attempting a LONG faces macro headwind
+            if btc_direction == DecisionAction.SHORT and proposal.direction == DecisionAction.LONG:
+                effective_confidence = round(effective_confidence * 0.70, 3)
+                proposal.thesis = f"[MACRO HEADWIND: BTC SHORT] {proposal.thesis}"
 
             # Guard 1: Master Risk Gate Primacy (Independent Circuit Breaker Veto)
             if not gate.is_trading_allowed:
@@ -247,6 +473,13 @@ class MastermindArbiterCouncil:
             elif proposal.direction not in (DecisionAction.LONG, DecisionAction.SHORT):
                 rejection_reason = (
                     f"Specialist reported {proposal.direction.value}: no qualified edge."
+                )
+
+            # Guard 3: Calibration Demotion Filter
+            elif calib["sample_size"] >= 5 and effective_confidence < 0.45:
+                rejection_reason = (
+                    f"Specialist calibration weight ({calib_weight:.2f}) demoted effective confidence "
+                    f"to {effective_confidence:.2f} < 0.45 (Brier: {calib['brier_score']:.3f})."
                 )
 
             # Guard C: Portfolio Position Capacity
@@ -260,8 +493,11 @@ class MastermindArbiterCouncil:
                 rejection_reason = f"Position already active for {sym}."
 
             # Guard E: Expected Value & Confidence Thresholds
-            elif proposal.expected_value_r < 0.20 or proposal.confidence_score < 0.50:
-                rejection_reason = f"EV ({proposal.expected_value_r:.2f}R) or Confidence ({proposal.confidence_score:.2f}) below threshold."
+            elif proposal.expected_value_r < 0.20 or effective_confidence < 0.50:
+                rejection_reason = (
+                    f"EV ({proposal.expected_value_r:.2f}R) or Effective Confidence ({effective_confidence:.2f}) "
+                    f"below threshold."
+                )
 
             # Guard F: Valid Stop-Loss / Take-Profit Boundaries
             elif proposal.stop_loss <= 0 or proposal.take_profit <= 0:
@@ -270,7 +506,9 @@ class MastermindArbiterCouncil:
             else:
                 # Candidate Cleared Deterministic Arbiter Gates!
                 is_approved = True
-                approved_notional = proposal.suggested_notional_usd or (current_eq * 0.02)
+                overlap_discount = overlap_discounts.get(proposal.proposal_id, 1.0)
+                base_notional = proposal.suggested_notional_usd or (current_eq * 0.02)
+                approved_notional = round(base_notional * calib_weight * overlap_discount, 2)
 
                 # Open virtual paper position in Shadow Portfolio with 1.0% stop-risk cap
                 direction_str = proposal.direction.value
@@ -301,10 +539,12 @@ class MastermindArbiterCouncil:
                     )
                     existing_symbols.add(sym)
                     logger.info(
-                        "Mastermind approved and deployed: %s %s (Notional: $%.2f)",
+                        "Mastermind approved and deployed: %s %s (Notional: $%.2f, Overlap Discount: %.2f, Calib Weight: %.2f)",
                         direction_str,
                         sym,
                         approved_notional,
+                        overlap_discount,
+                        calib_weight,
                     )
 
                     # Dispatch immediate notification to Telegram
@@ -324,8 +564,9 @@ class MastermindArbiterCouncil:
                             f"🛡️ *Stop-Loss:* `${proposal.stop_loss:,.2f}`\n"
                             f"🎯 *Take-Profit:* `${proposal.take_profit:,.2f}`\n"
                             f"📐 *Risk-Reward:* `{proposal.risk_reward_ratio:.2f}R`\n"
-                            f"📊 *Net EV:* `+{proposal.expected_value_r:.2f}R` | *Conf:* `{proposal.confidence_score * 100:.0f}%`\n"
+                            f"📊 *Net EV:* `+{proposal.expected_value_r:.2f}R` | *Conf:* `{effective_confidence * 100:.0f}%`\n"
                             f"💼 *Approved Sizing:* `${approved_notional:,.2f}` ({units:.4f} units)\n"
+                            f"🔍 *Overlap Discount:* `{overlap_discount:.2f}x` | *Calib:* `{calib_weight:.2f}x`\n"
                             f"📝 *Thesis:* _{proposal.thesis[:160]}_\n"
                             f"━━━━━━━━━━━━━━━━━━━━━━\n"
                             f"Darwinian Mastermind Council • Virtual Paper Execution"
@@ -356,10 +597,12 @@ class MastermindArbiterCouncil:
                 is_approved=is_approved,
                 rejection_reason=rejection_reason,
                 approved_notional_usd=approved_notional,
-                confidence_score=proposal.confidence_score,
+                confidence_score=effective_confidence,
                 expected_value_r=proposal.expected_value_r,
                 portfolio_equity_usd=current_eq,
                 timestamp_ms=now_ms,
+                correlation_discount=overlap_discounts.get(proposal.proposal_id, 1.0),
+                calibration_weight=calib_weight,
             )
             self._persist_decision(record)
             decisions.append(record)

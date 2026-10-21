@@ -291,3 +291,223 @@ def test_candidate_proposal_epistemic_grade_serialization():
     assert d["direction"] == "LONG"
     assert d["disconfirming_evidence"] == ["High funding rate"]
     assert d["falsification_conditions"] == ["1h candle close below $63,000"]
+
+
+@pytest.mark.asyncio
+async def test_arbiter_information_overlap_discount_for_correlated_assets():
+    """
+    Phase 2 Adversarial Test:
+    When multiple specialists generate simultaneous LONG proposals on highly correlated assets
+    (BTC, ETH, SOL with pairwise rho >= 0.78), the Arbiter must detect the information overlap
+    and apply a significant sizing haircut (N_eff / N < 0.45) rather than tripling portfolio risk.
+    """
+    arbiter = MastermindArbiterCouncil(account_equity_usd=10_000.0)
+
+    # 3 simultaneous LONG proposals on BTC, ETH, and SOL
+    p_btc = CandidateProposal(
+        proposal_id="prop_btc_test",
+        specialist_id="spec_btc_macro",
+        archetype=SpecialistArchetype.BTC_MACRO_MICROSTRUCTURE,
+        symbol="BTC/USDT",
+        direction=DecisionAction.LONG,
+        thesis="BTC Macro support reclaim.",
+        entry_price=65000.0,
+        stop_loss=64000.0,
+        take_profit=68000.0,
+        risk_reward_ratio=3.0,
+        expected_value_r=1.2,
+        confidence_score=0.75,
+        invalidation_condition="Close < 64000",
+        suggested_notional_usd=500.0,
+    )
+    p_eth = CandidateProposal(
+        proposal_id="prop_eth_test",
+        specialist_id="spec_eth_structural",
+        archetype=SpecialistArchetype.ETH_DEFI_STRUCTURAL,
+        symbol="ETH/USDT",
+        direction=DecisionAction.LONG,
+        thesis="ETH structural breakout.",
+        entry_price=3500.0,
+        stop_loss=3400.0,
+        take_profit=3800.0,
+        risk_reward_ratio=3.0,
+        expected_value_r=1.1,
+        confidence_score=0.72,
+        invalidation_condition="Close < 3400",
+        suggested_notional_usd=400.0,
+    )
+    p_sol = CandidateProposal(
+        proposal_id="prop_sol_test",
+        specialist_id="spec_sol_velocity",
+        archetype=SpecialistArchetype.SOL_HIGH_VELOCITY,
+        symbol="SOL/USDT",
+        direction=DecisionAction.LONG,
+        thesis="SOL momentum expansion.",
+        entry_price=160.0,
+        stop_loss=152.0,
+        take_profit=180.0,
+        risk_reward_ratio=2.5,
+        expected_value_r=0.9,
+        confidence_score=0.70,
+        invalidation_condition="Close < 152",
+        suggested_notional_usd=300.0,
+    )
+
+    discounts = arbiter.compute_information_overlap_discount([p_btc, p_eth, p_sol])
+
+    assert len(discounts) == 3
+    # Pairwise correlations between BTC, ETH, SOL are 0.78 - 0.85
+    # For N=3 and rho ~ 0.81, discount = 1 / (1 + 2 * 0.81) = 1 / 2.62 ~ 0.38
+    for pid in ("prop_btc_test", "prop_eth_test", "prop_sol_test"):
+        assert discounts[pid] <= 0.45
+        assert discounts[pid] >= 0.35
+
+    # A single isolated proposal must receive 1.0 (no discount)
+    single_discount = arbiter.compute_information_overlap_discount([p_btc])
+    assert single_discount["prop_btc_test"] == 1.0
+
+
+@pytest.mark.asyncio
+async def test_arbiter_macro_divergence_penalizes_altcoin_long_when_btc_short():
+    """
+    Phase 2 Adversarial Test:
+    When Macro BTC specialist issues a SHORT proposal, an altcoin specialist attempting
+    a LONG proposal faces an immediate macro headwind.
+    The Arbiter must penalize candidate confidence by 30% and reject it if it falls below 0.50 hurdle.
+    """
+    arbiter = MastermindArbiterCouncil(account_equity_usd=10_000.0)
+
+    # Synthetic candles where BTC is falling (bearish close)
+    btc_candles = _generate_synthetic_candles(base_price=65000.0, count=25, trend=-0.005)
+    # Synthetic candles for Altcoin
+    alt_candles = _generate_synthetic_candles(base_price=1.5, count=25, trend=0.001)
+
+    # Deploy dynamic specialist for SUI/USDT recommending LONG with moderate 0.60 confidence
+    arbiter.deploy_dynamic_specialist(
+        symbol="SUI/USDT",
+        category="PRE_SPIKE_ACCUMULATION",
+        direction="LONG",
+        market_attention_score=60.0,  # Translates to conf ~ 0.60
+    )
+
+    market_data = {
+        "BTC/USDT": {"15m": btc_candles, "multi_tf": {"15m": btc_candles}},
+        "SUI/USDT": {"15m": alt_candles, "multi_tf": {"15m": alt_candles}},
+    }
+
+    from unittest.mock import AsyncMock, patch
+
+    # Mock BTC specialist to produce high-conviction SHORT proposal
+    btc_short_proposal = CandidateProposal(
+        proposal_id="prop_btc_short_01",
+        specialist_id="spec_btc_macro",
+        archetype=SpecialistArchetype.BTC_MACRO_MICROSTRUCTURE,
+        symbol="BTC/USDT",
+        direction=DecisionAction.SHORT,
+        thesis="BTC Macro Distribution Breakdown: Institutional sweep of liquidity.",
+        entry_price=63000.0,
+        stop_loss=64500.0,
+        take_profit=59000.0,
+        risk_reward_ratio=2.67,
+        expected_value_r=1.35,
+        confidence_score=0.82,
+        invalidation_condition="Close > 64500",
+        suggested_notional_usd=600.0,
+    )
+
+    with patch.object(
+        arbiter.specialists[0], "evaluate_market", new=AsyncMock(return_value=btc_short_proposal)
+    ):
+        decisions = await arbiter.evaluate_swarm(market_data)
+
+        # Find SUI decision
+        sui_dec = next((d for d in decisions if d.symbol == "SUI/USDT"), None)
+        assert sui_dec is not None
+
+        # SUI LONG was evaluated against BTC SHORT:
+        # Confidence 0.60 haircut by 30% -> 0.42 (< 0.50 hurdle rate)
+        assert sui_dec.is_approved is False
+        assert "below threshold" in sui_dec.rejection_reason or "Effective Confidence" in sui_dec.rejection_reason
+        assert sui_dec.confidence_score <= 0.45
+
+
+def test_specialist_brier_score_calibration_penalizes_overconfident_loser():
+    """
+    Phase 2 Calibration Test:
+    A specialist claiming 0.85 confidence across 5 trades that all stopped out (outcome=0.0)
+    must receive a severe Brier penalty (Brier > 0.70) and dynamic weight downscaled to 0.25.
+    """
+    import uuid
+
+    arbiter = MastermindArbiterCouncil(account_equity_usd=10_000.0)
+    spec_id = f"spec_loser_{uuid.uuid4().hex[:6]}"
+
+    for i in range(5):
+        p = CandidateProposal(
+            proposal_id=f"prop_loser_{i}_{uuid.uuid4().hex[:6]}",
+            specialist_id=spec_id,
+            archetype=SpecialistArchetype.MEME_MOMENTUM_SPIKE,
+            symbol="DOGE/USDT",
+            direction=DecisionAction.LONG,
+            thesis="Overconfident meme trade.",
+            entry_price=0.20,
+            stop_loss=0.19,
+            take_profit=0.25,
+            risk_reward_ratio=5.0,
+            expected_value_r=2.0,
+            confidence_score=0.85,
+            invalidation_condition="Loss of 0.19",
+            suggested_notional_usd=200.0,
+        )
+        arbiter.record_proposal_for_calibration(p)
+        # All 5 trades ended in complete loss
+        arbiter.resolve_proposal_outcome(p.proposal_id, outcome=0.0, pnl_usd=-50.0)
+
+    calib = arbiter.get_specialist_calibration(spec_id)
+    assert calib["sample_size"] == 5
+    assert calib["win_rate"] == 0.0
+    # Brier = (0.85 - 0.0)^2 = 0.7225
+    assert calib["brier_score"] >= 0.70
+    # Dynamic weighting downscaled to minimum clamp (0.25)
+    assert calib["weight"] == 0.25
+
+
+def test_specialist_brier_score_calibration_rewards_accurate_specialist():
+    """
+    Phase 2 Calibration Test:
+    A specialist claiming 0.80 confidence across 5 trades that all hit take-profit (outcome=1.0)
+    must receive a stellar Brier score (Brier <= 0.05) and boosted dynamic weight (weight >= 1.20).
+    """
+    import uuid
+
+    arbiter = MastermindArbiterCouncil(account_equity_usd=10_000.0)
+    spec_id = f"spec_winner_{uuid.uuid4().hex[:6]}"
+
+    for i in range(5):
+        p = CandidateProposal(
+            proposal_id=f"prop_winner_{i}_{uuid.uuid4().hex[:6]}",
+            specialist_id=spec_id,
+            archetype=SpecialistArchetype.BTC_MACRO_MICROSTRUCTURE,
+            symbol="BTC/USDT",
+            direction=DecisionAction.LONG,
+            thesis="High-probability BTC trade.",
+            entry_price=60000.0,
+            stop_loss=59000.0,
+            take_profit=63000.0,
+            risk_reward_ratio=3.0,
+            expected_value_r=1.5,
+            confidence_score=0.80,
+            invalidation_condition="Loss of 59000",
+            suggested_notional_usd=500.0,
+        )
+        arbiter.record_proposal_for_calibration(p)
+        # All 5 trades ended in full win
+        arbiter.resolve_proposal_outcome(p.proposal_id, outcome=1.0, pnl_usd=150.0)
+
+    calib = arbiter.get_specialist_calibration(spec_id)
+    assert calib["sample_size"] == 5
+    assert calib["win_rate"] == 1.0
+    # Brier = (0.80 - 1.0)^2 = 0.04
+    assert calib["brier_score"] <= 0.05
+    # Dynamic weighting boosted for empirical reliability
+    assert calib["weight"] >= 1.20
