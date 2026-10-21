@@ -24,6 +24,11 @@ from unittest.mock import patch
 import pytest
 
 from core.cognitive_brain.experience_engine import TradingExperienceEngine
+from core.cognitive_brain.metacognition import (
+    MetacognitiveAdvice,
+    MetacognitiveAssessment,
+    MetacognitiveMonitor,
+)
 from core.cognitive_brain.outcome_resolver import DeterministicOutcomeResolver
 from core.cognitive_brain.prediction_ledger import (
     CognitivePredictionLedger,
@@ -43,7 +48,18 @@ from core.cognitive_brain.schema import (
     ResolutionStatus,
     TradingExperienceRecord,
 )
-from core.mastermind.specialist_base import EpistemicGrade
+from core.cognitive_brain.world_model import (
+    CognitiveWorldModel,
+    MarketRegimeType,
+    WorldModelState,
+)
+from core.market_state import MarketStateVector
+from core.mastermind.mastermind_arbiter import MastermindArbiterCouncil
+from core.mastermind.specialist_base import (
+    CandidateProposal,
+    EpistemicGrade,
+    SpecialistArchetype,
+)
 from core.sky_intelligence.types import DecisionAction
 
 
@@ -482,3 +498,270 @@ def test_end_to_end_experience_engine_resolution_lifecycle(engine: TradingExperi
     assert reloaded.observation.observation_timestamp_ms == now_ms
     assert reloaded.outcome.status == ResolutionStatus.HIT_TARGET
     assert reloaded.is_resolved is True
+
+
+# ==============================================================================
+# 8. COGNITIVE WORLD MODEL (PHASE C)
+# ==============================================================================
+
+def test_world_model_detects_stale_data_and_marks_out_of_distribution():
+    """
+    When input data is older than the stale threshold, CognitiveWorldModel
+    must classify primary_regime as OUT_OF_DISTRIBUTION with high uncertainty.
+    """
+    wm = CognitiveWorldModel(stale_threshold_sec=300.0)
+    now_ms = int(time.time() * 1000)
+    stale_ts = now_ms - (600 * 1000)  # 600s old (> 300s threshold)
+
+    stale_candles = [
+        {"timestamp": stale_ts, "open": 60000.0, "high": 60500.0, "low": 59900.0, "close": 60200.0}
+    ]
+
+    state = wm.evaluate_state(
+        asset="BTC/USDT",
+        timeframe="15m",
+        raw_candles=stale_candles,
+        current_time_ms=now_ms,
+    )
+
+    assert state.is_out_of_distribution is True
+    assert state.primary_regime == MarketRegimeType.OUT_OF_DISTRIBUTION
+    assert state.epistemic_uncertainty >= 0.90
+    assert any("stale_data" in f for f in state.missing_features)
+
+
+def test_world_model_classifies_bull_regime_probabilistically():
+    """
+    Validates probabilistic regime classification and probability normalization.
+    """
+    wm = CognitiveWorldModel()
+    now_ms = int(time.time() * 1000)
+
+    state_vec = MarketStateVector(
+        schema_version="v1.0.0",
+        asset="BTC/USDT",
+        timestamp=now_ms,
+        trend_scores={"15m": 0.05, "1h": 0.03},
+        structure={"bos_state": "BULLISH"},
+        orderflow={"cvd_delta": 250.0},
+        volatility={"atr_percentile": 0.50},
+        macro_alignment={"dxy_correlation": -0.45},
+        sentiment={"nlp_news_score": 0.60},
+    )
+
+    state = wm.evaluate_state(
+        asset="BTC/USDT",
+        timeframe="15m",
+        state_vector=state_vec,
+        current_time_ms=now_ms,
+    )
+
+    assert state.is_out_of_distribution is False
+    assert state.primary_regime == MarketRegimeType.TRENDING_BULL
+    assert sum(state.regime_probabilities.values()) == pytest.approx(1.0, abs=0.01)
+    assert state.regime_probabilities[MarketRegimeType.TRENDING_BULL] > 0.40
+
+
+# ==============================================================================
+# 9. METACOGNITIVE MONITOR (PHASE D)
+# ==============================================================================
+
+def test_metacognitive_monitor_enforces_abstain_on_out_of_distribution():
+    """
+    When the world model reports OUT_OF_DISTRIBUTION, MetacognitiveMonitor
+    must enforce an explicit ABSTAIN recommendation and block execution.
+    """
+    monitor = MetacognitiveMonitor()
+    now_ms = int(time.time() * 1000)
+
+    ood_state = WorldModelState(
+        asset="ETH/USDT",
+        timeframe="15m",
+        snapshot_timestamp_ms=now_ms,
+        primary_regime=MarketRegimeType.OUT_OF_DISTRIBUTION,
+        regime_probabilities={MarketRegimeType.OUT_OF_DISTRIBUTION: 1.0},
+        epistemic_uncertainty=0.95,
+        is_out_of_distribution=True,
+    )
+
+    proposal = CandidateProposal(
+        proposal_id="p_ood_test",
+        specialist_id="spec_eth",
+        archetype=SpecialistArchetype.ETH_DEFI_STRUCTURAL,
+        symbol="ETH/USDT",
+        direction=DecisionAction.LONG,
+        thesis="Breakout attempt during feed blackout",
+        entry_price=3000.0,
+        stop_loss=2950.0,
+        take_profit=3100.0,
+        risk_reward_ratio=2.0,
+        expected_value_r=1.0,
+        confidence_score=0.90,
+        invalidation_condition="SL",
+        suggested_notional_usd=1000.0,
+    )
+
+    assessment = monitor.evaluate_decision_context(ood_state, [proposal])
+    assert assessment.advice == MetacognitiveAdvice.ABSTAIN
+    assert assessment.confidence_scale_factor == 0.0
+    assert assessment.can_execute is False
+    assert any("OUT_OF_DISTRIBUTION" in r for r in assessment.rationale)
+
+
+def test_metacognitive_monitor_penalizes_opposing_specialist_proposals():
+    """
+    When opposing specialists submit both LONG and SHORT proposals simultaneously,
+    MetacognitiveMonitor flags high dispersion and discounts sizing confidence by 50%.
+    """
+    monitor = MetacognitiveMonitor()
+    now_ms = int(time.time() * 1000)
+
+    nominal_state = WorldModelState(
+        asset="BTC/USDT",
+        timeframe="15m",
+        snapshot_timestamp_ms=now_ms,
+        primary_regime=MarketRegimeType.MEAN_REVERTING_RANGE,
+        regime_probabilities={MarketRegimeType.MEAN_REVERTING_RANGE: 0.60},
+        epistemic_uncertainty=0.40,
+        is_out_of_distribution=False,
+    )
+
+    p_long = CandidateProposal(
+        proposal_id="p_long",
+        specialist_id="spec_btc",
+        archetype=SpecialistArchetype.BTC_MACRO_MICROSTRUCTURE,
+        symbol="BTC/USDT",
+        direction=DecisionAction.LONG,
+        thesis="Range bottom sweep",
+        entry_price=60000.0,
+        stop_loss=59500.0,
+        take_profit=61000.0,
+        risk_reward_ratio=2.0,
+        expected_value_r=1.0,
+        confidence_score=0.80,
+        invalidation_condition="SL",
+        suggested_notional_usd=1000.0,
+    )
+
+    p_short = CandidateProposal(
+        proposal_id="p_short",
+        specialist_id="spec_meme",
+        archetype=SpecialistArchetype.MEME_MOMENTUM_SPIKE,
+        symbol="BTC/USDT",
+        direction=DecisionAction.SHORT,
+        thesis="Overhead resistance rejection",
+        entry_price=60000.0,
+        stop_loss=60500.0,
+        take_profit=59000.0,
+        risk_reward_ratio=2.0,
+        expected_value_r=1.0,
+        confidence_score=0.75,
+        invalidation_condition="SL",
+        suggested_notional_usd=1000.0,
+    )
+
+    assessment = monitor.evaluate_decision_context(nominal_state, [p_long, p_short])
+    assert assessment.disagreement_dispersion == 1.0
+    assert assessment.confidence_scale_factor <= 0.50
+    assert assessment.advice == MetacognitiveAdvice.CAUTION
+    assert any("Severe specialist conflict" in r for r in assessment.rationale)
+
+
+# ==============================================================================
+# 10. ARBITER & EXPERIENCE ENGINE INTEGRATION (PHASE E)
+# ==============================================================================
+
+@pytest.mark.asyncio
+async def test_arbiter_records_experience_in_cognitive_ledger(tmp_path: Path):
+    """
+    Verifies that MastermindArbiterCouncil automatically writes frozen experience
+    records into the CognitivePredictionLedger during evaluate_swarm().
+    """
+    db_file = tmp_path / "arbiter_cognitive.db"
+    ledger = CognitivePredictionLedger(db_path=db_file)
+    engine = TradingExperienceEngine(ledger=ledger)
+
+    arbiter = MastermindArbiterCouncil(
+        account_equity_usd=20_000.0,
+        experience_engine=engine,
+    )
+
+    now_ms = int(time.time() * 1000)
+    candles = []
+    price = 60000.0
+    for i in range(25):
+        price *= 1.001
+        candles.append(
+            {
+                "timestamp": now_ms - ((25 - i) * 15 * 60 * 1000),
+                "open": price * 0.999,
+                "high": price * 1.002,
+                "low": price * 0.998,
+                "close": price,
+                "volume": 200.0,
+            }
+        )
+
+    market_data = {
+        "BTC/USDT": {"15m": candles, "multi_tf": {"15m": candles}},
+    }
+
+    decisions = await arbiter.evaluate_swarm(market_data)
+    assert len(decisions) >= 1
+
+    # Verify experience records were persisted into the CognitivePredictionLedger
+    pending = ledger.get_pending_experiences(asset="BTC/USDT")
+    assert len(pending) >= 1
+    exp = pending[0]
+    assert exp.observation.asset == "BTC/USDT"
+    assert exp.is_frozen is True
+    assert exp.outcome.status == ResolutionStatus.PENDING
+
+
+@pytest.mark.asyncio
+async def test_arbiter_metacognitive_monitor_blocks_trade_during_feed_blackout(tmp_path: Path):
+    """
+    When data feeds are stale (> 300s), the WorldModel marks OUT_OF_DISTRIBUTION,
+    the MetacognitiveMonitor recommends ABSTAIN, and the Arbiter rejects the proposal.
+    """
+    db_file = tmp_path / "arbiter_meta_ood.db"
+    ledger = CognitivePredictionLedger(db_path=db_file)
+    engine = TradingExperienceEngine(ledger=ledger)
+    wm = CognitiveWorldModel(stale_threshold_sec=300.0)
+    monitor = MetacognitiveMonitor(ledger=ledger)
+
+    arbiter = MastermindArbiterCouncil(
+        account_equity_usd=20_000.0,
+        experience_engine=engine,
+        metacognitive_monitor=monitor,
+        world_model=wm,
+    )
+
+    now_ms = int(time.time() * 1000)
+    stale_start = now_ms - (600 * 1000)  # 600s old (exceeds 300s stale limit)
+    candles = []
+    price = 60000.0
+    for i in range(25):
+        candles.append(
+            {
+                "timestamp": stale_start - ((25 - i) * 15 * 60 * 1000),
+                "open": price * 0.999,
+                "high": price * 1.002,
+                "low": price * 0.998,
+                "close": price,
+                "volume": 200.0,
+            }
+        )
+
+    market_data = {
+        "BTC/USDT": {"15m": candles, "multi_tf": {"15m": candles}},
+    }
+
+    decisions = await arbiter.evaluate_swarm(market_data)
+    assert len(decisions) >= 1
+    d = decisions[0]
+    # Trade MUST be rejected due to Metacognitive ABSTENTION
+    assert d.is_approved is False
+    assert "Metacognitive Monitor ABSTENTION" in d.rejection_reason
+
+

@@ -82,8 +82,17 @@ class MastermindArbiterCouncil:
       and daily drawdown circuit breaker.
     """
 
-    def __init__(self, account_equity_usd: float = 10_000.0) -> None:
+    def __init__(
+        self,
+        account_equity_usd: float = 10_000.0,
+        experience_engine: Any = None,
+        metacognitive_monitor: Any = None,
+        world_model: Any = None,
+    ) -> None:
         self.account_equity_usd = account_equity_usd
+        self.experience_engine = experience_engine
+        self.metacognitive_monitor = metacognitive_monitor
+        self.world_model = world_model
         self._bg_tasks: set[asyncio.Task[Any]] = set()
         self.specialists: list[BaseSpecialistAgent] = [
             BtcMacroSpecialist(),
@@ -465,9 +474,35 @@ class MastermindArbiterCouncil:
                 effective_confidence = round(effective_confidence * 0.70, 3)
                 proposal.thesis = f"[MACRO HEADWIND: BTC SHORT] {proposal.thesis}"
 
+            # Metacognitive Monitor Evaluation
+            if self.metacognitive_monitor:
+                try:
+                    all_props = [p for _, p in raw_candidates]
+                    spec_candles = market_data_by_symbol.get(sym, {}).get("15m", [])
+                    wm_state = (
+                        self.world_model.evaluate_state(asset=sym, timeframe="15m", raw_candles=spec_candles)
+                        if self.world_model
+                        else None
+                    )
+                    if wm_state:
+                        meta_eval = self.metacognitive_monitor.evaluate_decision_context(
+                            world_state=wm_state,
+                            proposals=all_props,
+                            target_asset=sym,
+                        )
+                        effective_confidence = round(effective_confidence * meta_eval.confidence_scale_factor, 3)
+                        if not meta_eval.can_execute:
+                            rejection_reason = "Metacognitive Monitor ABSTENTION: " + "; ".join(meta_eval.rationale)
+                except Exception as meta_err:
+                    logger.warning("Metacognitive evaluation skipped: %s", meta_err)
+
             # Guard 1: Master Risk Gate Primacy (Independent Circuit Breaker Veto)
             if not gate.is_trading_allowed:
                 rejection_reason = f"Risk Gate lockout active: {gate.reason}"
+
+            # Guard 1b: Metacognitive Monitor Abstention / Quarantine (Zero Lookahead / OOD / Conflict)
+            elif rejection_reason and "Metacognitive Monitor ABSTENTION" in rejection_reason:
+                pass  # Deterministically preserve metacognitive veto
 
             # Guard 2: Passive NO_TRADE / WATCH
             elif proposal.direction not in (DecisionAction.LONG, DecisionAction.SHORT):
@@ -606,6 +641,76 @@ class MastermindArbiterCouncil:
             )
             self._persist_decision(record)
             decisions.append(record)
+
+            # Cognitive Brain: Record Experience in Prediction Ledger
+            if self.experience_engine:
+                try:
+                    from core.cognitive_brain.schema import (
+                        ObservationType, GovernanceAction, ExecutionStatus,
+                        ForecastPayload, ProposalPayload, GovernancePayload, ExecutionPayload
+                    )
+                    obs_type = (
+                        ObservationType.TRADE_PROPOSAL
+                        if proposal.direction in (DecisionAction.LONG, DecisionAction.SHORT)
+                        else ObservationType.DISCIPLINED_NO_TRADE
+                    )
+                    gov_action = (
+                        GovernanceAction.APPROVED
+                        if is_approved
+                        else (
+                            GovernanceAction.RISK_VETO
+                            if "Risk Gate" in rejection_reason or "Circuit" in rejection_reason
+                            else GovernanceAction.NO_ACTION
+                        )
+                    )
+                    exec_status = (
+                        ExecutionStatus.PAPER_FILLED
+                        if is_approved
+                        else (
+                            ExecutionStatus.COUNTERFACTUAL_ONLY
+                            if obs_type == ObservationType.DISCIPLINED_NO_TRADE
+                            else ExecutionStatus.NOT_EXECUTED
+                        )
+                    )
+                    fc = ForecastPayload(
+                        direction=proposal.direction,
+                        target_price=proposal.take_profit,
+                        invalidation_price=proposal.stop_loss,
+                        raw_confidence=proposal.confidence_score,
+                        calibrated_probability=min(0.99, max(0.01, effective_confidence)) if calib_weight else None,
+                        epistemic_grade=proposal.epistemic_grade,
+                    )
+                    prop_p = ProposalPayload(
+                        direction=proposal.direction,
+                        suggested_notional_usd=proposal.suggested_notional_usd,
+                        thesis=proposal.thesis,
+                        disconfirming_evidence=proposal.disconfirming_evidence,
+                        falsification_conditions=proposal.falsification_conditions,
+                        alternative_explanation=proposal.alternative_explanation,
+                    )
+                    gov_p = GovernancePayload(
+                        action=gov_action,
+                        reason=rejection_reason or "Approved by Mastermind Arbiter",
+                        risk_cap_applied=0.015,
+                        authorized_notional_usd=approved_notional,
+                    )
+                    exec_p = ExecutionPayload(
+                        status=exec_status,
+                        simulated_fill_price=proposal.entry_price if is_approved else None,
+                    )
+                    self.experience_engine.record_observation(
+                        asset=sym,
+                        timeframe="15m",
+                        entry_reference_price=proposal.entry_price,
+                        observation_type=obs_type,
+                        forecast=fc,
+                        proposal=prop_p,
+                        governance=gov_p,
+                        execution=exec_p,
+                        observation_timestamp_ms=now_ms,
+                    )
+                except Exception as exp_err:
+                    logger.warning("Experience recording in Mastermind Arbiter skipped: %s", exp_err)
 
         return decisions
 
