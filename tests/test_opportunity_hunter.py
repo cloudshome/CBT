@@ -207,3 +207,49 @@ async def test_screener_api_endpoint_contracts():
         resp_wl = await client.get("/api/screener/watchlist")
         assert resp_wl.status_code == 200
         assert "watchlist" in resp_wl.json()
+
+
+def test_pre_spike_long_and_post_spike_short_rules(hunter: OpportunityHunter):
+    """
+    Stage 3 Adversarial Test:
+    Ensures that Pre-Spike Long candidates (compression near resistance with rising RVOL)
+    and Post-Spike Short candidates (climax extension with extreme volume) generate
+    deterministic invalidation levels, high R:R targets, and valid venue links.
+    """
+    # 1. Pre-Spike Long candidate
+    cat_long, state_long, venue_long, dir_long, rat_long, qual_long, inv_long = hunter._classify_opportunity(
+        symbol="WLD/USDT",
+        price=0.5420,
+        price_change=8.4,
+        quote_vol=389_000_000.0,
+        rvol=3.5,
+        spread_bps=3.5,
+        high_24h=0.5500,  # trading right near 24h high (within 3%)
+        low_24h=0.4936,
+        spot_eligible=True,
+        futures_eligible=True,
+        attention_score=76.8,
+    )
+    assert cat_long == OpportunityCategory.PRE_BREAKOUT_COMPRESSION
+    assert dir_long == "LONG"
+    assert inv_long is not None and inv_long <= 0.5420
+    assert qual_long >= 80.0
+
+    # 2. Post-Spike Short candidate
+    cat_short, state_short, venue_short, dir_short, rat_short, qual_short, inv_short = hunter._classify_opportunity(
+        symbol="BR/USDT",
+        price=0.7255,
+        price_change=47.2,
+        quote_vol=565_000_000.0,
+        rvol=10.0,
+        spread_bps=3.5,
+        high_24h=0.7500,
+        low_24h=0.4500,
+        spot_eligible=True,
+        futures_eligible=True,
+        attention_score=100.0,
+    )
+    assert cat_short == OpportunityCategory.BLOW_OFF_EXHAUSTION
+    assert dir_short == "SHORT"
+    assert inv_short is not None and inv_short > 0.7255
+    assert qual_short >= 70.0

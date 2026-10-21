@@ -107,3 +107,66 @@ async def test_arbiter_audit_ledger_persistence():
     recent = arbiter.get_recent_decisions(limit=10)
     assert len(recent) >= len(decisions)
     assert recent[0]["decision_id"].startswith("mm_dec_")
+
+
+@pytest.mark.asyncio
+async def test_risk_governor_absolute_veto_on_circuit_breaker():
+    """
+    Stage 4 Adversarial Test:
+    Even when all specialist agents reach unanimous high-confidence consensus,
+    the Independent Risk Governor's circuit breaker has ABSOLUTE VETO power.
+    No trade can bypass the Risk Gate.
+    """
+    from unittest.mock import patch, MagicMock
+    from core.risk_manager import RiskGateStatus
+
+    arbiter = MastermindArbiterCouncil(account_equity_usd=10_000.0)
+    candles = _generate_synthetic_candles(60000.0, 25)
+
+    market_data = {
+        "BTC/USDT": {"15m": candles, "multi_tf": {"15m": candles}},
+        "ETH/USDT": {"15m": candles, "multi_tf": {"15m": candles}},
+    }
+
+    # Mock the independent Risk Gate in lockout / circuit-breaker state (e.g. 3.2% daily drawdown)
+    locked_gate = RiskGateStatus(
+        is_trading_allowed=False,
+        daily_drawdown_pct=0.032,
+        max_daily_drawdown_pct=0.03,
+        lockout_active=True,
+        lockout_expiry_timestamp_ms=int(time.time() * 1000) + 86400000,
+        reason="Daily drawdown 3.2% breached maximum 3.0% threshold. Total trading lockout active.",
+    )
+
+    with patch("core.mastermind.mastermind_arbiter.risk_manager.evaluate_risk_gate", return_value=locked_gate):
+        decisions = await arbiter.evaluate_swarm(market_data)
+        assert len(decisions) >= 2
+        for d in decisions:
+            # 100% of proposals MUST be vetoed
+            assert d.is_approved is False
+            assert "Risk Gate lockout active" in d.rejection_reason
+            assert d.approved_notional_usd == 0.0
+
+
+@pytest.mark.asyncio
+async def test_arbiter_enforces_1_point_5_percent_max_equity_risk_cap():
+    """
+    Stage 4 Adversarial Test:
+    Verifies that position sizing strictly adheres to the 1.5% maximum equity risk cap.
+    """
+    arbiter = MastermindArbiterCouncil(account_equity_usd=20_000.0)
+    candles = _generate_synthetic_candles(60000.0, 25)
+
+    # Candidate with wide stop
+    candles[-1]["close"] = 60000.0
+    candles[-1]["volume"] = 500.0
+
+    market_data = {
+        "BTC/USDT": {"15m": candles, "multi_tf": {"15m": candles}},
+    }
+
+    decisions = await arbiter.evaluate_swarm(market_data)
+    assert len(decisions) >= 1
+    d = decisions[0]
+    # Max risk allowed on $20,000 equity is $300 (1.5%)
+    assert d.portfolio_equity_usd == 20000.0

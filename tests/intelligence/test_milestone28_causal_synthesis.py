@@ -631,3 +631,55 @@ def test_intelligence_hypotheses_rest_endpoints(tmp_path):
         assert stats_data["real_capital_enabled"] is False
         assert stats_data["daily_global_cap"] == 50
         assert "daily_family_trials" in stats_data
+
+
+def test_causal_synthesizer_sandbox_db_isolation(tmp_path):
+    """
+    Regression Test: Ensures CausalHypothesisSynthesizer automatically binds its
+    plan_ledger to the sandbox db_path of the injected HypothesisLedgerManager,
+    preventing any cross-database contamination or missing table OperationalErrors.
+    """
+    db_file = str(tmp_path / "isolated_sandbox.db")
+    ledger = HypothesisLedgerManager(db_path=db_file)
+    mock_fm = MagicMock(spec=FailureMemoryEngine)
+    mock_fm.check_prior_failures.return_value = (False, None, "")
+    firewall = CausalFirewallValidator(failure_memory=mock_fm, ledger=ledger)
+
+    synthesizer = CausalHypothesisSynthesizer(firewall=firewall, ledger=ledger)
+    assert synthesizer.plan_ledger.db_path == db_file
+
+    now = time.time()
+    rec = IntelligenceRecord.create(
+        source_platform=SourcePlatform.RSS,
+        source_url="https://reuters.com/markets/isolated-test",
+        title="Fed signals liquidity pause amid balance sheet runoff",
+        content_markdown="Federal reserve minutes detail quantitative tightening timeline.",
+        summary="QT timeline clarified.",
+        domain=IntelligenceDomain.MACRO,
+        entities=["QT", "Fed"],
+        evidence_grade=EvidenceGrade.CORROBORATED_REPORT,
+        published_at_utc=now - 1200,
+    )
+
+    hypos = synthesizer.synthesize_from_record(
+        record=rec,
+        target_asset="BTC/USDT",
+        timeframe="5m",
+        auto_validate=True,
+    )
+    assert len(hypos) >= 1
+    hypo = hypos[0]
+
+    plan = synthesizer.dispatch_to_research_lab(hypo.hypothesis_id, frictional_tier="CONSERVATIVE")
+    assert plan.hypothesis_id == hypo.hypothesis_id
+
+    # Verify plan was persisted specifically into isolated_sandbox.db
+    import sqlite3
+    conn = sqlite3.connect(db_file)
+    cursor = conn.cursor()
+    cursor.execute("SELECT plan_id, hypothesis_id FROM experiment_plans_ledger WHERE plan_id = ?", (plan.plan_id,))
+    row = cursor.fetchone()
+    conn.close()
+    assert row is not None
+    assert row[0] == plan.plan_id
+    assert row[1] == hypo.hypothesis_id

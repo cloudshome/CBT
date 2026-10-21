@@ -109,6 +109,12 @@ if PROGRESSION not in PROGRESSION_LEVELS:
 # trend continuation (sweep reversals + OB/FVG pullbacks).
 PRIMARY_SETUP_FAMILY = os.getenv("PRIMARY_SETUP_FAMILY", "sweep_trend_continuation").strip().lower()
 PRIMARY_FAMILIES = {
+    "pullback_continuation": {
+        "Buy Pullback",
+        "Sell Pullback",
+        "FVG Retest Buy",
+        "FVG Retest Sell",
+    },
     "sweep_trend_continuation": {
         "Sweep Reversal Buy",
         "Sweep Reversal Sell",

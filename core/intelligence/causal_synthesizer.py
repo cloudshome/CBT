@@ -58,7 +58,12 @@ class CausalHypothesisSynthesizer:
     ):
         self.firewall = firewall or global_causal_firewall
         self.ledger = ledger or global_hypothesis_ledger
-        self.plan_ledger = plan_ledger or global_plan_ledger
+        if plan_ledger is not None:
+            self.plan_ledger = plan_ledger
+        elif hasattr(self.ledger, 'db_path') and self.ledger.db_path is not None:
+            self.plan_ledger = ExperimentPlanLedger(db_path=self.ledger.db_path)
+        else:
+            self.plan_ledger = global_plan_ledger
 
     def synthesize_from_record(
         self,

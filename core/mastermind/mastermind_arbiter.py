@@ -239,15 +239,15 @@ class MastermindArbiterCouncil:
             rejection_reason = None
             approved_notional = 0.0
 
-            # Guard A: Passive NO_TRADE / WATCH
-            if proposal.direction not in (DecisionAction.LONG, DecisionAction.SHORT):
+            # Guard 1: Master Risk Gate Primacy (Independent Circuit Breaker Veto)
+            if not gate.is_trading_allowed:
+                rejection_reason = f"Risk Gate lockout active: {gate.reason}"
+
+            # Guard 2: Passive NO_TRADE / WATCH
+            elif proposal.direction not in (DecisionAction.LONG, DecisionAction.SHORT):
                 rejection_reason = (
                     f"Specialist reported {proposal.direction.value}: no qualified edge."
                 )
-
-            # Guard B: Master Risk Gate
-            elif not gate.is_trading_allowed:
-                rejection_reason = f"Risk Gate lockout active: {gate.reason}"
 
             # Guard C: Portfolio Position Capacity
             elif len(open_positions) >= max_active_portfolio_positions:
