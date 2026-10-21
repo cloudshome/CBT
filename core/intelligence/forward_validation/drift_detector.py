@@ -21,6 +21,7 @@ Epistemic & Statistical Governance:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from enum import StrEnum
@@ -95,9 +96,71 @@ class MultiDimensionalDriftDetector:
     volatility explosion, and trade return distribution breakdown.
     """
 
-    def __init__(self, min_sample_size: int = 30) -> None:
+    def __init__(
+        self,
+        min_sample_size: int = 30,
+        fill_simulator: RealisticPaperFillSimulator | None = None,
+        auto_dispatch_telegram: bool = True,
+    ) -> None:
         self.min_sample_size = min_sample_size
+        self.fill_simulator = fill_simulator
+        self.auto_dispatch_telegram = auto_dispatch_telegram
 
+    def dispatch_drift_alert(self, report: MultiDimensionalDriftReport) -> bool:
+        """
+        Dispatches high-priority urgent alert to Telegram desk operator when
+        severe or degraded drift is detected (KS-test p < 0.01 or toxic markout slope).
+        Supports both sync and async execution contexts.
+        """
+        if report.overall_status not in (DriftStatus.SEVERE, DriftStatus.DEGRADED):
+            return False
+
+        try:
+            from core.telegram_bot import telegram_bot
+
+            emoji = "🚨 CRITICAL" if report.overall_status == DriftStatus.SEVERE else "⚠️ WARNING"
+            axis_lines = []
+            for name, res in report.axes.items():
+                if res.status in (DriftStatus.SEVERE, DriftStatus.DEGRADED, DriftStatus.WATCH):
+                    status_icon = (
+                        "🔴"
+                        if res.status == DriftStatus.SEVERE
+                        else ("🟠" if res.status == DriftStatus.DEGRADED else "🟡")
+                    )
+                    axis_lines.append(
+                        f"{status_icon} *{name.replace('_', ' ').title()}:* `{res.status.value}` "
+                        f"({res.warning_message or 'Divergence detected'})"
+                    )
+
+            axes_str = "\n".join(axis_lines) if axis_lines else "• Multi-axis deviation"
+
+            msg = (
+                f"{emoji} *FORWARD VALIDATION DRIFT ALERT*\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"📊 *Strategy / Admission:* `{report.admission_id}`\n"
+                f"🎯 *Overall Status:* `{report.overall_status.value}` (N={report.sample_size_n})\n"
+                f"📝 *Summary:* _{report.drift_summary}_\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"*Axis Divergences:*\n"
+                f"{axes_str}\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"SKY Multi-Dimensional Sentinel • Epistemic p < 0.01 Trigger"
+            )
+
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(telegram_bot.send_message(msg, parse_mode="Markdown"))
+            except RuntimeError:
+                try:
+                    asyncio.run(telegram_bot.send_message(msg, parse_mode="Markdown"))
+                except Exception as e:
+                    logger.debug(f"Could not dispatch drift alert: {e}")
+
+            logger.info("Dispatched drift alert to Telegram for %s", report.admission_id)
+            return True
+        except Exception as e:
+            logger.warning("Failed to dispatch drift alert to Telegram: %s", e)
+            return False
     def evaluate_drift(
         self,
         scorecard: StrategyForwardScorecard,
@@ -192,13 +255,30 @@ class MultiDimensionalDriftDetector:
                     "All 5 drift axes operating within acceptable statistical tolerance."
                 )
 
-        return MultiDimensionalDriftReport(
+        report = MultiDimensionalDriftReport(
             admission_id=scorecard.admission_id,
             sample_size_n=n,
             overall_status=overall_status,
             axes=axes,
             drift_summary=drift_summary,
         )
+
+        # Closed-loop depth friction calibration if slippage degradation is detected
+        if (
+            self.fill_simulator is not None
+            and axes["slippage_drift"].status in (DriftStatus.SEVERE, DriftStatus.DEGRADED)
+            and baseline.expected_slippage_bps > 0
+        ):
+            self.fill_simulator.calibrate_depth_friction(
+                realized_slippage_bps=scorecard.avg_slippage_bps,
+                expected_slippage_bps=baseline.expected_slippage_bps,
+            )
+
+        # Automated high-priority Telegram alert dispatch on SEVERE or DEGRADED drift
+        if self.auto_dispatch_telegram and overall_status in (DriftStatus.SEVERE, DriftStatus.DEGRADED):
+            self.dispatch_drift_alert(report)
+
+        return report
 
     def _eval_return_distribution(
         self,

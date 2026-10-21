@@ -227,6 +227,37 @@ class SuspensionController:
             policy_version=self.policy.policy_version,
         )
 
+        # Dispatch urgent Telegram alert on circuit breaker trip
+        try:
+            import asyncio
+            from core.telegram_bot import telegram_bot
+
+            status_emoji = (
+                "🛑 SUSPENDED" if target_status == AdmissionStatus.SUSPENDED else "⚠️ QUARANTINED"
+            )
+            msg = (
+                f"🚨 *CIRCUIT BREAKER TRIGGERED: STRATEGY {status_emoji}*\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🤖 *Strategy / Admission:* `{admission_id}`\n"
+                f"⚡ *Trigger:* `{trigger_name}`\n"
+                f"🎯 *Target Status:* `{target_status.value}`\n"
+                f"📊 *Observed Metric:* `{observed_val:.2f}` (Limit: `{threshold_val:.2f}`)\n"
+                f"📝 *Reason:* _{reason}_\n"
+                f"👤 *Operator / Source:* `{operator_or_system}`\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"Deterministic Risk Guard • Zero-Discretion Circuit Breaker"
+            )
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(telegram_bot.send_message(msg, parse_mode="Markdown"))
+            except RuntimeError:
+                try:
+                    asyncio.run(telegram_bot.send_message(msg, parse_mode="Markdown"))
+                except Exception as e:
+                    logger.debug(f"Could not dispatch circuit breaker alert: {e}")
+        except Exception as t_err:
+            logger.debug("Failed to dispatch suspension alert to Telegram: %s", t_err)
+
         # 3. Cancel resting limit orders in simulated fill environment (SIMULATION_ONLY_CANCEL)
         if self.fill_simulator and self.policy.auto_cancel_resting_orders:
             cancelled = self.fill_simulator.cancel_all_orders_for_admission(admission_id)

@@ -158,6 +158,46 @@ class RealisticPaperFillSimulator:
         # order_id -> RestingLimitOrder
         self._resting_limit_orders: dict[str, RestingLimitOrder] = {}
 
+    def calibrate_depth_friction(
+        self,
+        realized_slippage_bps: float,
+        expected_slippage_bps: float = 0.5,
+    ) -> dict[str, float]:
+        """
+        Closed-Loop Feedback: Adjusts adverse_selection_factor and market_order_latency_ms
+        based on realized vs expected paper slippage.
+        If realized slippage > expected slippage, scales up friction parameters.
+        """
+        if expected_slippage_bps <= 0:
+            expected_slippage_bps = 0.5
+
+        ratio = realized_slippage_bps / expected_slippage_bps
+        old_factor = self.adverse_selection_factor
+        old_latency = self.market_order_latency_ms
+
+        if ratio > 1.2:
+            adjustment = min(2.5, 1.0 + 0.5 * (ratio - 1.0))
+            self.adverse_selection_factor = round(min(3.0, self.adverse_selection_factor * adjustment), 3)
+            self.market_order_latency_ms = round(min(250.0, self.market_order_latency_ms * adjustment), 1)
+        elif ratio < 0.8:
+            self.adverse_selection_factor = round(max(0.3, self.adverse_selection_factor * 0.95), 3)
+            self.market_order_latency_ms = round(max(20.0, self.market_order_latency_ms * 0.95), 1)
+
+        logger.info(
+            "RealisticPaperFillSimulator depth friction calibrated: factor %.3f -> %.3f, latency %.1f -> %.1fms (ratio: %.2fx)",
+            old_factor,
+            self.adverse_selection_factor,
+            old_latency,
+            self.market_order_latency_ms,
+            ratio,
+        )
+
+        return {
+            "slippage_ratio": round(ratio, 3),
+            "adverse_selection_factor": self.adverse_selection_factor,
+            "market_order_latency_ms": self.market_order_latency_ms,
+        }
+
     def simulate_market_order(
         self,
         admission_id: str,
