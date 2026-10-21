@@ -174,3 +174,4 @@ When adding or modifying agents in this repository, any autonomous AI MUST adher
    - Do not modify certified M18 connectors, the kill switch, or smart order routers without re-running `python scripts/verify_m18_certification.py` (149/149 passing tests required).
 5. **Epistemic Honesty:**
    - Mark statements using the standard taxonomy: `[FACT]`, `[ASSUMPTION]`, `[HYPOTHESIS]`, or `[UNVERIFIED]`. Never fabricate backtest wins or sample sizes.
+

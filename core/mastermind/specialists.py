@@ -67,7 +67,7 @@ class BtcMacroSpecialist(BaseSpecialistAgent):
             thesis = "BTC Macro in consolidation; no high-conviction institutional imbalance."
             conf = 0.20
 
-        return CandidateProposal(
+        prop = CandidateProposal(
             proposal_id=f"prop_btc_{uuid.uuid4().hex[:8]}",
             specialist_id=self.specialist_id,
             archetype=self.archetype,
@@ -87,6 +87,7 @@ class BtcMacroSpecialist(BaseSpecialistAgent):
                 "regime": str(setup.regime if setup else "UNKNOWN"),
             },
         )
+        return self.apply_adversarial_review(prop, candles_15m, order_book)
 
 
 class EthSpecialist(BaseSpecialistAgent):
@@ -130,7 +131,7 @@ class EthSpecialist(BaseSpecialistAgent):
             thesis = "ETH structural setup neutral."
             conf = 0.20
 
-        return CandidateProposal(
+        prop = CandidateProposal(
             proposal_id=f"prop_eth_{uuid.uuid4().hex[:8]}",
             specialist_id=self.specialist_id,
             archetype=self.archetype,
@@ -147,6 +148,7 @@ class EthSpecialist(BaseSpecialistAgent):
             suggested_notional_usd=decision.suggested_position_size_usd,
             telemetry={"kelly_fraction": decision.kelly_fraction},
         )
+        return self.apply_adversarial_review(prop, candles_15m, order_book)
 
 
 class SolSpecialist(BaseSpecialistAgent):
@@ -190,7 +192,7 @@ class SolSpecialist(BaseSpecialistAgent):
             thesis = "SOL velocity momentum flat."
             conf = 0.20
 
-        return CandidateProposal(
+        prop = CandidateProposal(
             proposal_id=f"prop_sol_{uuid.uuid4().hex[:8]}",
             specialist_id=self.specialist_id,
             archetype=self.archetype,
@@ -207,6 +209,7 @@ class SolSpecialist(BaseSpecialistAgent):
             suggested_notional_usd=decision.suggested_position_size_usd,
             telemetry={"kelly_fraction": decision.kelly_fraction},
         )
+        return self.apply_adversarial_review(prop, candles_15m, order_book)
 
 
 class MemeMomentumSpecialist(BaseSpecialistAgent):
@@ -263,7 +266,7 @@ class MemeMomentumSpecialist(BaseSpecialistAgent):
             tp = cur_price + 2.5 * risk_dist
             rr = (tp - cur_price) / risk_dist
 
-            return CandidateProposal(
+            prop = CandidateProposal(
                 proposal_id=f"prop_meme_{uuid.uuid4().hex[:8]}",
                 specialist_id=self.specialist_id,
                 archetype=self.archetype,
@@ -280,24 +283,31 @@ class MemeMomentumSpecialist(BaseSpecialistAgent):
                 suggested_notional_usd=150.0,
                 telemetry={"vol_ratio": vol_ratio, "avg_vol": avg_vol, "latest_vol": latest_vol},
             )
+            return self.apply_adversarial_review(prop, candles_15m, order_book)
 
-        return CandidateProposal(
+        no_trade_thesis = (
+            f"Meme volume spike ({vol_ratio:.1f}x) failed to break previous high ${prev_high:.4f}."
+            if vol_ratio > 2.5
+            else f"Normal meme activity: volume ratio {vol_ratio:.2f}x below 2.5x threshold."
+        )
+        prop = CandidateProposal(
             proposal_id=f"prop_meme_{uuid.uuid4().hex[:8]}",
             specialist_id=self.specialist_id,
             archetype=self.archetype,
             symbol=self.target_symbol,
             direction=DecisionAction.NO_TRADE,
-            thesis=f"Normal meme activity: volume ratio {vol_ratio:.2f}x below 2.5x threshold.",
+            thesis=no_trade_thesis,
             entry_price=cur_price,
             stop_loss=cur_price * 0.95,
             take_profit=cur_price * 1.10,
             risk_reward_ratio=2.0,
             expected_value_r=0.0,
             confidence_score=0.15,
-            invalidation_condition="Volume threshold not reached.",
+            invalidation_condition="Volume threshold or breakout price not reached.",
             suggested_notional_usd=0.0,
             telemetry={"vol_ratio": vol_ratio},
         )
+        return self.apply_adversarial_review(prop, candles_15m, order_book)
 
 
 class LowCapBreakoutSpecialist(BaseSpecialistAgent):
@@ -350,7 +360,7 @@ class LowCapBreakoutSpecialist(BaseSpecialistAgent):
         if obi > 0.40:
             sl = cur_price * 0.96
             tp = cur_price * 1.10
-            return CandidateProposal(
+            prop = CandidateProposal(
                 proposal_id=f"prop_lowcap_{uuid.uuid4().hex[:8]}",
                 specialist_id=self.specialist_id,
                 archetype=self.archetype,
@@ -367,6 +377,7 @@ class LowCapBreakoutSpecialist(BaseSpecialistAgent):
                 suggested_notional_usd=100.0,
                 telemetry={"obi": obi},
             )
+            return self.apply_adversarial_review(prop, candles_15m, order_book)
 
         return CandidateProposal(
             proposal_id=f"prop_lowcap_{uuid.uuid4().hex[:8]}",
@@ -468,7 +479,7 @@ class DynamicOpportunitySpecialist(BaseSpecialistAgent):
             ev = 0.0
             thesis = f"Opportunity Hunter [{self.category}]: Monitoring in progress (Watch state)."
 
-        return CandidateProposal(
+        prop = CandidateProposal(
             proposal_id=f"prop_opp_{uuid.uuid4().hex[:8]}",
             specialist_id=self.specialist_id,
             archetype=self.archetype,
@@ -490,3 +501,5 @@ class DynamicOpportunitySpecialist(BaseSpecialistAgent):
                 "invalidation_level": self.invalidation_level,
             },
         )
+        return self.apply_adversarial_review(prop, candles_15m, order_book)
+
