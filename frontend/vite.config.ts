@@ -83,6 +83,8 @@ const PYTHON_PREFIXES = [
   '/api/screener',
   '/api/risk',
   '/api/trader',
+  '/api/arena',
+  '/api/temporal',
   '/api/metrics',
   '/api/v1',
   '/api/web3',
