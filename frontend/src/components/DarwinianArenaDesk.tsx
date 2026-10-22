@@ -161,7 +161,7 @@ export const DarwinianArenaDesk: React.FC<DarwinianArenaDeskProps> = ({
               </span>
             </div>
             <p className="text-xs text-slate-400 font-mono flex items-center gap-2 mt-0.5">
-              <span>10 Isolated Sandboxes ($100 each)</span>
+              <span>10 Isolated Sandboxes ($1,000 each)</span>
               <span>•</span>
               <span className="text-emerald-400">Zero Desk Contamination</span>
               <span>•</span>
@@ -175,8 +175,8 @@ export const DarwinianArenaDesk: React.FC<DarwinianArenaDeskProps> = ({
           <div className="bg-[#0f172a] border border-[#1e293b] rounded-lg px-3 py-2">
             <div className="text-[10px] text-slate-400 font-mono uppercase">Arena Total Equity</div>
             <div className="text-sm font-bold font-mono text-cyan-400">
-              ${leaderboard?.total_arena_equity_usd.toFixed(2) || '1,000.00'}
-              <span className="text-[10px] text-slate-500 ml-1">/ $1,000.00</span>
+              ${leaderboard?.total_arena_equity_usd.toFixed(2) || '10,000.00'}
+              <span className="text-[10px] text-slate-500 ml-1">/ $10,000.00</span>
             </div>
           </div>
 

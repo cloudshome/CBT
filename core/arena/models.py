@@ -84,10 +84,10 @@ class ArenaSpecialistAccount(BaseModel):
 
     specialist_id: str
     symbol: str
-    initial_equity_usd: float = 100.0
-    current_cash_usd: float = 100.0
-    current_equity_usd: float = 100.0
-    peak_equity_usd: float = 100.0
+    initial_equity_usd: float = 1000.0
+    current_cash_usd: float = 1000.0
+    current_equity_usd: float = 1000.0
+    peak_equity_usd: float = 1000.0
     max_drawdown_pct: float = 0.0
     realized_pnl_usd: float = 0.0
     unrealized_pnl_usd: float = 0.0

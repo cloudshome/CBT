@@ -44,7 +44,7 @@ def isolated_ledger(tmp_path: Path) -> ArenaLedger:
 
 @pytest.fixture
 def arena_engine(isolated_ledger: ArenaLedger) -> DarwinianArenaEngine:
-    return DarwinianArenaEngine(ledger=isolated_ledger, initial_capital_per_specialist=100.0)
+    return DarwinianArenaEngine(ledger=isolated_ledger, initial_capital_per_specialist=1000.0)
 
 
 # ==============================================================================
@@ -52,12 +52,12 @@ def arena_engine(isolated_ledger: ArenaLedger) -> DarwinianArenaEngine:
 # ==============================================================================
 
 def test_arena_initializes_10_isolated_specialists_with_100_usd(arena_engine: DarwinianArenaEngine):
-    """Verifies that all 10 specialists are initialized with exactly $100 virtual equity."""
+    """Verifies that all 10 specialists are initialized with exactly $1,000 virtual equity."""
     accounts = arena_engine.ledger.get_all_accounts()
     assert len(accounts) == 10
 
     total_equity = sum(a.current_equity_usd for a in accounts)
-    assert total_equity == pytest.approx(1000.0, abs=0.01)
+    assert total_equity == pytest.approx(10000.0, abs=0.01)
 
     expected_symbols = {
         "BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "XRP/USDT",
@@ -67,9 +67,9 @@ def test_arena_initializes_10_isolated_specialists_with_100_usd(arena_engine: Da
     assert actual_symbols == expected_symbols
 
     for acc in accounts:
-        assert acc.current_cash_usd == 100.0
-        assert acc.current_equity_usd == 100.0
-        assert acc.peak_equity_usd == 100.0
+        assert acc.current_cash_usd == 1000.0
+        assert acc.current_equity_usd == 1000.0
+        assert acc.peak_equity_usd == 1000.0
         assert acc.status == SpecialistSurvivalStatus.SURVIVING
         assert acc.open_position is None
 
@@ -94,8 +94,8 @@ def test_specialist_trading_does_not_mutate_other_specialists(arena_engine: Darw
     assert btc_acc.open_position is not None
     assert eth_acc.open_position is None
     assert sol_acc.open_position is None
-    assert eth_acc.current_cash_usd == 100.0
-    assert sol_acc.current_cash_usd == 100.0
+    assert eth_acc.current_cash_usd == 1000.0
+    assert sol_acc.current_cash_usd == 1000.0
 
 
 # ==============================================================================
@@ -138,7 +138,7 @@ def test_realistic_friction_applied_on_entry_and_exit(arena_engine: DarwinianAre
     sol_acc = arena_engine.ledger.get_account("spec_arena_sol")
     assert sol_acc.total_trades == 1
     assert sol_acc.winning_trades == 1
-    assert sol_acc.current_equity_usd > 100.0
+    assert sol_acc.current_equity_usd > 1000.0
 
 
 # ==============================================================================
@@ -153,8 +153,8 @@ def test_benchmark_relative_alpha_calculation():
     metrics = AssetBenchmarkEngine.calculate(
         initial_price=100.0,
         current_price=90.0,  # Asset dropped -10%
-        initial_equity=100.0,
-        current_equity=105.0,  # Specialist made +5%
+        initial_equity=1000.0,
+        current_equity=1050.0,  # Specialist made +5%
     )
     assert metrics.benchmark_return_pct == -10.0
     assert metrics.specialist_return_pct == 5.0
@@ -169,7 +169,7 @@ def test_benchmark_relative_alpha_calculation():
 def test_drawdown_triggers_probation_state(arena_engine: DarwinianArenaEngine):
     """Drawdown >= 10% transitions specialist to PROBATION (sizing halved)."""
     sol_acc = arena_engine.ledger.get_account("spec_arena_sol")
-    sol_acc.current_equity_usd = 89.0  # -11% drawdown from $100
+    sol_acc.current_equity_usd = 890.0  # -11% drawdown from $1000
     sol_acc.max_drawdown_pct = 11.0
     arena_engine.ledger.upsert_account(sol_acc)
 
@@ -312,7 +312,7 @@ def test_api_leaderboard_endpoint(arena_engine: DarwinianArenaEngine):
 
     data = response.json()
     assert "total_arena_equity_usd" in data
-    assert data["total_arena_equity_usd"] == pytest.approx(1000.0, abs=1.0)
+    assert data["total_arena_equity_usd"] == pytest.approx(10000.0, abs=1.0)
     assert data["master_desk_equity_usd"] == 10000.0
     assert len(data["specialists"]) == 10
 
@@ -327,7 +327,7 @@ def test_api_specialist_detail_endpoint(arena_engine: DarwinianArenaEngine):
     data = response.json()
     assert data["specialist_id"] == "spec_arena_eth"
     assert data["symbol"] == "ETH/USDT"
-    assert data["initial_equity_usd"] == 100.0
+    assert data["initial_equity_usd"] == 1000.0
 
 
 # ==============================================================================

@@ -56,7 +56,7 @@ class DarwinianArenaEngine:
         self,
         ledger: ArenaLedger | None = None,
         survival_machine: SurvivalStateMachine | None = None,
-        initial_capital_per_specialist: float = 100.0,
+        initial_capital_per_specialist: float = 1000.0,
     ) -> None:
         self.ledger = ledger or ArenaLedger()
         self.survival = survival_machine or SurvivalStateMachine()
@@ -64,11 +64,11 @@ class DarwinianArenaEngine:
         self._ensure_specialists_initialized()
 
     def _ensure_specialists_initialized(self) -> None:
-        """Initializes all 10 specialists in SQLite if not already present."""
+        """Initializes all 10 specialists in SQLite if not already present or upgrades baseline."""
         now_ms = int(time.time() * 1000)
         for spec_id, symbol, strat_id in ARENA_DEFAULT_SYMBOLS:
             existing = self.ledger.get_account(spec_id)
-            if not existing:
+            if not existing or existing.initial_equity_usd != self.initial_capital:
                 account = ArenaSpecialistAccount(
                     specialist_id=spec_id,
                     symbol=symbol,
@@ -84,7 +84,7 @@ class DarwinianArenaEngine:
                 self.ledger.record_event(
                     specialist_id=spec_id,
                     event_type="INITIALIZED",
-                    old_status="NONE",
+                    old_status=existing.status.value if existing else "NONE",
                     new_status=SpecialistSurvivalStatus.SURVIVING.value,
                     reason=f"Specialist initialized with ${self.initial_capital:.2f} virtual sandbox capital",
                 )
