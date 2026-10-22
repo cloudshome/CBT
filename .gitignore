@@ -15,6 +15,7 @@ bin/
 !/data/research/vault/
 !/data/research/vault/**
 /data/research/vault/documents/
+/data/research/vault/articles/
 .venv/
 .vscode/
 .env
