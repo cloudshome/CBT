@@ -5697,6 +5697,134 @@ export async function getMastermindOpportunitySignals(
   return await handleResponse<any>(res);
 }
 
+// ============================================================================
+// DARWINIAN ARENA & TEMPORAL INTELLIGENCE INTERFACES
+// ============================================================================
+
+export interface ArenaSpecialist {
+  specialist_id: string;
+  symbol: string;
+  initial_equity_usd: number;
+  current_cash_usd: number;
+  current_equity_usd: number;
+  peak_equity_usd: number;
+  max_drawdown_pct: number;
+  realized_pnl_usd: number;
+  unrealized_pnl_usd: number;
+  fees_paid_usd: number;
+  total_trades: number;
+  winning_trades: number;
+  losing_trades: number;
+  consecutive_losses: number;
+  benchmark_initial_price: number | null;
+  benchmark_current_price: number | null;
+  benchmark_return_pct: number;
+  specialist_return_pct: number;
+  alpha_vs_benchmark_pct: number;
+  active_strategy_id: string;
+  active_strategy_version: string;
+  status: 'SURVIVING' | 'PROBATION' | 'QUARANTINED' | 'REJECTED' | 'PAPER_QUALIFIED';
+  quarantine_reason: string | null;
+  last_updated_ms: number;
+  open_position: {
+    symbol: string;
+    direction: 'LONG' | 'SHORT';
+    entry_price: number;
+    size_units: number;
+    notional_usd: number;
+    entry_time_ms: number;
+    stop_loss: number;
+    take_profit: number;
+    strategy_id: string;
+    strategy_version: string;
+  } | null;
+}
+
+export interface ArenaLeaderboardSnapshot {
+  timestamp_ms: number;
+  total_arena_equity_usd: number;
+  master_desk_equity_usd: number;
+  active_specialists_count: number;
+  quarantined_specialists_count: number;
+  specialists: ArenaSpecialist[];
+}
+
+export interface TemporalForecast {
+  forecast_id: string;
+  timestamp_ms: number;
+  symbol: string;
+  reference_price: number;
+  horizon: '15m' | '30m' | '1h' | '2h';
+  movement_threshold_pct: number;
+  prob_pump: number;
+  prob_dump: number;
+  prob_range: number;
+  prob_hit_upper_barrier_first: number;
+  prob_hit_lower_barrier_first: number;
+  prob_neither_barrier_hit: number;
+  expected_return_pct: number;
+  brier_skill_score: number;
+  epistemic_uncertainty: number;
+  active_law_ids: string[];
+  model_version: string;
+  resolution_status: string;
+}
+
+export interface PriceActionLaw {
+  law_id: string;
+  name: string;
+  description: string;
+  condition_expr: string;
+  target_horizon: string;
+  movement_threshold_pct: number;
+  sample_size_train: number;
+  effective_sample_size_train: number;
+  base_rate_pump_pct: number;
+  conditional_pump_pct_train: number;
+  lift_train: number;
+  p_value: number;
+  adjusted_p_value_fdr: number;
+  sample_size_test: number;
+  conditional_pump_pct_test: number;
+  lift_test: number;
+  brier_score_test: number;
+  brier_skill_score_test: number;
+  net_expectancy_r_base: number;
+  net_expectancy_r_conservative: number;
+  net_expectancy_r_stress: number;
+  status: 'DISCOVERED' | 'VALIDATED' | 'REJECTED' | 'INCONCLUSIVE';
+  rejection_reason?: string | null;
+}
+
+export async function getArenaLeaderboard(): Promise<ArenaLeaderboardSnapshot> {
+  const res = await authFetch('/api/arena/leaderboard');
+  return await handleResponse<ArenaLeaderboardSnapshot>(res);
+}
+
+export async function getTemporalBtcForecast(): Promise<TemporalForecast[]> {
+  const res = await authFetch('/api/temporal/btc/forecast');
+  return await handleResponse<TemporalForecast[]>(res);
+}
+
+export async function getTemporalLaws(): Promise<PriceActionLaw[]> {
+  const res = await authFetch('/api/temporal/laws');
+  return await handleResponse<PriceActionLaw[]>(res);
+}
+
+export async function evaluateTemporalCondition(payload: {
+  condition_expr: string;
+  target_horizon?: string;
+  symbol?: string;
+}): Promise<any> {
+  const res = await authFetch('/api/temporal/evaluate-condition', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return await handleResponse<any>(res);
+}
+
+
 
 
 

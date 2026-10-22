@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCw, Activity, Zap, TrendingUp, TrendingDown, BellOff, BellRing, Send, Layers, Cpu } from 'lucide-react';
+import { RefreshCw, Activity, Zap, TrendingUp, TrendingDown, BellOff, BellRing, Send, Layers, Cpu, Flame } from 'lucide-react';
 import { SupportedTimeframe } from '../types';
 import { api } from '../services/api';
 import { PairVenueLinks } from './PairVenueLinks';
@@ -17,8 +17,8 @@ interface HeaderProps {
   onRefresh: () => void;
   notificationsEnabled: boolean;
   onToggleNotifications: () => void;
-  activeView?: 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM';
-  onViewChange?: (view: 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM') => void;
+  activeView?: 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM' | 'DARWINIAN_ARENA';
+  onViewChange?: (view: 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM' | 'DARWINIAN_ARENA') => void;
   openPositionsCount?: number;
   wsState?: 'CONNECTING' | 'CONNECTED' | 'RECONNECTING' | 'DISCONNECTED' | 'ERROR' | 'IDLE';
   latencyMs?: number;
@@ -160,6 +160,17 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Cpu size={14} className={activeView === 'MASTERMIND_SWARM' ? 'text-white' : 'text-purple-400'} />
             <span>Mastermind Swarm</span>
+          </button>
+          <button
+            onClick={() => onViewChange?.('DARWINIAN_ARENA')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded transition-all font-bold ${
+              activeView === 'DARWINIAN_ARENA'
+                ? 'bg-gradient-to-r from-cyan-600 via-indigo-600 to-purple-600 text-white shadow-sm shadow-cyan-500/30 ring-1 ring-cyan-400/50'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Flame size={14} className={activeView === 'DARWINIAN_ARENA' ? 'text-white animate-pulse' : 'text-cyan-400'} />
+            <span>Darwinian Arena</span>
           </button>
         </div>
 

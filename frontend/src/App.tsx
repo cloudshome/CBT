@@ -37,6 +37,7 @@ import { IntelligenceCockpit } from './components/IntelligenceCockpit';
 import { RiskEnsembleDesk } from './components/RiskEnsembleDesk';
 import { InstitutionalMasterTerminal } from './components/terminal/InstitutionalMasterTerminal';
 import { MastermindSwarmDesk } from './components/MastermindSwarmDesk';
+import { DarwinianArenaDesk } from './components/DarwinianArenaDesk';
 import { ToastContainer } from './components/ToastContainer';
 import { marketProvider, TickerData } from './data/providers/marketProvider';
 import {
@@ -111,8 +112,8 @@ export const App: React.FC = () => {
   const [brief, setBrief] = useState<DeskBriefResponse | null>(null);
   const [loadingBrief, setLoadingBrief] = useState<boolean>(false);
 
-  // Main Screen View Switcher: Terminal Cockpit vs Master Cockpit vs Dedicated Shadow Paper Trading Desk vs Top-Level Research Lab vs Mastermind Swarm
-  const [activeMainView, setActiveMainView] = useState<'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM'>('MASTER_COCKPIT');
+  // Main Screen View Switcher: Terminal Cockpit vs Master Cockpit vs Dedicated Shadow Paper Trading Desk vs Top-Level Research Lab vs Mastermind Swarm vs Darwinian Arena
+  const [activeMainView, setActiveMainView] = useState<'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM' | 'DARWINIAN_ARENA'>('MASTER_COCKPIT');
 
   // Tab State for Single-Screen Compact Cockpit
   const [activeRightTab, setActiveRightTab] = useState<'ORDER_DESK' | 'ORDER_BOOK' | 'PAPER' | 'AI_DESK'>('ORDER_DESK');
@@ -615,6 +616,16 @@ export const App: React.FC = () => {
             setSymbol(clean);
             setActiveMainView('TERMINAL');
             addToast('info', 'Trade Ticket Ready', `Loaded ${clean} (${opp.recommended_direction}) in Terminal`);
+          }}
+          addToast={addToast}
+        />
+      ) : activeMainView === 'DARWINIAN_ARENA' ? (
+        <DarwinianArenaDesk
+          onSelectSymbol={(sym) => {
+            const clean = sym.replace('/', '').toUpperCase();
+            setSymbol(clean);
+            setActiveMainView('TERMINAL');
+            addToast('info', 'Cockpit Synced', `Switched Cockpit to ${clean}`);
           }}
           addToast={addToast}
         />
