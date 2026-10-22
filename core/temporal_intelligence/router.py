@@ -91,7 +91,12 @@ async def list_mathematical_laws() -> list[PriceActionLaw]:
 @temporal_router.get("/btc/forecast", response_model=list[TemporalForecastPayload])
 async def get_btc_multi_horizon_forecast() -> list[TemporalForecastPayload]:
     """Returns point-in-time forecasts for BTC across supported horizons (15m, 30m, 1h, 2h)."""
-    candles = get_historical_candles()
+    # 1. Prefer fresh live real-time candles from data_streamer
+    from core.data_streamer import data_streamer
+    candles = data_streamer.get_candles("BTC/USDT", "15m", limit=100)
+    if not candles or len(candles) < 20:
+        candles = get_historical_candles()
+
     if len(candles) < 20:
         raise HTTPException(status_code=503, detail="Historical BTC dataset unavailable or insufficient")
 

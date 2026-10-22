@@ -74,13 +74,66 @@ class TemporalPriceActionForecaster:
         if not feat:
             return None
 
-        # Base unconditional rates for 15m BTC (empirically ~28% pump, ~28% dump, ~44% range)
-        p_pump = 0.28
-        p_dump = 0.28
+        # 1. Horizon-specific empirical base rates and barrier ratios
+        if horizon == ForecastHorizon.H_15M:
+            p_pump = 0.28
+            p_dump = 0.28
+            p_range = 0.44
+            barrier_ratio = 0.90
+        elif horizon == ForecastHorizon.H_30M:
+            p_pump = 0.25
+            p_dump = 0.25
+            p_range = 0.50
+            barrier_ratio = 0.86
+        elif horizon == ForecastHorizon.H_1H:
+            p_pump = 0.22
+            p_dump = 0.22
+            p_range = 0.56
+            barrier_ratio = 0.82
+        else:  # H_2H
+            p_pump = 0.30
+            p_dump = 0.30
+            p_range = 0.40
+            barrier_ratio = 0.88
+
         active_laws: list[str] = []
         lift_pump = 1.0
         lift_dump = 1.0
 
+        # 2. Dynamic Price-Action Feature Conditioning (Zero Lookahead)
+        # Momentum directionality from short & medium returns
+        if feat.return_1bar_pct > 0.15:
+            lift_pump *= (1.0 + min(0.35, feat.return_1bar_pct * 0.4))
+            lift_dump *= (1.0 - min(0.30, feat.return_1bar_pct * 0.3))
+        elif feat.return_1bar_pct < -0.15:
+            lift_dump *= (1.0 + min(0.35, abs(feat.return_1bar_pct) * 0.4))
+            lift_pump *= (1.0 - min(0.30, abs(feat.return_1bar_pct) * 0.3))
+
+        if feat.return_4bar_pct > 0.30:
+            mult = 1.25 if horizon in (ForecastHorizon.H_30M, ForecastHorizon.H_1H, ForecastHorizon.H_2H) else 1.10
+            lift_pump *= mult
+            lift_dump *= 0.85
+        elif feat.return_4bar_pct < -0.30:
+            mult = 1.25 if horizon in (ForecastHorizon.H_30M, ForecastHorizon.H_1H, ForecastHorizon.H_2H) else 1.10
+            lift_dump *= mult
+            lift_pump *= 0.85
+
+        # Intrabar Wick Geometry (Rejection vs Absorption)
+        if feat.upper_wick_ratio >= 0.35:
+            lift_dump *= 1.15
+            lift_pump *= 0.88
+        if feat.lower_wick_ratio >= 0.35:
+            lift_pump *= 1.15
+            lift_dump *= 0.88
+
+        # Relative Volume Confirmation
+        if feat.relative_volume >= 1.5:
+            if feat.return_1bar_pct > 0:
+                lift_pump *= 1.12
+            else:
+                lift_dump *= 1.12
+
+        # 3. Validated Mathematical Laws evaluation
         for law in self.laws:
             if law.status == PriceActionLawStatus.VALIDATED and law.target_horizon == horizon:
                 if "MOMENTUM" in law.law_id and feat.return_1bar_pct >= 0.40 and feat.relative_volume >= 1.5:
@@ -93,10 +146,10 @@ class TemporalPriceActionForecaster:
                     lift_pump = max(lift_pump, law.lift_test)
                     active_laws.append(law.law_id)
 
-        # Apply lifts and normalize ternary probabilities
-        adj_pump = min(0.75, p_pump * lift_pump)
-        adj_dump = min(0.75, p_dump * lift_dump)
-        adj_range = max(0.10, 1.0 - (adj_pump + adj_dump))
+        # 4. Apply lifts and normalize ternary probabilities
+        adj_pump = min(0.80, max(0.08, p_pump * lift_pump))
+        adj_dump = min(0.80, max(0.08, p_dump * lift_dump))
+        adj_range = max(0.10, p_range)
 
         # Re-normalize to exact sum 1.0
         total_p = adj_pump + adj_dump + adj_range
@@ -105,8 +158,8 @@ class TemporalPriceActionForecaster:
         final_range = round(1.0 - (final_pump + final_dump), 3)
 
         # Barrier crossing model (P(hit upper first), P(hit lower first), P(neither))
-        p_hit_upper = round(final_pump * 0.90, 3)
-        p_hit_lower = round(final_dump * 0.90, 3)
+        p_hit_upper = round(final_pump * barrier_ratio, 3)
+        p_hit_lower = round(final_dump * barrier_ratio, 3)
         p_neither = round(1.0 - (p_hit_upper + p_hit_lower), 3)
 
         exp_ret = round((final_pump - final_dump) * movement_threshold_pct, 3)
