@@ -332,3 +332,4 @@ class ArenaLedger:
             last_updated_ms=row["last_updated_ms"],
             open_position=pos,
         )
+

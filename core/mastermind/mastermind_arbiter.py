@@ -89,12 +89,14 @@ class MastermindArbiterCouncil:
         metacognitive_monitor: Any = None,
         world_model: Any = None,
         arena_bridge: Any = None,
+        temporal_bridge: Any = None,
     ) -> None:
         self.account_equity_usd = account_equity_usd
         self.experience_engine = experience_engine
         self.metacognitive_monitor = metacognitive_monitor
         self.world_model = world_model
         self.arena_bridge = arena_bridge
+        self.temporal_bridge = temporal_bridge
         self._bg_tasks: set[asyncio.Task[Any]] = set()
         self.specialists: list[BaseSpecialistAgent] = [
             BtcMacroSpecialist(),
@@ -475,6 +477,17 @@ class MastermindArbiterCouncil:
             if btc_direction == DecisionAction.SHORT and proposal.direction == DecisionAction.LONG:
                 effective_confidence = round(effective_confidence * 0.70, 3)
                 proposal.thesis = f"[MACRO HEADWIND: BTC SHORT] {proposal.thesis}"
+
+            # Temporal Price-Action Intelligence Evidence (Read-Only)
+            if self.temporal_bridge:
+                try:
+                    spec_candles = market_data_by_symbol.get(sym, {}).get("15m", [])
+                    temp_ev = self.temporal_bridge.get_temporal_evidence(sym, spec_candles)
+                    if temp_ev.get("has_forecast"):
+                        scale = temp_ev.get("confidence_scale", 1.0)
+                        effective_confidence = round(effective_confidence * scale, 3)
+                except Exception as temp_err:
+                    logger.warning("Temporal evidence evaluation skipped: %s", temp_err)
 
             # Metacognitive Monitor Evaluation
             if self.metacognitive_monitor:

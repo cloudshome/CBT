@@ -56,3 +56,4 @@ class AssetBenchmarkEngine:
             alpha_pct=round(alpha, 2),
             is_outperforming=alpha > 0.0,
         )
+

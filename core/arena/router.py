@@ -65,3 +65,4 @@ async def get_specialist_trades(specialist_id: str, limit: int = 50) -> list[Are
     """Returns closed trade history and fee/PnL attribution for a specialist."""
     engine = get_arena_engine()
     return engine.ledger.get_trades_for_specialist(specialist_id, limit=limit)
+

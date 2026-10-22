@@ -66,6 +66,7 @@ from core.autonomous_trader import autonomous_trader
 from core.collective.routes import router as collective_router
 from core.screener import screener_router
 from core.arena import arena_router
+from core.temporal_intelligence import temporal_router
 from core.screener.opportunity_hunter import opportunity_hunter
 from core.collective.sync_daemon import cluster_sync_daemon
 from core.command_executor import command_executor
@@ -288,6 +289,7 @@ app.include_router(risk_engine_router)
 app.include_router(paper_router)
 app.include_router(screener_router)
 app.include_router(arena_router)
+app.include_router(temporal_router)
 
 # CORS — fail closed in production: CORS_ORIGIN must be an explicit allowlist.
 _cors_origin = os.getenv("CORS_ORIGIN", "").strip()

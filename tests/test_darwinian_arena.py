@@ -328,3 +328,4 @@ def test_api_specialist_detail_endpoint(arena_engine: DarwinianArenaEngine):
     assert data["specialist_id"] == "spec_arena_eth"
     assert data["symbol"] == "ETH/USDT"
     assert data["initial_equity_usd"] == 100.0
+
