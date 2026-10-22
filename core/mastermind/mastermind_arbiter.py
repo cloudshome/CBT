@@ -804,6 +804,23 @@ class MastermindArbiterCouncil:
             "MastermindArbiterCouncil: Continuous Swarm loop started (interval: %.1fs).",
             interval_sec,
         )
+
+        if self.arena_bridge is None:
+            try:
+                from core.arena import get_arena_engine
+                from core.arena.arbiter_bridge import ArenaArbiterBridge
+                self.arena_bridge = ArenaArbiterBridge(get_arena_engine())
+            except Exception as bridge_err:
+                logger.debug("Arena bridge initialization deferred: %s", bridge_err)
+
+        if self.temporal_bridge is None:
+            try:
+                from core.temporal_intelligence.arbiter_bridge import TemporalArbiterBridge
+                from core.temporal_intelligence.forecaster import get_temporal_forecaster
+                self.temporal_bridge = TemporalArbiterBridge(get_temporal_forecaster())
+            except Exception as bridge_err:
+                logger.debug("Temporal bridge initialization deferred: %s", bridge_err)
+
         await asyncio.sleep(15.0)  # Initial boot stagger
 
         loop_counter = 0

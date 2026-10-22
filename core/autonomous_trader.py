@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import time
 from dataclasses import asdict
 from typing import Any
@@ -70,7 +71,7 @@ class AutonomousTrader:
     def __init__(
         self,
         active_symbols: list[str] | None = None,
-        scan_interval_sec: float = 60.0,
+        scan_interval_sec: float = 30.0,
         account_equity_usd: float = 10_000.0,
         max_open_positions: int = 5,
     ):
@@ -81,7 +82,9 @@ class AutonomousTrader:
             "BNB/USDT",
             "XAU/USD",
         ]
-        self.scan_interval_sec = scan_interval_sec
+        self.scan_interval_sec = float(
+            os.getenv("AUTONOMOUS_SCAN_INTERVAL_SEC", str(scan_interval_sec))
+        )
         self.account_equity_usd = account_equity_usd
         self.max_open_positions = max_open_positions
         self.is_running = True
@@ -449,6 +452,12 @@ class AutonomousTrader:
             except Exception as e:
                 logger.error(f"AutonomousTrader scan error for {sym}: {e}")
 
+        # Execute Arena cycle across all 10 specialists
+        try:
+            await self.scan_and_update_arena()
+        except Exception as arena_err:
+            logger.error(f"AutonomousTrader arena update cycle error: {arena_err}")
+
         return executed_actions
 
     async def _mirror_trade_to_testnet(
@@ -503,6 +512,8 @@ class AutonomousTrader:
                 and sl_price > 0
             ):
                 try:
+                    from core.execution.connectors.binance_connector import BinanceSpotConnector
+
                     connector = BinanceSpotConnector(
                         environment="TESTNET",
                         api_key=cred.api_key,
@@ -619,6 +630,57 @@ class AutonomousTrader:
             except Exception as e:
                 logger.error(f"AutonomousTrader loop uncaught exception: {e}")
             await asyncio.sleep(self.scan_interval_sec)
+
+    async def scan_and_update_arena(self) -> None:
+        """
+        Polls live prices and candles for the 10 Darwinian Arena Specialist coins,
+        updates mark-to-market and benchmarks, and evaluates specialist entries.
+        """
+        from core.arena import get_arena_engine
+        from core.arena.engine import ARENA_DEFAULT_SYMBOLS
+
+        engine = get_arena_engine()
+        now_ms = int(time.time() * 1000)
+
+        for spec_id, symbol, strat_id in ARENA_DEFAULT_SYMBOLS:
+            try:
+                # 1. Fetch live ticker price
+                try:
+                    live_price = await data_streamer.get_live_ticker(symbol)
+                except Exception:
+                    live_price = 0.0
+
+                # 2. Fetch candles for signal evaluation or fallback price
+                candles_15m = data_streamer.get_candles(symbol, "15m", limit=30)
+                if not candles_15m or len(candles_15m) < 15:
+                    try:
+                        fresh_candles = await data_streamer.fetch_external_ohlcv(symbol, "15m", limit=30)
+                        if fresh_candles:
+                            candles_15m = fresh_candles
+                    except Exception as ex:
+                        logger.debug(f"Arena candle fetch deferred for {symbol}: {ex}")
+
+                if live_price <= 0 and candles_15m:
+                    live_price = float(candles_15m[-1]["close"])
+
+                if live_price <= 0:
+                    continue
+
+                # 3. Process live market tick (MTM, SL/TP execution, benchmark alpha, survival state)
+                engine.on_market_tick(symbol=symbol, current_price=live_price, timestamp_ms=now_ms)
+
+                # 4. If specialist is not in a position, evaluate strategy entry signal
+                account = engine.get_specialist_by_symbol(symbol)
+                if account and account.open_position is None and candles_15m:
+                    engine.evaluate_specialist_signal(
+                        symbol=symbol,
+                        current_price=live_price,
+                        candles=candles_15m,
+                        timestamp_ms=now_ms,
+                    )
+
+            except Exception as e:
+                logger.error(f"Arena cycle failed for {symbol}: {e}")
 
     def start(self) -> None:
         self.is_running = True

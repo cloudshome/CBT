@@ -329,3 +329,70 @@ def test_api_specialist_detail_endpoint(arena_engine: DarwinianArenaEngine):
     assert data["symbol"] == "ETH/USDT"
     assert data["initial_equity_usd"] == 100.0
 
+
+# ==============================================================================
+# 7. LIVE FEED SIGNAL EVALUATION & AUTONOMOUS INTEGRATION
+# ==============================================================================
+
+def test_evaluate_specialist_signal_triggers_breakout_trade(arena_engine: DarwinianArenaEngine):
+    """Verifies that evaluate_specialist_signal triggers a sandbox trade upon valid breakout setup."""
+    now_ms = int(time.time() * 1000)
+    # Generate 20 bars with a range between 130 and 150
+    candles = []
+    base_price = 140.0
+    for i in range(20):
+        candles.append({
+            "timestamp": now_ms - (20 - i) * 900_000,
+            "open": base_price + (i % 3),
+            "high": base_price + 5.0,
+            "low": base_price - 5.0,
+            "close": base_price + (i % 4),
+            "volume": 1000.0,
+        })
+
+    # Breakout price above 145.0
+    breakout_price = 152.0
+    pos = arena_engine.evaluate_specialist_signal(
+        symbol="SOL/USDT",
+        current_price=breakout_price,
+        candles=candles,
+        timestamp_ms=now_ms,
+    )
+
+    assert pos is not None
+    assert pos.symbol == "SOL/USDT"
+    assert pos.direction == "LONG"
+    assert pos.entry_price > 150.0
+    assert pos.stop_loss < breakout_price
+    assert pos.take_profit > breakout_price
+
+    sol_acc = arena_engine.get_specialist_by_symbol("SOL/USDT")
+    assert sol_acc is not None
+    assert sol_acc.open_position is not None
+
+
+@pytest.mark.asyncio
+async def test_autonomous_trader_scan_and_update_arena_runs(arena_engine: DarwinianArenaEngine, monkeypatch):
+    """Verifies autonomous_trader.scan_and_update_arena updates all 10 specialists."""
+    from unittest.mock import AsyncMock
+    from core.arena.router import set_arena_engine
+    from core.autonomous_trader import autonomous_trader
+    from core.data_streamer import data_streamer
+
+    set_arena_engine(arena_engine)
+
+    # Mock ticker to return $100.0 for any coin
+    monkeypatch.setattr(data_streamer, "get_live_ticker", AsyncMock(return_value=100.0))
+    monkeypatch.setattr(data_streamer, "get_candles", lambda sym, tf, limit=30: [
+        {"timestamp": int(time.time() * 1000) - (30 - i) * 60000, "open": 100.0, "high": 102.0, "low": 98.0, "close": 100.0, "volume": 500.0}
+        for i in range(30)
+    ])
+
+    await autonomous_trader.scan_and_update_arena()
+
+    accounts = arena_engine.ledger.get_all_accounts()
+    assert len(accounts) == 10
+    for acc in accounts:
+        assert acc.benchmark_current_price == 100.0
+
+

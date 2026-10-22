@@ -334,6 +334,139 @@ class DarwinianArenaEngine:
                 return acc
         return None
 
+    def evaluate_specialist_signal(
+        self,
+        symbol: str,
+        current_price: float,
+        candles: list[dict[str, Any]],
+        timestamp_ms: int | None = None,
+    ) -> ArenaPosition | None:
+        """
+        Evaluates the specialist's strategy concept against recent historical candles
+        and opens a risk-governed sandbox position if an entry setup triggers.
+        """
+        now_ms = timestamp_ms or int(time.time() * 1000)
+        account = self.get_specialist_by_symbol(symbol)
+        if not account:
+            return None
+
+        # Cannot open trade if already in position or quarantined/rejected
+        if account.open_position is not None:
+            return None
+        if account.status in (SpecialistSurvivalStatus.QUARANTINED, SpecialistSurvivalStatus.REJECTED):
+            return None
+        if not candles or len(candles) < 15:
+            return None
+
+        closes = [float(c["close"]) for c in candles]
+        highs = [float(c.get("high", c["close"])) for c in candles]
+        lows = [float(c.get("low", c["close"])) for c in candles]
+        volumes = [float(c.get("volume", 1.0)) for c in candles]
+
+        strat = account.active_strategy_id
+        direction: str | None = None
+        sl_price = 0.0
+        tp_price = 0.0
+
+        # Strategy Dispatch
+        if strat in ("concept_pullback_v1", "concept_trend_continuation_v1"):
+            sma10 = sum(closes[-10:]) / 10.0
+            sma25 = sum(closes[-25:]) / 25.0 if len(closes) >= 25 else sma10
+            if sma10 > sma25 and current_price <= sma10 * 1.005 and closes[-1] >= sma10 * 0.995:
+                direction = "LONG"
+                sl_price = round(min(lows[-5:]) * 0.995, 4)
+                risk = max(current_price - sl_price, current_price * 0.015)
+                tp_price = round(current_price + (risk * 2.0), 4)
+            elif sma10 < sma25 and current_price >= sma10 * 0.995 and closes[-1] <= sma10 * 1.005:
+                direction = "SHORT"
+                sl_price = round(max(highs[-5:]) * 1.005, 4)
+                risk = max(sl_price - current_price, current_price * 0.015)
+                tp_price = round(current_price - (risk * 2.0), 4)
+
+        elif strat in ("concept_breakout_v1",):
+            prior_highs = highs[-16:-1]
+            prior_lows = lows[-16:-1]
+            donchian_high = max(prior_highs)
+            donchian_low = min(prior_lows)
+            if current_price > donchian_high:
+                direction = "LONG"
+                sl_price = round(donchian_low, 4)
+                risk = max(current_price - sl_price, current_price * 0.02)
+                tp_price = round(current_price + (risk * 2.0), 4)
+            elif current_price < donchian_low:
+                direction = "SHORT"
+                sl_price = round(donchian_high, 4)
+                risk = max(sl_price - current_price, current_price * 0.02)
+                tp_price = round(current_price - (risk * 2.0), 4)
+
+        elif strat in ("concept_momentum_v1", "concept_momentum_spike_v1"):
+            roc5 = (closes[-1] - closes[-6]) / closes[-6] if len(closes) >= 6 else 0.0
+            avg_vol = sum(volumes[-10:]) / 10.0 if len(volumes) >= 10 else 1.0
+            vol_ratio = volumes[-1] / avg_vol if avg_vol > 0 else 1.0
+
+            if roc5 > 0.005 and vol_ratio > 1.1:
+                direction = "LONG"
+                sl_price = round(current_price * 0.985, 4)
+                tp_price = round(current_price * 1.03, 4)
+            elif roc5 < -0.005 and vol_ratio > 1.1:
+                direction = "SHORT"
+                sl_price = round(current_price * 1.015, 4)
+                tp_price = round(current_price * 0.97, 4)
+
+        elif strat in ("concept_mean_reversion_v1", "concept_volatility_expansion_v1"):
+            mean20 = sum(closes[-20:]) / 20.0 if len(closes) >= 20 else sum(closes) / len(closes)
+            diffs = [(c - mean20) ** 2 for c in closes[-20:]]
+            std20 = (sum(diffs) / len(diffs)) ** 0.5 if diffs else 1.0
+            upper_band = mean20 + (2.0 * std20)
+            lower_band = mean20 - (2.0 * std20)
+
+            if current_price <= lower_band:
+                direction = "LONG"
+                sl_price = round(current_price * 0.98, 4)
+                tp_price = round(mean20, 4)
+            elif current_price >= upper_band:
+                direction = "SHORT"
+                sl_price = round(current_price * 1.02, 4)
+                tp_price = round(mean20, 4)
+
+        elif strat in ("concept_sweep_reversal_v1",):
+            prior_low = min(lows[-11:-1])
+            prior_high = max(highs[-11:-1])
+            last_low = lows[-1]
+            last_high = highs[-1]
+            last_close = closes[-1]
+
+            if last_low < prior_low and last_close > prior_low:
+                direction = "LONG"
+                sl_price = round(last_low * 0.998, 4)
+                risk = max(current_price - sl_price, current_price * 0.015)
+                tp_price = round(current_price + (risk * 2.5), 4)
+            elif last_high > prior_high and last_close < prior_high:
+                direction = "SHORT"
+                sl_price = round(last_high * 1.002, 4)
+                risk = max(sl_price - current_price, current_price * 0.015)
+                tp_price = round(current_price - (risk * 2.5), 4)
+
+        if not direction or sl_price <= 0 or tp_price <= 0:
+            return None
+
+        if direction == "LONG" and not (sl_price < current_price < tp_price):
+            return None
+        if direction == "SHORT" and not (tp_price < current_price < sl_price):
+            return None
+
+        pos = self.open_position(
+            specialist_id=account.specialist_id,
+            direction=direction,
+            entry_price=current_price,
+            stop_loss=sl_price,
+            take_profit=tp_price,
+            fraction_of_equity=0.50,
+            strategy_id=strat,
+            timestamp_ms=now_ms,
+        )
+        return pos
+
     def get_leaderboard(self) -> ArenaLeaderboardSnapshot:
         """Constructs an audited leaderboard snapshot."""
         accounts = self.ledger.get_all_accounts()
