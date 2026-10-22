@@ -88,11 +88,13 @@ class MastermindArbiterCouncil:
         experience_engine: Any = None,
         metacognitive_monitor: Any = None,
         world_model: Any = None,
+        arena_bridge: Any = None,
     ) -> None:
         self.account_equity_usd = account_equity_usd
         self.experience_engine = experience_engine
         self.metacognitive_monitor = metacognitive_monitor
         self.world_model = world_model
+        self.arena_bridge = arena_bridge
         self._bg_tasks: set[asyncio.Task[Any]] = set()
         self.specialists: list[BaseSpecialistAgent] = [
             BtcMacroSpecialist(),
@@ -504,6 +506,11 @@ class MastermindArbiterCouncil:
             elif rejection_reason and "Metacognitive Monitor ABSTENTION" in rejection_reason:
                 pass  # Deterministically preserve metacognitive veto
 
+            # Guard 1c: Darwinian Arena Survival Gate (Veto Quarantined/Rejected Specialists)
+            elif self.arena_bridge and not self.arena_bridge.evaluate_specialist_for_mastermind(sym).is_eligible:
+                arena_assessment = self.arena_bridge.evaluate_specialist_for_mastermind(sym)
+                rejection_reason = arena_assessment.rejection_reason or f"Darwinian Arena Veto: Specialist for {sym} is not eligible."
+
             # Guard 2: Passive NO_TRADE / WATCH
             elif proposal.direction not in (DecisionAction.LONG, DecisionAction.SHORT):
                 rejection_reason = (
@@ -543,7 +550,10 @@ class MastermindArbiterCouncil:
                 is_approved = True
                 overlap_discount = overlap_discounts.get(proposal.proposal_id, 1.0)
                 base_notional = proposal.suggested_notional_usd or (current_eq * 0.02)
-                approved_notional = round(base_notional * calib_weight * overlap_discount, 2)
+                arena_weight = 1.0
+                if self.arena_bridge:
+                    arena_weight = self.arena_bridge.evaluate_specialist_for_mastermind(sym).weight_multiplier
+                approved_notional = round(base_notional * calib_weight * overlap_discount * arena_weight, 2)
 
                 # Open virtual paper position in Shadow Portfolio with 1.0% stop-risk cap
                 direction_str = proposal.direction.value
