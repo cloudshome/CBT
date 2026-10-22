@@ -17,8 +17,8 @@ interface HeaderProps {
   onRefresh: () => void;
   notificationsEnabled: boolean;
   onToggleNotifications: () => void;
-  activeView?: 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM' | 'DARWINIAN_ARENA';
-  onViewChange?: (view: 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM' | 'DARWINIAN_ARENA') => void;
+  activeView?: 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM' | 'DARWINIAN_ARENA' | 'LEGACY_DESK';
+  onViewChange?: (view: 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM' | 'DARWINIAN_ARENA' | 'LEGACY_DESK') => void;
   openPositionsCount?: number;
   wsState?: 'CONNECTING' | 'CONNECTED' | 'RECONNECTING' | 'DISCONNECTED' | 'ERROR' | 'IDLE';
   latencyMs?: number;
@@ -99,12 +99,12 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Primary Screen View Switcher: Terminal vs Master Cockpit vs Shadow Paper Desk vs Research Lab */}
+        {/* Primary Screen View Switcher: Clean Unified Institutional Cockpit */}
         <div className="flex items-center bg-[#090d16] border border-[#1e293b] rounded-lg p-0.5 text-xs font-mono">
           <button
             onClick={() => onViewChange?.('TERMINAL')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all font-bold ${
-              activeView === 'TERMINAL'
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded transition-all font-bold ${
+              activeView === 'TERMINAL' || activeView === 'MASTER_COCKPIT'
                 ? 'bg-sky-500 text-white shadow-sm'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
@@ -113,15 +113,26 @@ export const Header: React.FC<HeaderProps> = ({
             <span>Terminal</span>
           </button>
           <button
-            onClick={() => onViewChange?.('MASTER_COCKPIT')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all font-bold ${
-              activeView === 'MASTER_COCKPIT'
-                ? 'bg-gradient-to-r from-cyan-500 to-indigo-600 text-white shadow-sm shadow-cyan-500/30'
+            onClick={() => onViewChange?.('DARWINIAN_ARENA')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded transition-all font-bold ${
+              activeView === 'DARWINIAN_ARENA'
+                ? 'bg-gradient-to-r from-cyan-600 via-indigo-600 to-purple-600 text-white shadow-sm shadow-cyan-500/30 ring-1 ring-cyan-400/50'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Zap size={14} className={activeView === 'MASTER_COCKPIT' ? 'text-white' : 'text-cyan-400'} />
-            <span>Master Cockpit</span>
+            <Flame size={14} className={activeView === 'DARWINIAN_ARENA' ? 'text-white animate-pulse' : 'text-cyan-400'} />
+            <span>Darwinian Arena</span>
+          </button>
+          <button
+            onClick={() => onViewChange?.('MASTERMIND_SWARM')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded transition-all font-bold ${
+              activeView === 'MASTERMIND_SWARM'
+                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-sm shadow-purple-500/30 ring-1 ring-purple-400/50'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Cpu size={14} className={activeView === 'MASTERMIND_SWARM' ? 'text-white' : 'text-purple-400'} />
+            <span>Mastermind Swarm</span>
           </button>
           <button
             onClick={() => onViewChange?.('PAPER_DESK')}
@@ -132,7 +143,7 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <Layers size={14} />
-            <span>Paper Desk</span>
+            <span>Paper Ledger</span>
             {openPositionsCount > 0 && (
               <span className="px-1.5 py-0.5 bg-emerald-500 text-[#0B0E14] text-[10px] rounded-full font-bold leading-none">
                 {openPositionsCount}
@@ -149,28 +160,6 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <span className="text-sm">🧠</span>
             <span>Research Lab</span>
-          </button>
-          <button
-            onClick={() => onViewChange?.('MASTERMIND_SWARM')}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded transition-all font-bold ${
-              activeView === 'MASTERMIND_SWARM'
-                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-sm shadow-purple-500/30 ring-1 ring-purple-400/50'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Cpu size={14} className={activeView === 'MASTERMIND_SWARM' ? 'text-white' : 'text-purple-400'} />
-            <span>Mastermind Swarm</span>
-          </button>
-          <button
-            onClick={() => onViewChange?.('DARWINIAN_ARENA')}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded transition-all font-bold ${
-              activeView === 'DARWINIAN_ARENA'
-                ? 'bg-gradient-to-r from-cyan-600 via-indigo-600 to-purple-600 text-white shadow-sm shadow-cyan-500/30 ring-1 ring-cyan-400/50'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Flame size={14} className={activeView === 'DARWINIAN_ARENA' ? 'text-white animate-pulse' : 'text-cyan-400'} />
-            <span>Darwinian Arena</span>
           </button>
         </div>
 

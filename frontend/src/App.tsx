@@ -112,8 +112,8 @@ export const App: React.FC = () => {
   const [brief, setBrief] = useState<DeskBriefResponse | null>(null);
   const [loadingBrief, setLoadingBrief] = useState<boolean>(false);
 
-  // Main Screen View Switcher: Terminal Cockpit vs Master Cockpit vs Dedicated Shadow Paper Trading Desk vs Top-Level Research Lab vs Mastermind Swarm vs Darwinian Arena
-  const [activeMainView, setActiveMainView] = useState<'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM' | 'DARWINIAN_ARENA'>('MASTER_COCKPIT');
+  // Main Screen View Switcher: Institutional Terminal vs Darwinian Arena vs Mastermind Swarm vs Dedicated Paper Ledger vs Research Lab
+  const [activeMainView, setActiveMainView] = useState<'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM' | 'DARWINIAN_ARENA' | 'LEGACY_DESK'>('TERMINAL');
 
   // Tab State for Single-Screen Compact Cockpit
   const [activeRightTab, setActiveRightTab] = useState<'ORDER_DESK' | 'ORDER_BOOK' | 'PAPER' | 'AI_DESK'>('ORDER_DESK');
@@ -579,21 +579,10 @@ export const App: React.FC = () => {
         latencyMs={latencyMs}
       />
 
-      {/* Primary View Routing: Dedicated Shadow Paper Desk vs Master Cockpit vs Top-Level Research Lab vs Classic Terminal */}
+      {/* Primary View Routing: Institutional Master Terminal (Default) vs Arena vs Swarm vs Paper Desk vs Research Lab */}
       {activeMainView === 'PAPER_DESK' ? (
         <DedicatedPaperTradingDesk
           onClosePosition={handleClosePosition}
-        />
-      ) : activeMainView === 'MASTER_COCKPIT' ? (
-        <InstitutionalMasterTerminal
-          initialSymbol={symbol}
-          initialTimeframe={timeframe}
-          onSymbolChange={setSymbol}
-          onDeployToOrderDesk={(setup) => {
-            setSelectedSetup(setup);
-            addToast('info', 'Setup Loaded', `Transferred ${setup.type} order to Order Desk.`);
-          }}
-          addToast={addToast}
         />
       ) : activeMainView === 'RESEARCH_LAB' ? (
         <div className="max-w-[1920px] w-full mx-auto p-4 flex-1">
@@ -629,7 +618,7 @@ export const App: React.FC = () => {
           }}
           addToast={addToast}
         />
-      ) : (
+      ) : activeMainView === 'LEGACY_DESK' ? (
         <>
           {/* Institutional Quantitative HUD Control Bar */}
       <div className="max-w-[1920px] w-full mx-auto px-4 pt-2 space-y-1">
@@ -1262,6 +1251,17 @@ export const App: React.FC = () => {
         </div>
       </main>
         </>
+      ) : (
+        <InstitutionalMasterTerminal
+          initialSymbol={symbol}
+          initialTimeframe={timeframe}
+          onSymbolChange={setSymbol}
+          onDeployToOrderDesk={(setup) => {
+            setSelectedSetup(setup);
+            addToast('info', 'Setup Loaded', `Transferred ${setup.type} order to Order Desk.`);
+          }}
+          addToast={addToast}
+        />
       )}
       {/* First-Run Configuration Wizard */}
       {showSetupWizard && (

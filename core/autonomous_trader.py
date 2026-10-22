@@ -232,19 +232,30 @@ class AutonomousTrader:
                     cur_price = live_price if live_price > 0 else float(candles_15m[-1]["close"])
                     setup = decision_out.setup_qualified
 
-                    # Guard 2a: Institutional Trend Regime Filter (ADX & Chop Protection)
+                    # Guard 2a: Strict Institutional Trend & Chop Filter (Zero Chop Bleed)
                     regime_dossier = decision_out.explanation_dossier.get("regime_state", {})
                     adx_val = float(regime_dossier.get("trend_strength_adx", 25.0))
                     regime_name = str(regime_dossier.get("regime_type", ""))
                     st_type = getattr(setup, "setup_type", None)
                     st_val = getattr(st_type, "value", str(st_type)) if st_type else ""
+                    vol_dossier = decision_out.explanation_dossier.get("volume", {})
+                    rvol = float(vol_dossier.get("relative_volume", 1.0)) if isinstance(vol_dossier, dict) else 1.0
 
-                    if adx_val < 20.0 and regime_name in ("RANGING_CONSOLIDATION", "COMPRESSION_SQUEEZE"):
-                        if st_val in ("SETUP_B_PULLBACK_FVG", "SETUP_C_BREAKOUT_EXPANSION"):
+                    if (adx_val < 20.0 or rvol < 0.85) and regime_name in ("RANGING_CONSOLIDATION", "COMPRESSION_SQUEEZE", "LOW_VOLATILITY"):
+                        if st_val != "SETUP_D_RANGE_SWEEP_RECLAIM":
                             logger.info(
-                                f"Trend Regime Filter: Rejecting {sym} breakout setup in low-ADX chop (ADX={adx_val:.1f}, Regime={regime_name})."
+                                f"AutonomousTrader Chop Filter: Skipping {sym} ({st_val or 'SMC'}) in low-volatility chop "
+                                f"(ADX={adx_val:.1f} < 20.0, RVOL={rvol:.2f}x < 0.85x, Regime={regime_name}). Preserving capital in 100% Cash."
                             )
                             continue
+
+                    # Setup Confluence Hurdle: Only institutional A+ grade setups (>= 72.0)
+                    setup_conf = float(getattr(setup, "confluence_score", 0.0) or 0.0)
+                    if setup_conf > 0.0 and setup_conf < 72.0:
+                        logger.info(
+                            f"AutonomousTrader Confluence Hurdle: Skipping {sym} trade (Confluence={setup_conf:.1f} < 72.0 institutional threshold)."
+                        )
+                        continue
 
                     # Guard 2b: Rolling Asset Performance Gate (Cap Bleed on Negative PF Assets)
                     with db_manager.get_trading_conn() as conn:
@@ -298,7 +309,7 @@ class AutonomousTrader:
                     risk_dist = abs(entry_price - sl)
                     min_tp_dist = max(risk_dist * 2.0, 3.0 * atr_val)
 
-                    if setup and setup.target_tp > 0 and abs(setup.target_tp - entry_price) >= risk_dist * 1.5:
+                    if setup and setup.target_tp > 0 and abs(setup.target_tp - entry_price) >= risk_dist * 2.0:
                         tp = setup.target_tp
                     else:
                         # Target at least 2.0R to guarantee asymmetric positive mathematical expectancy
@@ -307,6 +318,13 @@ class AutonomousTrader:
                             if decision_out.decision == DecisionAction.LONG
                             else round(entry_price - min_tp_dist, 6)
                         )
+
+                    rr_ratio = abs(tp - entry_price) / max(risk_dist, 1e-4)
+                    if rr_ratio < 2.0:
+                        logger.info(
+                            f"AutonomousTrader: Skipping {sym} trade due to insufficient R:R ({rr_ratio:.2f} < 2.0R minimum hurdle)."
+                        )
+                        continue
 
                     # Guard 3: Invalidate expired setups where market has already breached target or stop
                     if decision_out.decision == DecisionAction.LONG:
