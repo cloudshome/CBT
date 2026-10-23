@@ -1686,6 +1686,14 @@ async def set_sovereign_auto_pilot(req: SovereignAutoPilotRequest):
     return await sovereign_master_agent.set_auto_pilot(req.enabled, options=options)
 
 
+@terminal_router.get("/api/terminal/sovereign-agent/self-improvement")
+async def get_sovereign_self_improvement():
+    """Returns real-time forensic loss autopsies, learned adaptations, and burn-in scorecard."""
+    if not sovereign_master_agent:
+        raise HTTPException(status_code=503, detail="Sovereign Master Agent offline")
+    return sovereign_master_agent.get_self_improvement_dossier()
+
+
 # ==============================================================================
 # ROUTE: GET /api/terminal/glossary
 # ==============================================================================

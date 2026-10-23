@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCw, Activity, Zap, TrendingUp, TrendingDown, BellOff, BellRing, Send, Layers, Cpu, Flame } from 'lucide-react';
+import { RefreshCw, Activity, Zap, TrendingUp, TrendingDown, BellOff, BellRing, Send, Layers } from 'lucide-react';
 import { SupportedTimeframe } from '../types';
 import { api } from '../services/api';
 import { PairVenueLinks } from './PairVenueLinks';
@@ -110,7 +110,7 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <span className="text-sm">👑</span>
-            <span>Master Agent</span>
+            <span>Master Cockpit</span>
           </button>
           <button
             onClick={() => onViewChange?.('TERMINAL')}
@@ -121,29 +121,7 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <Activity size={14} />
-            <span>Terminal</span>
-          </button>
-          <button
-            onClick={() => onViewChange?.('DARWINIAN_ARENA')}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded transition-all font-bold ${
-              activeView === 'DARWINIAN_ARENA'
-                ? 'bg-gradient-to-r from-cyan-600 via-indigo-600 to-purple-600 text-white shadow-sm shadow-cyan-500/30 ring-1 ring-cyan-400/50'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Flame size={14} className={activeView === 'DARWINIAN_ARENA' ? 'text-white animate-pulse' : 'text-cyan-400'} />
-            <span>Darwinian Arena</span>
-          </button>
-          <button
-            onClick={() => onViewChange?.('MASTERMIND_SWARM')}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded transition-all font-bold ${
-              activeView === 'MASTERMIND_SWARM'
-                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-sm shadow-purple-500/30 ring-1 ring-purple-400/50'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Cpu size={14} className={activeView === 'MASTERMIND_SWARM' ? 'text-white' : 'text-purple-400'} />
-            <span>Mastermind Swarm</span>
+            <span>Chart &amp; Depth</span>
           </button>
           <button
             onClick={() => onViewChange?.('PAPER_DESK')}
@@ -154,7 +132,7 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <Layers size={14} />
-            <span>Paper Ledger</span>
+            <span>Positions Ledger</span>
             {openPositionsCount > 0 && (
               <span className="px-1.5 py-0.5 bg-emerald-500 text-[#0B0E14] text-[10px] rounded-full font-bold leading-none">
                 {openPositionsCount}
@@ -170,7 +148,7 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <span className="text-sm">🧠</span>
-            <span>Research Lab</span>
+            <span>Research Vault</span>
           </button>
         </div>
 

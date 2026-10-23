@@ -2535,6 +2535,15 @@ export const api = {
   },
 
   /**
+   * GET /api/terminal/sovereign-agent/self-improvement
+   * Real-time forensic loss autopsies, learned adaptations, and 14-day burn-in scorecard
+   */
+  async getSovereignSelfImprovement(): Promise<any> {
+    const res = await authFetch(`${BASE_URL}/api/terminal/sovereign-agent/self-improvement`);
+    return handleResponse<any>(res);
+  },
+
+  /**
    * POST /api/terminal/approval-action
    * Signal Lifecycle Execution & Transition
    */
