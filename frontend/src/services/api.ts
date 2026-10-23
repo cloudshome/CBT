@@ -2482,6 +2482,37 @@ export const api = {
   },
 
   /**
+   * GET /api/terminal/sovereign-agent/dashboard
+   * Apex Master Level Agent (BTC, ETH, GOLD) Multi-Asset Synthesis
+   */
+  async getSovereignDashboard(): Promise<any> {
+    const res = await authFetch(`${BASE_URL}/api/terminal/sovereign-agent/dashboard`);
+    return handleResponse<any>(res);
+  },
+
+  /**
+   * GET /api/terminal/sovereign-agent/decision
+   * Real-time Sovereign Master Agent Decision for a Tier-1 Asset
+   */
+  async getSovereignDecision(symbol: string = 'BTCUSDT'): Promise<any> {
+    const res = await authFetch(`${BASE_URL}/api/terminal/sovereign-agent/decision?symbol=${encodeURIComponent(symbol)}`);
+    return handleResponse<any>(res);
+  },
+
+  /**
+   * POST /api/terminal/sovereign-agent/execute
+   * Instantly executes Sovereign Master Agent Decision into live paper / testnet
+   */
+  async executeSovereignDecision(symbol: string, overrideReason?: string): Promise<any> {
+    const res = await authFetch(`${BASE_URL}/api/terminal/sovereign-agent/execute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol, override_reason: overrideReason }),
+    });
+    return handleResponse<any>(res);
+  },
+
+  /**
    * POST /api/terminal/approval-action
    * Signal Lifecycle Execution & Transition
    */

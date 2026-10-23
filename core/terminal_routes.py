@@ -35,6 +35,11 @@ try:
 except ImportError:
     portfolio_shadow = None
 
+try:
+    from core.mastermind.sovereign_master_agent import sovereign_master_agent
+except ImportError:
+    sovereign_master_agent = None
+
 terminal_router = APIRouter(tags=["terminal"])
 
 # ==============================================================================
@@ -1608,6 +1613,49 @@ async def update_signal_approval(req: SignalApprovalRequest):
         "newState": signal["state"],
         "updatedSignal": signal,
     }
+
+
+# ==============================================================================
+# ROUTE: GET & POST /api/terminal/sovereign-agent/*
+# Apex Master Level Agent (BTC, ETH, GOLD)
+# ==============================================================================
+class SovereignExecuteRequest(BaseModel):
+    symbol: str
+    override_reason: str | None = None
+
+
+@terminal_router.get("/api/terminal/sovereign-agent/dashboard")
+async def get_sovereign_agent_dashboard():
+    """Returns the Sovereign Master Agent synthesis across BTC, ETH, and GOLD."""
+    if not sovereign_master_agent:
+        raise HTTPException(status_code=503, detail="Sovereign Master Agent offline")
+    return await sovereign_master_agent.get_all_sovereign_decisions()
+
+
+@terminal_router.get("/api/terminal/sovereign-agent/decision")
+async def get_sovereign_agent_decision(symbol: str = Query("BTCUSDT")):
+    """Returns instantaneous Sovereign Master Agent decision for a Tier-1 asset."""
+    if not sovereign_master_agent:
+        raise HTTPException(status_code=503, detail="Sovereign Master Agent offline")
+    try:
+        decision = await sovereign_master_agent.synthesize_asset(symbol)
+        return decision.to_dict()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@terminal_router.post("/api/terminal/sovereign-agent/execute")
+async def execute_sovereign_agent_decision(req: SovereignExecuteRequest):
+    """Instantly executes the Sovereign Master Agent's decision into live paper & testnet."""
+    if not sovereign_master_agent:
+        raise HTTPException(status_code=503, detail="Sovereign Master Agent offline")
+    try:
+        result = await sovereign_master_agent.execute_master_decision(
+            symbol=req.symbol, override_reason=req.override_reason
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # ==============================================================================

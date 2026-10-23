@@ -38,6 +38,7 @@ import { RiskEnsembleDesk } from './components/RiskEnsembleDesk';
 import { InstitutionalMasterTerminal } from './components/terminal/InstitutionalMasterTerminal';
 import { MastermindSwarmDesk } from './components/MastermindSwarmDesk';
 import { DarwinianArenaDesk } from './components/DarwinianArenaDesk';
+import { SovereignMasterAgentDesk } from './components/SovereignMasterAgentDesk';
 import { ToastContainer } from './components/ToastContainer';
 import { marketProvider, TickerData } from './data/providers/marketProvider';
 import {
@@ -112,8 +113,8 @@ export const App: React.FC = () => {
   const [brief, setBrief] = useState<DeskBriefResponse | null>(null);
   const [loadingBrief, setLoadingBrief] = useState<boolean>(false);
 
-  // Main Screen View Switcher: Institutional Terminal vs Darwinian Arena vs Mastermind Swarm vs Dedicated Paper Ledger vs Research Lab
-  const [activeMainView, setActiveMainView] = useState<'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM' | 'DARWINIAN_ARENA' | 'LEGACY_DESK'>('TERMINAL');
+  // Main Screen View Switcher: Sovereign Master Agent vs Terminal vs Arena vs Swarm vs Paper Ledger vs Research Lab
+  const [activeMainView, setActiveMainView] = useState<'MASTER_AGENT' | 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM' | 'DARWINIAN_ARENA' | 'LEGACY_DESK'>('MASTER_AGENT');
 
   // Tab State for Single-Screen Compact Cockpit
   const [activeRightTab, setActiveRightTab] = useState<'ORDER_DESK' | 'ORDER_BOOK' | 'PAPER' | 'AI_DESK'>('ORDER_DESK');
@@ -579,8 +580,18 @@ export const App: React.FC = () => {
         latencyMs={latencyMs}
       />
 
-      {/* Primary View Routing: Institutional Master Terminal (Default) vs Arena vs Swarm vs Paper Desk vs Research Lab */}
-      {activeMainView === 'PAPER_DESK' ? (
+      {/* Primary View Routing: Sovereign Master Agent vs Terminal vs Arena vs Swarm vs Paper Desk vs Research Lab */}
+      {activeMainView === 'MASTER_AGENT' ? (
+        <SovereignMasterAgentDesk
+          onSelectSymbol={(sym) => {
+            const clean = sym.replace('/', '').toUpperCase();
+            setSymbol(clean);
+            setActiveMainView('TERMINAL');
+            addToast('info', 'Cockpit Synced', `Switched Cockpit to ${clean}`);
+          }}
+          addToast={addToast}
+        />
+      ) : activeMainView === 'PAPER_DESK' ? (
         <DedicatedPaperTradingDesk
           onClosePosition={handleClosePosition}
         />

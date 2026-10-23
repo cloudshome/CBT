@@ -17,8 +17,8 @@ interface HeaderProps {
   onRefresh: () => void;
   notificationsEnabled: boolean;
   onToggleNotifications: () => void;
-  activeView?: 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM' | 'DARWINIAN_ARENA' | 'LEGACY_DESK';
-  onViewChange?: (view: 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM' | 'DARWINIAN_ARENA' | 'LEGACY_DESK') => void;
+  activeView?: 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM' | 'DARWINIAN_ARENA' | 'LEGACY_DESK' | 'MASTER_AGENT';
+  onViewChange?: (view: 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM' | 'DARWINIAN_ARENA' | 'LEGACY_DESK' | 'MASTER_AGENT') => void;
   openPositionsCount?: number;
   wsState?: 'CONNECTING' | 'CONNECTED' | 'RECONNECTING' | 'DISCONNECTED' | 'ERROR' | 'IDLE';
   latencyMs?: number;
@@ -101,6 +101,17 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Primary Screen View Switcher: Clean Unified Institutional Cockpit */}
         <div className="flex items-center bg-[#090d16] border border-[#1e293b] rounded-lg p-0.5 text-xs font-mono">
+          <button
+            onClick={() => onViewChange?.('MASTER_AGENT')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded transition-all font-bold ${
+              activeView === 'MASTER_AGENT'
+                ? 'bg-gradient-to-r from-cyan-500 via-indigo-600 to-purple-600 text-white shadow-md shadow-cyan-500/30 ring-1 ring-cyan-400'
+                : 'text-cyan-400 hover:text-white'
+            }`}
+          >
+            <span className="text-sm">👑</span>
+            <span>Master Agent</span>
+          </button>
           <button
             onClick={() => onViewChange?.('TERMINAL')}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded transition-all font-bold ${
