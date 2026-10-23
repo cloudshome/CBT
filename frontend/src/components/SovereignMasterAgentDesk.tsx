@@ -58,6 +58,9 @@ export const SovereignMasterAgentDesk: React.FC<SovereignMasterAgentDeskProps> =
   const [decisions, setDecisions] = useState<Record<string, SovereignDecision>>({});
   const [selectedAsset, setSelectedAsset] = useState<string>('BTC/USDT');
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
+  const [autoPilotEnabled, setAutoPilotEnabled] = useState<boolean>(false);
+  const [autoPilotLoading, setAutoPilotLoading] = useState<boolean>(false);
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
 
   const fetchDashboard = useCallback(async () => {
     try {
@@ -66,6 +69,12 @@ export const SovereignMasterAgentDesk: React.FC<SovereignMasterAgentDeskProps> =
       if (res && res.decisions) {
         setDecisions(res.decisions);
         setLastRefreshed(new Date());
+      }
+      if (res && res.auto_pilot) {
+        setAutoPilotEnabled(Boolean(res.auto_pilot.auto_pilot_enabled));
+        if (res.auto_pilot.recent_activity) {
+          setRecentActivity(res.auto_pilot.recent_activity);
+        }
       }
     } catch (err: any) {
       console.warn('Could not refresh Sovereign Agent dashboard:', err);
@@ -76,9 +85,38 @@ export const SovereignMasterAgentDesk: React.FC<SovereignMasterAgentDeskProps> =
 
   useEffect(() => {
     fetchDashboard();
-    const interval = setInterval(fetchDashboard, 15000); // 15s refresh
+    const interval = setInterval(fetchDashboard, 10000); // 10s refresh
     return () => clearInterval(interval);
   }, [fetchDashboard]);
+
+  const handleToggleAutoPilot = async () => {
+    try {
+      setAutoPilotLoading(true);
+      const nextState = !autoPilotEnabled;
+      const res = await api.setSovereignAutoPilot(nextState);
+      if (res && typeof res.auto_pilot_enabled === 'boolean') {
+        setAutoPilotEnabled(res.auto_pilot_enabled);
+        if (res.auto_pilot_enabled) {
+          addToast(
+            'success',
+            '⚡ Autonomous Auto-Pilot Activated',
+            'Sovereign Master Agent is now hands-free. High-confidence A+ setups on BTC, ETH, and Gold will auto-execute to Binance Futures Testnet.'
+          );
+        } else {
+          addToast(
+            'info',
+            'Auto-Pilot Deactivated',
+            'Sovereign Master Agent returned to Manual 1-Click Confirmation Mode.'
+          );
+        }
+      }
+      fetchDashboard();
+    } catch (err: any) {
+      addToast('error', 'Auto-Pilot Toggle Error', err.message || 'Could not update auto-pilot mode');
+    } finally {
+      setAutoPilotLoading(false);
+    }
+  };
 
   const handleExecute = async (symbol: string) => {
     try {
@@ -140,6 +178,22 @@ export const SovereignMasterAgentDesk: React.FC<SovereignMasterAgentDeskProps> =
             <Database className="w-3.5 h-3.5" />
             <span>BINANCE FUTURES ($5,000 TESTNET ACTIVE)</span>
           </div>
+          
+          {/* Autonomous Auto-Pilot Toggle Button */}
+          <button
+            onClick={handleToggleAutoPilot}
+            disabled={autoPilotLoading}
+            className={`px-3 py-1 rounded-lg border font-bold flex items-center gap-2 transition-all shadow-md ${
+              autoPilotEnabled
+                ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 border-emerald-400 text-white shadow-emerald-500/30 ring-1 ring-emerald-400'
+                : 'bg-[#0f172a] border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500'
+            }`}
+            title={autoPilotEnabled ? 'Auto-Pilot ACTIVE: Click to switch to Safe 1-Click Co-Pilot' : 'Click to enable 100% Hands-Free Autonomous Auto-Trading'}
+          >
+            <Zap className={`w-3.5 h-3.5 ${autoPilotEnabled ? 'text-yellow-300 animate-bounce' : 'text-slate-400'}`} />
+            <span>{autoPilotEnabled ? '⚡ AUTO-PILOT: ACTIVE' : '⚡ AUTO-PILOT: OFF'}</span>
+          </button>
+
           <button
             onClick={fetchDashboard}
             disabled={loading}
@@ -148,6 +202,34 @@ export const SovereignMasterAgentDesk: React.FC<SovereignMasterAgentDeskProps> =
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             <span>{lastRefreshed.toLocaleTimeString()}</span>
           </button>
+        </div>
+      </div>
+
+      {/* Auto-Pilot Status Banner */}
+      <div className={`p-3 rounded-xl border flex items-center justify-between text-xs transition-all ${
+        autoPilotEnabled
+          ? 'bg-gradient-to-r from-emerald-950/60 via-[#0a1b24] to-[#0c1829] border-emerald-500/50 text-emerald-200 shadow-lg shadow-emerald-950/40'
+          : 'bg-[#0a0f1d] border-[#1e293b] text-slate-400'
+      }`}>
+        <div className="flex items-center gap-2.5">
+          <div className={`w-2.5 h-2.5 rounded-full ${autoPilotEnabled ? 'bg-emerald-400 animate-ping' : 'bg-slate-500'}`} />
+          <span className="font-bold text-slate-200">
+            {autoPilotEnabled ? '⚡ AUTONOMOUS AUTO-PILOT RUNNING' : '🛡️ SAFE 1-CLICK CO-PILOT MODE'}
+          </span>
+          <span className="hidden md:inline text-slate-400">
+            {autoPilotEnabled
+              ? '• Hands-free autonomous execution enabled. When an A+ setup triggers (≥70% conf, ≥2.0R), it auto-dispatches into Binance Futures Testnet and Shadow Ledger.'
+              : '• Signals are actively evaluated every 10s. Click [Check & Execute] on any card to authorize trade dispatch.'}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 font-mono text-[11px]">
+          <span className="text-slate-500">Scan Cycle:</span>
+          <span className="text-cyan-400 font-bold">10s</span>
+          {recentActivity.length > 0 && (
+            <span className="text-slate-400 ml-2">
+              Last: <span className="text-slate-200">{recentActivity[recentActivity.length - 1]?.action}</span>
+            </span>
+          )}
         </div>
       </div>
 

@@ -2513,6 +2513,28 @@ export const api = {
   },
 
   /**
+   * GET /api/terminal/sovereign-agent/auto-pilot
+   * Autonomous Auto-Pilot Status
+   */
+  async getSovereignAutoPilotStatus(): Promise<any> {
+    const res = await authFetch(`${BASE_URL}/api/terminal/sovereign-agent/auto-pilot`);
+    return handleResponse<any>(res);
+  },
+
+  /**
+   * POST /api/terminal/sovereign-agent/auto-pilot
+   * Set Autonomous Auto-Pilot Mode
+   */
+  async setSovereignAutoPilot(enabled: boolean, options?: { scan_interval_sec?: number; min_confidence_pct?: number }): Promise<any> {
+    const res = await authFetch(`${BASE_URL}/api/terminal/sovereign-agent/auto-pilot`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled, ...options }),
+    });
+    return handleResponse<any>(res);
+  },
+
+  /**
    * POST /api/terminal/approval-action
    * Signal Lifecycle Execution & Transition
    */

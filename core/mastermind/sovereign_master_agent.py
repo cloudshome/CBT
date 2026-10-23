@@ -20,11 +20,13 @@ Constitutional Invariants:
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from typing import Any
 
 from core.database import db_manager
@@ -101,6 +103,179 @@ class SovereignMasterAgent:
     def __init__(self, account_equity_usd: float = 10_000.0) -> None:
         self.account_equity_usd = account_equity_usd
         self.agent_id = "SOVEREIGN_MASTER_AGENT_V1"
+        self.config_path = Path(__file__).resolve().parent.parent.parent / "data" / "sovereign_agent_config.json"
+        self.auto_pilot_enabled: bool = False
+        self.scan_interval_sec: float = 20.0
+        self.min_confidence_pct: float = 70.0
+        self.min_risk_reward: float = 2.0
+        self.last_scan_ms: int = 0
+        self.recent_activity_log: list[dict[str, Any]] = []
+        self._auto_pilot_task: asyncio.Task | None = None
+        self._load_config()
+
+    def _load_config(self) -> None:
+        try:
+            if self.config_path.exists():
+                with open(self.config_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    self.auto_pilot_enabled = bool(data.get("auto_pilot_enabled", False))
+                    self.scan_interval_sec = float(data.get("scan_interval_sec", 20.0))
+                    self.min_confidence_pct = float(data.get("min_confidence_pct", 70.0))
+                    self.min_risk_reward = float(data.get("min_risk_reward", 2.0))
+        except Exception as e:
+            logger.warning(f"Could not load sovereign agent config: {e}")
+
+    def _save_config(self) -> None:
+        try:
+            self.config_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.config_path, "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "auto_pilot_enabled": self.auto_pilot_enabled,
+                        "scan_interval_sec": self.scan_interval_sec,
+                        "min_confidence_pct": self.min_confidence_pct,
+                        "min_risk_reward": self.min_risk_reward,
+                        "updated_at_ms": int(time.time() * 1000),
+                    },
+                    f,
+                    indent=2,
+                )
+        except Exception as e:
+            logger.warning(f"Could not save sovereign agent config: {e}")
+
+    def get_auto_pilot_status(self) -> dict[str, Any]:
+        open_tier1_positions = []
+        try:
+            open_pos = portfolio_shadow.get_open_positions() if portfolio_shadow else []
+            for p in open_pos:
+                if normalize_symbol(p.get("symbol", "")) in ALLOWED_SYMBOLS:
+                    open_tier1_positions.append(
+                        {
+                            "id": p.get("id"),
+                            "symbol": p.get("symbol"),
+                            "direction": p.get("direction"),
+                            "entry_price": p.get("entry_price"),
+                            "unrealized_pnl": p.get("unrealized_pnl", 0.0),
+                        }
+                    )
+        except Exception as e:
+            logger.warning(f"Error fetching open positions for auto-pilot status: {e}")
+
+        return {
+            "agent_id": self.agent_id,
+            "auto_pilot_enabled": self.auto_pilot_enabled,
+            "scan_interval_sec": self.scan_interval_sec,
+            "min_confidence_pct": self.min_confidence_pct,
+            "min_risk_reward": self.min_risk_reward,
+            "tier_1_universe": ["BTC/USDT", "ETH/USDT", "XAU/USD"],
+            "last_scan_ms": self.last_scan_ms,
+            "active_tier1_positions": open_tier1_positions,
+            "active_positions_count": len(open_tier1_positions),
+            "recent_activity": self.recent_activity_log[-20:],
+        }
+
+    async def set_auto_pilot(self, enabled: bool, options: dict[str, Any] | None = None) -> dict[str, Any]:
+        self.auto_pilot_enabled = bool(enabled)
+        if options:
+            if "scan_interval_sec" in options:
+                self.scan_interval_sec = max(5.0, float(options["scan_interval_sec"]))
+            if "min_confidence_pct" in options:
+                self.min_confidence_pct = float(options["min_confidence_pct"])
+        self._save_config()
+
+        status_msg = f"Autonomous Auto-Pilot {'ACTIVATED' if self.auto_pilot_enabled else 'DEACTIVATED'}."
+        self._record_activity("SYSTEM", "CONFIG", status_msg)
+
+        if self.auto_pilot_enabled:
+            self._ensure_worker_running()
+        else:
+            if self._auto_pilot_task and not self._auto_pilot_task.done():
+                self._auto_pilot_task.cancel()
+                self._auto_pilot_task = None
+
+        return self.get_auto_pilot_status()
+
+    def _ensure_worker_running(self) -> None:
+        if self.auto_pilot_enabled:
+            if self._auto_pilot_task is None or self._auto_pilot_task.done():
+                try:
+                    loop = asyncio.get_running_loop()
+                    self._auto_pilot_task = loop.create_task(self._auto_pilot_worker())
+                except RuntimeError:
+                    pass
+
+    def _record_activity(
+        self, symbol: str, action: str, details: str, meta: dict[str, Any] | None = None
+    ) -> None:
+        entry = {
+            "timestamp_ms": int(time.time() * 1000),
+            "symbol": symbol,
+            "action": action,
+            "details": details,
+            "meta": meta or {},
+        }
+        self.recent_activity_log.append(entry)
+        if len(self.recent_activity_log) > 100:
+            self.recent_activity_log = self.recent_activity_log[-100:]
+
+    async def _auto_pilot_worker(self) -> None:
+        logger.info("[SOVEREIGN_MASTER] Autonomous Auto-Pilot Background Worker started.")
+        while self.auto_pilot_enabled:
+            try:
+                self.last_scan_ms = int(time.time() * 1000)
+                symbols = ["BTC/USDT", "ETH/USDT", "XAU/USD"]
+                for sym in symbols:
+                    if not self.auto_pilot_enabled:
+                        break
+                    try:
+                        decision = await self.synthesize_asset(sym)
+                        if decision.decision in ("BUY", "SELL"):
+                            if (
+                                decision.confidence_pct >= self.min_confidence_pct
+                                and decision.risk_reward_ratio >= self.min_risk_reward
+                            ):
+                                open_pos = portfolio_shadow.get_open_positions() if portfolio_shadow else []
+                                already_open = any(
+                                    normalize_symbol(p.get("symbol", "")) == normalize_symbol(sym)
+                                    for p in open_pos
+                                )
+                                if already_open:
+                                    self._record_activity(
+                                        sym,
+                                        "HOLD_EXISTING",
+                                        f"Valid {decision.decision} signal, but position is already active in ledger.",
+                                    )
+                                else:
+                                    logger.info(
+                                        f"[SOVEREIGN_MASTER][AUTOPILOT] Dispatching {decision.decision} on {sym} | "
+                                        f"Conf: {decision.confidence_pct}% | R:R: {decision.risk_reward_ratio:.1f}R"
+                                    )
+                                    exec_result = await self.execute_master_decision(
+                                        sym, override_reason="[AUTONOMOUS_AUTO_PILOT]"
+                                    )
+                                    self._record_activity(
+                                        sym,
+                                        f"AUTO_EXEC_{decision.decision}",
+                                        f"Executed {decision.decision} @ {decision.current_price:.2f}. "
+                                        f"Testnet Mirrored: {exec_result.get('mirrored_to_binance_testnet')}",
+                                        meta=exec_result,
+                                    )
+                            else:
+                                self._record_activity(
+                                    sym,
+                                    "FILTERED",
+                                    f"Signal {decision.decision} filtered: Conf {decision.confidence_pct:.0f}% < {self.min_confidence_pct}% or RR < {self.min_risk_reward}R",
+                                )
+                    except Exception as sym_err:
+                        logger.error(f"[SOVEREIGN_MASTER][AUTOPILOT] Error evaluating {sym}: {sym_err}")
+
+                await asyncio.sleep(self.scan_interval_sec)
+            except asyncio.CancelledError:
+                logger.info("[SOVEREIGN_MASTER] Autonomous Auto-Pilot Worker gracefully cancelled.")
+                break
+            except Exception as e:
+                logger.error(f"[SOVEREIGN_MASTER] Error in auto-pilot loop: {e}")
+                await asyncio.sleep(10.0)
 
     # =========================================================================
     # PILLAR 1: Deep Memory & Trade History Engine
@@ -534,12 +709,15 @@ class SovereignMasterAgent:
             else:
                 decisions_map[sym] = res.to_dict()
 
+        self._ensure_worker_running()
+
         return {
             "agent_id": self.agent_id,
             "status": "ONLINE_ACTIVE",
             "tier_1_universe": symbols,
             "timestamp_ms": int(time.time() * 1000),
             "decisions": decisions_map,
+            "auto_pilot": self.get_auto_pilot_status(),
         }
 
 

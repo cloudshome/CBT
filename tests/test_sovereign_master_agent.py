@@ -91,3 +91,47 @@ def test_api_sovereign_agent_decision_invalid_symbol(client):
     res = client.get("/api/terminal/sovereign-agent/decision?symbol=DOGEUSDT")
     assert res.status_code == 400
     assert "Sovereign Master Agent is locked to Tier-1 assets only" in res.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_sovereign_master_agent_auto_pilot_toggle():
+    """Validates activating and deactivating autonomous auto-pilot."""
+    # Enable
+    res_on = await sovereign_master_agent.set_auto_pilot(True, options={"scan_interval_sec": 15.0})
+    assert res_on["auto_pilot_enabled"] is True
+    assert res_on["scan_interval_sec"] == 15.0
+    assert sovereign_master_agent.auto_pilot_enabled is True
+
+    # Disable
+    res_off = await sovereign_master_agent.set_auto_pilot(False)
+    assert res_off["auto_pilot_enabled"] is False
+    assert sovereign_master_agent.auto_pilot_enabled is False
+
+
+def test_api_sovereign_agent_auto_pilot_endpoints(client):
+    """Tests GET and POST /api/terminal/sovereign-agent/auto-pilot."""
+    # GET status
+    res = client.get("/api/terminal/sovereign-agent/auto-pilot")
+    assert res.status_code == 200
+    data = res.json()
+    assert "auto_pilot_enabled" in data
+    assert "tier_1_universe" in data
+
+    # POST toggle ON
+    res_post_on = client.post("/api/terminal/sovereign-agent/auto-pilot", json={"enabled": True})
+    assert res_post_on.status_code == 200
+    assert res_post_on.json()["auto_pilot_enabled"] is True
+
+    # POST toggle OFF
+    res_post_off = client.post("/api/terminal/sovereign-agent/auto-pilot", json={"enabled": False})
+    assert res_post_off.status_code == 200
+    assert res_post_off.json()["auto_pilot_enabled"] is False
+
+
+def test_api_sovereign_agent_dashboard_contains_auto_pilot(client):
+    """Tests that dashboard response includes live auto_pilot metadata."""
+    res = client.get("/api/terminal/sovereign-agent/dashboard")
+    assert res.status_code == 200
+    data = res.json()
+    assert "auto_pilot" in data
+    assert "auto_pilot_enabled" in data["auto_pilot"]

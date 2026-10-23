@@ -1658,6 +1658,34 @@ async def execute_sovereign_agent_decision(req: SovereignExecuteRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+class SovereignAutoPilotRequest(BaseModel):
+    enabled: bool
+    scan_interval_sec: float | None = None
+    min_confidence_pct: float | None = None
+
+
+@terminal_router.get("/api/terminal/sovereign-agent/auto-pilot")
+async def get_sovereign_auto_pilot():
+    """Returns current Autonomous Auto-Pilot status and recent activity."""
+    if not sovereign_master_agent:
+        raise HTTPException(status_code=503, detail="Sovereign Master Agent offline")
+    return sovereign_master_agent.get_auto_pilot_status()
+
+
+@terminal_router.post("/api/terminal/sovereign-agent/auto-pilot")
+async def set_sovereign_auto_pilot(req: SovereignAutoPilotRequest):
+    """Enables or disables Autonomous Auto-Pilot for the Sovereign Master Agent."""
+    if not sovereign_master_agent:
+        raise HTTPException(status_code=503, detail="Sovereign Master Agent offline")
+    options: dict[str, Any] = {}
+    if req.scan_interval_sec is not None:
+        options["scan_interval_sec"] = req.scan_interval_sec
+    if req.min_confidence_pct is not None:
+        options["min_confidence_pct"] = req.min_confidence_pct
+
+    return await sovereign_master_agent.set_auto_pilot(req.enabled, options=options)
+
+
 # ==============================================================================
 # ROUTE: GET /api/terminal/glossary
 # ==============================================================================
