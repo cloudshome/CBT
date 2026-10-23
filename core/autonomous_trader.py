@@ -503,12 +503,17 @@ class AutonomousTrader:
             from core.auth.credential_vault import credential_vault
             from core.execution.live_canary_runner import CanaryRunRequest, live_canary_runner
 
-            cred = credential_vault.get_credential("BINANCE", "TESTNET")
+            # Check Binance Futures Testnet first (active & funded with 5,000 USDT)
+            cred = credential_vault.get_credential("BINANCE_FUTURES", "TESTNET")
+            target_exchange = "BINANCE_FUTURES"
+            if not cred or not cred.is_active:
+                cred = credential_vault.get_credential("BINANCE", "TESTNET")
+                target_exchange = "BINANCE"
             if not cred or not cred.is_active:
                 return
             side = "BUY" if direction.upper() == "LONG" else "SELL"
             req = CanaryRunRequest(
-                exchange="BINANCE",
+                exchange=target_exchange,
                 symbol=exchange_sym,
                 notional_usd=15.0,
                 side=side,
@@ -518,7 +523,7 @@ class AutonomousTrader:
             )
             res = await live_canary_runner.execute_canary_order(req)
             logger.info(
-                f"AutonomousTrader mirrored {side} {exchange_sym} to BINANCE TESTNET: "
+                f"AutonomousTrader mirrored {side} {exchange_sym} to {target_exchange} TESTNET: "
                 f"status={res.status} order_id={res.exchange_order_id} ack={res.dispatch_to_ack_latency_ms}ms"
             )
 

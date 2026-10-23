@@ -915,23 +915,53 @@ class CredentialVault:
             )
             row = cursor.fetchone()
 
-        if not row:
-            return None
+        if row:
+            try:
+                encrypted_str = row["encrypted_payload"]
+                decrypted_bytes = self.decrypt(encrypted_str)
+                data = json.loads(decrypted_bytes.decode("utf-8"))
 
-        encrypted_str = row["encrypted_payload"]
-        decrypted_bytes = self.decrypt(encrypted_str)
-        data = json.loads(decrypted_bytes.decode("utf-8"))
+                return ExchangeCredential(
+                    exchange=data["exchange"],
+                    environment=data["environment"],
+                    api_key=data["api_key"],
+                    api_secret=data["api_secret"],
+                    passphrase=data.get("passphrase"),
+                    is_active=data.get("is_active", True),
+                    created_at=data.get("created_at", int(time.time() * 1000)),
+                    updated_at=data.get("updated_at", int(time.time() * 1000)),
+                )
+            except Exception as dec_err:
+                logger.warning(
+                    f"Vault payload decryption skipped for {exch} [{env}]: {dec_err}. Checking environment fallback."
+                )
 
-        return ExchangeCredential(
-            exchange=data["exchange"],
-            environment=data["environment"],
-            api_key=data["api_key"],
-            api_secret=data["api_secret"],
-            passphrase=data.get("passphrase"),
-            is_active=data.get("is_active", True),
-            created_at=data.get("created_at", int(time.time() * 1000)),
-            updated_at=data.get("updated_at", int(time.time() * 1000)),
-        )
+        # Environment variable fallback for testnet / development runners
+        if env == "TESTNET":
+            if exch == "BINANCE_FUTURES":
+                k = os.getenv("BINANCE_FUTURES_TESTNET_API_KEY")
+                s = os.getenv("BINANCE_FUTURES_TESTNET_API_SECRET")
+                if k and s:
+                    return ExchangeCredential(
+                        exchange="BINANCE_FUTURES",
+                        environment="TESTNET",
+                        api_key=k,
+                        api_secret=s,
+                        is_active=True,
+                    )
+            elif exch == "BINANCE":
+                k = os.getenv("BINANCE_TESTNET_API_KEY") or os.getenv("BINANCE_API_KEY")
+                s = os.getenv("BINANCE_TESTNET_API_SECRET") or os.getenv("BINANCE_API_SECRET")
+                if k and s:
+                    return ExchangeCredential(
+                        exchange="BINANCE",
+                        environment="TESTNET",
+                        api_key=k,
+                        api_secret=s,
+                        is_active=True,
+                    )
+
+        return None
 
     def register_revocation_listener(self, listener: Callable[[str, str], None]) -> None:
         """Registers a callback invoked whenever an exchange credential is deleted or revoked."""
