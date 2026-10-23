@@ -72,7 +72,7 @@ jobs:
         working-directory: frontend
         run: npm audit --audit-level=high || echo "::warning::npm audit reported high/critical findings (frontend)"
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
 
