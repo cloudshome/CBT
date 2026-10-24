@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCw, Activity, Zap, TrendingUp, TrendingDown, BellOff, BellRing, Send, Layers } from 'lucide-react';
+import { RefreshCw, Activity, Zap, TrendingUp, TrendingDown, BellOff, BellRing, Send, Layers, Crown, Dna, Cpu, Sparkles } from 'lucide-react';
 import { SupportedTimeframe } from '../types';
 import { api } from '../services/api';
 import { PairVenueLinks } from './PairVenueLinks';
@@ -99,56 +99,89 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Primary Screen View Switcher: Clean Unified Institutional Cockpit */}
+        {/* Primary Screen View Switcher: Clean Unified Institutional Cockpit (6 Core Desks) */}
         <div className="flex items-center bg-[#090d16] border border-[#1e293b] rounded-lg p-0.5 text-xs font-mono">
           <button
             onClick={() => onViewChange?.('MASTER_AGENT')}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded transition-all font-bold ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all font-bold ${
               activeView === 'MASTER_AGENT'
-                ? 'bg-gradient-to-r from-cyan-500 via-indigo-600 to-purple-600 text-white shadow-md shadow-cyan-500/30 ring-1 ring-cyan-400'
-                : 'text-cyan-400 hover:text-white'
+                ? 'bg-gradient-to-r from-amber-500/20 via-cyan-500/20 to-purple-500/20 text-white border border-cyan-400/50 shadow-md shadow-cyan-500/20'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
+            title="Sovereign Master Agent for BTC, ETH, and Gold with auto-pilot and loss autopsies"
           >
-            <span className="text-sm">👑</span>
-            <span>Master Cockpit</span>
+            <Crown size={13} className={activeView === 'MASTER_AGENT' ? 'text-amber-400' : 'text-slate-400'} />
+            <span>Master Agent</span>
           </button>
+
           <button
             onClick={() => onViewChange?.('TERMINAL')}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded transition-all font-bold ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all font-bold ${
               activeView === 'TERMINAL' || activeView === 'MASTER_COCKPIT'
                 ? 'bg-sky-500 text-white shadow-sm'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
+            title="Institutional Trading Terminal with TradingView chart, depth ladder, and order desk"
           >
-            <Activity size={14} />
-            <span>Chart &amp; Depth</span>
+            <Activity size={13} className={activeView === 'TERMINAL' || activeView === 'MASTER_COCKPIT' ? 'text-white' : 'text-sky-400'} />
+            <span>Terminal</span>
           </button>
+
           <button
-            onClick={() => onViewChange?.('PAPER_DESK')}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded transition-all font-bold ${
-              activeView === 'PAPER_DESK'
-                ? 'bg-sky-500 text-white shadow-sm'
+            onClick={() => onViewChange?.('DARWINIAN_ARENA')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all font-bold ${
+              activeView === 'DARWINIAN_ARENA'
+                ? 'bg-emerald-600 text-white shadow-sm'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
+            title="Darwinian Specialist Arena: 10 isolated coin specialists competing with $1,000 capital"
           >
-            <Layers size={14} />
-            <span>Positions Ledger</span>
+            <Dna size={13} className={activeView === 'DARWINIAN_ARENA' ? 'text-white' : 'text-emerald-400'} />
+            <span>Arena</span>
+          </button>
+
+          <button
+            onClick={() => onViewChange?.('MASTERMIND_SWARM')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all font-bold ${
+              activeView === 'MASTERMIND_SWARM'
+                ? 'bg-purple-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+            title="Mastermind Swarm Council: Multi-agent debate, adversarial challenge, and consensus"
+          >
+            <Cpu size={13} className={activeView === 'MASTERMIND_SWARM' ? 'text-white' : 'text-purple-400'} />
+            <span>Swarm</span>
+          </button>
+
+          <button
+            onClick={() => onViewChange?.('PAPER_DESK')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all font-bold ${
+              activeView === 'PAPER_DESK'
+                ? 'bg-cyan-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+            title="Positions Ledger: Dedicated shadow/paper portfolio tracking and markouts"
+          >
+            <Layers size={13} className={activeView === 'PAPER_DESK' ? 'text-white' : 'text-cyan-400'} />
+            <span>Ledger</span>
             {openPositionsCount > 0 && (
               <span className="px-1.5 py-0.5 bg-emerald-500 text-[#0B0E14] text-[10px] rounded-full font-bold leading-none">
                 {openPositionsCount}
               </span>
             )}
           </button>
+
           <button
             onClick={() => onViewChange?.('RESEARCH_LAB')}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded transition-all font-bold ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all font-bold ${
               activeView === 'RESEARCH_LAB'
-                ? 'bg-gradient-to-r from-indigo-500 via-purple-600 to-pink-600 text-white shadow-sm shadow-indigo-500/30 ring-1 ring-indigo-400/50'
+                ? 'bg-gradient-to-r from-indigo-500 via-purple-600 to-pink-600 text-white shadow-sm shadow-indigo-500/30'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
+            title="Research Vault: Macroeconomic intelligence, dossiers, and knowledge synthesis"
           >
-            <span className="text-sm">🧠</span>
-            <span>Research Vault</span>
+            <Sparkles size={13} className={activeView === 'RESEARCH_LAB' ? 'text-white' : 'text-indigo-400'} />
+            <span>Vault</span>
           </button>
         </div>
 
