@@ -381,6 +381,67 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
     }
   };
 
+  const renderFormattedText = (text: string) => {
+    const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={i} className="font-bold text-slate-900 dark:text-white">{part.slice(2, -2)}</strong>;
+      }
+      if (part.startsWith('`') && part.endsWith('`')) {
+        return <code key={i} className="px-1 py-0.5 rounded bg-slate-800 text-cyan-300 font-mono text-[11px]">{part.slice(1, -1)}</code>;
+      }
+      return part;
+    });
+  };
+
+  const renderMarkdownBody = (md: string) => {
+    if (!md) return null;
+    const lines = md.split('\n');
+    return (
+      <div className="space-y-2.5 font-sans text-xs text-[#202122] dark:text-[#eaecf0] leading-relaxed">
+        {lines.map((line, idx) => {
+          const trimmed = line.trim();
+          if (!trimmed) return <div key={idx} className="h-1" />;
+          if (trimmed.startsWith('# ')) return null;
+          if (trimmed === '---') {
+            return <hr key={idx} className="border-t border-[#c8ccd1] dark:border-[#2a374a] my-3" />;
+          }
+          if (trimmed.startsWith('## ')) {
+            return (
+              <h2 key={idx} className="text-base font-serif font-bold text-[#000000] dark:text-cyan-300 border-b border-[#a2a9b1] dark:border-[#2d3a4e] pt-4 pb-1">
+                {trimmed.replace('## ', '')}
+              </h2>
+            );
+          }
+          if (trimmed.startsWith('### ')) {
+            return (
+              <h3 key={idx} className="text-sm font-sans font-bold text-amber-600 dark:text-amber-400 pt-2 flex items-center gap-1.5">
+                <span>📌</span> {trimmed.replace('### ', '')}
+              </h3>
+            );
+          }
+          if (trimmed.startsWith('> ')) {
+            return (
+              <blockquote key={idx} className="border-l-4 border-cyan-500 bg-cyan-950/20 px-3 py-1.5 rounded-r text-cyan-300 dark:text-cyan-200 italic my-1">
+                {trimmed.replace('> ', '')}
+              </blockquote>
+            );
+          }
+          if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
+            const itemText = trimmed.substring(2);
+            return (
+              <div key={idx} className="flex items-start gap-2 pl-3">
+                <span className="text-cyan-400 font-bold shrink-0">•</span>
+                <div>{renderFormattedText(itemText)}</div>
+              </div>
+            );
+          }
+          return <p key={idx} className="leading-relaxed text-[#202122] dark:text-[#eaecf0]">{renderFormattedText(trimmed)}</p>;
+        })}
+      </div>
+    );
+  };
+
   // Source icon
   const getSourceIcon = (sourceType: string) => {
     if (sourceType.includes('FACEBOOK') || sourceType.includes('VIDEO') || sourceType.includes('REEL')) {
@@ -868,6 +929,23 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
                         {activeArticle.executive_summary}
                       </p>
                     </section>
+
+                    {/* Full Dossier & Dictionary Definitions Section */}
+                    {activeArticle.full_markdown_content && (
+                      <section className="space-y-3 pt-2">
+                        <div className="flex items-center justify-between border-b border-[#a2a9b1] dark:border-[#2d3a4e] pb-1">
+                          <h2 className="text-lg font-serif font-bold text-[#000000] dark:text-cyan-300 flex items-center gap-2">
+                            <span>📖 Full Encyclopedic Dossier &amp; Definitions</span>
+                          </h2>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950/60 text-cyan-300 border border-cyan-800/50">
+                            Knowledge Base
+                          </span>
+                        </div>
+                        <div className="bg-[#f8f9fa] dark:bg-[#0f141e] border border-[#c8ccd1] dark:border-[#263346] rounded-lg p-4 shadow-inner">
+                          {renderMarkdownBody(activeArticle.full_markdown_content)}
+                        </div>
+                      </section>
+                    )}
 
                     {/* Bengali Practical Guide Notice Box (Wikipedia Callout style) */}
                     {activeSource?.real_life_summary && (
