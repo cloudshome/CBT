@@ -15,7 +15,12 @@ from typing import Any
 
 import numpy as np
 
+from core.evidence_integrity import EvidenceGrade, weakest_grade
+
 logger = logging.getLogger("ai_quant_sentinel.path_simulator")
+
+MIN_CANDLES_FOR_OBSERVED_RETURNS = 30
+"""Below this many candles the bootstrap has too little history to resample."""
 
 
 @dataclass
@@ -32,6 +37,15 @@ class SimulationCone:
     model_b_p_win: float
     model_c_p_win: float
     simulated_paths_count: int
+    # Provenance. A simulation is model output, never observation, so a cone can
+    # be at most SIMULATED. It is FABRICATED when the returns it resampled were
+    # generated or came from non-empirical candles; in that case every number in
+    # the cone, including model agreement, carries no information about the market.
+    # The default is SIMULATED (never EMPIRICAL) so hand-built cones stay valid;
+    # only ``simulate_paths`` can see the input candles and assign FABRICATED.
+    evidence_grade: str = EvidenceGrade.SIMULATED.label
+    evidence_note: str = ""
+    observed_return_count: int = 0
 
 
 class TriModelPathSimulator:
@@ -54,12 +68,30 @@ class TriModelPathSimulator:
         """
         Executes 10,000 path simulation split across Historical, Block, and Regime-Conditioned bootstrap.
         """
-        if len(candles) < 30:
-            # Fallback baseline returns if minimal history
+        if len(candles) < MIN_CANDLES_FOR_OBSERVED_RETURNS:
+            # Too little history to resample. The cone is still drawn so the UI has
+            # something to render, but the returns are generated, so it is graded
+            # FABRICATED and downstream layers must not treat it as information.
             returns = np.random.normal(0.0001, 0.006, 100)
+            observed_return_count = 0
+            grade = EvidenceGrade.FABRICATED
+            note = (
+                f"only {len(candles)} candles (<{MIN_CANDLES_FOR_OBSERVED_RETURNS}); "
+                "returns were generated, not observed"
+            )
         else:
             closes = np.array([c["close"] for c in candles], dtype=np.float64)
             returns = np.diff(closes) / closes[:-1]
+            # Weakest link: synthetic or untagged candles contaminate the cone, and a
+            # simulation can never be better than SIMULATED whatever its inputs were.
+            grade = min(weakest_grade(candles), EvidenceGrade.SIMULATED)
+            # Returns computed from fabricated candles were never observed.
+            observed_return_count = len(returns) if grade is EvidenceGrade.SIMULATED else 0
+            note = (
+                "bootstrap over observed returns"
+                if grade is EvidenceGrade.SIMULATED
+                else "input candles are synthetic or carry no provenance"
+            )
 
         n_per_model = self.num_paths // 3
 
@@ -113,6 +145,9 @@ class TriModelPathSimulator:
             model_b_p_win=round(win_b, 3),
             model_c_p_win=round(win_c, 3),
             simulated_paths_count=len(all_paths),
+            evidence_grade=grade.label,
+            evidence_note=note,
+            observed_return_count=observed_return_count,
         )
 
     def _run_historical_bootstrap(

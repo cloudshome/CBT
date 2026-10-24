@@ -20,6 +20,7 @@ import numpy as np
 from core.analogue_engine import AnalogueDistribution
 from core.data_quality_gate import QualityCheckResult
 from core.event_shock_engine import EventRiskState
+from core.evidence_integrity import EvidenceGrade
 from core.path_simulator import SimulationCone
 from core.regime_transition import RegimeClassificationResult
 
@@ -67,6 +68,11 @@ class UncertaintyEngine:
         # 3. Model Disagreement Entropy
         # Spread between Model A, B, C win rates
         u_models = float(np.clip(sim_cone.tp_sl_uncertainty_spread * 2.5, 0.0, 1.0))
+        # Agreement between models resampling generated returns is an artefact, not
+        # evidence. A fabricated cone must never lower the budget, so it counts as
+        # maximum disagreement.
+        if getattr(sim_cone, "evidence_grade", None) == EvidenceGrade.FABRICATED.label:
+            u_models = 1.0
 
         # 4. Regime Transition Uncertainty
         u_regime = 1.0 - regime_res.confidence
