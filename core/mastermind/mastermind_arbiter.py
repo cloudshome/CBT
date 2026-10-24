@@ -112,9 +112,6 @@ class MastermindArbiterCouncil:
         self.specialists: list[BaseSpecialistAgent] = [
             BtcMacroSpecialist(),
             EthSpecialist(),
-            SolSpecialist(),
-            MemeMomentumSpecialist("DOGE/USDT"),
-            LowCapBreakoutSpecialist("PEPE/USDT"),
         ]
         self.dynamic_specialists: dict[str, BaseSpecialistAgent] = {}
         self._ensure_tables()
@@ -407,7 +404,7 @@ class MastermindArbiterCouncil:
     async def evaluate_swarm(
         self,
         market_data_by_symbol: dict[str, dict[str, Any]],
-        max_active_portfolio_positions: int = 5,
+        max_active_portfolio_positions: int = 3,
     ) -> list[MastermindDecisionRecord]:
         """
         Polls all active specialists, collects CandidateProposals, arbitrates conflicts,
@@ -640,6 +637,7 @@ class MastermindArbiterCouncil:
                         max_open_limit=max_active_portfolio_positions,
                         max_risk_usd=current_eq * 0.015,
                         prevent_duplicate_symbol=True,
+                        allow_multi_style=False,
                     )
                     existing_symbols.add(sym)
                     logger.info(

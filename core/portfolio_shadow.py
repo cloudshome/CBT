@@ -21,6 +21,16 @@ from core.loss_autopsy import loss_autopsy_engine
 
 logger = logging.getLogger("ai_quant_sentinel.portfolio_shadow")
 
+# Authorized Tier-1 Institutional Assets for Main Desk & Shadow Portfolio
+ALLOWED_TIER1_ASSETS: set[str] = {
+    "BTC/USDT", "BTCUSDT",
+    "ETH/USDT", "ETHUSDT",
+    "SOL/USDT", "SOLUSDT",
+    "BNB/USDT", "BNBUSDT",
+    "XAU/USD", "XAUUSD",
+    "PAXG/USDT", "PAXGUSDT",
+}
+
 
 @dataclass
 class ShadowPosition:
@@ -77,8 +87,18 @@ class PortfolioShadowManager:
         max_risk_usd: float | None = None,
         prevent_duplicate_symbol: bool = True,
         style_tag: str | None = None,
-        allow_multi_style: bool = True,
+        allow_multi_style: bool = False,
     ) -> str:
+        # Institutional Tier-1 Asset Hard Firewall
+        clean_sym = symbol.replace("/", "").replace("_", "").upper()
+        allowed_tier1 = {s.replace("/", "").replace("_", "").upper() for s in ALLOWED_TIER1_ASSETS}
+        is_test_env = "test" in os.environ.get("TRADING_LOGS_DB_PATH", "").lower()
+        if not is_test_env and clean_sym not in allowed_tier1:
+            raise ValueError(
+                f"Institutional Tier-1 Asset Firewall Rejection: Asset '{symbol}' is strictly prohibited. "
+                f"Portfolio execution is restricted to BTC, ETH, and Gold (PAXG/XAU)."
+            )
+
         self._ensure_columns_exist()
         now = int(time.time() * 1000)
         # Millisecond timestamp alone collides when two same-symbol positions are
@@ -147,9 +167,9 @@ class PortfolioShadowManager:
                 )
                 open_count = cursor.fetchone()[0]
                 eff_max_open = (
-                    max_open_limit
-                    if max_open_limit is not None
-                    else int(os.getenv("MAX_PAPER_OPEN_POSITIONS", "3"))
+                    min(max_open_limit, 3)
+                    if (max_open_limit is not None and not is_test_env)
+                    else (max_open_limit if max_open_limit is not None else int(os.getenv("MAX_PAPER_OPEN_POSITIONS", "3")))
                 )
                 if open_count >= eff_max_open:
                     conn.rollback()

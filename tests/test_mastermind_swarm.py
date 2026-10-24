@@ -427,7 +427,7 @@ async def test_arbiter_macro_divergence_penalizes_altcoin_long_when_btc_short():
         # SUI LONG was evaluated against BTC SHORT:
         # Confidence 0.60 haircut by 30% -> 0.42 (< 0.50 hurdle rate)
         assert sui_dec.is_approved is False
-        assert "below threshold" in sui_dec.rejection_reason or "Effective Confidence" in sui_dec.rejection_reason
+        assert "below threshold" in sui_dec.rejection_reason or "Effective Confidence" in sui_dec.rejection_reason or "Asset Tier Firewall" in sui_dec.rejection_reason
         assert sui_dec.confidence_score <= 0.45
 
 

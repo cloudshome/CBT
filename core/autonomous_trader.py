@@ -74,13 +74,11 @@ class AutonomousTrader:
         active_symbols: list[str] | None = None,
         scan_interval_sec: float = 30.0,
         account_equity_usd: float = 10_000.0,
-        max_open_positions: int = 5,
+        max_open_positions: int = 3,
     ):
         self.active_symbols = active_symbols or [
             "BTC/USDT",
             "ETH/USDT",
-            "SOL/USDT",
-            "BNB/USDT",
             "XAU/USD",
         ]
         self.scan_interval_sec = float(
@@ -428,7 +426,7 @@ class AutonomousTrader:
                         max_risk_usd=current_eq * 0.015,
                         prevent_duplicate_symbol=True,
                         style_tag=style_tag,
-                        allow_multi_style=True,
+                        allow_multi_style=False,
                     )
                     self.total_trades_executed += 1
                     self._last_traded_candle_ts[sym] = latest_candle_ts

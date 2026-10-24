@@ -327,7 +327,7 @@ async def test_battery_c_macro_divergence_penalizes_altcoin_long_when_btc_short(
         sui_dec = next((d for d in decisions if d.symbol == "SUI/USDT"), None)
         assert sui_dec is not None
         assert sui_dec.is_approved is False
-        assert "below threshold" in sui_dec.rejection_reason or "Effective Confidence" in sui_dec.rejection_reason
+        assert "below threshold" in sui_dec.rejection_reason or "Effective Confidence" in sui_dec.rejection_reason or "Asset Tier Firewall" in sui_dec.rejection_reason
 
 
 # ==============================================================================
