@@ -157,6 +157,13 @@ class PortfolioShadowManager:
                         f"Risk Gate Rejection: {open_count} open positions — maximum {eff_max_open} reached."
                     )
 
+                # Nervous System Cooldown Governor Guard
+                from core.cooldown_governor import cooldown_governor
+                can_enter, cooldown_reason = cooldown_governor.evaluate_entry_clearance(symbol)
+                if not can_enter:
+                    conn.rollback()
+                    raise ValueError(f"Risk Gate Rejection: {cooldown_reason}")
+
                 if max_risk_usd is not None:
                     trade_risk = float(size) * abs(float(entry_price) - float(stop_loss))
                     if trade_risk > max_risk_usd:
@@ -427,6 +434,18 @@ class PortfolioShadowManager:
                     except Exception as exc:
                         logger.debug(f"Telegram exit alert dispatch error: {exc}")
 
+                    # Notify Nervous System Cooldown Governor
+                    try:
+                        from core.cooldown_governor import cooldown_governor
+                        cooldown_governor.record_trade_closed(
+                            symbol=symbol,
+                            realized_pnl=float(final_pnl),
+                            exit_reason=close_reason,
+                            closed_at_sec=now / 1000.0 if now > 1e11 else float(now),
+                        )
+                    except Exception as cg_exc:
+                        logger.debug(f"Cooldown governor notify error: {cg_exc}")
+
                     # Audit Event & Loss Autopsy Integration
                     autopsy_report = None
                     if final_pnl < 0:
@@ -561,6 +580,18 @@ class PortfolioShadowManager:
                 )
             except Exception as exc:
                 logger.debug(f"Telegram exit alert dispatch error: {exc}")
+
+            # Notify Nervous System Cooldown Governor
+            try:
+                from core.cooldown_governor import cooldown_governor
+                cooldown_governor.record_trade_closed(
+                    symbol=row["symbol"],
+                    realized_pnl=float(pnl),
+                    exit_reason=exit_reason,
+                    closed_at_sec=now / 1000.0 if now > 1e11 else float(now),
+                )
+            except Exception as cg_exc:
+                logger.debug(f"Cooldown governor notify error: {cg_exc}")
 
             # Trigger Autopsy on Manual/API Loss Close
             autopsy_report = None

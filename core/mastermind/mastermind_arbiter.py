@@ -18,6 +18,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from core.database import db_manager
+from core.cooldown_governor import cooldown_governor
 from core.mastermind.specialist_base import BaseSpecialistAgent, CandidateProposal
 from core.mastermind.specialists import (
     BtcMacroSpecialist,
@@ -32,6 +33,16 @@ from core.risk_manager import risk_manager
 from core.sky_intelligence.types import DecisionAction
 
 logger = logging.getLogger("sky.mastermind.arbiter")
+
+# Authorized Tier-1 Institutional Assets for Main Desk ($10,000 Portfolio)
+ALLOWED_MAIN_DESK_SYMBOLS: set[str] = {
+    "BTC/USDT", "BTCUSDT",
+    "ETH/USDT", "ETHUSDT",
+    "SOL/USDT", "SOLUSDT",
+    "BNB/USDT", "BNBUSDT",
+    "XAU/USD", "XAUUSD",
+    "PAXG/USDT", "PAXGUSDT",
+}
 
 # Empirical Cross-Asset Correlation Priors (rho)
 CORRELATION_PRIORS: dict[tuple[str, str], float] = {
@@ -160,6 +171,11 @@ class MastermindArbiterCouncil:
         short_count = 0
 
         for opp in opps:
+            # Asset Tier Firewall: Only sync Tier-1 Institutional Assets into active Swarm
+            clean_opp_sym = opp.symbol.replace("/", "").upper()
+            if clean_opp_sym not in {s.replace("/", "").upper() for s in ALLOWED_MAIN_DESK_SYMBOLS}:
+                continue
+
             if opp.recommended_direction == "LONG" and long_count < max_top_longs:
                 if opp.symbol not in self.dynamic_specialists:
                     self.deploy_dynamic_specialist(
@@ -524,6 +540,18 @@ class MastermindArbiterCouncil:
                 arena_assessment = self.arena_bridge.evaluate_specialist_for_mastermind(sym)
                 rejection_reason = arena_assessment.rejection_reason or f"Darwinian Arena Veto: Specialist for {sym} is not eligible."
 
+            # Guard 1d: Asset Tier Firewall (Strict Tier-1 Institutional Assets Only on Main Desk)
+            elif sym.replace("/", "").upper() not in {s.replace("/", "").upper() for s in ALLOWED_MAIN_DESK_SYMBOLS}:
+                rejection_reason = (
+                    f"Asset Tier Firewall: {sym} is not an authorized Tier-1 Institutional Asset. "
+                    f"Main Desk is strictly restricted to BTC, ETH, SOL, BNB, and GOLD. "
+                    f"Microcaps and meme tokens are prohibited from Master Portfolio."
+                )
+
+            # Guard 1e: Nervous System Cooldown Governor (Anti-Revenge Pause & Resting Period)
+            elif not cooldown_governor.evaluate_entry_clearance(sym)[0]:
+                rejection_reason = cooldown_governor.evaluate_entry_clearance(sym)[1]
+
             # Guard 2: Passive NO_TRADE / WATCH
             elif proposal.direction not in (DecisionAction.LONG, DecisionAction.SHORT):
                 rejection_reason = (
@@ -537,7 +565,7 @@ class MastermindArbiterCouncil:
                     f"to {effective_confidence:.2f} < 0.45 (Brier: {calib['brier_score']:.3f})."
                 )
 
-            # Guard C: Portfolio Position Capacity
+            # Guard C: Portfolio Position Capacity (Max Cap)
             elif len(open_positions) >= max_active_portfolio_positions:
                 rejection_reason = (
                     f"Max portfolio positions ({max_active_portfolio_positions}) reached."
@@ -547,18 +575,36 @@ class MastermindArbiterCouncil:
             elif sym in existing_symbols:
                 rejection_reason = f"Position already active for {sym}."
 
-            # Guard E: Expected Value & Confidence Thresholds
-            elif proposal.expected_value_r < 0.20 or effective_confidence < 0.50:
+            # Guard E: High Expected Value & Confidence Thresholds (Institutional Quality Over Quantity)
+            elif proposal.expected_value_r < 0.35 or effective_confidence < 0.65:
                 rejection_reason = (
                     f"EV ({proposal.expected_value_r:.2f}R) or Effective Confidence ({effective_confidence:.2f}) "
-                    f"below threshold."
+                    f"below institutional hurdle (min 0.35R, min 0.65 conf). Preserving capital in Cash."
                 )
 
-            # Guard F: Valid Stop-Loss / Take-Profit Boundaries
-            elif proposal.stop_loss <= 0 or proposal.take_profit <= 0:
-                rejection_reason = "Invalid stop loss or take profit level."
-
+            # Guard F: Institutional Stop-Loss & Take-Profit Geometry Bounds
             else:
+                cur_p = proposal.entry_price
+                sl_dist_pct = (abs(cur_p - proposal.stop_loss) / cur_p * 100.0) if cur_p > 0 else 0.0
+                if proposal.stop_loss <= 0 or proposal.take_profit <= 0:
+                    rejection_reason = "Invalid stop loss or take profit level."
+                elif proposal.take_profit <= 0.01:
+                    rejection_reason = f"Irrational Take-Profit: Target ${proposal.take_profit} is too close to zero."
+                elif sl_dist_pct > 3.5:
+                    rejection_reason = (
+                        f"Irrational Stop-Loss Geometry: Stop distance {sl_dist_pct:.1f}% exceeds 3.5% institutional ceiling. "
+                        f"Catastrophic stop losses are strictly prohibited."
+                    )
+                elif sl_dist_pct < 0.4:
+                    rejection_reason = f"Irrational Stop-Loss Geometry: Stop distance {sl_dist_pct:.2f}% is within exchange noise (<0.4%)."
+                elif proposal.direction == DecisionAction.SHORT and proposal.take_profit >= cur_p:
+                    rejection_reason = f"Inverted Target: Short take profit ${proposal.take_profit} is above entry ${cur_p}."
+                elif proposal.direction == DecisionAction.LONG and proposal.take_profit <= cur_p:
+                    rejection_reason = f"Inverted Target: Long take profit ${proposal.take_profit} is below entry ${cur_p}."
+                elif proposal.risk_reward_ratio < 2.0:
+                    rejection_reason = f"Insufficient Reward-to-Risk: R:R {proposal.risk_reward_ratio:.2f} < 2.0R hurdle."
+
+            if not rejection_reason:
                 # Candidate Cleared Deterministic Arbiter Gates!
                 is_approved = True
                 overlap_discount = overlap_discounts.get(proposal.proposal_id, 1.0)

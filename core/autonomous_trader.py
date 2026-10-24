@@ -17,6 +17,7 @@ from typing import Any
 
 from core.api_health_guard import api_health_guard
 from core.audit_bus import audit_bus
+from core.cooldown_governor import cooldown_governor
 from core.data_streamer import data_streamer
 from core.database import db_manager
 from core.portfolio_shadow import portfolio_shadow
@@ -126,23 +127,8 @@ class AutonomousTrader:
         executed_actions: list[dict[str, Any]] = []
         self.last_scan_time = time.time()
 
-        # Dynamic Opportunity Hunter Expansion: incorporate Top 5 qualified opportunities
+        # Strictly locked to Tier-1 Institutional Assets (BTC, ETH, SOL, BNB, GOLD)
         scan_symbols = list(self.active_symbols)
-        try:
-            from core.screener.opportunity_hunter import opportunity_hunter
-
-            hunter_opps = await opportunity_hunter.scan_and_rank()
-            for opp in hunter_opps:
-                if (
-                    opp.trade_quality_score >= 75.0
-                    and opp.market_attention_score >= 65.0
-                    and opp.symbol not in scan_symbols
-                ):
-                    scan_symbols.append(opp.symbol)
-                if len(scan_symbols) >= len(self.active_symbols) + 5:
-                    break
-        except Exception as hunter_err:
-            logger.debug(f"Opportunity hunter discovery deferred: {hunter_err}")
 
         for sym in scan_symbols:
             try:
@@ -208,6 +194,12 @@ class AutonomousTrader:
                         logger.info(
                             f"Skipping {sym} trade: Max open positions ({self.max_open_positions}) reached."
                         )
+                        continue
+
+                    # Guard 1b: Nervous System Cooldown Governor (Anti-Revenge & Resting Period)
+                    can_enter, cooldown_reason = cooldown_governor.evaluate_entry_clearance(sym)
+                    if not can_enter:
+                        logger.info(f"AutonomousTrader skipping {sym}: {cooldown_reason}")
                         continue
 
                     # Check existing open positions for this symbol
@@ -307,6 +299,13 @@ class AutonomousTrader:
                         )
 
                     risk_dist = abs(entry_price - sl)
+                    sl_dist_pct = (risk_dist / entry_price * 100.0) if entry_price > 0 else 0.0
+                    if sl_dist_pct > 3.5:
+                        logger.info(
+                            f"AutonomousTrader: Skipping {sym} trade: Stop distance ({sl_dist_pct:.1f}%) exceeds 3.5% institutional ceiling."
+                        )
+                        continue
+
                     min_tp_dist = max(risk_dist * 2.0, 3.0 * atr_val)
 
                     if setup and setup.target_tp > 0 and abs(setup.target_tp - entry_price) >= risk_dist * 2.0:
