@@ -1575,15 +1575,60 @@ async def update_signal_approval(req: SignalApprovalRequest):
         if portfolio_shadow:
             try:
                 sym = signal.get("symbol", "BTCUSDT")
+                clean_sym = sym.replace("/", "").upper()
                 if "/" not in sym:
                     sym = f"{sym[:-4]}/{sym[-4:]}"
                 direction = signal.get("side", "BUY")
                 direction = "LONG" if "LONG" in direction or "BUY" in direction else "SHORT"
-                entry_p = float(signal.get("entryPrice", 0.0))
-                sl_p = float(signal.get("stopLoss", entry_p * 0.98))
-                tp_p = float(signal.get("tpLadder", {}).get("tp1", entry_p * 1.04))
+
+                # CRITICAL INVARIANT: Fetch true live market fill price at the exact moment of execution
+                live_price = None
+                try:
+                    if data_streamer:
+                        live_price = await data_streamer.get_live_ticker(clean_sym)
+                except Exception as ex:
+                    logger.warning(f"Could not fetch live price for {sym}: {ex}")
+
+                if live_price and live_price > 0:
+                    entry_p = float(live_price)
+                else:
+                    entry_p = float(signal.get("entryPrice", 0.0))
+
+                # Calculate structural stop loss and take profit relative to true fill price
+                old_entry = float(signal.get("entryPrice", entry_p))
+                old_sl = float(signal.get("stopLoss", 0.0))
+                old_tp = float(signal.get("tpLadder", {}).get("tp1", 0.0))
+
+                if old_entry > 0 and old_sl > 0:
+                    sl_dist_pct = abs(old_entry - old_sl) / old_entry
+                    sl_p = round(
+                        entry_p * (1.0 - sl_dist_pct)
+                        if direction == "LONG"
+                        else entry_p * (1.0 + sl_dist_pct),
+                        2,
+                    )
+                else:
+                    sl_p = round(entry_p * 0.98 if direction == "LONG" else entry_p * 1.02, 2)
+
+                if old_entry > 0 and old_tp > 0:
+                    tp_dist_pct = abs(old_tp - old_entry) / old_entry
+                    tp_p = round(
+                        entry_p * (1.0 + tp_dist_pct)
+                        if direction == "LONG"
+                        else entry_p * (1.0 - tp_dist_pct),
+                        2,
+                    )
+                else:
+                    tp_p = round(entry_p * 1.04 if direction == "LONG" else entry_p * 0.96, 2)
+
                 notional = float(signal.get("notionalUsd", 1000.0))
                 size = max(0.001, round(notional / max(entry_p, 1e-4), 4))
+
+                # Update signal metadata with actual execution fill
+                signal["entryPrice"] = entry_p
+                signal["stopLoss"] = sl_p
+                signal["currentPrice"] = entry_p
+                signal["unrealizedPnlUsd"] = 0.0
 
                 new_pos_id = portfolio_shadow.open_position(
                     symbol=sym,
@@ -1597,7 +1642,7 @@ async def update_signal_approval(req: SignalApprovalRequest):
                 )
                 signal["position_id"] = new_pos_id
             except Exception as e:
-                pass
+                logger.error(f"Error opening position from approval action: {e}")
     elif action == "CLOSE":
         signal["state"] = "CLOSED"
         signal["closedAt"] = now
