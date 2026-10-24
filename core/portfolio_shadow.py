@@ -51,6 +51,7 @@ class ShadowPosition:
     breakeven_triggered: bool = False
     entry_reason: str | None = None
     exit_reason: str | None = None
+    book_id: str = "MAIN_SOVEREIGN"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -69,6 +70,8 @@ class PortfolioShadowManager:
                     conn.execute("ALTER TABLE shadow_positions ADD COLUMN entry_reason TEXT;")
                 if "exit_reason" not in cols:
                     conn.execute("ALTER TABLE shadow_positions ADD COLUMN exit_reason TEXT;")
+                if "book_id" not in cols:
+                    conn.execute("ALTER TABLE shadow_positions ADD COLUMN book_id TEXT DEFAULT 'MAIN_SOVEREIGN';")
                 conn.commit()
         except Exception as e:
             logger.debug(f"Shadow positions column verification check: {e}")
@@ -88,16 +91,26 @@ class PortfolioShadowManager:
         prevent_duplicate_symbol: bool = True,
         style_tag: str | None = None,
         allow_multi_style: bool = False,
+        book_id: str = "MAIN_SOVEREIGN",
     ) -> str:
-        # Institutional Tier-1 Asset Hard Firewall
+        # Multi-Book Institutional Asset Firewall
+        is_test_env = "test" in os.environ.get("TRADING_LOGS_DB_PATH", "").lower()
         clean_sym = symbol.replace("/", "").replace("_", "").upper()
         allowed_tier1 = {s.replace("/", "").replace("_", "").upper() for s in ALLOWED_TIER1_ASSETS}
-        is_test_env = "test" in os.environ.get("TRADING_LOGS_DB_PATH", "").lower()
-        if not is_test_env and clean_sym not in allowed_tier1:
-            raise ValueError(
-                f"Institutional Tier-1 Asset Firewall Rejection: Asset '{symbol}' is strictly prohibited. "
-                f"Portfolio execution is restricted to BTC, ETH, and Gold (PAXG/XAU)."
-            )
+
+        if book_id == "MAIN_SOVEREIGN":
+            # Strict Tier-1 Hard Firewall for Main $10,000 Portfolio
+            if not is_test_env and clean_sym not in allowed_tier1:
+                raise ValueError(
+                    f"Institutional Tier-1 Asset Firewall Rejection: Asset '{symbol}' is strictly prohibited on Main Sovereign Desk. "
+                    f"Main Portfolio execution is restricted to BTC, ETH, and Gold (PAXG/XAU)."
+                )
+        elif book_id == "RADAR_ALPHA":
+            # $2,000 Alpha Radar Satellite Desk Firewall
+            # Allows high-momentum and mean-reversion setups discovered by Opportunity Radar
+            pass
+        else:
+            raise ValueError(f"Unknown portfolio book: {book_id}")
 
         self._ensure_columns_exist()
         now = int(time.time() * 1000)
@@ -118,8 +131,8 @@ class PortfolioShadowManager:
 
             # 1. Fetch existing open positions for this symbol
             sym_cur = conn.execute(
-                "SELECT position_id, direction, entry_reason, size, entry_price, stop_loss FROM shadow_positions WHERE status = 'OPEN' AND symbol = ?;",
-                (symbol,),
+                "SELECT position_id, direction, entry_reason, size, entry_price, stop_loss FROM shadow_positions WHERE status = 'OPEN' AND symbol = ? AND (book_id = ? OR (? = 'MAIN_SOVEREIGN' AND book_id IS NULL));",
+                (symbol, book_id, book_id),
             )
             existing_sym_positions = sym_cur.fetchall()
 
@@ -163,18 +176,29 @@ class PortfolioShadowManager:
 
             if enforce_atomic_limits:
                 cursor = conn.execute(
-                    "SELECT COUNT(*) FROM shadow_positions WHERE status = 'OPEN';"
+                    "SELECT COUNT(*) FROM shadow_positions WHERE status = 'OPEN' AND (book_id = ? OR (? = 'MAIN_SOVEREIGN' AND book_id IS NULL));",
+                    (book_id, book_id),
                 )
                 open_count = cursor.fetchone()[0]
-                eff_max_open = (
-                    min(max_open_limit, 3)
-                    if (max_open_limit is not None and not is_test_env)
-                    else (max_open_limit if max_open_limit is not None else int(os.getenv("MAX_PAPER_OPEN_POSITIONS", "3")))
-                )
+                if book_id == "MAIN_SOVEREIGN":
+                    eff_max_open = (
+                        min(max_open_limit, 3)
+                        if (max_open_limit is not None and not is_test_env)
+                        else (max_open_limit if max_open_limit is not None else 3)
+                    )
+                elif book_id == "RADAR_ALPHA":
+                    eff_max_open = (
+                        min(max_open_limit, 2)
+                        if (max_open_limit is not None and not is_test_env)
+                        else (max_open_limit if max_open_limit is not None else 2)
+                    )
+                else:
+                    eff_max_open = max_open_limit or 5
+
                 if open_count >= eff_max_open:
                     conn.rollback()
                     raise ValueError(
-                        f"Risk Gate Rejection: {open_count} open positions — maximum {eff_max_open} reached."
+                        f"Risk Gate Rejection: {open_count} open positions in book '{book_id}' — maximum allowable cap ({eff_max_open}) reached."
                     )
 
                 # Nervous System Cooldown Governor Guard
@@ -210,9 +234,9 @@ class PortfolioShadowManager:
                     position_id, opened_at, closed_at, symbol, direction, size,
                     entry_price, current_price, stop_loss, take_profit,
                     unrealized_pnl, realized_pnl, status, trailing_stop, breakeven_triggered,
-                    entry_reason, exit_reason
+                    entry_reason, exit_reason, book_id
                 )
-                VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, 0.0, 0.0, 'OPEN', NULL, 0, ?, NULL);
+                VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, 0.0, 0.0, 'OPEN', NULL, 0, ?, NULL, ?);
                 """,
                 (
                     pos_id,
@@ -225,6 +249,7 @@ class PortfolioShadowManager:
                     float(stop_loss),
                     float(take_profit),
                     reason_text,
+                    book_id,
                 ),
             )
             conn.commit()
@@ -696,31 +721,48 @@ class PortfolioShadowManager:
             conn.commit()
         logger.info("Reset all shadow positions in database.")
 
-    def get_open_positions(self) -> list[dict[str, Any]]:
+    def get_open_positions(self, book_id: str | None = None) -> list[dict[str, Any]]:
         with db_manager.get_trading_conn() as conn:
-            cursor = conn.execute(
-                "SELECT * FROM shadow_positions WHERE status = 'OPEN' ORDER BY opened_at DESC;"
-            )
+            if book_id:
+                cursor = conn.execute(
+                    "SELECT * FROM shadow_positions WHERE status = 'OPEN' AND (book_id = ? OR (? = 'MAIN_SOVEREIGN' AND book_id IS NULL)) ORDER BY opened_at DESC;",
+                    (book_id, book_id),
+                )
+            else:
+                cursor = conn.execute(
+                    "SELECT * FROM shadow_positions WHERE status = 'OPEN' ORDER BY opened_at DESC;"
+                )
             rows = cursor.fetchall()
         return [dict(r) for r in rows]
 
-    def get_all_positions(self, limit: int = 50) -> list[dict[str, Any]]:
+    def get_all_positions(self, limit: int = 50, book_id: str | None = None) -> list[dict[str, Any]]:
         with db_manager.get_trading_conn() as conn:
-            cursor = conn.execute(
-                "SELECT * FROM shadow_positions ORDER BY opened_at DESC LIMIT ?;", (limit,)
-            )
+            if book_id:
+                cursor = conn.execute(
+                    "SELECT * FROM shadow_positions WHERE (book_id = ? OR (? = 'MAIN_SOVEREIGN' AND book_id IS NULL)) ORDER BY opened_at DESC LIMIT ?;",
+                    (book_id, book_id, limit),
+                )
+            else:
+                cursor = conn.execute(
+                    "SELECT * FROM shadow_positions ORDER BY opened_at DESC LIMIT ?;", (limit,)
+                )
             rows = cursor.fetchall()
         return [dict(r) for r in rows]
 
-    def get_portfolio_accounting(self, starting_capital: float = 10000.0) -> dict[str, Any]:
+    def get_portfolio_accounting(
+        self, starting_capital: float | None = None, book_id: str | None = None
+    ) -> dict[str, Any]:
         """
-        Computes the authoritative accounting ledger for the shadow portfolio.
+        Computes the authoritative accounting ledger for the shadow portfolio or specific book.
         Invariants:
           settled_cash = starting_capital + total_realized_pnl
           virtual_equity = settled_cash + total_unrealized_pnl
         """
-        open_positions = self.get_open_positions()
-        all_positions = self.get_all_positions(limit=500)
+        if starting_capital is None:
+            starting_capital = 2000.0 if book_id == "RADAR_ALPHA" else 10000.0
+
+        open_positions = self.get_open_positions(book_id=book_id)
+        all_positions = self.get_all_positions(limit=500, book_id=book_id)
         closed_positions = [p for p in all_positions if p.get("status") == "CLOSED"]
 
         total_realized_pnl = sum(float(p.get("realized_pnl", 0.0)) for p in all_positions)

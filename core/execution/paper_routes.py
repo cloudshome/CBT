@@ -19,7 +19,7 @@ import time
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
 
 from core.auth import require_api_key
@@ -44,6 +44,7 @@ class PaperTradeRequest(BaseModel):
     tp: float = Field(gt=0)
     size: float | None = Field(default=1.0, gt=0, le=1_000_000)
     reason: str | None = Field(default=None, description="Trade setup reason / thesis")
+    book_id: str | None = Field(default="MAIN_SOVEREIGN", description="Target portfolio book")
 
     @field_validator("symbol")
     @classmethod
@@ -463,11 +464,11 @@ async def get_paper_desk_overview():
 
 
 @paper_router.get("/api/paper/positions", dependencies=[Depends(require_api_key)])
-async def get_paper_positions():
+async def get_paper_positions(book_id: str | None = Query(None)):
     """
     Returns active shadow portfolio positions mapped to the PaperPositionsResponse schema for the Web UI.
     """
-    open_pos = portfolio_shadow.get_open_positions()
+    open_pos = portfolio_shadow.get_open_positions(book_id=book_id)
     mapped = []
     from core.data_streamer import data_streamer
 
@@ -541,6 +542,7 @@ async def get_paper_positions():
                 "agentManager": agent_mgr,
                 "strategyName": strat_name,
                 "entryReason": entry_reason_val,
+                "bookId": p.get("book_id", "MAIN_SOVEREIGN"),
             }
         )
     return {"positions": mapped, "count": len(mapped)}
@@ -589,6 +591,7 @@ async def place_paper_trade(order: PaperTradeRequest):
             max_risk_usd=balance * max_risk_pct,
             prevent_duplicate_symbol=True,
             allow_multi_style=True,
+            book_id=order.book_id or "MAIN_SOVEREIGN",
         )
 
         # Record approved execution into Central Mind immutable decision ledger

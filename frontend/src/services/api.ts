@@ -233,6 +233,18 @@ export const api = {
     return getScreenerHealth();
   },
 
+  async getMultiDeskSummary(): Promise<any> {
+    return getMultiDeskSummary();
+  },
+
+  async getRadarAlphaCandidates(): Promise<any> {
+    return getRadarAlphaCandidates();
+  },
+
+  async executeRadarAlphaCandidate(candidate: any): Promise<any> {
+    return executeRadarAlphaCandidate(candidate);
+  },
+
   /**
    * GET /api/testnet/burnin/report - Gate 5 Extended Testnet Burn-In telemetry
    */
@@ -5882,6 +5894,25 @@ export async function evaluateTemporalCondition(payload: {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
+  });
+  return await handleResponse<any>(res);
+}
+
+export async function getMultiDeskSummary(): Promise<any> {
+  const res = await authFetch('/api/terminal/multi-desk/summary');
+  return await handleResponse<any>(res);
+}
+
+export async function getRadarAlphaCandidates(): Promise<any> {
+  const res = await authFetch('/api/terminal/radar-alpha/candidates');
+  return await handleResponse<any>(res);
+}
+
+export async function executeRadarAlphaCandidate(candidate: any): Promise<any> {
+  const res = await authFetch('/api/terminal/radar-alpha/execute', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(candidate),
   });
   return await handleResponse<any>(res);
 }

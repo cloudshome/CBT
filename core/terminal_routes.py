@@ -2028,3 +2028,67 @@ async def generate_desk_ai_brief(req: DeskBriefRequest):
         },
         "timestamp": int(time.time() * 1000),
     }
+
+
+# ==============================================================================
+# ROUTE: GET /api/terminal/multi-desk/summary
+# ==============================================================================
+@terminal_router.get("/api/terminal/multi-desk/summary")
+async def get_multi_desk_summary():
+    """
+    Returns the unified Multi-Strategy Pod Architecture across all 4 isolated books:
+    1. Sovereign Main Desk ($10,000 - Tier-1 Institutional)
+    2. Alpha Opportunity Radar Desk ($2,000 - 700+ Discovery)
+    3. Darwinian Survival Arena ($1,000 across 10 specialists)
+    4. Canary Testnet Desk ($5,000 Binance Futures)
+    """
+    from core.screener.radar_executor import radar_alpha_executor
+    from core.portfolio_shadow import portfolio_shadow
+
+    # 1. Sovereign Main Desk ($10,000)
+    main_acc = portfolio_shadow.get_portfolio_accounting(starting_capital=10000.0, book_id="MAIN_SOVEREIGN")
+    main_open = portfolio_shadow.get_open_positions(book_id="MAIN_SOVEREIGN")
+
+    # 2. Alpha Opportunity Radar Desk ($2,000)
+    radar_summary = radar_alpha_executor.get_desk_summary()
+
+    # 3. Darwinian Survival Arena Desk ($1,000)
+    arena_data: dict[str, Any] = {"specialists_count": 10, "initial_capital_per_specialist": 1000.0, "status": "ACTIVE_SURVIVAL"}
+
+    # 4. Canary Live Testnet Desk ($5,000)
+    canary_data: dict[str, Any] = {"venue": "BINANCE_FUTURES_TESTNET", "allocated_capital_usd": 5000.0, "status": "ARMED_HEALTHY"}
+
+    return {
+        "sovereign_main_desk": {
+            "desk_name": "Sovereign Tier-1 Main Desk",
+            "book_id": "MAIN_SOVEREIGN",
+            "allocated_capital_usd": 10000.0,
+            "virtual_equity_usd": main_acc.get("virtual_equity", 10000.0),
+            "settled_cash_usd": main_acc.get("settled_cash", 10000.0),
+            "realized_pnl_usd": main_acc.get("total_realized_pnl", 0.0),
+            "unrealized_pnl_usd": main_acc.get("total_unrealized_pnl", 0.0),
+            "win_rate_pct": main_acc.get("win_rate_pct", 0.0),
+            "open_positions_count": len(main_open),
+            "open_positions": main_open,
+            "universe": ["BTC/USDT", "ETH/USDT", "XAU/USD"],
+        },
+        "alpha_radar_desk": radar_summary,
+        "darwinian_arena_desk": arena_data,
+        "canary_testnet_desk": canary_data,
+        "total_managed_capital_usd": 10000.0 + 2000.0 + 1000.0 + 5000.0,
+    }
+
+
+@terminal_router.get("/api/terminal/radar-alpha/candidates")
+async def get_radar_alpha_candidates():
+    from core.screener.radar_executor import radar_alpha_executor
+    return await radar_alpha_executor.evaluate_radar_candidates()
+
+
+@terminal_router.post("/api/terminal/radar-alpha/execute")
+async def execute_radar_alpha_candidate(candidate: dict[str, Any]):
+    from core.screener.radar_executor import radar_alpha_executor
+    pos_id = await radar_alpha_executor.execute_top_candidate(candidate)
+    if not pos_id:
+        raise HTTPException(status_code=400, detail="Failed to execute candidate on $2,000 Alpha Desk.")
+    return {"status": "SUCCESS", "position_id": pos_id}

@@ -16,6 +16,7 @@ import {
   Zap,
   Bot,
   Crosshair,
+  Flame,
 } from 'lucide-react';
 import { api } from '../services/api';
 import { PairVenueLinks } from './PairVenueLinks';
@@ -96,6 +97,8 @@ export const MastermindSwarmDesk: React.FC<MastermindSwarmDeskProps> = ({
   const [opportunities, setOpportunities] = useState<OpportunityRecord[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [screenerHealth, setScreenerHealth] = useState<any>(null);
+  const [radarDesk, setRadarDesk] = useState<any>(null);
+  const [executingOpp, setExecutingOpp] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [deployingSymbol, setDeployingSymbol] = useState<string | null>(null);
@@ -104,10 +107,11 @@ export const MastermindSwarmDesk: React.FC<MastermindSwarmDeskProps> = ({
   const fetchData = async () => {
     try {
       setRefreshing(true);
-      const [sRes, dRes, oppRes] = await Promise.allSettled([
+      const [sRes, dRes, oppRes, deskRes] = await Promise.allSettled([
         api.getMastermindStatus(),
         api.getMastermindDecisions(30),
         api.getMastermindOpportunitySignals(),
+        api.getMultiDeskSummary(),
       ]);
 
       let hasSuccess = false;
@@ -119,6 +123,9 @@ export const MastermindSwarmDesk: React.FC<MastermindSwarmDeskProps> = ({
       if (dRes.status === 'fulfilled' && dRes.value?.decisions) {
         setDecisions(dRes.value.decisions);
         hasSuccess = true;
+      }
+      if (deskRes.status === 'fulfilled' && deskRes.value?.alpha_radar_desk) {
+        setRadarDesk(deskRes.value.alpha_radar_desk);
       }
 
       if (oppRes.status === 'fulfilled' && oppRes.value?.opportunities) {
@@ -178,6 +185,51 @@ export const MastermindSwarmDesk: React.FC<MastermindSwarmDeskProps> = ({
       addToast?.('error', 'Deployment Failed', `Failed to deploy specialist for ${opp.symbol}`);
     } finally {
       setDeployingSymbol(null);
+    }
+  };
+
+  const handleExecuteRadarTrade = async (opp: OpportunityRecord) => {
+    if (opp.quote_volume_24h_usd < 20_000_000) {
+      addToast?.('warning', 'Low Liquidity Protection', `${opp.symbol} 24h volume ($${(opp.quote_volume_24h_usd/1e6).toFixed(1)}M) is below the $20M minimum liquidity hurdle.`);
+      return;
+    }
+    try {
+      setExecutingOpp(opp.symbol);
+      const isShort = opp.opportunity_category === 'BLOW_OFF_EXHAUSTION' || opp.opportunity_category === 'BEARISH_CONTINUATION';
+      const direction = isShort ? 'SHORT' : 'LONG';
+      const cur_px = opp.current_price;
+      let sl = opp.invalidation_level || 0;
+      if (direction === 'LONG') {
+        if (sl <= 0 || sl >= cur_px || (cur_px - sl) / cur_px > 0.08) sl = cur_px * 0.965;
+      } else {
+        if (sl <= 0 || sl <= cur_px || (sl - cur_px) / cur_px > 0.08) sl = cur_px * 1.035;
+      }
+      const stop_dist = Math.abs(cur_px - sl);
+      const size = stop_dist > 0 ? Number((20.0 / stop_dist).toFixed(4)) : 1;
+      const tp = direction === 'LONG' ? cur_px + stop_dist * 2.2 : cur_px - stop_dist * 2.2;
+
+      const candidate = {
+        symbol: opp.symbol,
+        direction,
+        category: opp.opportunity_category,
+        entry_price: cur_px,
+        stop_loss: sl,
+        take_profit: tp,
+        size,
+        risk_usd: 20.0,
+        volume_24h_usd: opp.quote_volume_24h_usd,
+        thesis: `Alpha Radar [${opp.opportunity_category}]: 1-Click execution on $2,000 Alpha Book.`,
+      };
+
+      const res = await api.executeRadarAlphaCandidate(candidate);
+      if (res?.position_id) {
+        addToast?.('success', 'Alpha Desk Execution', `Deployed ${direction} ${opp.symbol} on $2,000 Book (Risk: $20.00). ID: ${res.position_id}`);
+        fetchData();
+      }
+    } catch (err: any) {
+      addToast?.('error', 'Execution Error', err?.message || 'Could not place trade on $2,000 Alpha Desk.');
+    } finally {
+      setExecutingOpp(null);
     }
   };
 
@@ -328,6 +380,48 @@ export const MastermindSwarmDesk: React.FC<MastermindSwarmDeskProps> = ({
               <RefreshCw size={11} className={refreshing ? 'animate-spin text-cyan-400' : 'text-slate-400'} />
               {refreshing ? 'Scanning...' : 'Scan Now'}
             </button>
+          </div>
+        </div>
+
+        {/* Alpha Radar Satellite Desk ($2,000 Isolated Book) Status Card */}
+        <div className="bg-gradient-to-r from-cyan-950/40 via-slate-900/60 to-purple-950/40 border border-cyan-800/40 rounded-lg p-3 flex flex-wrap items-center justify-between gap-3 shadow-md">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 font-bold text-xs">
+              $2K
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-white tracking-wide">ALPHA RADAR SATELLITE DESK</span>
+                <span className="text-[9px] bg-cyan-900/60 text-cyan-300 border border-cyan-700/50 px-1.5 py-0.2 rounded font-mono font-semibold">
+                  ISOLATED BOOK
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-400">
+                Dedicated $2,000 allocation for 700+ Coin Discovery. Sized strictly at $20 (1.0%) risk per trade. Completely isolated from the $10,000 Main Desk.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4 text-xs font-mono">
+            <div>
+              <span className="text-[9px] text-slate-500 uppercase block">ALLOCATED</span>
+              <span className="font-bold text-slate-200">${radarDesk?.allocated_capital_usd?.toLocaleString() || '2,000.00'}</span>
+            </div>
+            <div className="h-6 w-[1px] bg-slate-800" />
+            <div>
+              <span className="text-[9px] text-slate-500 uppercase block">LIVE EQUITY</span>
+              <span className="font-bold text-cyan-300">${radarDesk?.virtual_equity_usd ? radarDesk.virtual_equity_usd.toFixed(2) : '2,000.00'}</span>
+            </div>
+            <div className="h-6 w-[1px] bg-slate-800" />
+            <div>
+              <span className="text-[9px] text-slate-500 uppercase block">ACTIVE POSITIONS</span>
+              <span className="font-bold text-amber-400">{radarDesk?.open_positions_count ?? 0} / 2</span>
+            </div>
+            <div className="h-6 w-[1px] bg-slate-800" />
+            <div>
+              <span className="text-[9px] text-slate-500 uppercase block">MIN VOLUME</span>
+              <span className="font-semibold text-emerald-400">≥ $20M</span>
+            </div>
           </div>
         </div>
 
@@ -665,6 +759,33 @@ export const MastermindSwarmDesk: React.FC<MastermindSwarmDeskProps> = ({
                           >
                             <Bot size={10} className={deployingSymbol === opp.symbol ? 'animate-spin' : ''} />
                             <span>{opp.has_active_specialist ? 'Active' : 'Deploy'}</span>
+                          </button>
+
+                          {/* 1-Click Alpha Radar Desk Trade ($2,000 Book) */}
+                          <button
+                            onClick={() => handleExecuteRadarTrade(opp)}
+                            disabled={
+                              executingOpp === opp.symbol ||
+                              (radarDesk ? radarDesk.open_positions_count >= 2 : false) ||
+                              !opp.futures_eligible
+                            }
+                            className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all border ${
+                              !opp.futures_eligible
+                                ? 'bg-slate-800/40 text-slate-600 border-slate-700/50 cursor-not-allowed'
+                                : (radarDesk ? radarDesk.open_positions_count >= 2 : false)
+                                ? 'bg-amber-950/20 text-amber-500/60 border-amber-800/30 cursor-not-allowed'
+                                : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/50 hover:shadow-sm hover:shadow-amber-500/20'
+                            }`}
+                            title={
+                              !opp.futures_eligible
+                                ? 'Not eligible for Binance Futures'
+                                : (radarDesk ? radarDesk.open_positions_count >= 2 : false)
+                                ? 'Radar Desk Full (Max 2 concurrent positions)'
+                                : `Execute 1-Click Alpha Radar Trade ($20 Risk / $2,000 Book)`
+                            }
+                          >
+                            <Flame size={10} className={executingOpp === opp.symbol ? 'animate-spin' : ''} />
+                            <span>{executingOpp === opp.symbol ? 'Trading...' : '⚡ $2K Trade'}</span>
                           </button>
                         </div>
                       </td>
