@@ -104,7 +104,8 @@ class SovereignMasterAgent:
     def __init__(self, account_equity_usd: float = 10_000.0) -> None:
         self.account_equity_usd = account_equity_usd
         self.agent_id = "SOVEREIGN_MASTER_AGENT_V1"
-        self.config_path = Path(__file__).resolve().parent.parent.parent / "data" / "sovereign_agent_config.json"
+        config_dir = Path(os.environ.get("DATA_DIR", str(Path(__file__).resolve().parent.parent.parent / "data")))
+        self.config_path = config_dir / "sovereign_agent_config.json"
         self.auto_pilot_enabled: bool = False
         self.scan_interval_sec: float = 20.0
         self.min_confidence_pct: float = 70.0

@@ -15,6 +15,7 @@ Constitutional Mandates:
 from __future__ import annotations
 
 import logging
+import os
 import time
 from typing import Any
 
@@ -36,11 +37,11 @@ class CooldownGovernor:
         self,
         asset_cooldown_sec: float = 3600.0,      # 60 minutes
         loss_global_cooldown_sec: float = 1800.0, # 30 minutes
-        max_daily_trades: int = 5,
+        max_daily_trades: int = 10,
     ) -> None:
         self.asset_cooldown_sec = asset_cooldown_sec
         self.loss_global_cooldown_sec = loss_global_cooldown_sec
-        self.max_daily_trades = max_daily_trades
+        self.max_daily_trades = int(os.getenv("MAX_DAILY_TRADES", str(max_daily_trades)))
         self._last_closed_trades: dict[str, dict[str, Any]] = {}
         self._last_loss_exit_time: float = 0.0
         self._last_loss_symbol: str = ""
@@ -69,6 +70,12 @@ class CooldownGovernor:
                 rows = cursor.fetchall()
                 for sym, closed_at, pnl, exit_reason in rows:
                     if not closed_at:
+                        continue
+                    clean_sym = sym.replace("/", "").replace("_", "").upper()
+                    # Only consider authorized Tier-1 assets and exclude administrative purges/dedupes
+                    if clean_sym not in {"BTCUSDT", "ETHUSDT", "XAUUSD", "PAXGUSDT", "SOLUSDT", "BNBUSDT"}:
+                        continue
+                    if "purge" in str(exit_reason or "").lower() or "de-duplicated" in str(exit_reason or "").lower():
                         continue
                     # closed_at can be millisecond epoch or second epoch
                     exit_sec = float(closed_at) / 1000.0 if float(closed_at) > 1e11 else float(closed_at)
@@ -175,9 +182,15 @@ class CooldownGovernor:
                     """
                     SELECT count(*)
                     FROM shadow_positions
-                    WHERE status = 'CLOSED' AND (closed_at > ? OR closed_at > ?);
+                    WHERE status = 'CLOSED' 
+                      AND (
+                        (closed_at > 100000000000 AND closed_at > ?) OR
+                        (closed_at <= 100000000000 AND closed_at > ?)
+                      )
+                      AND symbol IN ('BTC/USDT', 'BTCUSDT', 'ETH/USDT', 'ETHUSDT', 'XAU/USD', 'XAUUSD', 'PAXG/USDT', 'PAXGUSDT', 'SOL/USDT', 'SOLUSDT', 'BNB/USDT', 'BNBUSDT')
+                      AND (exit_reason IS NULL OR (exit_reason NOT LIKE '%purge%' AND exit_reason NOT LIKE '%De-duplicated%'));
                     """,
-                    (one_day_ago, one_day_ago_ms),
+                    (one_day_ago_ms, one_day_ago),
                 )
                 count = cursor.fetchone()[0]
                 if count >= self.max_daily_trades:

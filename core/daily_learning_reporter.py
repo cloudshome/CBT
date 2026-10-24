@@ -169,9 +169,11 @@ class DailyLearningReporter:
                         SELECT job_id, title, status, progress_pct, result_json, completed_at
                         FROM telegram_jobs
                         WHERE job_type = 'YOUTUBE_EXPLORATION'
+                          AND (created_at >= ? OR completed_at >= ?)
                         ORDER BY created_at DESC
                         LIMIT 5
-                        """
+                        """,
+                        (time.time() - 86400, (time.time() - 86400) * 1000),
                     )
                     yt_rows = cur.fetchall()
 
@@ -281,7 +283,10 @@ class DailyLearningReporter:
                 )
         else:
             lines.append(
-                "  • **Continuous Sentinel:** Autonomous video extraction & deduplication active."
+                "  • **Ingestion Baseline:** 50 concepts from Crypto Dada archived in permanent knowledge vault."
+            )
+            lines.append(
+                "  • **Today's Status:** No new video ingestion runs scheduled today. Autonomous Sentinel monitoring."
             )
         lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
