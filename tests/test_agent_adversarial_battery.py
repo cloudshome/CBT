@@ -337,6 +337,8 @@ async def test_battery_c_macro_divergence_penalizes_altcoin_long_when_btc_short(
 @pytest.mark.asyncio
 async def test_battery_d_absolute_1_point_5_percent_max_equity_cap():
     """Even under extreme specialist consensus with max confidence, risk cannot exceed 1.5% of equity."""
+    from core.portfolio_shadow import portfolio_shadow
+    portfolio_shadow.reset_all_positions()
     equity = 20_000.0
     arbiter = MastermindArbiterCouncil(account_equity_usd=equity)
     candles = _generate_synthetic_candles(60000.0, 25)

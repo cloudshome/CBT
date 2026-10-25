@@ -160,6 +160,8 @@ async def test_arbiter_enforces_1_point_5_percent_max_equity_risk_cap():
     Stage 4 Adversarial Test:
     Verifies that position sizing strictly adheres to the 1.5% maximum equity risk cap.
     """
+    from core.portfolio_shadow import portfolio_shadow
+    portfolio_shadow.reset_all_positions()
     arbiter = MastermindArbiterCouncil(account_equity_usd=20_000.0)
     candles = _generate_synthetic_candles(60000.0, 25)
 

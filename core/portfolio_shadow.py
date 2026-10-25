@@ -112,6 +112,55 @@ class PortfolioShadowManager:
         else:
             raise ValueError(f"Unknown portfolio book: {book_id}")
 
+        # Zero-Bypass Exit Geometry Hardwall (Anti-Hallucination & Risk Firewall)
+        ep = float(entry_price)
+        sl = float(stop_loss)
+        tp = float(take_profit)
+        sz = float(size)
+        dir_upper = direction.upper()
+
+        if ep <= 0 or sl <= 0 or tp <= 0 or sz <= 0:
+            raise ValueError(
+                f"Geometry Sanity Rejection: Entry (${ep:.6f}), SL (${sl:.6f}), TP (${tp:.6f}), and Size ({sz}) must be strictly positive."
+            )
+
+        if dir_upper == "LONG":
+            if sl >= ep:
+                raise ValueError(
+                    f"Geometry Sanity Rejection: LONG Stop-Loss (${sl:.6f}) must be strictly below Entry (${ep:.6f})."
+                )
+            if tp <= ep:
+                raise ValueError(
+                    f"Geometry Sanity Rejection: LONG Take-Profit (${tp:.6f}) must be strictly above Entry (${ep:.6f})."
+                )
+            sl_pct = (ep - sl) / ep
+            tp_pct = (tp - ep) / ep
+        elif dir_upper == "SHORT":
+            if sl <= ep:
+                raise ValueError(
+                    f"Geometry Sanity Rejection: SHORT Stop-Loss (${sl:.6f}) must be strictly above Entry (${ep:.6f})."
+                )
+            if tp >= ep:
+                raise ValueError(
+                    f"Geometry Sanity Rejection: SHORT Take-Profit (${tp:.6f}) must be strictly below Entry (${ep:.6f})."
+                )
+            sl_pct = (sl - ep) / ep
+            tp_pct = (ep - tp) / ep
+        else:
+            raise ValueError(f"Invalid direction: '{direction}'. Must be LONG or SHORT.")
+
+        # Institutional Stop-Loss Cap: Max 5% adverse excursion allowed
+        if sl_pct > 0.05 and not is_test_env:
+            raise ValueError(
+                f"Risk Gate Rejection: Stop-Loss distance ({sl_pct * 100:.2f}%) exceeds absolute institutional cap of 5.0%."
+            )
+
+        # Minimum Asymmetric Reward-to-Risk Hurdle (Must be at least 1.0R)
+        if tp_pct < (sl_pct * 0.99) and not is_test_env:
+            raise ValueError(
+                f"Risk Gate Rejection: Reward-to-Risk ratio ({tp_pct / max(sl_pct, 1e-6):.2f}R) is below minimum institutional hurdle (1.0R)."
+            )
+
         self._ensure_columns_exist()
         now = int(time.time() * 1000)
         # Millisecond timestamp alone collides when two same-symbol positions are

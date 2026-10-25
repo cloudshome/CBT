@@ -97,3 +97,64 @@ def test_geometry_sanity_bounds():
     sl_dist_pct = (abs(entry - bad_sl) / entry) * 100.0
     assert sl_dist_pct > 3.5  # Must exceed 3.5% ceiling!
     assert bad_tp <= 0.01     # Must be flagged as irrational target!
+
+
+def test_portfolio_shadow_zero_bypass_geometry_hardwall():
+    """Verifies that PortfolioShadowManager rejects irrational orders fail-closed."""
+    import pytest
+    from core.portfolio_shadow import portfolio_shadow
+
+    # 1. Zero or negative prices / TP = 0.00 (as seen in rogue MAGMA trade)
+    with pytest.raises(ValueError, match="Geometry Sanity Rejection"):
+        portfolio_shadow.open_position(
+            symbol="BTC/USDT",
+            direction="SHORT",
+            size=1.0,
+            entry_price=0.28,
+            stop_loss=0.52,
+            take_profit=0.00,  # Rogue 0.0 TP
+        )
+
+    # 2. LONG SL >= Entry
+    with pytest.raises(ValueError, match="LONG Stop-Loss .* must be strictly below Entry"):
+        portfolio_shadow.open_position(
+            symbol="BTC/USDT",
+            direction="LONG",
+            size=0.01,
+            entry_price=50000.0,
+            stop_loss=50500.0,
+            take_profit=52000.0,
+        )
+
+    # 3. LONG TP <= Entry
+    with pytest.raises(ValueError, match="LONG Take-Profit .* must be strictly above Entry"):
+        portfolio_shadow.open_position(
+            symbol="BTC/USDT",
+            direction="LONG",
+            size=0.01,
+            entry_price=50000.0,
+            stop_loss=49000.0,
+            take_profit=49500.0,
+        )
+
+    # 4. SHORT SL <= Entry
+    with pytest.raises(ValueError, match="SHORT Stop-Loss .* must be strictly above Entry"):
+        portfolio_shadow.open_position(
+            symbol="BTC/USDT",
+            direction="SHORT",
+            size=0.01,
+            entry_price=50000.0,
+            stop_loss=49500.0,
+            take_profit=48000.0,
+        )
+
+    # 5. SHORT TP >= Entry
+    with pytest.raises(ValueError, match="SHORT Take-Profit .* must be strictly below Entry"):
+        portfolio_shadow.open_position(
+            symbol="BTC/USDT",
+            direction="SHORT",
+            size=0.01,
+            entry_price=50000.0,
+            stop_loss=50500.0,
+            take_profit=51000.0,
+        )
