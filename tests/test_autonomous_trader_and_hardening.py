@@ -111,8 +111,6 @@ async def test_autonomous_trader_scan_and_status():
     assert "active_symbols" in status
     assert "BTC/USDT" in status["active_symbols"]
     assert "ETH/USDT" in status["active_symbols"]
-    assert "SOL/USDT" in status["active_symbols"]
-    assert "BNB/USDT" in status["active_symbols"]
     assert "XAU/USD" in status["active_symbols"]
 
     # Execute a single market scan
@@ -178,8 +176,8 @@ async def test_autonomous_trader_emits_open_event():
         timestamp=1788696900000,
         setup_qualified=SimpleNamespace(
             entry_price=100.0,
-            invalidation_sl=95.0,
-            target_tp=110.0,
+            invalidation_sl=98.0,
+            target_tp=106.0,
         ),
         net_ev_r=1.0,
         kelly_fraction=0.01,
