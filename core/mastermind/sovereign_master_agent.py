@@ -656,19 +656,20 @@ class SovereignMasterAgent:
             max_risk_usd=decision.suggested_risk_usd,
         )
 
-        # Mirror to Binance Futures Testnet (active with $5,000 USDT)
+        # Mirror to Binance Testnet (active with testnet fund)
         mirrored_ok = False
         mirror_err = None
+        binance_order_id = None
         try:
             from core.auth.credential_vault import credential_vault
             from core.execution.live_canary_runner import CanaryRunRequest, live_canary_runner
 
-            cred = credential_vault.get_credential("BINANCE_FUTURES", "TESTNET")
+            cred = credential_vault.get_credential("BINANCE_FUTURES", "TESTNET") or credential_vault.get_credential("BINANCE", "TESTNET")
             if cred and cred.is_active:
                 req = CanaryRunRequest(
-                    exchange="BINANCE_FUTURES",
+                    exchange="BINANCE",
                     symbol=decision.symbol.replace("/", ""),
-                    notional_usd=min(25.0, decision.suggested_units * decision.current_price),
+                    notional_usd=min(25.0, max(15.0, decision.suggested_units * decision.current_price)),
                     side="BUY" if direction_str == "LONG" else "SELL",
                     stop_loss_price=decision.stop_loss,
                     is_dry_run=False,
@@ -676,6 +677,11 @@ class SovereignMasterAgent:
                 )
                 res = await live_canary_runner.execute_canary_order(req)
                 mirrored_ok = res.success
+                binance_order_id = getattr(res, "exchange_order_id", None)
+                if not mirrored_ok:
+                    mirror_err = getattr(res, "message", "Unknown canary failure")
+            else:
+                mirror_err = "No active Binance credentials found in vault"
         except Exception as ex:
             mirror_err = str(ex)
 
@@ -691,6 +697,7 @@ class SovereignMasterAgent:
             "take_profit": tp_primary,
             "risk_reward_ratio": decision.risk_reward_ratio,
             "mirrored_to_binance_testnet": mirrored_ok,
+            "binance_order_id": binance_order_id,
             "binance_mirror_error": mirror_err,
             "thesis": decision.thesis,
             "decision": decision.to_dict(),

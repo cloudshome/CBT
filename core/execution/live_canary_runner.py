@@ -449,7 +449,7 @@ class LiveCanaryRunner:
             from core.execution.connectors.binance_connector import BinanceSpotConnector
             from core.execution.connectors.bybit_connector import BybitV5Connector
 
-            if exchange_upper == "BINANCE":
+            if exchange_upper in ("BINANCE", "BINANCE_FUTURES", "BINANCE_TESTNET"):
                 connector = BinanceSpotConnector(
                     environment=req.environment,
                     api_key=cred.api_key,

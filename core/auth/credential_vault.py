@@ -31,9 +31,13 @@ from typing import Any
 
 import aiohttp
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from dotenv import load_dotenv
 
 from core.auth.exchange_signers import BinanceSigner, BybitV5Signer
 from core.database import db_manager
+
+# Ensure environment variables from .env are globally available to vault
+load_dotenv()
 
 logger = logging.getLogger("sky.credential_vault")
 
