@@ -5,7 +5,7 @@
 > **Category:** `Macro Geopolitics & Hegemony` | **Source Type:** `FACEBOOK_REEL`  
 > **Original Source:** [https://www.facebook.com/share/r/14rU2inKqPQ/](https://www.facebook.com/share/r/14rU2inKqPQ/)  
 > **Analyst / Speaker Attribution:** `Macro Intelligence Desk / Geopolitical Analysis`  
-> **Last Cross-Verified:** `2026-09-27 12:37:44 UTC` | **Epistemic Rigor Score:** `84.0%`
+> **Last Cross-Verified:** `2026-10-01 17:31:19 UTC` | **Epistemic Rigor Score:** `84.0%`
 
 ---
 

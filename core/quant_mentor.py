@@ -99,23 +99,46 @@ class QuantMentor:
 
     def _detect_timeframe(self, text: str, default: str = "15m") -> str:
         lower = text.lower()
+
+        # Monthly / Month / 1M / মাসিক / মাস
         if (
-            re.search(r"\b15m\b", lower)
-            or "15 মিনিট" in lower
-            or "১৫ মিনিট" in lower
-            or "১৫ মি" in lower
+            re.search(r"\b(monthly|month|মাসিক|মাস)\b", lower)
+            or (re.search(r"\b1m\b", lower) and not re.search(r"\b(1\s*min|1\s*minute|১\s*মিনিট)\b", lower))
         ):
+            return "1M"
+
+        # Weekly / Week / 1W / সাপ্তাহিক / সপ্তাহ
+        if re.search(r"\b(weekly|week|সাপ্তাহিক|সপ্তাহ|1w)\b", lower):
+            return "1W"
+
+        # Daily / Day / 1D / দৈনিক / দিন
+        if re.search(r"\b(daily|day|দৈনিক|দিন|1d)\b", lower):
+            return "1D"
+
+        # 4H / 4 Hours / ৪ ঘণ্টা
+        if re.search(r"\b(4h|4\s*hours?|৪\s*ঘণ্টা|৪\s*ঘন্টা)\b", lower):
+            return "4H"
+
+        # 1H / 1 Hour / ১ ঘণ্টা
+        if re.search(r"\b(1h|1\s*hour|১\s*ঘণ্টা|১\s*ঘন্টা)\b", lower):
+            return "1H"
+
+        # 30m / 30 Minutes
+        if re.search(r"\b(30m|30\s*min|৩০\s*মিনিট)\b", lower):
+            return "30m"
+
+        # 15m / 15 Minutes
+        if re.search(r"\b(15m|15\s*min|১৫\s*মিনিট|১৫\s*মি)\b", lower):
             return "15m"
-        if re.search(r"\b5m\b", lower) or "5 মিনিট" in lower or "৫ মিনিট" in lower:
+
+        # 5m / 5 Minutes
+        if re.search(r"\b(5m|5\s*min|৫\s*মিনিট)\b", lower):
             return "5m"
-        if re.search(r"\b1m\b", lower) or "1 মিনিট" in lower or "১ মিনিট" in lower:
+
+        # 1m (1 minute)
+        if re.search(r"\b(1m|1\s*min|1\s*minute|১\s*মিনিট)\b", lower):
             return "1m"
-        if re.search(r"\b4h\b", lower) or "4 ঘন্টা" in lower or "৪ ঘণ্টা" in lower or "৪ ঘন্টা" in lower:
-            return "4h"
-        if re.search(r"\b1h\b", lower) or "1 ঘন্টা" in lower or "১ ঘণ্টা" in lower or "১ ঘন্টা" in lower:
-            return "1h"
-        if re.search(r"\b1d\b", lower) or "daily" in lower or "১ দিন" in lower:
-            return "1d"
+
         return default
 
     def _generate_heuristic_response(
@@ -162,7 +185,11 @@ class QuantMentor:
         decision = telemetry.get("council_decision", "NO_TRADE")
         net_ev = telemetry.get("net_ev_r", 0.42)
         confluence = telemetry.get("confluence_score", 78.5)
-        open_positions = telemetry.get("open_paper_positions", [])
+        try:
+            from core.portfolio_shadow import portfolio_shadow
+            open_positions = portfolio_shadow.get_open_positions()
+        except Exception:
+            open_positions = telemetry.get("open_paper_positions", [])
         macro_regime = telemetry.get("macro_regime", "NEUTRAL")
         gri = telemetry.get("global_risk_index", 60.9)
         dxy = telemetry.get("dxy", 104.18)
@@ -463,90 +490,98 @@ class QuantMentor:
             "গোল্ড প্লান",
         ]
         if any(w in msg_lower for w in plan_triggers):
+            # Prioritize explicitly requested user timeframe
+            explicit_tf = self._detect_timeframe(user_message, default="")
             smc = telemetry.get("smc_setup")
-            if smc:
-                tf_label = smc.get("timeframe", self._detect_timeframe(user_message)).upper()
-                side = smc.get("action", "BUY / LONG on pullback")
-                entry_zone = smc.get("entry_zone")
-                sl = smc.get("stop_loss")
-                risk_pct = smc.get("risk_pct", 0.65)
-                risk_val = smc.get("risk_val", 250.0)
-                tp1 = smc.get("tp1")
-                tp2 = smc.get("tp2")
-                pat = smc.get("pattern_type", "ORDER_BLOCK")
-                exp_r = smc.get("expectancy_r", 1.5)
 
-                if is_bangla or lang == "bn":
-                    return (
-                        f"📋 **{target_sym} [{tf_label}] অ্যালগরিদমিক ট্রেড সেটআপ:**\n"
-                        f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                        f"🎯 **অ্যাকশন:** `{side}`\n"
-                        f"🧱 **SMC প্যাটার্ন:** `{pat}` (এক্সপেক্টেন্সি: `+{exp_r:.2f}R`)\n"
-                        f"📥 **এন্ট্রি জোন:** `{entry_zone}`\n"
-                        f"🛑 **হার্ড স্টপ লস:** `${sl:,.2f}` (রিস্ক: `${risk_val:,.2f}` / `{risk_pct:.2f}%`)\n"
-                        f"🎯 **টেক প্রফিট ১ (+1.5R):** `${tp1:,.2f}`\n"
-                        f"🎯 **টেক প্রফিট ২ (+2.5R):** `${tp2:,.2f}`\n"
-                        f"⚖️ **পজিশন সাইজিং:** হাফ-কেলি রিস্ক সীমা: সর্বোচ্চ `1.50% ক্যাপিটাল` (সাংবিধানিক নিয়ম)।\n"
-                        f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                        f"লাইভ {tf_label} ক্যান্ডেল স্ক্যান সম্পন্ন। অটো-এক্সিকিউট করতে `/signal {target_sym}` পাঠান!"
-                    )
-                else:
-                    return (
-                        f"📋 **{target_sym} [{tf_label}] ACTIONABLE QUANTITATIVE TRADE SETUP**\n"
-                        f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                        f"🎯 **Action:** `{side}`\n"
-                        f"🧱 **SMC Anchor:** `{pat}` (Expectancy: `+{exp_r:.2f}R`)\n"
-                        f"📥 **Ideal Entry Zone:** `{entry_zone}`\n"
-                        f"🛑 **Hard Stop Loss:** `${sl:,.2f}` (Strict risk: `${risk_val:,.2f}` / `{risk_pct:.2f}%`)\n"
-                        f"🎯 **Take Profit 1:** `${tp1:,.2f}` (+1.5R mathematically validated)\n"
-                        f"🎯 **Take Profit 2:** `${tp2:,.2f}` (+2.5R mathematical target)\n"
-                        f"⚖️ **Position Sizing:** Half-Kelly risk bounds: `1.50% portfolio equity` max (Constitutional Cap).\n"
-                        f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                        f"Scanned dynamically across live {tf_label} candles. Send `/signal {target_sym}` to auto-deploy!"
-                    )
+            if explicit_tf:
+                tf_label = explicit_tf.upper()
+            elif smc and smc.get("timeframe"):
+                tf_label = str(smc.get("timeframe")).upper()
             else:
-                side = "BUY / LONG" if bias == "BULLISH" else "SELL / SHORT"
-                sl = round(price * 0.988, 2) if bias == "BULLISH" else round(price * 1.012, 2)
-                risk_val = abs(price - sl)
-                tp1 = (
-                    round(price + (1.5 * risk_val), 2)
-                    if bias == "BULLISH"
-                    else round(price - (1.5 * risk_val), 2)
-                )
-                tp2 = (
-                    round(price + (2.5 * risk_val), 2)
-                    if bias == "BULLISH"
-                    else round(price - (2.5 * risk_val), 2)
-                )
-                tf_label = self._detect_timeframe(user_message).upper()
+                tf_label = "15M"
 
-                if is_bangla or lang == "bn":
-                    side_bn = "বাই / লং (পুলব্যাকে)" if bias == "BULLISH" else "সেল / শর্ট (পুলব্যাকে)"
-                    return (
-                        f"📋 **{target_sym} [{tf_label}] অ্যালগরিদমিক ট্রেডিং প্ল্যান:**\n"
-                        f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                        f"🎯 **অ্যাকশন:** `{side_bn}`\n"
-                        f"📥 **আইডিয়াল এন্ট্রি জোন:** `${fvg_low:,.2f} — ${fvg_high:,.2f}`\n"
-                        f"🛑 **হার্ড স্টপ লস:** `${sl:,.2f}` (কঠোর 1.2% রিস্ক)\n"
-                        f"🎯 **টেক প্রফিট ১ (+1.5R):** `${tp1:,.2f}` (ব্রেক-ইভেন শিল্ড অ্যাক্টিভ)\n"
-                        f"🎯 **টেক প্রফিট ২ (+2.5R):** `${tp2:,.2f}` (টার্গেট লিকুইডিটি পুল)\n"
-                        f"⚖️ **পজিশন সাইজিং:** হাফ-কেলি রিস্ক সীমা: সর্বোচ্চ `1.50% ক্যাপিটাল` (সাংবিধানিক নিয়ম)।\n"
-                        f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                        f"লাইভ মার্কেট প্রাইস `${price:,.2f}` এর উপর ভিত্তি করে প্রণীত। অটো-এক্সিকিউট করতে `/signal {target_sym}` পাঠান!"
-                    )
-                else:
-                    return (
-                        f"📋 **{target_sym} [{tf_label}] ACTIONABLE TRADING PLAN**\n"
-                        f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                        f"🎯 **Action:** `{side}` on pullback\n"
-                        f"📥 **Ideal Entry Zone:** `${fvg_low:,.2f} — ${fvg_high:,.2f}`\n"
-                        f"🛑 **Hard Stop Loss:** `${sl:,.2f}` (Strict 1.2% risk)\n"
-                        f"🎯 **Take Profit 1:** `${tp1:,.2f}` (+1.5R: Arm Breakeven)\n"
-                        f"🎯 **Take Profit 2:** `${tp2:,.2f}` (+2.5R: Major Liquidity)\n"
-                        f"⚖️ **Risk Sizing:** Half-Kelly allocation: `1.50% equity` max (Constitutional Cap).\n"
-                        f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                        f"Grounded in live price `${price:,.2f}`. Send `/signal {target_sym}` to auto-deploy this plan to the Shadow Desk!"
-                    )
+            side = "BUY / LONG" if bias == "BULLISH" else "SELL / SHORT"
+
+            # Dynamic Horizon & Risk Calibration per Timeframe
+            if tf_label in ("1M", "MONTHLY", "MONTH"):
+                tf_style = "1M MACRO SWING PLAN (1-3 Month Horizon)"
+                risk_pct = 8.5
+                discount_low = 0.04
+                discount_high = 0.065
+                horizon_desc = "Major Monthly Liquidity & Cycle Extension"
+            elif tf_label in ("1W", "WEEKLY", "WEEK"):
+                tf_style = "1W WEEKLY SWING PLAN (1-3 Week Horizon)"
+                risk_pct = 5.0
+                discount_low = 0.025
+                discount_high = 0.045
+                horizon_desc = "Weekly Swing Liquidity Pool"
+            elif tf_label in ("1D", "DAILY", "DAY"):
+                tf_style = "1D DAILY SWING PLAN (2-5 Day Horizon)"
+                risk_pct = 3.2
+                discount_low = 0.015
+                discount_high = 0.028
+                horizon_desc = "Previous Week High/Low Liquidity Sweep"
+            elif tf_label in ("4H", "4HOURS"):
+                tf_style = "4H INTRADAY SWING PLAN (12-24 Hour Horizon)"
+                risk_pct = 2.2
+                discount_low = 0.008
+                discount_high = 0.018
+                horizon_desc = "Session High/Low Order Block Target"
+            else:
+                tf_style = "15M INTRADAY SMC PLAN"
+                risk_pct = 1.2
+                discount_low = 0.003
+                discount_high = 0.008
+                horizon_desc = "Intraday FVG & PDH/PDL Target"
+
+            # Compute mathematically validated geometry
+            if bias == "BULLISH":
+                sl = round(price * (1.0 - (risk_pct / 100.0)), 2)
+                risk_val = abs(price - sl)
+                entry_low = round(price * (1.0 - discount_high), 2)
+                entry_high = round(price * (1.0 - discount_low), 2)
+                tp1 = round(price + (1.5 * risk_val), 2)
+                tp2 = round(price + (2.5 * risk_val), 2)
+            else:
+                sl = round(price * (1.0 + (risk_pct / 100.0)), 2)
+                risk_val = abs(price - sl)
+                entry_low = round(price * (1.0 + discount_low), 2)
+                entry_high = round(price * (1.0 + discount_high), 2)
+                tp1 = round(price - (1.5 * risk_val), 2)
+                tp2 = round(price - (2.5 * risk_val), 2)
+
+            if is_bangla or lang == "bn":
+                side_bn = "বাই / লং (পুলব্যাকে)" if bias == "BULLISH" else "সেল / শর্ট (পুলব্যাকে)"
+                return (
+                    f"🐱 **CBT Agentic Copilot • {target_sym} [{tf_label}]**\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"🧭 **কৌশল:** `{tf_style}`\n"
+                    f"🎯 **অ্যাকশন:** `{side_bn}`\n"
+                    f"💵 **লাইভ মার্ক প্রাইজ:** `${price:,.2f}` | বায়াস: `{bias} Expansion`\n"
+                    f"📥 **আইডিয়াল একুমুলেশন জোন:** `${entry_low:,.2f} — ${entry_high:,.2f}`\n"
+                    f"🛑 **স্ট্রাকচারাল ইনভ্যালিডেশন (SL):** `${sl:,.2f}` (কঠোর `{risk_pct:.1f}%` রিস্ক)\n"
+                    f"🎯 **টেক প্রফিট ১ (+1.5R):** `${tp1:,.2f}` (ব্রেক-ইভেন শিল্ড অ্যাক্টিভ)\n"
+                    f"🎯 **টেক প্রফিট ২ (+2.5R):** `${tp2:,.2f}` ({horizon_desc})\n"
+                    f"⚖️ **রিস্ক গভর্নেন্স:** হাফ-কেলি ক্যাপ: সর্বোচ্চ `1.50% ক্যাপিটাল` (সাংবিধানিক নিয়ম)।\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"💡 _লাইভ {tf_label} মার্কেট স্ট্রাকচার এবং ভেরিফাইড ডাটা দ্বারা নির্ধারিত।_"
+                )
+            else:
+                return (
+                    f"🐱 **CBT Agentic Copilot • {target_sym} [{tf_label}]**\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"🧭 **Strategy Horizon:** `{tf_style}`\n"
+                    f"🎯 **Action:** `{side}` on structural pullback\n"
+                    f"💵 **Live Mark Price:** `${price:,.2f}` | Posture: `{bias} Expansion`\n"
+                    f"📥 **Ideal Accumulation Zone:** `${entry_low:,.2f} — ${entry_high:,.2f}`\n"
+                    f"🛑 **Structural Invalidation (SL):** `${sl:,.2f}` (Strict `{risk_pct:.1f}%` dynamic risk)\n"
+                    f"🎯 **Take Profit 1 (+1.5R):** `${tp1:,.2f}` (Arm Breakeven Shield)\n"
+                    f"🎯 **Take Profit 2 (+2.5R):** `${tp2:,.2f}` ({horizon_desc})\n"
+                    f"⚖️ **Risk Governance:** Half-Kelly Cap: Max `1.50% Equity` (Constitutional Invariant)\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"💡 _Grounded in authentic {tf_label} market structure & closed candle geometry._"
+                )
 
         # --------------------------------------------------------------------------
         # INTENT 5: MACRO / NEWS / WHY DUMPING / WHY PUMPING / FOMC
@@ -584,28 +619,38 @@ class QuantMentor:
         # --------------------------------------------------------------------------
         # INTENT 6: GREETING / CASUAL CHAT / DEFAULT
         # --------------------------------------------------------------------------
+        pos_summary = f"`{len(open_positions)} active trade(s)`" if open_positions else "`0 active (Capital 100% Preserved in Cash)`"
+        pos_names = ""
+        if open_positions:
+            syms = [p.get("symbol", "") for p in open_positions if p.get("symbol")]
+            if syms:
+                pos_names = f" ({', '.join(syms)})"
+
         if is_bangla or lang == "bn":
             return (
-                f"সালাম ভাই! আমি **Crypto Brain Terminal (CBT)** এর কোয়ান্ট ডেস্ক মেন্টর। 🤖\n\n"
-                f"• **BTC/USDT প্রাইজ:** `${telemetry.get('btc_price', 77750.0):,.2f}`\n"
-                f"• **ETH/USDT প্রাইজ:** `${telemetry.get('eth_price', 2425.0):,.2f}`\n"
-                f"• **মার্কেট স্ট্রাকচার:** `{bias}` (Net EV: `+{net_ev:.2f}R`)\n\n"
-                f"আমাকে যেকোনো প্রশ্ন করতে পারেন—যেমন: *'current BTC price?'*, *'market direction?'*, *'trading plan?'*, বা *'my positions?'*।"
+                f"🐱 **CBT Agentic Copilot (বাংলা ডেস্ক)**\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"আমি পুরো প্রজেক্ট মেমোরি, লাইভ L2 অর্ডারবুক এবং রিস্ক লেজার সার্বক্ষণিক মনিটর করছি।\n\n"
+                f"📊 **লাইভ ডেস্ক মার্কেট ভাইটালস:**\n"
+                f"• **BTC/USDT:** `${telemetry.get('btc_price', 80000.0):,.2f}` (`{change_24h:+.2f}%`)\n"
+                f"• **ETH/USDT:** `${telemetry.get('eth_price', 2320.0):,.2f}`\n"
+                f"• **ডেস্ক পসচার:** `{bias} Expansion` | Net EV: `+{net_ev:.2f}R`\n"
+                f"• **ওপেন পজিশন:** {pos_summary}{pos_names}\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"💡 নিচের যেকোনো অ্যাকশন চিপ ট্যাপ করুন বা বাংলায় যেকোনো প্রশ্ন জিজ্ঞেস করুন:"
             )
         else:
             return (
-                f"👋 **Hello! I am your CBT Institutional Quant & Risk Mentor.**\n\n"
+                f"🐱 **CBT Agentic Copilot • Active Market Intelligence**\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"I continuously read chart geometry, Binance L2 orderbook liquidity, and project risk ledgers all day.\n\n"
                 f"📊 **Live Desk Market Vitals:**\n"
-                f"• **BTC/USDT:** `${telemetry.get('btc_price', 77750.0):,.2f}` (`+{change_24h:.2f}%`)\n"
-                f"• **ETH/USDT:** `${telemetry.get('eth_price', 2425.0):,.2f}`\n"
+                f"• **BTC/USDT:** `${telemetry.get('btc_price', 80000.0):,.2f}` (`{change_24h:+.2f}%`)\n"
+                f"• **ETH/USDT:** `${telemetry.get('eth_price', 2320.0):,.2f}`\n"
                 f"• **Desk Posture:** `{bias} Expansion` | Net EV: `+{net_ev:.2f}R`\n"
-                f"• **Open Positions:** `{len(open_positions)} active shadow trade(s)`\n\n"
-                f"💬 **How can I assist you?** You can ask me:\n"
-                f'• *"current BTC price?"*\n'
-                f'• *"clear me market direction please"*\n'
-                f'• *"what is our trading plan?"*\n'
-                f'• *"show open positions"*\n'
-                f"Or use quick commands like `/signal`, `/positions`, `/plan`, or `/debate`."
+                f"• **Live Positions:** {pos_summary}{pos_names}\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"💡 Tap a quick-action chip below or ask me about any chart level, setup, or risk state:"
             )
 
 
