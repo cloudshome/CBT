@@ -114,7 +114,7 @@ export const App: React.FC = () => {
   const [loadingBrief, setLoadingBrief] = useState<boolean>(false);
 
   // Main Screen View Switcher: Sovereign Master Agent vs Terminal vs Arena vs Swarm vs Paper Ledger vs Research Lab
-  const [activeMainView, setActiveMainView] = useState<'MASTER_AGENT' | 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM' | 'DARWINIAN_ARENA' | 'LEGACY_DESK'>('MASTER_AGENT');
+  const [activeMainView, setActiveMainView] = useState<'MASTER_AGENT' | 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM' | 'DARWINIAN_ARENA' | 'LEGACY_DESK' | 'LIVE_LAUNCHPAD'>('MASTER_AGENT');
 
   // Tab State for Single-Screen Compact Cockpit
   const [activeRightTab, setActiveRightTab] = useState<'ORDER_DESK' | 'ORDER_BOOK' | 'PAPER' | 'AI_DESK'>('ORDER_DESK');
@@ -629,6 +629,12 @@ export const App: React.FC = () => {
           }}
           addToast={addToast}
         />
+      ) : activeMainView === 'LIVE_LAUNCHPAD' ? (
+        <div className="max-w-[1920px] w-full mx-auto p-4 flex-1">
+          <LiveLaunchpadDesk
+            onNotify={addToast}
+          />
+        </div>
       ) : activeMainView === 'LEGACY_DESK' ? (
         <>
           {/* Institutional Quantitative HUD Control Bar */}

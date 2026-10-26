@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCw, Activity, Zap, TrendingUp, TrendingDown, BellOff, BellRing, Send, Layers, Crown, Dna, Cpu, Sparkles } from 'lucide-react';
+import { RefreshCw, Activity, Zap, TrendingUp, TrendingDown, BellOff, BellRing, Send, Layers, Crown, Dna, Cpu, Sparkles, ShieldCheck } from 'lucide-react';
 import { SupportedTimeframe } from '../types';
 import { api } from '../services/api';
 import { PairVenueLinks } from './PairVenueLinks';
@@ -17,8 +17,8 @@ interface HeaderProps {
   onRefresh: () => void;
   notificationsEnabled: boolean;
   onToggleNotifications: () => void;
-  activeView?: 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM' | 'DARWINIAN_ARENA' | 'LEGACY_DESK' | 'MASTER_AGENT';
-  onViewChange?: (view: 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM' | 'DARWINIAN_ARENA' | 'LEGACY_DESK' | 'MASTER_AGENT') => void;
+  activeView?: 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM' | 'DARWINIAN_ARENA' | 'LEGACY_DESK' | 'MASTER_AGENT' | 'LIVE_LAUNCHPAD';
+  onViewChange?: (view: 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM' | 'DARWINIAN_ARENA' | 'LEGACY_DESK' | 'MASTER_AGENT' | 'LIVE_LAUNCHPAD') => void;
   openPositionsCount?: number;
   wsState?: 'CONNECTING' | 'CONNECTED' | 'RECONNECTING' | 'DISCONNECTED' | 'ERROR' | 'IDLE';
   latencyMs?: number;
@@ -182,6 +182,19 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Sparkles size={13} className={activeView === 'RESEARCH_LAB' ? 'text-white' : 'text-indigo-400'} />
             <span>Vault</span>
+          </button>
+
+          <button
+            onClick={() => onViewChange?.('LIVE_LAUNCHPAD')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all font-bold ${
+              activeView === 'LIVE_LAUNCHPAD'
+                ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white shadow-sm shadow-emerald-500/30'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+            title="Live Launchpad: Binance/exchange connectivity, live balances, active working orders, and panic flatten"
+          >
+            <ShieldCheck size={13} className={activeView === 'LIVE_LAUNCHPAD' ? 'text-white' : 'text-emerald-400'} />
+            <span>Launchpad</span>
           </button>
         </div>
 
