@@ -466,9 +466,11 @@ export const SovereignMasterAgentDesk: React.FC<SovereignMasterAgentDeskProps> =
             {/* Gate 1 */}
             <div className="p-3 bg-[#060912] border border-[#1e293b] rounded-lg space-y-1.5">
               <div className="text-slate-400 font-bold text-[10px]">GATE 1: DURATION</div>
-              <div className="text-base font-bold text-white">Day {selfImprovement.burn_in_scorecard.days_elapsed} / 14</div>
+              <div className="text-base font-bold text-white">Day {Math.min(14, selfImprovement.burn_in_scorecard.days_elapsed || 1)} / 14</div>
               <p className="text-[10px] text-slate-500">14 consecutive calendar days of zero-crash stability.</p>
-              <div className="text-[10px] text-amber-400 font-bold">⏳ IN PROGRESS</div>
+              <div className={`text-[10px] font-bold ${selfImprovement.burn_in_scorecard.days_elapsed >= 14 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                {selfImprovement.burn_in_scorecard.days_elapsed >= 14 ? '✅ PASS' : '⏳ IN PROGRESS'}
+              </div>
             </div>
 
             {/* Gate 2 */}
@@ -478,17 +480,21 @@ export const SovereignMasterAgentDesk: React.FC<SovereignMasterAgentDeskProps> =
                 {selfImprovement.burn_in_scorecard.gate_2_profit_factor.current} / ≥ 1.50
               </div>
               <p className="text-[10px] text-slate-500">Gross profit must exceed gross loss by 1.5x.</p>
-              <div className="text-[10px] text-amber-400 font-bold">⏳ ACCUMULATING</div>
+              <div className={`text-[10px] font-bold ${selfImprovement.burn_in_scorecard.gate_2_profit_factor.current >= 1.50 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                {selfImprovement.burn_in_scorecard.gate_2_profit_factor.current >= 1.50 ? '✅ PASS' : '⏳ ACCUMULATING'}
+              </div>
             </div>
 
             {/* Gate 3 */}
             <div className="p-3 bg-[#060912] border border-[#1e293b] rounded-lg space-y-1.5">
               <div className="text-slate-400 font-bold text-[10px]">GATE 3: MAX DRAWDOWN</div>
-              <div className="text-base font-bold text-emerald-400">
+              <div className={`text-base font-bold ${selfImprovement.burn_in_scorecard.gate_3_max_drawdown.current_pct <= 3.0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                 {selfImprovement.burn_in_scorecard.gate_3_max_drawdown.current_pct}% ≤ 3.0%
               </div>
               <p className="text-[10px] text-slate-500">Peak-to-trough equity decline strictly constrained.</p>
-              <div className="text-[10px] text-emerald-400 font-bold">✅ PASS</div>
+              <div className={`text-[10px] font-bold ${selfImprovement.burn_in_scorecard.gate_3_max_drawdown.current_pct <= 3.0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {selfImprovement.burn_in_scorecard.gate_3_max_drawdown.current_pct <= 3.0 ? '✅ PASS' : '❌ EXCEEDED'}
+              </div>
             </div>
 
             {/* Gate 4 */}
@@ -498,7 +504,9 @@ export const SovereignMasterAgentDesk: React.FC<SovereignMasterAgentDeskProps> =
                 {selfImprovement.burn_in_scorecard.gate_4_dsr_significance.current_score} / ≥ 0.95
               </div>
               <p className="text-[10px] text-slate-500">Deflated Sharpe proves edge is not random luck.</p>
-              <div className="text-[10px] text-amber-400 font-bold">⏳ INGESTING</div>
+              <div className={`text-[10px] font-bold ${selfImprovement.burn_in_scorecard.gate_4_dsr_significance.current_score >= 0.95 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                {selfImprovement.burn_in_scorecard.gate_4_dsr_significance.current_score >= 0.95 ? '✅ PASS' : '⏳ INGESTING'}
+              </div>
             </div>
 
             {/* Gate 5 */}

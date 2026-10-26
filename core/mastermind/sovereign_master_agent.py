@@ -782,12 +782,13 @@ class SovereignMasterAgent:
         passed_gates_count = sum([gate_1_passed, gate_2_passed, gate_3_passed, gate_4_passed, gate_5_passed])
         overall_readiness_pct = round((passed_gates_count / 5.0) * 100.0, 1)
 
+        display_days = min(14, days_elapsed)
         burn_in_scorecard = {
             "target_days": 14,
-            "days_elapsed": days_elapsed,
+            "days_elapsed": display_days,
             "gate_1_duration": {
                 "target_days": 14,
-                "current_days": days_elapsed,
+                "current_days": display_days,
                 "passed": gate_1_passed,
             },
             "gate_2_profit_factor": {
