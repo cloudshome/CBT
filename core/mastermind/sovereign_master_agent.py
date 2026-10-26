@@ -671,6 +671,8 @@ class SovereignMasterAgent:
                     symbol=decision.symbol.replace("/", ""),
                     notional_usd=min(25.0, max(15.0, decision.suggested_units * decision.current_price)),
                     side="BUY" if direction_str == "LONG" else "SELL",
+                    order_type="MARKET",
+                    price=decision.current_price,
                     stop_loss_price=decision.stop_loss,
                     is_dry_run=False,
                     environment="TESTNET",

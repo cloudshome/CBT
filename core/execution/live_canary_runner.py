@@ -244,7 +244,26 @@ class LiveCanaryRunner:
         )
         client_order_id = f"CL_{canary_exec_id}"
 
-        ref_price = req.price or account_probe.reference_prices.get("BTC", 65000.0)
+        # Determine dynamic real-time price discovery
+        ref_price = req.price
+        if not ref_price or ref_price <= 0:
+            try:
+                from core.market_providers import market_gateway
+
+                clean = sym.replace("/", "").upper()
+                slash_sym = f"{clean[:-4]}/{clean[-4:]}" if clean.endswith("USDT") else sym
+                px = market_gateway.get_latest_price(slash_sym)
+                if not px or px <= 0:
+                    ticker = await market_gateway.get_ticker(slash_sym)
+                    px = float(ticker.get("price", 0.0) or 0.0)
+                if px and px > 0:
+                    ref_price = px
+            except Exception as e:
+                logger.debug(f"[CanaryRunner] Real-time market discovery fallback for {sym}: {e}")
+
+        if not ref_price or ref_price <= 0:
+            base_asset = sym.replace("/USDT", "").replace("USDT", "").replace("/USD", "").replace("USD", "")
+            ref_price = account_probe.reference_prices.get(base_asset, 65000.0)
 
         # 1. Microstructure Symbol Feasibility Check
         feasibility: FeasibilityResult = symbol_constraint_engine.evaluate_order_feasibility(

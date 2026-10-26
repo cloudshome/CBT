@@ -394,6 +394,7 @@ export const LiveLaunchpadDesk: React.FC<LiveLaunchpadDeskProps> = ({ onNotify }
         symbol,
         notional_usd: notional,
         side,
+        order_type: 'MARKET',
         is_dry_run: isDryRun,
         environment: envMode,
       });
