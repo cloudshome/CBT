@@ -1183,6 +1183,51 @@ async def handle_confirm(
     return res.output_text
 
 
+async def handle_hermes(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
+    """
+    Nous Research Hermes Agent (v0.22+) Multi-Model Intelligence Adapter.
+    Executes deep qualitative reasoning, SMC market hypothesis verification,
+    and multi-model queries.
+    """
+    from core.cognitive_brain.hermes_agent_bridge import hermes_bridge
+    from core.telegram_bot import telegram_bot
+
+    query = args.strip() if args else ""
+    if not query:
+        status = await hermes_bridge.get_status()
+        msg = (
+            "☤ *Nous Research Hermes Agent (v0.22+)*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"• *Status:* {'Operational' if status.get('installed') else 'Offline'}\n"
+            f"• *Model:* `{status.get('model', 'unknown')}`\n"
+            f"• *Provider:* `{status.get('provider', 'unknown')}`\n"
+            f"• *Gateway:* `{status.get('gateway', 'unknown')}`\n\n"
+            "*Usage:*\n"
+            "`/hermes <market question or hypothesis>`\n"
+            "_Example:_ `/hermes analyze BTC 15m liquidity sweep at 80200`"
+        )
+        if chat_id:
+            await telegram_bot.send_message(msg, chat_id=chat_id)
+        return msg
+
+    if chat_id:
+        await telegram_bot.send_message("☤ _Consulting Hermes Agent..._", chat_id=chat_id)
+
+    res = await hermes_bridge.ask_hermes(query, timeout=45.0)
+    if res.get("success"):
+        resp_text = res.get("response", "No response.")
+        msg = f"☤ *Hermes Agent Intelligence:*\n━━━━━━━━━━━━━━━━━━━━━━\n{resp_text}"
+    else:
+        err = res.get("error", "Execution failed")
+        msg = f"⚠️ *Hermes Error:* {err}"
+
+    if chat_id:
+        await telegram_bot.send_message(msg, chat_id=chat_id)
+    return msg
+
+
 # ==============================================================================
 # CENTRAL V5 COMMAND REGISTRATION
 # ==============================================================================
@@ -1455,6 +1500,14 @@ def register_all_v5_commands() -> None:
             required_role=TelegramRole.ANALYST,
             aliases=["/collect", "/fetch_intel"],
             argument_schema="",
+        ),
+        TelegramCommand(
+            name="/hermes",
+            description="Nous Research Hermes Agent (v0.22+) multi-model reasoning and market intelligence",
+            handler=handle_hermes,
+            required_role=TelegramRole.ANALYST,
+            aliases=["/hermes_agent", "/nous"],
+            argument_schema="[query]",
         ),
     ]
 

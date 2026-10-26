@@ -4188,6 +4188,59 @@ async def deploy_mastermind_specialist(payload: dict[str, Any]) -> dict[str, Any
     }
 
 
+# ==============================================================================
+# NOUS RESEARCH HERMES AGENT (v0.22+) INTEGRATION ROUTES
+# ==============================================================================
+
+@app.get("/api/v1/hermes/status")
+@app.get("/api/hermes/status")
+async def get_hermes_agent_status() -> dict[str, Any]:
+    """Retrieve operational status, model, and gateway details of Nous Hermes Agent."""
+    from core.cognitive_brain.hermes_agent_bridge import hermes_bridge
+    return await hermes_bridge.get_status()
+
+
+@app.post("/api/v1/hermes/query")
+@app.post("/api/hermes/query")
+async def query_hermes_agent(payload: dict[str, Any]) -> dict[str, Any]:
+    """Dispatch a reasoning query to Hermes Agent headless runner (--oneshot -Q)."""
+    from core.cognitive_brain.hermes_agent_bridge import hermes_bridge
+
+    query = payload.get("query")
+    if not query or not isinstance(query, str):
+        raise HTTPException(status_code=400, detail="Missing or invalid 'query' parameter")
+
+    model = payload.get("model")
+    provider = payload.get("provider")
+    timeout = float(payload.get("timeout", 60.0))
+
+    res = await hermes_bridge.ask_hermes(query=query, model=model, provider=provider, timeout=timeout)
+    if not res.get("success", False):
+        raise HTTPException(status_code=502, detail=res.get("error", "Hermes Agent execution failed"))
+    return res
+
+
+@app.post("/api/v1/hermes/market-critique")
+@app.post("/api/hermes/market-critique")
+async def hermes_market_critique(payload: dict[str, Any]) -> dict[str, Any]:
+    """Ask Hermes Agent to critique an SMC / Order Flow market hypothesis."""
+    from core.cognitive_brain.hermes_agent_bridge import hermes_bridge
+
+    symbol = payload.get("symbol", "BTC/USDT")
+    timeframe = payload.get("timeframe", "15m")
+    current_price = float(payload.get("current_price", 0.0))
+    hypothesis = payload.get("hypothesis", "")
+    if not hypothesis:
+        raise HTTPException(status_code=400, detail="Missing 'hypothesis' parameter")
+
+    return await hermes_bridge.evaluate_market_thesis(
+        symbol=symbol,
+        timeframe=timeframe,
+        current_price=current_price,
+        hypothesis=hypothesis,
+    )
+
+
 if __name__ == "__main__":
     import uvicorn
 
