@@ -42,9 +42,11 @@ class CooldownGovernor:
         self.asset_cooldown_sec = asset_cooldown_sec
         self.loss_global_cooldown_sec = loss_global_cooldown_sec
         self.max_daily_trades = int(os.getenv("MAX_DAILY_TRADES", str(max_daily_trades)))
+        self._testing_mode: bool = False
         self._last_closed_trades: dict[str, dict[str, Any]] = {}
         self._last_loss_exit_time: float = 0.0
         self._last_loss_symbol: str = ""
+        # Initialize from database (hydrates latest trade data)
         self._initialize_from_database()
 
     def _normalize_sym(self, symbol: str) -> str:
@@ -52,6 +54,29 @@ class CooldownGovernor:
         if "/" not in clean and len(clean) > 4:
             clean = f"{clean[:-4]}/{clean[-4:]}"
         return clean
+
+    def reset(self) -> None:
+        """Clear all in-memory cooldown state. Called by reset_all_positions()."""
+        self._last_closed_trades.clear()
+        self._last_loss_exit_time = 0.0
+        self._last_loss_symbol = ""
+        logger.info("CooldownGovernor state cleared.")
+
+    def enable_testing_mode(self) -> None:
+        """Enable testing mode: bypass all cooldown checks. Used by test suite."""
+        if not self._testing_mode:
+            self._testing_mode = True
+            self._last_closed_trades.clear()
+            self._last_loss_exit_time = 0.0
+            self._last_loss_symbol = ""
+            logger.info("CooldownGovernor testing mode ENABLED: all cooldown checks bypassed.")
+
+    def disable_testing_mode(self) -> None:
+        """Disable testing mode: restore standard institutional cooldown enforcement."""
+        if self._testing_mode:
+            self._testing_mode = False
+            self._initialize_from_database()
+            logger.info("CooldownGovernor testing mode DISABLED: institutional risk enforcement active.")
 
     def _initialize_from_database(self) -> None:
         """Hydrates latest trade exit timestamps from SQLite shadow_positions."""
@@ -209,6 +234,10 @@ class CooldownGovernor:
         Holistic Nervous System Clearance Check.
         Returns (can_trade, rejection_reason).
         """
+        # In testing mode, bypass all cooldown checks for clean test runs
+        if self._testing_mode:
+            return True, ""
+
         # 1. Global Loss Cooldown Check
         loss_active, loss_reason, _ = self.is_global_in_loss_cooldown()
         if loss_active:

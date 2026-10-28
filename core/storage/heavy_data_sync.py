@@ -151,7 +151,8 @@ class HeavyDataSyncManager:
         if not file_path.is_file():
             return False
         # Ignore git, cache, temp, and test fixtures
-        parts = file_path.parts
+        rel_path = file_path.resolve().relative_to(self.repo_root)
+        parts = rel_path.parts
         if any(p.startswith(".") for p in parts) or "__pycache__" in parts:
             return False
 

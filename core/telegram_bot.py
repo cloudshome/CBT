@@ -1161,8 +1161,19 @@ class TelegramBotDispatcher:
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
             f"⏱️ _{now_str}_ | SKY Quantitative Terminal"
         )
+        pos_id = exec_res.get("position_id")
+        keyboard = []
+        if pos_id and pos_id != "N/A":
+            keyboard.append(
+                [
+                    {"text": "🛑 Close Trade Now", "callback_data": f"close:{pos_id}"},
+                    {"text": "⚖️ Move SL to Breakeven", "callback_data": f"be:{pos_id}"},
+                ]
+            )
         venue_row = self.build_venue_buttons(sym, is_futures=True)
-        reply_markup = {"inline_keyboard": [venue_row]}
+        if venue_row:
+            keyboard.append(venue_row)
+        reply_markup = {"inline_keyboard": keyboard} if keyboard else None
         return await self.send_message(msg, reply_markup=reply_markup)
 
     async def send_trade_entry_alert(self, trade: dict[str, Any]) -> bool:
@@ -1216,8 +1227,7 @@ class TelegramBotDispatcher:
             f"🆔 **Position ID:** `{pos_id}`\n"
             f"🛡️ **Desk:** `Paper Trading Desk (Live Shadow Ledger)`"
         )
-        venue_row = self.build_venue_buttons(sym, is_futures=True)
-        keyboard = [venue_row]
+        keyboard = []
         if pos_id and pos_id != "N/A":
             keyboard.append(
                 [
@@ -1225,7 +1235,10 @@ class TelegramBotDispatcher:
                     {"text": "⚖️ Move SL to Breakeven", "callback_data": f"be:{pos_id}"},
                 ]
             )
-        reply_markup = {"inline_keyboard": keyboard}
+        venue_row = self.build_venue_buttons(sym, is_futures=True)
+        if venue_row:
+            keyboard.append(venue_row)
+        reply_markup = {"inline_keyboard": keyboard} if keyboard else None
         return await self.send_message(msg, reply_markup=reply_markup)
 
     async def send_trade_exit_alert(self, trade: dict[str, Any]) -> bool:
@@ -1287,7 +1300,7 @@ class TelegramBotDispatcher:
             f"🆔 **Position ID:** `{pos_id}`"
         )
         venue_row = self.build_venue_buttons(sym, is_futures=True)
-        reply_markup = {"inline_keyboard": [venue_row]}
+        reply_markup = {"inline_keyboard": [venue_row]} if venue_row else None
         return await self.send_message(msg, reply_markup=reply_markup)
 
     def notify_trade_entry_sync(self, trade: dict[str, Any]) -> None:
@@ -1397,7 +1410,7 @@ class TelegramBotDispatcher:
             f"⏱️ _{now_str}_ | SKY Mastermind Quantitative Engine"
         )
         venue_row = self.build_venue_buttons(sym, is_futures=True)
-        reply_markup = {"inline_keyboard": [venue_row]}
+        reply_markup = {"inline_keyboard": [venue_row]} if venue_row else None
         return await self.send_message(msg, reply_markup=reply_markup)
 
     async def send_event_alert(self, event: dict[str, Any]) -> bool:
@@ -2095,7 +2108,7 @@ class TelegramBotDispatcher:
             trade_keywords = [
                 "trade", "enter", "entry", "stop loss", "stoploss", "sl", "tp",
                 "take profit", "should i", "where is", "buy", "sell", "long", "short",
-                "target", "signal", "setup", "analysis", "point"
+                "target", "signal", "question", "should", "best", "strategy",
             ]
             is_trade_question = any(k in caption_lower for k in trade_keywords) or not caption
 
