@@ -135,8 +135,12 @@ class CooldownGovernor:
             "reason": exit_reason,
         }
 
-        # If trade closed at a loss or triggered Stop Loss, activate global nervous system pause
-        is_loss = realized_pnl < 0.0 or "Stop-Loss" in exit_reason or "Invalidation" in exit_reason
+        # If trade closed at a loss or triggered Stop Loss (and not an intentional portfolio reallocation/replacement)
+        is_loss = (
+            realized_pnl < 0.0
+            or "Stop-Loss" in exit_reason
+            or "Invalidation" in exit_reason
+        ) and "REPLACE" not in exit_reason.upper()
         if is_loss:
             self._last_loss_exit_time = exit_time
             self._last_loss_symbol = norm_sym

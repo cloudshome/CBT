@@ -32,10 +32,18 @@ from enum import StrEnum
 from typing import Any
 
 from core.database import db_manager
-from core.portfolio_shadow import portfolio_shadow
+from core.portfolio_shadow import is_core_anchor, portfolio_shadow
 from core.risk_manager import risk_manager
 
 logger = logging.getLogger("sky.central_mind")
+
+
+class PortfolioAction(StrEnum):
+    OPEN = "OPEN"
+    HOLD = "HOLD"
+    REDUCE = "REDUCE"
+    CLOSE = "CLOSE"
+    REPLACE = "REPLACE"
 
 
 class TradingStyle(StrEnum):
@@ -60,6 +68,8 @@ class TradeProposal:
     is_synthetic: bool = False
     proposal_id: str = field(default_factory=lambda: f"PROP_{uuid.uuid4().hex[:10].upper()}")
     timestamp_ms: int = field(default_factory=lambda: int(time.time() * 1000))
+    confluence_score: float | None = None
+    expected_value_r: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -83,6 +93,8 @@ class CentralMindVerdict:
     risk_pct_equity: float
     executed_position_id: str | None
     timestamp_ms: int
+    portfolio_action: str = PortfolioAction.OPEN.value
+    replaced_position_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -94,14 +106,18 @@ class CentralTradingMind:
     Unifies Market Regime, Multi-Style Desks, Risk Primacy, and Execution Gateways.
     """
 
-    MAX_PORTFOLIO_HEAT_PCT: float = float(
-        os.getenv("MAX_PORTFOLIO_HEAT_PCT", "7.50")
-    )  # 7.5% max cumulative portfolio risk
-    MAX_TRADE_RISK_PCT: float = 1.50  # 1.5% max risk per trade
+    NORMAL_CONCURRENT_POSITIONS: int = 3  # Normal operating target
+    _raw_agg = float(os.getenv("MAX_AGGREGATE_RISK_PCT", "2.00"))
+    MAX_AGGREGATE_RISK_PCT: float = _raw_agg * 100.0 if _raw_agg <= 0.20 else _raw_agg  # 2.0% ($200 on $10k) aggregate live stop risk
+    _raw_trade = float(os.getenv("NORMAL_TRADE_RISK_PCT", "0.50"))
+    NORMAL_TRADE_RISK_PCT: float = _raw_trade * 100.0 if _raw_trade <= 0.20 else _raw_trade  # 0.5% ($50 on $10k) planned risk per trade
+    _raw_heat = float(os.getenv("MAX_PORTFOLIO_HEAT_PCT", "7.50"))
+    MAX_PORTFOLIO_HEAT_PCT: float = _raw_heat * 100.0 if _raw_heat <= 0.20 else _raw_heat  # 7.5% max cumulative portfolio heat
+    MAX_TRADE_RISK_PCT: float = 1.50  # 1.5% max risk per trade ceiling
     MAX_PRICE_DEVIATION_PCT: float = 1.50  # 1.5% max divergence from live ticker
     MAX_CONCURRENT_POSITIONS: int = int(
         os.getenv("MAX_CONCURRENT_POSITIONS", "6")
-    )  # Institutional concurrency cap
+    )  # Concurrency cap with opportunity reserve
 
     def __init__(self) -> None:
         self._ensure_tables()
@@ -127,9 +143,18 @@ class CentralTradingMind:
                         risk_usd REAL NOT NULL,
                         risk_pct_equity REAL NOT NULL,
                         executed_position_id TEXT,
-                        timestamp_ms INTEGER NOT NULL
+                        timestamp_ms INTEGER NOT NULL,
+                        portfolio_action TEXT DEFAULT 'OPEN',
+                        replaced_position_id TEXT
                     );
                 """)
+                # Defensively migrate columns if table already exists
+                cur = conn.execute("PRAGMA table_info(central_mind_decisions);")
+                cols = [r[1] for r in cur.fetchall()]
+                if "portfolio_action" not in cols:
+                    conn.execute("ALTER TABLE central_mind_decisions ADD COLUMN portfolio_action TEXT DEFAULT 'OPEN';")
+                if "replaced_position_id" not in cols:
+                    conn.execute("ALTER TABLE central_mind_decisions ADD COLUMN replaced_position_id TEXT;")
                 conn.execute(
                     "CREATE INDEX IF NOT EXISTS idx_cmd_ts ON central_mind_decisions (timestamp_ms DESC);"
                 )
@@ -181,6 +206,117 @@ class CentralTradingMind:
 
         return None
 
+    def evaluate_conditional_allocation(
+        self,
+        proposal: TradeProposal,
+        account_equity_usd: float,
+        planned_trade_risk_usd: float,
+    ) -> dict[str, Any]:
+        """
+        The CBT Conditional Portfolio Capital Allocator.
+        Evaluates whether to OPEN, HOLD, REDUCE, CLOSE, or REPLACE.
+
+        Core Invariants:
+        1. Always focus on main 3 (BTC, ETH, GOLD) as prioritized Core Anchors.
+           Core Anchors are IMMUTABLE against replacement by satellite coins.
+        2. Normal operating limit is 3 trades, but conditional expansion (+ coin + coin...)
+           is permitted as long as total aggregate stop risk <= 2.0% ($200 on $10k).
+        3. Trailed stops to breakeven release 100% of risk capital back into the budget.
+        4. If risk budget is saturated (>= 2.0%) or positions at capacity, and an Elite setup arrives,
+           evaluate replacing the weakest, stagnant satellite position.
+        """
+        budget = portfolio_shadow.calculate_aggregate_risk_budget(
+            book_id="MAIN_SOVEREIGN",
+            account_equity_usd=account_equity_usd,
+            max_aggregate_risk_pct=self.MAX_AGGREGATE_RISK_PCT,
+        )
+        open_positions = portfolio_shadow.get_open_positions()
+        is_core = is_core_anchor(proposal.symbol)
+
+        raw_conf = proposal.confluence_score
+        if raw_conf is None:
+            raw_c = getattr(proposal, "confidence", 0.0)
+            raw_conf = raw_c * 100.0 if raw_c <= 1.0 else raw_c
+        conf_score = float(raw_conf or 0.0)
+        ev_r = float(proposal.expected_value_r or 0.0)
+        is_elite = conf_score >= 85.0 or ev_r >= 1.50
+
+        elite_cap = int(os.getenv("MAX_ELITE_POSITIONS", str(self.MAX_CONCURRENT_POSITIONS + 2)))
+        eff_capacity = elite_cap if is_elite else self.MAX_CONCURRENT_POSITIONS
+
+        agg_risk = budget["aggregate_stop_risk_usd"]
+        max_agg_risk = budget["max_aggregate_risk_usd"]
+        total_risk_after = round(agg_risk + planned_trade_risk_usd, 2)
+
+        # Case 1: Normal operating limits (< 3 positions)
+        if len(open_positions) < self.NORMAL_CONCURRENT_POSITIONS:
+            if total_risk_after <= max_agg_risk:
+                return {
+                    "action": PortfolioAction.OPEN,
+                    "is_allowed": True,
+                    "rejection_reason": None,
+                    "replace_position_id": None,
+                    "budget": budget,
+                }
+            else:
+                return {
+                    "action": PortfolioAction.HOLD,
+                    "is_allowed": False,
+                    "rejection_reason": f"Risk Budget Saturated: Aggregate stop risk (${total_risk_after:.2f}) exceeds ${max_agg_risk:.2f} (2.0%) ceiling.",
+                    "replace_position_id": None,
+                    "budget": budget,
+                }
+
+        # Case 2: Conditional Expansion (>= 3 positions: BTC + ETH + coin + coin...)
+        if total_risk_after <= max_agg_risk and len(open_positions) < eff_capacity:
+            # If satellite coin, require institutional confluence hurdle (min 80.0)
+            if not is_core and conf_score < 80.0 and ev_r < 0.50:
+                return {
+                    "action": PortfolioAction.HOLD,
+                    "is_allowed": False,
+                    "rejection_reason": f"Opportunity Hurdle: Satellite setup confluence ({conf_score:.1f}) < 80.0 institutional hurdle for conditional expansion.",
+                    "replace_position_id": None,
+                    "budget": budget,
+                }
+            return {
+                "action": PortfolioAction.OPEN,
+                "is_allowed": True,
+                "rejection_reason": None,
+                "replace_position_id": None,
+                "budget": budget,
+            }
+
+        # Case 3: Risk or Capacity Saturated -> Evaluate REPLACE
+        if is_elite and budget.get("satellite_positions"):
+            # Core anchors (BTC, ETH, GOLD) are IMMUTABLE against replacement by satellite coins
+            replaceable = [
+                p for p in budget["satellite_positions"]
+                if not p.get("is_breakeven_or_profit")
+            ]
+            if replaceable:
+                target_p = min(replaceable, key=lambda p: float(p.get("unrealized_pnl", 0.0)))
+                return {
+                    "action": PortfolioAction.REPLACE,
+                    "is_allowed": True,
+                    "rejection_reason": None,
+                    "replace_position_id": target_p["position_id"],
+                    "replace_symbol": target_p["symbol"],
+                    "budget": budget,
+                }
+
+        if len(open_positions) >= eff_capacity:
+            reason = f"Capacity Rejection: Maximum concurrent positions ({eff_capacity}) reached with all active positions protected."
+        else:
+            reason = f"Risk Budget Saturated: Aggregate stop risk (${total_risk_after:.2f}) exceeds ${max_agg_risk:.2f} ceiling. Awaiting breakeven trailing stop to release risk."
+
+        return {
+            "action": PortfolioAction.HOLD,
+            "is_allowed": False,
+            "rejection_reason": reason,
+            "replace_position_id": None,
+            "budget": budget,
+        }
+
     def evaluate_and_route(self, proposal: TradeProposal) -> CentralMindVerdict:
         """
         Supreme Evaluation & Routing Pipeline:
@@ -189,7 +325,7 @@ class CentralTradingMind:
         now_ms = int(time.time() * 1000)
         verdict_id = f"V_{uuid.uuid4().hex[:10].upper()}"
 
-        def _reject(reason: str) -> CentralMindVerdict:
+        def _reject(reason: str, action: str = PortfolioAction.HOLD.value) -> CentralMindVerdict:
             logger.warning(
                 f"Central Mind REJECTED [{proposal.origin}] {proposal.direction} {proposal.symbol}: {reason}"
             )
@@ -210,6 +346,7 @@ class CentralTradingMind:
                 risk_pct_equity=0.0,
                 executed_position_id=None,
                 timestamp_ms=now_ms,
+                portfolio_action=action,
             )
             self._persist_verdict(v)
             return v
@@ -312,21 +449,33 @@ class CentralTradingMind:
         risk_pct = round((trade_risk_usd / current_eq) * 100.0, 2)
 
         # -------------------------------------------------------------
-        # INVARIANT 6: Concurrency, Portfolio Heat, & Opportunity Reserve
+        # INVARIANT 6: The CBT Conditional Portfolio Capital Allocator
         # -------------------------------------------------------------
-        open_positions = portfolio_shadow.get_open_positions()
-        elite_cap = int(os.getenv("MAX_ELITE_POSITIONS", str(self.MAX_CONCURRENT_POSITIONS + 2)))
-        conf = getattr(proposal, "confidence", 0.0)
-        conf_score = conf * 100.0 if conf <= 1.0 else conf
-        is_elite = conf_score >= 85.0
-        eff_capacity = elite_cap if is_elite else self.MAX_CONCURRENT_POSITIONS
+        alloc_res = self.evaluate_conditional_allocation(
+            proposal=proposal,
+            account_equity_usd=current_eq,
+            planned_trade_risk_usd=trade_risk_usd,
+        )
 
-        if len(open_positions) >= eff_capacity:
-            return _reject(
-                f"Capacity Rejection: Maximum concurrent positions ({eff_capacity}) reached."
+        if not alloc_res["is_allowed"]:
+            return _reject(alloc_res["rejection_reason"], action=alloc_res["action"].value)
+
+        # Handle REPLACE action: cleanly close the identified stagnant satellite position
+        replaced_pos_id = None
+        if alloc_res["action"] == PortfolioAction.REPLACE and alloc_res.get("replace_position_id"):
+            replaced_pos_id = alloc_res["replace_position_id"]
+            rep_sym = alloc_res.get("replace_symbol", "satellite")
+            logger.info(
+                f"Conditional Allocator executing REPLACE: Closing stagnant satellite {rep_sym} ({replaced_pos_id}) "
+                f"to reallocate risk budget to higher-edge {proposal.symbol} setup."
+            )
+            portfolio_shadow.close_position(
+                position_id=replaced_pos_id,
+                exit_reason=f"REPLACED_BY_ELITE_{proposal.symbol}",
             )
 
-        # Check existing portfolio heat
+        # Check existing overall portfolio heat
+        open_positions = portfolio_shadow.get_open_positions()
         current_heat_usd = sum(
             float(p.get("size", 0.0))
             * abs(float(p.get("entry_price", 0.0)) - float(p.get("stop_loss", 0.0)))
@@ -337,7 +486,7 @@ class CentralTradingMind:
         if (current_heat_usd + trade_risk_usd) > max_portfolio_heat_usd:
             return _reject(
                 f"Portfolio Heat Rejection: Cumulative risk ${(current_heat_usd + trade_risk_usd):.2f} "
-                f"exceeds 2.50% portfolio heat cap (${max_portfolio_heat_usd:.2f})."
+                f"exceeds portfolio heat cap (${max_portfolio_heat_usd:.2f})."
             )
 
         # -------------------------------------------------------------
@@ -361,6 +510,7 @@ class CentralTradingMind:
                 prevent_duplicate_symbol=True,
                 style_tag=style_upper,
                 allow_multi_style=True,
+                confluence_score=proposal.confluence_score,
             )
         except Exception as exec_err:
             return _reject(f"Execution Rejection: {exec_err}")
@@ -383,6 +533,8 @@ class CentralTradingMind:
             risk_pct_equity=risk_pct,
             executed_position_id=pos_id,
             timestamp_ms=now_ms,
+            portfolio_action=alloc_res["action"].value,
+            replaced_position_id=replaced_pos_id,
         )
         self._persist_verdict(v)
         logger.info(
@@ -400,8 +552,8 @@ class CentralTradingMind:
                         verdict_id, proposal_id, origin, symbol, direction, style,
                         is_approved, rejection_reason, approved_size, entry_price,
                         stop_loss, take_profit, risk_usd, risk_pct_equity,
-                        executed_position_id, timestamp_ms
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                        executed_position_id, timestamp_ms, portfolio_action, replaced_position_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                     """,
                     (
                         v.verdict_id,
@@ -420,6 +572,8 @@ class CentralTradingMind:
                         v.risk_pct_equity,
                         v.executed_position_id,
                         v.timestamp_ms,
+                        getattr(v, "portfolio_action", "OPEN"),
+                        getattr(v, "replaced_position_id", None),
                     ),
                 )
                 conn.commit()

@@ -31,6 +31,21 @@ ALLOWED_TIER1_ASSETS: set[str] = {
     "PAXG/USDT", "PAXGUSDT",
 }
 
+# The Primary Core Anchors of CBT (BTC, ETH, GOLD)
+CORE_ANCHOR_SYMBOLS: set[str] = {
+    "BTC/USDT", "BTCUSDT",
+    "ETH/USDT", "ETHUSDT",
+    "XAU/USD", "XAUUSD",
+    "PAXG/USDT", "PAXGUSDT",
+    "GOLD",
+}
+
+
+def is_core_anchor(symbol: str) -> bool:
+    """Checks whether a symbol belongs to the 3 primary core anchors (BTC, ETH, GOLD)."""
+    clean = symbol.replace("/", "").replace("_", "").upper()
+    return clean in {s.replace("/", "").replace("_", "").upper() for s in CORE_ANCHOR_SYMBOLS}
+
 
 @dataclass
 class ShadowPosition:
@@ -794,7 +809,19 @@ class PortfolioShadowManager:
     def get_open_positions(self, book_id: str | None = None) -> list[dict[str, Any]]:
         clean_book_id = book_id if isinstance(book_id, str) and book_id else None
         with db_manager.get_trading_conn() as conn:
-            if clean_book_id:
+            cursor = conn.execute("PRAGMA table_info(shadow_positions);")
+            cols = {r[1] for r in cursor.fetchall()}
+            if not cols:
+                return []
+            if "book_id" not in cols and clean_book_id:
+                try:
+                    conn.execute("ALTER TABLE shadow_positions ADD COLUMN book_id TEXT DEFAULT 'MAIN_SOVEREIGN';")
+                    conn.commit()
+                    cols.add("book_id")
+                except Exception:
+                    pass
+
+            if clean_book_id and "book_id" in cols:
                 cursor = conn.execute(
                     "SELECT * FROM shadow_positions WHERE status = 'OPEN' AND (book_id = ? OR (? = 'MAIN_SOVEREIGN' AND book_id IS NULL)) ORDER BY opened_at DESC;",
                     (clean_book_id, clean_book_id),
@@ -809,7 +836,19 @@ class PortfolioShadowManager:
     def get_all_positions(self, limit: int = 50, book_id: str | None = None) -> list[dict[str, Any]]:
         clean_book_id = book_id if isinstance(book_id, str) and book_id else None
         with db_manager.get_trading_conn() as conn:
-            if clean_book_id:
+            cursor = conn.execute("PRAGMA table_info(shadow_positions);")
+            cols = {r[1] for r in cursor.fetchall()}
+            if not cols:
+                return []
+            if "book_id" not in cols and clean_book_id:
+                try:
+                    conn.execute("ALTER TABLE shadow_positions ADD COLUMN book_id TEXT DEFAULT 'MAIN_SOVEREIGN';")
+                    conn.commit()
+                    cols.add("book_id")
+                except Exception:
+                    pass
+
+            if clean_book_id and "book_id" in cols:
                 cursor = conn.execute(
                     "SELECT * FROM shadow_positions WHERE (book_id = ? OR (? = 'MAIN_SOVEREIGN' AND book_id IS NULL)) ORDER BY opened_at DESC LIMIT ?;",
                     (clean_book_id, clean_book_id, limit),
@@ -820,6 +859,92 @@ class PortfolioShadowManager:
                 )
             rows = cursor.fetchall()
         return [dict(r) for r in rows]
+
+    def calculate_aggregate_risk_budget(
+        self,
+        book_id: str = "MAIN_SOVEREIGN",
+        account_equity_usd: float = 10_000.0,
+        max_aggregate_risk_pct: float = 2.0,
+    ) -> dict[str, Any]:
+        """
+        Calculates the active aggregate stop-loss risk across open positions.
+        Invariants:
+        1. Distinguishes Core Anchors (BTC, ETH, GOLD) from Satellite Opportunities ('+ coin + coin...').
+        2. Breakeven Trailing Stops Release Risk: Once a position trails its stop to or above entry,
+           downside risk to initial capital is $0.00, releasing that risk tranche back to the budget.
+        3. Returns remaining available risk capacity in dollars and percentage.
+        """
+        open_positions = self.get_open_positions(book_id=book_id)
+        aggregate_stop_risk_usd = 0.0
+        released_risk_usd = 0.0
+        core_anchor_positions: list[dict[str, Any]] = []
+        satellite_positions: list[dict[str, Any]] = []
+
+        for pos in open_positions:
+            sym = pos.get("symbol", "")
+            sz = float(pos.get("size", 0.0))
+            entry_p = float(pos.get("entry_price", 0.0))
+            sl_p = float(pos.get("stop_loss", 0.0)) if pos.get("stop_loss") is not None else entry_p
+            tr_p = float(pos.get("trailing_stop", 0.0)) if pos.get("trailing_stop") is not None else None
+            dir_str = str(pos.get("direction", "LONG")).upper()
+            be_trig = bool(pos.get("breakeven_triggered", 0))
+
+            if dir_str == "LONG":
+                eff_stop = max(sl_p, tr_p) if tr_p is not None else sl_p
+                if eff_stop >= entry_p or be_trig:
+                    remaining_risk = 0.0
+                    initial_risk = sz * abs(entry_p - sl_p) if sl_p < entry_p else 0.0
+                    released_risk_usd += initial_risk
+                else:
+                    remaining_risk = sz * max(0.0, entry_p - eff_stop)
+            else:  # SHORT
+                eff_stop = min(sl_p, tr_p) if tr_p is not None else sl_p
+                if eff_stop <= entry_p or be_trig:
+                    remaining_risk = 0.0
+                    initial_risk = sz * abs(sl_p - entry_p) if sl_p > entry_p else 0.0
+                    released_risk_usd += initial_risk
+                else:
+                    remaining_risk = sz * max(0.0, eff_stop - entry_p)
+
+            aggregate_stop_risk_usd += remaining_risk
+
+            rec = {
+                "position_id": pos.get("position_id"),
+                "symbol": sym,
+                "direction": dir_str,
+                "size": sz,
+                "entry_price": entry_p,
+                "effective_stop": eff_stop,
+                "remaining_risk_usd": round(remaining_risk, 2),
+                "is_breakeven_or_profit": remaining_risk == 0.0,
+                "is_core_anchor": is_core_anchor(sym),
+                "opened_at": pos.get("opened_at"),
+                "unrealized_pnl": float(pos.get("unrealized_pnl", 0.0)),
+                "entry_reason": pos.get("entry_reason"),
+            }
+            if is_core_anchor(sym):
+                core_anchor_positions.append(rec)
+            else:
+                satellite_positions.append(rec)
+
+        max_risk_usd = round(account_equity_usd * (max_aggregate_risk_pct / 100.0), 2)
+        available_risk_budget_usd = max(0.0, round(max_risk_usd - aggregate_stop_risk_usd, 2))
+
+        return {
+            "book_id": book_id,
+            "account_equity_usd": account_equity_usd,
+            "total_open_positions": len(open_positions),
+            "core_anchor_count": len(core_anchor_positions),
+            "satellite_count": len(satellite_positions),
+            "aggregate_stop_risk_usd": round(aggregate_stop_risk_usd, 2),
+            "aggregate_stop_risk_pct": round((aggregate_stop_risk_usd / account_equity_usd) * 100.0, 3) if account_equity_usd > 0 else 0.0,
+            "released_risk_usd": round(released_risk_usd, 2),
+            "max_aggregate_risk_usd": max_risk_usd,
+            "available_risk_budget_usd": available_risk_budget_usd,
+            "core_anchor_positions": core_anchor_positions,
+            "satellite_positions": satellite_positions,
+            "can_allocate_additional": available_risk_budget_usd > 0.0,
+        }
 
     def get_portfolio_accounting(
         self, starting_capital: float | None = None, book_id: str | None = None
