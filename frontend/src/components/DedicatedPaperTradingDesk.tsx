@@ -850,7 +850,7 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
                   <th className="py-2.5 px-3">TRADE ID</th>
                   <th className="py-2.5 px-3">ASSET</th>
                   <th className="py-2.5 px-3">SIDE</th>
-                  <th className="py-2.5 px-3">TIMESTAMPS (UTC)</th>
+                  <th className="py-2.5 px-3">TIMESTAMPS (BD TIME / UTC+6)</th>
                   <th className="py-2.5 px-3">ENTRY / EXIT</th>
                   <th className="py-2.5 px-3 text-right">REALIZED P&amp;L</th>
                   <th className="py-2.5 px-3">ENTRY &amp; EXIT REASONS</th>

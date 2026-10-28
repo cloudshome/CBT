@@ -16,7 +16,7 @@ import logging
 import os
 import re
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -27,6 +27,8 @@ from core.macro_trade_planner import macro_trade_planner
 from core.portfolio_shadow import portfolio_shadow
 
 logger = logging.getLogger("sky.execution.paper_routes")
+
+BD_TZ = timezone(timedelta(hours=6))
 
 paper_router = APIRouter(tags=["paper-trading"])
 
@@ -221,7 +223,7 @@ async def get_paper_desk_overview():
 
         opened_at_ts = p.get("opened_at")
         opened_at_fmt = (
-            datetime.fromtimestamp(opened_at_ts / 1000.0, tz=UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
+            datetime.fromtimestamp(opened_at_ts / 1000.0, tz=BD_TZ).strftime("%Y-%m-%d %H:%M:%S BST")
             if opened_at_ts
             else None
         )
@@ -295,12 +297,12 @@ async def get_paper_desk_overview():
         opened_at_ts = p.get("opened_at")
         closed_at_ts = p.get("closed_at")
         opened_at_fmt = (
-            datetime.fromtimestamp(opened_at_ts / 1000.0, tz=UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
+            datetime.fromtimestamp(opened_at_ts / 1000.0, tz=BD_TZ).strftime("%Y-%m-%d %H:%M:%S BST")
             if opened_at_ts
             else None
         )
         closed_at_fmt = (
-            datetime.fromtimestamp(closed_at_ts / 1000.0, tz=UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
+            datetime.fromtimestamp(closed_at_ts / 1000.0, tz=BD_TZ).strftime("%Y-%m-%d %H:%M:%S BST")
             if closed_at_ts
             else None
         )
