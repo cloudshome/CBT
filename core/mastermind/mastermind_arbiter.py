@@ -635,30 +635,44 @@ class MastermindArbiterCouncil:
                 reason = f"Mastermind Arbiter [{spec.specialist_id}]: {proposal.thesis[:120]}"
 
                 try:
-                    portfolio_shadow.open_position(
+                    # Route through Supreme Central Trading Mind & Risk Gateway (Finding D-01)
+                    from core.data_streamer import data_streamer
+                    from core.central_mind import CentralTradingMind, TradeProposal
+
+                    data_streamer._last_known_prices[sym] = cur_price
+
+                    mind = CentralTradingMind()
+                    cm_proposal = TradeProposal(
+                        origin=f"MASTERMIND_{spec.specialist_id}",
                         symbol=sym,
                         direction=direction_str,
-                        size=units,
-                        entry_price=cur_price,
+                        style="DAY",
+                        planned_entry=cur_price,
                         stop_loss=proposal.stop_loss,
                         take_profit=proposal.take_profit,
-                        entry_reason=reason,
-                        enforce_atomic_limits=True,
-                        max_open_limit=max_active_portfolio_positions,
-                        max_risk_usd=current_eq * 0.015,
-                        prevent_duplicate_symbol=True,
-                        allow_multi_style=False,
-                        confluence_score=getattr(proposal, "confluence_score", 80.0),
+                        thesis=reason,
+                        requested_size=units,
+                        confluence_score=getattr(proposal, "confidence_score", 0.8) * 100.0,
+                        expected_value_r=getattr(proposal, "expected_value_r", None),
                     )
-                    existing_symbols.add(sym)
-                    logger.info(
-                        "Mastermind approved and deployed: %s %s (Notional: $%.2f, Overlap Discount: %.2f, Calib Weight: %.2f)",
-                        direction_str,
-                        sym,
-                        approved_notional,
-                        overlap_discount,
-                        calib_weight,
-                    )
+                    verdict = mind.evaluate_and_route(cm_proposal)
+                    if not verdict.is_approved:
+                        logger.warning(
+                            "Mastermind proposal rejected by Central Trading Mind: %s (%s)",
+                            sym, verdict.rejection_reason
+                        )
+                        is_approved = False
+                        rejection_reason = f"Central Trading Mind: {verdict.rejection_reason}"
+                    else:
+                        existing_symbols.add(sym)
+                        logger.info(
+                            "Mastermind approved and deployed: %s %s (Notional: $%.2f, Overlap Discount: %.2f, Calib Weight: %.2f)",
+                            direction_str,
+                            sym,
+                            approved_notional,
+                            overlap_discount,
+                            calib_weight,
+                        )
 
                     # Dispatch immediate notification to Telegram
                     try:

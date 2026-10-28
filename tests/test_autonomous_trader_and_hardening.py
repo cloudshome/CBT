@@ -185,6 +185,12 @@ async def test_autonomous_trader_emits_open_event():
         risk_gate_passed=True,
         explanation_dossier={},
     )
+    from core.risk_manager import risk_manager
+    from core.cooldown_governor import cooldown_governor
+
+    risk_manager.reset_lockout()
+    cooldown_governor.reset()
+
     trader = AutonomousTrader(active_symbols=["BTC/USDT"], max_open_positions=3)
 
     with (

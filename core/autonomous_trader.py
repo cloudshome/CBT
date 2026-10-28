@@ -414,7 +414,7 @@ class AutonomousTrader:
                         units = max(0.001, round(pos_size_usd / entry_price, 4))
                     direction_str = decision_out.decision.value
 
-                    # 5. Open Position in Shadow Portfolio (with atomic multi-style sub-books & risk limits)
+                    # 5. Route through Supreme Central Trading Mind & Risk Gateway (Finding D-01)
                     st_obj = getattr(setup, "setup_type", None) if setup else None
                     if hasattr(st_obj, "value"):
                         setup_label = st_obj.value
@@ -426,22 +426,31 @@ class AutonomousTrader:
                         f"{style_tag} {setup_label} ({direction_str}) | "
                         f"Net-EV: {decision_out.net_ev_r:.2f}R | Kelly: {decision_out.kelly_fraction:.1%}"
                     )
-                    pos_id = portfolio_shadow.open_position(
+
+                    from core.central_mind import CentralTradingMind, TradeProposal
+                    data_streamer._last_known_prices[sym] = entry_price
+
+                    mind = getattr(self, "central_mind", None) or CentralTradingMind()
+                    proposal = TradeProposal(
+                        origin="AUTONOMOUS_TRADER",
                         symbol=sym,
                         direction=direction_str,
-                        size=units,
-                        entry_price=entry_price,
+                        style=style_tag,
+                        planned_entry=entry_price,
                         stop_loss=sl,
                         take_profit=tp,
-                        entry_reason=reason_desc,
-                        enforce_atomic_limits=True,
-                        max_open_limit=self.max_open_positions,
-                        max_risk_usd=current_eq * 0.015,
-                        prevent_duplicate_symbol=True,
-                        style_tag=style_tag,
-                        allow_multi_style=False,
+                        thesis=reason_desc,
+                        requested_size=units,
                         confluence_score=conf,
+                        expected_value_r=getattr(decision_out, "net_ev_r", None),
                     )
+                    verdict = mind.evaluate_and_route(proposal)
+                    if not verdict.is_approved:
+                        logger.warning(
+                            f"Central Trading Mind REJECTED [{style_tag}] {sym}: {verdict.rejection_reason}"
+                        )
+                        continue
+                    pos_id = verdict.executed_position_id or f"POS_{sym}_{int(time.time()*1000)}"
                     self.total_trades_executed += 1
                     self._last_traded_candle_ts[sym] = latest_candle_ts
 

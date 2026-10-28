@@ -76,12 +76,20 @@ def test_breakeven_trailed_stop_releases_risk_budget():
     # 2. Update stop loss to breakeven (80,000.0)
     portfolio_shadow.update_stop_loss(pos_id, new_stop_loss=80000.0)
 
-    # 3. Recalculate risk budget: remaining risk must drop to $0.00 and budget fully available!
+    # 3. Recalculate risk budget: remaining risk reflects residual friction reserve ($1.84) rather than naive $0.00 (Finding D-03)
     budget_after = portfolio_shadow.calculate_aggregate_risk_budget(
         book_id="MAIN_SOVEREIGN", account_equity_usd=10000.0, max_aggregate_risk_pct=2.0
     )
-    assert budget_after["aggregate_stop_risk_usd"] == 0.0
-    assert budget_after["available_risk_budget_usd"] == 200.0
+    assert budget_after["aggregate_stop_risk_usd"] == 1.84
+    assert budget_after["available_risk_budget_usd"] == 198.16
+    assert budget_after["released_risk_usd"] == 38.16
+
+    # Nominal calculation without friction drops fully to $0.00
+    budget_nominal = portfolio_shadow.calculate_aggregate_risk_budget(
+        book_id="MAIN_SOVEREIGN", account_equity_usd=10000.0, max_aggregate_risk_pct=2.0, include_friction_reserve=False
+    )
+    assert budget_nominal["aggregate_stop_risk_usd"] == 0.0
+    assert budget_nominal["available_risk_budget_usd"] == 200.0
 
 
 def test_conditional_expansion_btc_eth_plus_coins(monkeypatch):

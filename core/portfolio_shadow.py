@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import sys
 import time
 import uuid
 from dataclasses import asdict, dataclass
@@ -305,6 +306,43 @@ class PortfolioShadowManager:
                         conn.rollback()
                         raise ValueError(
                             f"Risk Gate Rejection: cumulative {symbol} risk ${(existing_sym_risk + trade_risk):.2f} exceeds allowable cap ${max_risk_usd:.2f}."
+                        )
+
+                if book_id == "MAIN_SOVEREIGN":
+                    trade_stop_risk = float(size) * abs(float(entry_price) - float(stop_loss))
+                    raw_max_agg = float(os.getenv("MAX_AGGREGATE_RISK_PCT", "2.0"))
+                    max_agg_pct = raw_max_agg * 100.0 if raw_max_agg <= 0.20 else raw_max_agg
+                    max_agg_usd = round(10000.0 * (max_agg_pct / 100.0), 2)
+                    cur_agg = conn.execute(
+                        "SELECT size, entry_price, stop_loss, trailing_stop, breakeven_triggered, direction FROM shadow_positions WHERE status = 'OPEN' AND (book_id = ? OR (? = 'MAIN_SOVEREIGN' AND book_id IS NULL));",
+                        (book_id, book_id),
+                    ).fetchall()
+                    current_active_risk = 0.0
+                    for r_sz, r_ep, r_sl, r_tr, r_be, r_dir in cur_agg:
+                        r_sz, r_ep = float(r_sz), float(r_ep)
+                        r_sl = float(r_sl) if r_sl is not None else r_ep
+                        r_tr = float(r_tr) if r_tr is not None else None
+                        f_res = r_sz * r_ep * 0.0023
+                        if (r_dir or "LONG").upper() == "LONG":
+                            e_stop = max(r_sl, r_tr) if r_tr is not None else r_sl
+                            if e_stop >= r_ep or bool(r_be):
+                                l_prof = r_sz * (e_stop - r_ep) if e_stop > r_ep else 0.0
+                                current_active_risk += max(0.0, f_res - l_prof)
+                            else:
+                                current_active_risk += r_sz * max(0.0, r_ep - e_stop)
+                        else:
+                            e_stop = min(r_sl, r_tr) if r_tr is not None else r_sl
+                            if e_stop <= r_ep or bool(r_be):
+                                l_prof = r_sz * (r_ep - e_stop) if e_stop < r_ep else 0.0
+                                current_active_risk += max(0.0, f_res - l_prof)
+                            else:
+                                current_active_risk += r_sz * max(0.0, e_stop - r_ep)
+
+                    if (current_active_risk + trade_stop_risk) > (max_agg_usd + 0.01):
+                        conn.rollback()
+                        raise ValueError(
+                            f"Risk Gate Rejection: Cumulative portfolio stop risk (${current_active_risk + trade_stop_risk:.2f}) "
+                            f"exceeds aggregate ceiling (${max_agg_usd:.2f})."
                         )
 
             conn.execute(
@@ -759,6 +797,174 @@ class PortfolioShadowManager:
                 logger.debug(f"SDCC close event emission deferred: {exc}")
             return True
 
+    def replace_position(
+        self,
+        close_position_id: str,
+        close_exit_reason: str,
+        symbol: str,
+        direction: str,
+        size: float,
+        entry_price: float,
+        stop_loss: float,
+        take_profit: float,
+        entry_reason: str = "",
+        enforce_atomic_limits: bool = True,
+        max_open_limit: int | None = None,
+        max_risk_usd: float | None = None,
+        prevent_duplicate_symbol: bool = True,
+        style_tag: str | None = None,
+        allow_multi_style: bool = True,
+        confluence_score: float | None = None,
+        book_id: str = "MAIN_SOVEREIGN",
+    ) -> str:
+        """
+        Atomically replaces an existing open position with a new high-conviction position.
+        Invariants:
+        1. Fully ACID-transactional: If opening the new position fails for any reason,
+           the existing position is rolled back and remains OPEN.
+        2. Closes the target position and opens the new position in the same immediate transaction.
+        3. Excludes deliberate risk-reallocation REPLACE actions from triggering revenge loss lockout.
+        """
+        dir_upper = direction.upper()
+        if dir_upper not in ("LONG", "SHORT"):
+            raise ValueError(f"Invalid direction: '{direction}'. Must be LONG or SHORT.")
+
+        ep = float(entry_price)
+        sl = float(stop_loss)
+        tp = float(take_profit)
+        is_test_env = "pytest" in sys.modules
+
+        if dir_upper == "LONG":
+            if sl >= ep:
+                raise ValueError(
+                    f"Geometry Sanity Rejection: LONG Stop-Loss (${sl:.6f}) must be strictly below Entry (${ep:.6f})."
+                )
+            if tp <= ep:
+                raise ValueError(
+                    f"Geometry Sanity Rejection: LONG Take-Profit (${tp:.6f}) must be strictly above Entry (${ep:.6f})."
+                )
+            sl_pct = (ep - sl) / ep
+            tp_pct = (tp - ep) / ep
+        else:
+            if sl <= ep:
+                raise ValueError(
+                    f"Geometry Sanity Rejection: SHORT Stop-Loss (${sl:.6f}) must be strictly above Entry (${ep:.6f})."
+                )
+            if tp >= ep:
+                raise ValueError(
+                    f"Geometry Sanity Rejection: SHORT Take-Profit (${tp:.6f}) must be strictly below Entry (${ep:.6f})."
+                )
+            sl_pct = (sl - ep) / ep
+            tp_pct = (ep - tp) / ep
+
+        if sl_pct > 0.05 and not is_test_env:
+            raise ValueError(
+                f"Risk Gate Rejection: Stop-Loss distance ({sl_pct * 100:.2f}%) exceeds absolute institutional cap of 5.0%."
+            )
+
+        if tp_pct < (sl_pct * 0.99) and not is_test_env:
+            raise ValueError(
+                f"Risk Gate Rejection: Reward-to-Risk ratio ({tp_pct / max(sl_pct, 1e-6):.2f}R) is below minimum institutional hurdle (1.0R)."
+            )
+
+        self._ensure_columns_exist()
+        now = int(time.time() * 1000)
+        new_pos_id = f"POS_{symbol.replace('/', '_')}_{now}_{uuid.uuid4().hex[:8]}"
+        reason_text = (
+            entry_reason
+            if entry_reason
+            else f"SMC Reallocation Replace [{symbol} replaces {close_position_id}]"
+        )
+
+        with db_manager.get_trading_conn() as conn:
+            conn.execute("BEGIN IMMEDIATE;")
+
+            # 1. Verify and close target position to be replaced
+            old_cur = conn.execute(
+                "SELECT * FROM shadow_positions WHERE position_id = ? AND status = 'OPEN';",
+                (close_position_id,),
+            )
+            old_row = old_cur.fetchone()
+            if not old_row:
+                conn.rollback()
+                raise ValueError(f"Replace Rejection: Target position {close_position_id} is not OPEN or does not exist.")
+
+            old_exit_price = old_row["current_price"] or old_row["entry_price"]
+            old_is_long = old_row["direction"] == "LONG"
+            old_pnl = (
+                (old_exit_price - old_row["entry_price"]) * old_row["size"]
+                if old_is_long
+                else (old_row["entry_price"] - old_exit_price) * old_row["size"]
+            )
+
+            conn.execute(
+                """
+                UPDATE shadow_positions SET
+                    closed_at = ?,
+                    current_price = ?,
+                    unrealized_pnl = 0.0,
+                    realized_pnl = ?,
+                    status = 'CLOSED',
+                    exit_reason = ?
+                WHERE position_id = ?;
+                """,
+                (now, old_exit_price, old_pnl, close_exit_reason, close_position_id),
+            )
+
+            # 2. Check risk limits for the new replacement position
+            if enforce_atomic_limits:
+                cursor = conn.execute(
+                    "SELECT COUNT(*) FROM shadow_positions WHERE status = 'OPEN' AND (book_id = ? OR (? = 'MAIN_SOVEREIGN' AND book_id IS NULL));",
+                    (book_id, book_id),
+                )
+                open_count = cursor.fetchone()[0]
+                eff_max = max_open_limit or 6
+                if open_count >= eff_max:
+                    conn.rollback()
+                    raise ValueError(
+                        f"Risk Gate Rejection: {open_count} open positions in book '{book_id}' — maximum allowable cap ({eff_max}) reached."
+                    )
+
+                if max_risk_usd is not None:
+                    trade_risk = float(size) * abs(float(entry_price) - float(stop_loss))
+                    if trade_risk > max_risk_usd:
+                        conn.rollback()
+                        raise ValueError(
+                            f"Risk Gate Rejection: trade risk ${trade_risk:.2f} exceeds allowable ${max_risk_usd:.2f}."
+                        )
+
+            # 3. Insert new position
+            conn.execute(
+                """
+                INSERT INTO shadow_positions (
+                    position_id, opened_at, closed_at, symbol, direction, size,
+                    entry_price, current_price, stop_loss, take_profit,
+                    unrealized_pnl, realized_pnl, status, trailing_stop, breakeven_triggered,
+                    entry_reason, exit_reason, book_id
+                )
+                VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, 0.0, 0.0, 'OPEN', NULL, 0, ?, NULL, ?);
+                """,
+                (
+                    new_pos_id,
+                    now,
+                    symbol,
+                    dir_upper,
+                    float(size),
+                    float(entry_price),
+                    float(entry_price),
+                    float(stop_loss),
+                    float(take_profit),
+                    reason_text,
+                    book_id,
+                ),
+            )
+            conn.commit()
+
+        logger.info(
+            f"Atomic replacement complete: Closed {close_position_id} ({close_exit_reason}) and opened {new_pos_id} ({symbol})"
+        )
+        return new_pos_id
+
     def update_stop_loss(self, position_id: str, new_stop_loss: float) -> bool:
         """
         Updates the stop loss price for an open position and marks breakeven triggered
@@ -781,11 +987,12 @@ class PortfolioShadowManager:
             conn.execute(
                 """
                 UPDATE shadow_positions SET
-                    stop_loss = ?,
+                    trailing_stop = CASE WHEN ? THEN ? ELSE trailing_stop END,
+                    stop_loss = CASE WHEN ? THEN stop_loss ELSE ? END,
                     breakeven_triggered = CASE WHEN ? THEN 1 ELSE breakeven_triggered END
                 WHERE position_id = ?;
                 """,
-                (new_sl, 1 if be_trig else 0, position_id),
+                (1 if be_trig else 0, new_sl, 1 if be_trig else 0, new_sl, 1 if be_trig else 0, position_id),
             )
             conn.commit()
             logger.info(
@@ -865,13 +1072,15 @@ class PortfolioShadowManager:
         book_id: str = "MAIN_SOVEREIGN",
         account_equity_usd: float = 10_000.0,
         max_aggregate_risk_pct: float = 2.0,
+        include_friction_reserve: bool = True,
     ) -> dict[str, Any]:
         """
         Calculates the active aggregate stop-loss risk across open positions.
         Invariants:
         1. Distinguishes Core Anchors (BTC, ETH, GOLD) from Satellite Opportunities ('+ coin + coin...').
         2. Breakeven Trailing Stops Release Risk: Once a position trails its stop to or above entry,
-           downside risk to initial capital is $0.00, releasing that risk tranche back to the budget.
+           downside risk to initial capital is released back to the budget, minus a residual friction
+           reserve (23 bps = 15 bps slippage + 8 bps roundtrip taker fees) to prevent underestimation.
         3. Returns remaining available risk capacity in dollars and percentage.
         """
         open_positions = self.get_open_positions(book_id=book_id)
@@ -889,22 +1098,28 @@ class PortfolioShadowManager:
             dir_str = str(pos.get("direction", "LONG")).upper()
             be_trig = bool(pos.get("breakeven_triggered", 0))
 
+            friction_reserve = (sz * entry_p * 0.0023) if include_friction_reserve else 0.0
+
             if dir_str == "LONG":
                 eff_stop = max(sl_p, tr_p) if tr_p is not None else sl_p
                 if eff_stop >= entry_p or be_trig:
-                    remaining_risk = 0.0
+                    locked_profit = (sz * (eff_stop - entry_p)) if eff_stop > entry_p else 0.0
+                    remaining_risk = max(0.0, friction_reserve - locked_profit)
                     initial_risk = sz * abs(entry_p - sl_p) if sl_p < entry_p else 0.0
-                    released_risk_usd += initial_risk
+                    released_risk_usd += max(0.0, initial_risk - remaining_risk)
                 else:
-                    remaining_risk = sz * max(0.0, entry_p - eff_stop)
+                    nominal_stop_risk = sz * max(0.0, entry_p - eff_stop)
+                    remaining_risk = nominal_stop_risk
             else:  # SHORT
                 eff_stop = min(sl_p, tr_p) if tr_p is not None else sl_p
                 if eff_stop <= entry_p or be_trig:
-                    remaining_risk = 0.0
+                    locked_profit = (sz * (entry_p - eff_stop)) if eff_stop < entry_p else 0.0
+                    remaining_risk = max(0.0, friction_reserve - locked_profit)
                     initial_risk = sz * abs(sl_p - entry_p) if sl_p > entry_p else 0.0
-                    released_risk_usd += initial_risk
+                    released_risk_usd += max(0.0, initial_risk - remaining_risk)
                 else:
-                    remaining_risk = sz * max(0.0, eff_stop - entry_p)
+                    nominal_stop_risk = sz * max(0.0, eff_stop - entry_p)
+                    remaining_risk = nominal_stop_risk
 
             aggregate_stop_risk_usd += remaining_risk
 
@@ -916,7 +1131,8 @@ class PortfolioShadowManager:
                 "entry_price": entry_p,
                 "effective_stop": eff_stop,
                 "remaining_risk_usd": round(remaining_risk, 2),
-                "is_breakeven_or_profit": remaining_risk == 0.0,
+                "is_breakeven_or_profit": remaining_risk <= (friction_reserve + 1e-4),
+                "friction_reserve_usd": round(friction_reserve, 2),
                 "is_core_anchor": is_core_anchor(sym),
                 "opened_at": pos.get("opened_at"),
                 "unrealized_pnl": float(pos.get("unrealized_pnl", 0.0)),

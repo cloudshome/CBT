@@ -113,6 +113,8 @@ class CentralTradingMind:
     NORMAL_TRADE_RISK_PCT: float = _raw_trade * 100.0 if _raw_trade <= 0.20 else _raw_trade  # 0.5% ($50 on $10k) planned risk per trade
     _raw_heat = float(os.getenv("MAX_PORTFOLIO_HEAT_PCT", "7.50"))
     MAX_PORTFOLIO_HEAT_PCT: float = _raw_heat * 100.0 if _raw_heat <= 0.20 else _raw_heat  # 7.5% max cumulative portfolio heat
+    _raw_cluster = float(os.getenv("MAX_CRYPTO_CLUSTER_RISK_PCT", "1.60"))
+    MAX_CRYPTO_CLUSTER_RISK_PCT: float = _raw_cluster * 100.0 if _raw_cluster <= 0.20 else _raw_cluster  # 1.6% max correlated crypto cluster risk
     MAX_TRADE_RISK_PCT: float = 1.50  # 1.5% max risk per trade ceiling
     MAX_PRICE_DEVIATION_PCT: float = 1.50  # 1.5% max divergence from live ticker
     MAX_CONCURRENT_POSITIONS: int = int(
@@ -170,16 +172,16 @@ class CentralTradingMind:
         try:
             from core.data_streamer import data_streamer
 
-            # 1. Check live recent candles
+            # 1. Check authoritative live ticker / WebSocket price first
+            if symbol in data_streamer._last_known_prices:
+                return float(data_streamer._last_known_prices[symbol])
+
+            # 2. Check live recent candles
             candles = data_streamer.get_candles(symbol, "15m", limit=3)
             if candles and len(candles) > 0:
                 last_c = candles[-1]
                 if int(last_c.get("is_synthetic", 0) or 0) == 0:
                     return float(last_c["close"])
-
-            # 2. Check last known live prices
-            if symbol in data_streamer._last_known_prices:
-                return float(data_streamer._last_known_prices[symbol])
 
             # 3. Check SQLite candles
             import sqlite3
@@ -247,6 +249,38 @@ class CentralTradingMind:
         agg_risk = budget["aggregate_stop_risk_usd"]
         max_agg_risk = budget["max_aggregate_risk_usd"]
         total_risk_after = round(agg_risk + planned_trade_risk_usd, 2)
+
+        # Correlated Crypto Cluster Risk Guard (Finding D-04)
+        # Directional crypto assets (BTC, ETH, SOL, BNB, etc.) share high beta.
+        # Aggregate same-direction crypto risk is capped at MAX_CRYPTO_CLUSTER_RISK_PCT,
+        # preserving risk budget for uncorrelated macro assets (e.g. GOLD / PAXG / XAU).
+        is_incoming_crypto = not any(g in proposal.symbol.upper() for g in ("XAU", "PAXG", "GOLD"))
+        if is_incoming_crypto:
+            max_cluster_risk_usd = round(account_equity_usd * (self.MAX_CRYPTO_CLUSTER_RISK_PCT / 100.0), 2)
+            existing_crypto_cluster_risk = 0.0
+            for pos in budget.get("core_anchor_positions", []) + budget.get("satellite_positions", []):
+                pos_sym = pos.get("symbol", "")
+                pos_dir = pos.get("direction", "LONG").upper()
+                pos_is_crypto = not any(g in pos_sym.upper() for g in ("XAU", "PAXG", "GOLD"))
+                if pos_is_crypto and pos_dir == proposal.direction.upper():
+                    existing_crypto_cluster_risk += float(pos.get("remaining_risk_usd", 0.0))
+
+            projected_cluster_risk = round(existing_crypto_cluster_risk + planned_trade_risk_usd, 2)
+            if projected_cluster_risk > (max_cluster_risk_usd + 0.05):
+                # If an elite opportunity arrives, allow evaluate REPLACE before outright rejecting
+                if not (is_elite and budget.get("satellite_positions")):
+                    return {
+                        "action": PortfolioAction.HOLD,
+                        "is_allowed": False,
+                        "rejection_reason": (
+                            f"Cluster Correlation Rejection: Projected crypto {proposal.direction.upper()} "
+                            f"risk (${projected_cluster_risk:.2f}) exceeds cluster ceiling (${max_cluster_risk_usd:.2f} / "
+                            f"{self.MAX_CRYPTO_CLUSTER_RISK_PCT}% equity). Allocate to uncorrelated assets (e.g. GOLD) "
+                            f"or wait for trailing stops to release risk."
+                        ),
+                        "replace_position_id": None,
+                        "budget": budget,
+                    }
 
         # Case 1: Normal operating limits (< 3 positions)
         if len(open_positions) < self.NORMAL_CONCURRENT_POSITIONS:
@@ -460,18 +494,15 @@ class CentralTradingMind:
         if not alloc_res["is_allowed"]:
             return _reject(alloc_res["rejection_reason"], action=alloc_res["action"].value)
 
-        # Handle REPLACE action: cleanly close the identified stagnant satellite position
+        # Handle REPLACE action: prepare atomic replacement (Finding D-02)
+        # Target position is NOT pre-closed here; replacement happens atomically in portfolio_shadow.replace_position
         replaced_pos_id = None
         if alloc_res["action"] == PortfolioAction.REPLACE and alloc_res.get("replace_position_id"):
             replaced_pos_id = alloc_res["replace_position_id"]
             rep_sym = alloc_res.get("replace_symbol", "satellite")
             logger.info(
-                f"Conditional Allocator executing REPLACE: Closing stagnant satellite {rep_sym} ({replaced_pos_id}) "
-                f"to reallocate risk budget to higher-edge {proposal.symbol} setup."
-            )
-            portfolio_shadow.close_position(
-                position_id=replaced_pos_id,
-                exit_reason=f"REPLACED_BY_ELITE_{proposal.symbol}",
+                f"Conditional Allocator preparing atomic REPLACE: Swapping stagnant satellite {rep_sym} ({replaced_pos_id}) "
+                f"for higher-edge {proposal.symbol} setup."
             )
 
         # Check existing overall portfolio heat
@@ -496,22 +527,42 @@ class CentralTradingMind:
         formatted_reason = f"[{proposal.symbol.replace('/', '')}_{style_upper}] {proposal.thesis} | Net-Risk: ${trade_risk_usd:.2f} ({risk_pct}%)"
 
         try:
-            pos_id = portfolio_shadow.open_position(
-                symbol=proposal.symbol,
-                direction=dir_upper,
-                size=effective_units,
-                entry_price=effective_entry,
-                stop_loss=proposal.stop_loss,
-                take_profit=proposal.take_profit,
-                entry_reason=formatted_reason,
-                enforce_atomic_limits=True,
-                max_open_limit=self.MAX_CONCURRENT_POSITIONS,
-                max_risk_usd=max_allowed_risk_usd,
-                prevent_duplicate_symbol=True,
-                style_tag=style_upper,
-                allow_multi_style=True,
-                confluence_score=proposal.confluence_score,
-            )
+            if replaced_pos_id:
+                pos_id = portfolio_shadow.replace_position(
+                    close_position_id=replaced_pos_id,
+                    close_exit_reason=f"REPLACED_BY_ELITE_{proposal.symbol}",
+                    symbol=proposal.symbol,
+                    direction=dir_upper,
+                    size=effective_units,
+                    entry_price=effective_entry,
+                    stop_loss=proposal.stop_loss,
+                    take_profit=proposal.take_profit,
+                    entry_reason=formatted_reason,
+                    enforce_atomic_limits=True,
+                    max_open_limit=self.MAX_CONCURRENT_POSITIONS,
+                    max_risk_usd=max_allowed_risk_usd,
+                    prevent_duplicate_symbol=True,
+                    style_tag=style_upper,
+                    allow_multi_style=True,
+                    confluence_score=proposal.confluence_score,
+                )
+            else:
+                pos_id = portfolio_shadow.open_position(
+                    symbol=proposal.symbol,
+                    direction=dir_upper,
+                    size=effective_units,
+                    entry_price=effective_entry,
+                    stop_loss=proposal.stop_loss,
+                    take_profit=proposal.take_profit,
+                    entry_reason=formatted_reason,
+                    enforce_atomic_limits=True,
+                    max_open_limit=self.MAX_CONCURRENT_POSITIONS,
+                    max_risk_usd=max_allowed_risk_usd,
+                    prevent_duplicate_symbol=True,
+                    style_tag=style_upper,
+                    allow_multi_style=True,
+                    confluence_score=proposal.confluence_score,
+                )
         except Exception as exec_err:
             return _reject(f"Execution Rejection: {exec_err}")
 
