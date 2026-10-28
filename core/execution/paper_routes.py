@@ -100,7 +100,7 @@ def enforce_paper_risk_gate(order: PaperTradeRequest) -> None:
     All limits come from environment variables; in production they MUST be set.
     """
     open_count = len(portfolio_shadow.get_open_positions())
-    max_open = int(os.getenv("MAX_PAPER_OPEN_POSITIONS", "3"))
+    max_open = int(os.getenv("MAX_CONCURRENT_POSITIONS", os.getenv("MAX_PAPER_OPEN_POSITIONS", "6")))
     if open_count >= max_open:
         raise HTTPException(
             status_code=422,
@@ -587,7 +587,7 @@ async def place_paper_trade(order: PaperTradeRequest):
             take_profit=order.tp,
             entry_reason=order.reason,
             enforce_atomic_limits=True,
-            max_open_limit=int(os.getenv("MAX_PAPER_OPEN_POSITIONS", "3")),
+            max_open_limit=int(os.getenv("MAX_CONCURRENT_POSITIONS", os.getenv("MAX_PAPER_OPEN_POSITIONS", "6"))),
             max_risk_usd=balance * max_risk_pct,
             prevent_duplicate_symbol=True,
             allow_multi_style=True,

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import time
 import uuid
 from dataclasses import asdict, dataclass
@@ -404,7 +405,7 @@ class MastermindArbiterCouncil:
     async def evaluate_swarm(
         self,
         market_data_by_symbol: dict[str, dict[str, Any]],
-        max_active_portfolio_positions: int = 3,
+        max_active_portfolio_positions: int = 6,
     ) -> list[MastermindDecisionRecord]:
         """
         Polls all active specialists, collects CandidateProposals, arbitrates conflicts,
@@ -524,6 +525,15 @@ class MastermindArbiterCouncil:
                 except Exception as meta_err:
                     logger.warning("Metacognitive evaluation skipped: %s", meta_err)
 
+            # Opportunity Reserve Protocol: Determine effective portfolio capacity
+            elite_active_cap = int(os.getenv("MAX_ELITE_POSITIONS", str(max_active_portfolio_positions + 2)))
+            is_elite_proposal = (
+                effective_confidence >= 0.85
+                or getattr(proposal, "confluence_score", 0.0) >= 85.0
+                or getattr(proposal, "expected_value_r", 0.0) >= 1.50
+            )
+            effective_cap = elite_active_cap if is_elite_proposal else max_active_portfolio_positions
+
             # Guard 1: Master Risk Gate Primacy (Independent Circuit Breaker Veto)
             if not gate.is_trading_allowed:
                 rejection_reason = f"Risk Gate lockout active: {gate.reason}"
@@ -562,10 +572,10 @@ class MastermindArbiterCouncil:
                     f"to {effective_confidence:.2f} < 0.45 (Brier: {calib['brier_score']:.3f})."
                 )
 
-            # Guard C: Portfolio Position Capacity (Max Cap)
-            elif len(open_positions) >= max_active_portfolio_positions:
+            # Guard C: Portfolio Position Capacity (Max Cap with Opportunity Reserve)
+            elif len(open_positions) >= effective_cap:
                 rejection_reason = (
-                    f"Max portfolio positions ({max_active_portfolio_positions}) reached."
+                    f"Max portfolio positions ({effective_cap}) reached."
                 )
 
             # Guard D: Symbol Deduplication
@@ -638,6 +648,7 @@ class MastermindArbiterCouncil:
                         max_risk_usd=current_eq * 0.015,
                         prevent_duplicate_symbol=True,
                         allow_multi_style=False,
+                        confluence_score=getattr(proposal, "confluence_score", 80.0),
                     )
                     existing_symbols.add(sym)
                     logger.info(

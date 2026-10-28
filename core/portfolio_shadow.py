@@ -92,6 +92,7 @@ class PortfolioShadowManager:
         style_tag: str | None = None,
         allow_multi_style: bool = False,
         book_id: str = "MAIN_SOVEREIGN",
+        confluence_score: float | None = None,
     ) -> str:
         # Multi-Book Institutional Asset Firewall
         is_test_env = "test" in os.environ.get("TRADING_LOGS_DB_PATH", "").lower()
@@ -230,19 +231,33 @@ class PortfolioShadowManager:
                 )
                 open_count = cursor.fetchone()[0]
                 if book_id == "MAIN_SOVEREIGN":
-                    eff_max_open = (
-                        min(max_open_limit, 3)
-                        if (max_open_limit is not None and not is_test_env)
-                        else (max_open_limit if max_open_limit is not None else 3)
+                    base_cap = int(os.getenv("MAX_CONCURRENT_POSITIONS", "6"))
+                    elite_cap = int(os.getenv("MAX_ELITE_POSITIONS", str(base_cap + 2)))
+                    # Opportunity Reserve Protocol: Reserve headroom for elite / high-conviction opportunities
+                    is_elite = (confluence_score is not None and confluence_score >= 85.0) or (
+                        entry_reason
+                        and any(
+                            kw in entry_reason.upper()
+                            for kw in ["CONFLUENCE: 9", "CONFLUENCE: 8", "ELITE", "A+", "HIGH CONVICTION"]
+                        )
                     )
+                    default_eff = elite_cap if is_elite else base_cap
+                    if max_open_limit is not None and is_test_env:
+                        eff_max_open = max_open_limit
+                    elif max_open_limit is not None and not is_test_env:
+                        eff_max_open = max(max_open_limit, default_eff)
+                    else:
+                        eff_max_open = default_eff
                 elif book_id == "RADAR_ALPHA":
-                    eff_max_open = (
-                        min(max_open_limit, 2)
-                        if (max_open_limit is not None and not is_test_env)
-                        else (max_open_limit if max_open_limit is not None else 2)
-                    )
+                    base_radar = int(os.getenv("MAX_RADAR_POSITIONS", "4"))
+                    if max_open_limit is not None and is_test_env:
+                        eff_max_open = max_open_limit
+                    elif max_open_limit is not None and not is_test_env:
+                        eff_max_open = max(max_open_limit, base_radar)
+                    else:
+                        eff_max_open = base_radar
                 else:
-                    eff_max_open = max_open_limit or 5
+                    eff_max_open = max_open_limit or 6
 
                 if open_count >= eff_max_open:
                     conn.rollback()
@@ -777,11 +792,12 @@ class PortfolioShadowManager:
         logger.info("Reset all shadow positions in database and cleared cooldown governor state.")
 
     def get_open_positions(self, book_id: str | None = None) -> list[dict[str, Any]]:
+        clean_book_id = book_id if isinstance(book_id, str) and book_id else None
         with db_manager.get_trading_conn() as conn:
-            if book_id:
+            if clean_book_id:
                 cursor = conn.execute(
                     "SELECT * FROM shadow_positions WHERE status = 'OPEN' AND (book_id = ? OR (? = 'MAIN_SOVEREIGN' AND book_id IS NULL)) ORDER BY opened_at DESC;",
-                    (book_id, book_id),
+                    (clean_book_id, clean_book_id),
                 )
             else:
                 cursor = conn.execute(
@@ -791,11 +807,12 @@ class PortfolioShadowManager:
         return [dict(r) for r in rows]
 
     def get_all_positions(self, limit: int = 50, book_id: str | None = None) -> list[dict[str, Any]]:
+        clean_book_id = book_id if isinstance(book_id, str) and book_id else None
         with db_manager.get_trading_conn() as conn:
-            if book_id:
+            if clean_book_id:
                 cursor = conn.execute(
                     "SELECT * FROM shadow_positions WHERE (book_id = ? OR (? = 'MAIN_SOVEREIGN' AND book_id IS NULL)) ORDER BY opened_at DESC LIMIT ?;",
-                    (book_id, book_id, limit),
+                    (clean_book_id, clean_book_id, limit),
                 )
             else:
                 cursor = conn.execute(

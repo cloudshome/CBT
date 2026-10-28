@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import time
 from typing import Any
 
@@ -38,7 +39,7 @@ class RadarAlphaExecutor:
         min_market_attention: float = 80.0,
     ) -> None:
         self.allocated_capital_usd = allocated_capital_usd
-        self.max_open_positions = max_open_positions
+        self.max_open_positions = int(os.getenv("MAX_RADAR_POSITIONS", "4"))
         self.risk_per_trade_usd = risk_per_trade_usd
         self.min_24h_volume_usd = min_24h_volume_usd
         self.min_market_attention = min_market_attention

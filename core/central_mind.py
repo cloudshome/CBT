@@ -24,6 +24,7 @@ Governing Principles:
 from __future__ import annotations
 
 import logging
+import os
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
@@ -93,10 +94,14 @@ class CentralTradingMind:
     Unifies Market Regime, Multi-Style Desks, Risk Primacy, and Execution Gateways.
     """
 
-    MAX_PORTFOLIO_HEAT_PCT: float = 2.50  # 2.5% max cumulative portfolio risk
+    MAX_PORTFOLIO_HEAT_PCT: float = float(
+        os.getenv("MAX_PORTFOLIO_HEAT_PCT", "7.50")
+    )  # 7.5% max cumulative portfolio risk
     MAX_TRADE_RISK_PCT: float = 1.50  # 1.5% max risk per trade
     MAX_PRICE_DEVIATION_PCT: float = 1.50  # 1.5% max divergence from live ticker
-    MAX_CONCURRENT_POSITIONS: int = 3  # Institutional concurrency cap
+    MAX_CONCURRENT_POSITIONS: int = int(
+        os.getenv("MAX_CONCURRENT_POSITIONS", "6")
+    )  # Institutional concurrency cap
 
     def __init__(self) -> None:
         self._ensure_tables()
@@ -307,12 +312,18 @@ class CentralTradingMind:
         risk_pct = round((trade_risk_usd / current_eq) * 100.0, 2)
 
         # -------------------------------------------------------------
-        # INVARIANT 6: Concurrency, Portfolio Heat, & Anti-Cannibalization
+        # INVARIANT 6: Concurrency, Portfolio Heat, & Opportunity Reserve
         # -------------------------------------------------------------
         open_positions = portfolio_shadow.get_open_positions()
-        if len(open_positions) >= self.MAX_CONCURRENT_POSITIONS:
+        elite_cap = int(os.getenv("MAX_ELITE_POSITIONS", str(self.MAX_CONCURRENT_POSITIONS + 2)))
+        conf = getattr(proposal, "confidence", 0.0)
+        conf_score = conf * 100.0 if conf <= 1.0 else conf
+        is_elite = conf_score >= 85.0
+        eff_capacity = elite_cap if is_elite else self.MAX_CONCURRENT_POSITIONS
+
+        if len(open_positions) >= eff_capacity:
             return _reject(
-                f"Capacity Rejection: Maximum concurrent positions ({self.MAX_CONCURRENT_POSITIONS}) reached."
+                f"Capacity Rejection: Maximum concurrent positions ({eff_capacity}) reached."
             )
 
         # Check existing portfolio heat

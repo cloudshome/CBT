@@ -74,7 +74,7 @@ class AutonomousTrader:
         active_symbols: list[str] | None = None,
         scan_interval_sec: float = 30.0,
         account_equity_usd: float = 10_000.0,
-        max_open_positions: int = 3,
+        max_open_positions: int = 6,
     ):
         self.active_symbols = active_symbols or [
             "BTC/USDT",
@@ -85,7 +85,9 @@ class AutonomousTrader:
             os.getenv("AUTONOMOUS_SCAN_INTERVAL_SEC", str(scan_interval_sec))
         )
         self.account_equity_usd = account_equity_usd
-        self.max_open_positions = max_open_positions
+        self.max_open_positions = int(
+            os.getenv("MAX_CONCURRENT_POSITIONS", str(max_open_positions))
+        )
         self.is_running = True
         self.last_scan_time: float = 0.0
         self.last_decisions: dict[str, Any] = {}
@@ -187,10 +189,21 @@ class AutonomousTrader:
                 ):
                     open_positions = portfolio_shadow.get_open_positions()
 
-                    # Enforce max open positions limit
-                    if len(open_positions) >= self.max_open_positions:
+                    # Enforce max open positions limit with Opportunity Reserve headroom for elite setups
+                    base_max = self.max_open_positions
+                    elite_max = int(os.getenv("MAX_ELITE_POSITIONS", str(base_max + 2)))
+                    conf = getattr(decision_out, "confluence_score", None)
+                    if conf is None and getattr(decision_out, "setup_qualified", None):
+                        conf = getattr(decision_out.setup_qualified, "confluence_score", None)
+                    if conf is None and hasattr(decision_out, "confidence"):
+                        raw_c = float(decision_out.confidence)
+                        conf = raw_c * 100.0 if raw_c <= 1.0 else raw_c
+                    is_elite = conf is not None and conf >= 85.0
+                    eff_limit = elite_max if is_elite else base_max
+
+                    if len(open_positions) >= eff_limit:
                         logger.info(
-                            f"Skipping {sym} trade: Max open positions ({self.max_open_positions}) reached."
+                            f"Skipping {sym} trade: Max open positions ({eff_limit}) reached."
                         )
                         continue
 
@@ -427,6 +440,7 @@ class AutonomousTrader:
                         prevent_duplicate_symbol=True,
                         style_tag=style_tag,
                         allow_multi_style=False,
+                        confluence_score=conf,
                     )
                     self.total_trades_executed += 1
                     self._last_traded_candle_ts[sym] = latest_candle_ts
