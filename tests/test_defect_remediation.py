@@ -237,3 +237,4 @@ def test_d04_correlated_crypto_cluster_cap_protects_gold_budget(monkeypatch):
     ))
     assert v_gold.is_approved is True
     assert v_gold.portfolio_action == PortfolioAction.OPEN.value
+
