@@ -133,9 +133,13 @@ class DarwinianArenaEngine:
                     self.close_position(account.specialist_id, current_price, "TAKE_PROFIT", now_ms)
                     return self.ledger.get_account(account.specialist_id)
 
-        # 3. Update Equity & Drawdown
+        # 3. Update Equity & Drawdown (Enforcing Zero-Floor Sandbox Bankruptcy Clamp)
         account.unrealized_pnl_usd = round(unrealized, 4)
-        account.current_equity_usd = round(account.current_cash_usd + unrealized, 4)
+        account.current_equity_usd = max(0.0, round(account.current_cash_usd + unrealized, 4))
+        if account.current_equity_usd <= 0.0 and account.status != SpecialistSurvivalStatus.QUARANTINED:
+            account.status = SpecialistSurvivalStatus.QUARANTINED
+            account.quarantine_reason = "Account equity fully depleted (Bankruptcy liquidation)"
+
         if account.current_equity_usd > account.peak_equity_usd:
             account.peak_equity_usd = account.current_equity_usd
 
@@ -288,8 +292,8 @@ class DarwinianArenaEngine:
 
         self.ledger.record_trade(trade_rec)
 
-        # Update account balances
-        account.current_cash_usd = round(account.current_cash_usd + net_pnl, 4)
+        # Update account balances (Clamped to non-negative cash)
+        account.current_cash_usd = max(0.0, round(account.current_cash_usd + net_pnl, 4))
         account.current_equity_usd = account.current_cash_usd
         account.realized_pnl_usd = round(account.realized_pnl_usd + net_pnl, 4)
         account.fees_paid_usd = round(account.fees_paid_usd + fee, 4)

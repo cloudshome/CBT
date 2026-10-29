@@ -266,9 +266,8 @@ async def test_arbiter_bridge_vetoes_quarantined_specialist_proposals(arena_engi
     candles = [{"timestamp": int(time.time() * 1000) - i * 60000, "open": 0.15, "high": 0.16, "low": 0.14, "close": 0.15, "volume": 1000.0} for i in range(25)]
     market_data = {"DOGE/USDT": {"15m": candles}}
 
-    for spec in arbiter.specialists:
-        if spec.target_symbol == "DOGE/USDT":
-            spec.evaluate_market = AsyncMock(return_value=mock_prop)
+    spec = arbiter.deploy_dynamic_specialist("DOGE/USDT", SpecialistArchetype.MEME_MOMENTUM_SPIKE)
+    spec.evaluate_market = AsyncMock(return_value=mock_prop)
 
     decisions = await arbiter.evaluate_swarm(market_data)
     doge_decisions = [d for d in decisions if d.symbol == "DOGE/USDT"]
