@@ -8,10 +8,11 @@ Tests the Lean & Zero-Junk GitHub Researcher:
 4. Storage quota discipline (25 MB max)
 """
 
-import os
 from pathlib import Path
+
 import pytest
-from core.github_researcher import GitHubResearcher, MAX_SINGLE_FILE_BYTES
+
+from core.github_researcher import GitHubResearcher
 
 
 @pytest.fixture

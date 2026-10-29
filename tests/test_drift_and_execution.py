@@ -89,7 +89,8 @@ def test_drift_detector_dispatches_telegram_alert_on_severe_drift():
     When the multi-dimensional drift detector flags SEVERE structural divergence
     (e.g. KS return test p < 0.001 or toxic markout slope), it dispatches an urgent alert.
     """
-    from unittest.mock import MagicMock, patch
+    from unittest.mock import patch
+
     from core.intelligence.forward_validation.drift_detector import (
         AxisDriftResult,
         DriftStatus,
@@ -200,7 +201,7 @@ def test_suspension_controller_dispatches_telegram_on_circuit_breaker():
     an urgent notification is dispatched to Telegram.
     """
     from unittest.mock import MagicMock, patch
-    from core.intelligence.forward_validation.models import AdmissionStatus
+
     from core.intelligence.forward_validation.suspension_controller import (
         SuspensionController,
         SuspensionPolicy,

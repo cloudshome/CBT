@@ -5,6 +5,7 @@ Modular FastAPI router for Dynamic Market Universe Discovery & Opportunity Hunte
 """
 
 from typing import Any
+
 from fastapi import APIRouter
 
 from core.screener.opportunity_hunter import opportunity_hunter

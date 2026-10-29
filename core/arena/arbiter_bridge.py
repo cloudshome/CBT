@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+
 from core.arena.engine import DarwinianArenaEngine
 from core.arena.models import SpecialistSurvivalStatus
 

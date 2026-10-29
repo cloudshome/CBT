@@ -91,7 +91,7 @@ class DeterministicOutcomeResolver:
         resolved_price = float(eval_candles[-1].get("close", p0))
         resolved_at_ms = int(eval_candles[-1].get("timestamp", obs_ts))
 
-        for idx, bar in enumerate(eval_candles):
+        for _idx, bar in enumerate(eval_candles):
             h = float(bar.get("high", bar.get("close", p0)))
             l = float(bar.get("low", bar.get("close", p0)))
             c = float(bar.get("close", p0))

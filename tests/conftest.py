@@ -10,6 +10,21 @@ from pathlib import Path
 
 import pytest
 
+from core.cooldown_governor import cooldown_governor
+
+
+@pytest.fixture(autouse=True)
+def _reset_cooldown_governor():
+    cooldown_governor.reset()
+    old_asset = cooldown_governor.asset_cooldown_sec
+    old_loss = cooldown_governor.loss_global_cooldown_sec
+    cooldown_governor.asset_cooldown_sec = 0.0
+    cooldown_governor.loss_global_cooldown_sec = 0.0
+    yield
+    cooldown_governor.asset_cooldown_sec = old_asset
+    cooldown_governor.loss_global_cooldown_sec = old_loss
+    cooldown_governor.reset()
+
 # 1. Create isolated temporary directory for test databases
 _TEST_TEMP_DIR = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
 _temp_path = Path(_TEST_TEMP_DIR.name)

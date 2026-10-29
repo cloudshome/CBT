@@ -10,11 +10,11 @@ Tests:
 """
 
 import time
+
 import pytest
+
 from core.cooldown_governor import CooldownGovernor
-from core.mastermind.mastermind_arbiter import MastermindArbiterCouncil, ALLOWED_MAIN_DESK_SYMBOLS
-from core.mastermind.specialist_base import CandidateProposal, SpecialistArchetype
-from core.sky_intelligence.types import DecisionAction
+from core.mastermind.mastermind_arbiter import ALLOWED_MAIN_DESK_SYMBOLS, MastermindArbiterCouncil
 
 
 def test_cooldown_governor_asset_cooldown():
@@ -102,6 +102,7 @@ def test_geometry_sanity_bounds():
 def test_portfolio_shadow_zero_bypass_geometry_hardwall():
     """Verifies that PortfolioShadowManager rejects irrational orders fail-closed."""
     import pytest
+
     from core.portfolio_shadow import portfolio_shadow
 
     # 1. Zero or negative prices / TP = 0.00 (as seen in rogue MAGMA trade)
@@ -116,7 +117,7 @@ def test_portfolio_shadow_zero_bypass_geometry_hardwall():
         )
 
     # 2. LONG SL >= Entry
-    with pytest.raises(ValueError, match="LONG Stop-Loss .* must be strictly below Entry"):
+    with pytest.raises(ValueError, match=r"LONG Stop-Loss .* must be strictly below Entry"):
         portfolio_shadow.open_position(
             symbol="BTC/USDT",
             direction="LONG",
@@ -127,7 +128,7 @@ def test_portfolio_shadow_zero_bypass_geometry_hardwall():
         )
 
     # 3. LONG TP <= Entry
-    with pytest.raises(ValueError, match="LONG Take-Profit .* must be strictly above Entry"):
+    with pytest.raises(ValueError, match=r"LONG Take-Profit .* must be strictly above Entry"):
         portfolio_shadow.open_position(
             symbol="BTC/USDT",
             direction="LONG",
@@ -138,7 +139,7 @@ def test_portfolio_shadow_zero_bypass_geometry_hardwall():
         )
 
     # 4. SHORT SL <= Entry
-    with pytest.raises(ValueError, match="SHORT Stop-Loss .* must be strictly above Entry"):
+    with pytest.raises(ValueError, match=r"SHORT Stop-Loss .* must be strictly above Entry"):
         portfolio_shadow.open_position(
             symbol="BTC/USDT",
             direction="SHORT",
@@ -149,7 +150,7 @@ def test_portfolio_shadow_zero_bypass_geometry_hardwall():
         )
 
     # 5. SHORT TP >= Entry
-    with pytest.raises(ValueError, match="SHORT Take-Profit .* must be strictly below Entry"):
+    with pytest.raises(ValueError, match=r"SHORT Take-Profit .* must be strictly below Entry"):
         portfolio_shadow.open_position(
             symbol="BTC/USDT",
             direction="SHORT",

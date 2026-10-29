@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import copy
 import json
-import time
 from pathlib import Path
 
 import pytest
@@ -27,7 +26,6 @@ from fastapi.testclient import TestClient
 
 from app import app
 from core.cognitive_brain.prediction_ledger import CognitivePredictionLedger
-from core.mastermind.mastermind_arbiter import MastermindArbiterCouncil
 from core.temporal_intelligence.arbiter_bridge import TemporalArbiterBridge
 from core.temporal_intelligence.features import ZeroLookaheadFeatureExtractor
 from core.temporal_intelligence.forecaster import TemporalPriceActionForecaster
@@ -35,9 +33,7 @@ from core.temporal_intelligence.law_miner import MathematicalLawMiner
 from core.temporal_intelligence.models import (
     ForecastHorizon,
     PriceActionLawStatus,
-    TemporalFeatureVector,
 )
-from core.temporal_intelligence.router import get_historical_candles
 
 DATASET_PATH = Path("data/research/datasets/K9_BTCUSDT_15m_464d2ff4.json")
 

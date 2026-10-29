@@ -15,15 +15,16 @@ Verifies:
 from __future__ import annotations
 
 import time
+
 import pytest
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 
 from app import app
 from core.mastermind.mastermind_arbiter import MastermindArbiterCouncil
+from core.mastermind.specialist_base import SpecialistArchetype
 from core.mastermind.specialists import (
     DynamicOpportunitySpecialist,
 )
-from core.mastermind.specialist_base import SpecialistArchetype
 from core.screener.opportunity_hunter import (
     AttentionState,
     OpportunityCategory,

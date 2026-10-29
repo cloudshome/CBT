@@ -14,8 +14,9 @@ from __future__ import annotations
 
 import logging
 from typing import Any
+
 from core.temporal_intelligence.forecaster import TemporalPriceActionForecaster
-from core.temporal_intelligence.models import ForecastHorizon, TemporalForecastPayload
+from core.temporal_intelligence.models import ForecastHorizon
 
 logger = logging.getLogger("sky.temporal.arbiter_bridge")
 

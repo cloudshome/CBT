@@ -30,7 +30,6 @@ from core.arena.engine import DarwinianArenaEngine
 from core.arena.ledger import ArenaLedger
 from core.arena.models import SpecialistSurvivalStatus
 from core.arena.router import set_arena_engine
-from core.arena.survival import SurvivalStateMachine
 from core.mastermind.mastermind_arbiter import MastermindArbiterCouncil
 from core.mastermind.specialist_base import CandidateProposal, SpecialistArchetype
 from core.sky_intelligence.types import DecisionAction
@@ -375,6 +374,7 @@ def test_evaluate_specialist_signal_triggers_breakout_trade(arena_engine: Darwin
 async def test_autonomous_trader_scan_and_update_arena_runs(arena_engine: DarwinianArenaEngine, monkeypatch):
     """Verifies autonomous_trader.scan_and_update_arena updates all 10 specialists."""
     from unittest.mock import AsyncMock
+
     from core.arena.router import set_arena_engine
     from core.autonomous_trader import autonomous_trader
     from core.data_streamer import data_streamer

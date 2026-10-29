@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any
+
 from core.temporal_intelligence.models import TemporalFeatureVector
 
 logger = logging.getLogger("sky.temporal.features")

@@ -24,18 +24,16 @@ import json
 import logging
 import os
 import time
-import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from core.database import db_manager
 from core.data_streamer import data_streamer
+from core.database import db_manager
 from core.loss_autopsy import loss_autopsy_engine
 from core.portfolio_shadow import portfolio_shadow
-from core.risk_manager import risk_manager
 from core.sky_intelligence.orchestrator import sky_orchestrator
-from core.sky_intelligence.types import DecisionAction, SetupType
+from core.sky_intelligence.types import DecisionAction
 
 logger = logging.getLogger("sky.mastermind.sovereign_agent")
 
@@ -118,7 +116,7 @@ class SovereignMasterAgent:
     def _load_config(self) -> None:
         try:
             if self.config_path.exists():
-                with open(self.config_path, "r", encoding="utf-8") as f:
+                with open(self.config_path, encoding="utf-8") as f:
                     data = json.load(f)
                     self.auto_pilot_enabled = bool(data.get("auto_pilot_enabled", False))
                     self.scan_interval_sec = float(data.get("scan_interval_sec", 20.0))
@@ -503,8 +501,6 @@ class SovereignMasterAgent:
 
         # 2. Apply Master Behavioral Memory Gate
         is_eth = "ETH" in norm_sym
-        is_btc = "BTC" in norm_sym
-        is_gold = "XAU" in norm_sym or "PAXG" in norm_sym
 
         # Severe Chop Protection Filter:
         # If ADX < 20 or volume is dry (< 0.85x), refuse trend/breakout setups
@@ -867,7 +863,7 @@ class SovereignMasterAgent:
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         decisions_map: dict[str, Any] = {}
-        for sym, res in zip(symbols, results):
+        for sym, res in zip(symbols, results, strict=False):
             if isinstance(res, Exception):
                 decisions_map[sym] = {"error": str(res), "action": "CASH"}
             else:

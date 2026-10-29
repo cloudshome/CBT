@@ -233,6 +233,12 @@ class CooldownGovernor:
             logger.warning(f"Error checking daily trade count: {e}")
             return False, "", 0
 
+    def reset(self) -> None:
+        """Clears all in-memory cooldown state (for test isolation / admin reset)."""
+        self._last_closed_trades = {}
+        self._last_loss_exit_time = 0.0
+        self._last_loss_symbol = ""
+
     def evaluate_entry_clearance(self, symbol: str) -> tuple[bool, str]:
         """
         Holistic Nervous System Clearance Check.

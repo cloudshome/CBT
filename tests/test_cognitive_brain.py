@@ -26,13 +26,11 @@ import pytest
 from core.cognitive_brain.experience_engine import TradingExperienceEngine
 from core.cognitive_brain.metacognition import (
     MetacognitiveAdvice,
-    MetacognitiveAssessment,
     MetacognitiveMonitor,
 )
 from core.cognitive_brain.outcome_resolver import DeterministicOutcomeResolver
 from core.cognitive_brain.prediction_ledger import (
     CognitivePredictionLedger,
-    DuplicateExperienceError,
     PersistenceError,
 )
 from core.cognitive_brain.schema import (
@@ -40,11 +38,8 @@ from core.cognitive_brain.schema import (
     ExecutionPayload,
     ExecutionStatus,
     ForecastPayload,
-    GovernanceAction,
-    GovernancePayload,
     MarketObservationPayload,
     ObservationType,
-    ProposalPayload,
     ResolutionStatus,
     TradingExperienceRecord,
 )

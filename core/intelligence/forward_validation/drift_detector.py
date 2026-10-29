@@ -35,6 +35,7 @@ from core.intelligence.forward_validation.forward_ledger import (
 )
 from core.intelligence.forward_validation.paper_fill_simulator import (
     PaperFill,
+    RealisticPaperFillSimulator,
 )
 
 logger = logging.getLogger("ai_quant_sentinel.intelligence.drift_detector")
@@ -149,7 +150,8 @@ class MultiDimensionalDriftDetector:
 
             try:
                 loop = asyncio.get_running_loop()
-                loop.create_task(telegram_bot.send_message(msg, parse_mode="Markdown"))
+                _task = loop.create_task(telegram_bot.send_message(msg, parse_mode="Markdown"))
+                _ = _task
             except RuntimeError:
                 try:
                     asyncio.run(telegram_bot.send_message(msg, parse_mode="Markdown"))

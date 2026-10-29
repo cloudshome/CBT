@@ -685,7 +685,7 @@ class AutonomousTrader:
         engine = get_arena_engine()
         now_ms = int(time.time() * 1000)
 
-        for spec_id, symbol, strat_id in ARENA_DEFAULT_SYMBOLS:
+        for _spec_id, symbol, _strat_id in ARENA_DEFAULT_SYMBOLS:
             try:
                 # 1. Fetch live ticker price
                 try:

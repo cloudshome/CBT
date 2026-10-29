@@ -117,7 +117,6 @@ class CognitiveWorldModel:
         trend_1h = 0.0
         atr_pct = 0.50
         squeeze_state = False
-        cvd_delta = 0.0
 
         if state_vector:
             trend_scores = state_vector.trend_scores or {}
@@ -129,7 +128,7 @@ class CognitiveWorldModel:
             squeeze_state = bool(vol.get("squeeze_state", False))
 
             of = state_vector.orderflow or {}
-            cvd_delta = float(of.get("cvd_delta", 0.0))
+            float(of.get("cvd_delta", 0.0))
             state_hash = state_vector.state_hash
         else:
             state_hash = ""

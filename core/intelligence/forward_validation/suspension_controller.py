@@ -230,6 +230,7 @@ class SuspensionController:
         # Dispatch urgent Telegram alert on circuit breaker trip
         try:
             import asyncio
+
             from core.telegram_bot import telegram_bot
 
             status_emoji = (
@@ -249,7 +250,8 @@ class SuspensionController:
             )
             try:
                 loop = asyncio.get_running_loop()
-                loop.create_task(telegram_bot.send_message(msg, parse_mode="Markdown"))
+                _task = loop.create_task(telegram_bot.send_message(msg, parse_mode="Markdown"))
+                _ = _task
             except RuntimeError:
                 try:
                     asyncio.run(telegram_bot.send_message(msg, parse_mode="Markdown"))

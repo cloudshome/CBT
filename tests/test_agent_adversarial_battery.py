@@ -14,15 +14,10 @@ Tests 5 Critical Adversarial Batteries:
 from __future__ import annotations
 
 import time
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from core.intelligence.forward_validation.drift_detector import (
-    DriftStatus,
-    MultiDimensionalDriftDetector,
-)
 from core.intelligence.forward_validation.paper_fill_simulator import (
     RealisticPaperFillSimulator,
 )
@@ -33,18 +28,16 @@ from core.intelligence.forward_validation.suspension_controller import (
 from core.mastermind.mastermind_arbiter import MastermindArbiterCouncil
 from core.mastermind.specialist_base import (
     CandidateProposal,
-    EpistemicGrade,
     SpecialistArchetype,
 )
 from core.mastermind.specialists import (
     BtcMacroSpecialist,
     EthSpecialist,
     LowCapBreakoutSpecialist,
-    MemeMomentumSpecialist,
     SolSpecialist,
 )
 from core.risk_manager import RiskGateStatus
-from core.screener.opportunity_hunter import OpportunityCategory, OpportunityHunter
+from core.screener.opportunity_hunter import OpportunityHunter
 from core.sky_intelligence.types import DecisionAction
 
 

@@ -8,17 +8,9 @@ Tests for:
 
 from __future__ import annotations
 
-import sqlite3
 import pytest
 
 from core.database import db_manager
-from core.sky_intelligence.types import (
-    DecisionAction,
-    DecisionOutput,
-    MarketRegimeType,
-    SetupType,
-    SKYSetup,
-)
 
 
 @pytest.fixture(autouse=True)

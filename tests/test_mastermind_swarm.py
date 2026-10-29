@@ -123,7 +123,8 @@ async def test_risk_governor_absolute_veto_on_circuit_breaker():
     the Independent Risk Governor's circuit breaker has ABSOLUTE VETO power.
     No trade can bypass the Risk Gate.
     """
-    from unittest.mock import patch, MagicMock
+    from unittest.mock import patch
+
     from core.risk_manager import RiskGateStatus
 
     arbiter = MastermindArbiterCouncil(account_equity_usd=10_000.0)

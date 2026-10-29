@@ -18,16 +18,13 @@ import uuid
 from dataclasses import asdict, dataclass
 from typing import Any
 
-from core.database import db_manager
 from core.cooldown_governor import cooldown_governor
+from core.database import db_manager
 from core.mastermind.specialist_base import BaseSpecialistAgent, CandidateProposal
 from core.mastermind.specialists import (
     BtcMacroSpecialist,
     DynamicOpportunitySpecialist,
     EthSpecialist,
-    LowCapBreakoutSpecialist,
-    MemeMomentumSpecialist,
-    SolSpecialist,
 )
 from core.portfolio_shadow import portfolio_shadow
 from core.risk_manager import risk_manager
@@ -285,7 +282,7 @@ class MastermindArbiterCouncil:
             if p.direction in (DecisionAction.LONG, DecisionAction.SHORT):
                 by_direction.setdefault(p.direction, []).append(p)
 
-        for direction, group in by_direction.items():
+        for _direction, group in by_direction.items():
             n = len(group)
             if n <= 1:
                 continue
@@ -738,8 +735,13 @@ class MastermindArbiterCouncil:
             if self.experience_engine:
                 try:
                     from core.cognitive_brain.schema import (
-                        ObservationType, GovernanceAction, ExecutionStatus,
-                        ForecastPayload, ProposalPayload, GovernancePayload, ExecutionPayload
+                        ExecutionPayload,
+                        ExecutionStatus,
+                        ForecastPayload,
+                        GovernanceAction,
+                        GovernancePayload,
+                        ObservationType,
+                        ProposalPayload,
                     )
                     obs_type = (
                         ObservationType.TRADE_PROPOSAL

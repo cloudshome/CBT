@@ -13,11 +13,14 @@ Provides:
 
 from __future__ import annotations
 
+import logging
 import time
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 try:
     from core.data_streamer import data_streamer
@@ -2042,8 +2045,8 @@ async def get_multi_desk_summary():
     3. Darwinian Survival Arena ($1,000 across 10 specialists)
     4. Canary Testnet Desk ($5,000 Binance Futures)
     """
-    from core.screener.radar_executor import radar_alpha_executor
     from core.portfolio_shadow import portfolio_shadow
+    from core.screener.radar_executor import radar_alpha_executor
 
     # 1. Sovereign Main Desk ($10,000)
     main_acc = portfolio_shadow.get_portfolio_accounting(starting_capital=10000.0, book_id="MAIN_SOVEREIGN")

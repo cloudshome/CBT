@@ -14,13 +14,6 @@ import pytest
 
 from core.portfolio_shadow import portfolio_shadow
 from core.sky_intelligence.volatility_engine import volatility_engine
-from core.sky_intelligence.types import (
-    DecisionAction,
-    DecisionOutput,
-    MarketRegimeType,
-    SetupType,
-    SKYSetup,
-)
 
 
 @pytest.fixture(autouse=True)
