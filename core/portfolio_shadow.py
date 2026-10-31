@@ -1410,7 +1410,8 @@ class PortfolioShadowManager:
                 """
                 SELECT record_id, specialist_id, confidence_score
                 FROM specialist_track_record
-                WHERE (proposal_id = ? OR record_id = ?) AND outcome IS NULL;
+                WHERE (proposal_id = ? OR record_id = ?) AND outcome IS NULL
+                ORDER BY created_at_ms DESC LIMIT 1;
                 """,
                 (pos_id, pos_id),
             ).fetchall()

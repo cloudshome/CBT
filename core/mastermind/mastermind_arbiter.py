@@ -475,9 +475,6 @@ class MastermindArbiterCouncil:
             rejection_reason = None
             approved_notional = 0.0
 
-            # Record proposal into calibration track record ledger
-            self.record_proposal_for_calibration(proposal)
-
             # Retrieve specialist calibration weighting
             calib = self.get_specialist_calibration(spec.specialist_id)
             calib_weight = calib["weight"]
@@ -611,6 +608,7 @@ class MastermindArbiterCouncil:
             if not rejection_reason:
                 # Candidate Cleared Deterministic Arbiter Gates!
                 is_approved = True
+                self.record_proposal_for_calibration(proposal)
                 overlap_discount = overlap_discounts.get(proposal.proposal_id, 1.0)
                 base_notional = proposal.suggested_notional_usd or (current_eq * 0.02)
                 arena_weight = 1.0
