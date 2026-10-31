@@ -262,13 +262,9 @@ class AutonomousTrader:
                         )
                         continue
 
-                    # Guard 2b: Rolling Asset Performance Gate (True 20-Trade Rolling Window anchored to active burn-in epoch)
+                    # Guard 2b: Rolling Asset Performance Gate (True 20-Trade Rolling Window anchored to post-patch epoch)
                     with db_manager.get_trading_conn() as conn:
-                        epoch_cur = conn.execute(
-                            "SELECT start_timestamp FROM burn_in_sessions WHERE status = 'ACTIVE' ORDER BY start_timestamp DESC LIMIT 1;"
-                        )
-                        epoch_row = epoch_cur.fetchone()
-                        epoch_cutoff_ms = int(epoch_row["start_timestamp"]) if epoch_row and epoch_row["start_timestamp"] else 0
+                        epoch_cutoff_ms = int(os.getenv("ASSET_GATE_EPOCH_MS", "1793469018542"))
 
                         p_cur = conn.execute(
                             """

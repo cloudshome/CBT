@@ -292,7 +292,7 @@ class PortfolioShadowManager:
 
                 if max_risk_usd is not None:
                     trade_risk = float(size) * abs(float(entry_price) - float(stop_loss))
-                    if trade_risk > max_risk_usd:
+                    if trade_risk > (max_risk_usd + 1e-4):
                         conn.rollback()
                         raise ValueError(
                             f"Risk Gate Rejection: trade risk ${trade_risk:.2f} exceeds allowable ${max_risk_usd:.2f}."
@@ -929,7 +929,7 @@ class PortfolioShadowManager:
 
                 if max_risk_usd is not None:
                     trade_risk = float(size) * abs(float(entry_price) - float(stop_loss))
-                    if trade_risk > max_risk_usd:
+                    if trade_risk > (max_risk_usd + 1e-4):
                         conn.rollback()
                         raise ValueError(
                             f"Risk Gate Rejection: trade risk ${trade_risk:.2f} exceeds allowable ${max_risk_usd:.2f}."

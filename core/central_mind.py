@@ -443,15 +443,39 @@ class CentralTradingMind:
             logger.debug(f"EventShock evaluation bypassed: {shock_err}")
 
         # -------------------------------------------------------------
+        # INVARIANT 2e: Strict Tier-1 Asset Whitelist Firewall
+        # -------------------------------------------------------------
+        # Unless explicitly overridden by ALLOW_ALTCOIN_AUTO_EXECUTION=true,
+        # autonomous execution is strictly limited to Tier-1 Institutional Assets:
+        # BTC, ETH, SOL, BNB, and XAU/PAXG (Gold).
+        # Microcaps and satellite altcoins operate in Advisory/Radar-Alert mode only.
+        allow_altcoins = os.getenv("ALLOW_ALTCOIN_AUTO_EXECUTION", "false").lower() in ("true", "1", "yes")
+        origin_upper = proposal.origin.upper()
+        is_manual_approval = any(m in origin_upper for m in ("MANUAL", "TERMINAL_MANUAL", "UI_CONFIRMED"))
+
+        if not allow_altcoins and not is_manual_approval:
+            clean_sym = proposal.symbol.replace("/", "").replace("_", "").upper()
+            tier1_keys = {
+                "BTCUSDT", "BTCUSD",
+                "ETHUSDT", "ETHUSD",
+                "SOLUSDT", "SOLUSD",
+                "BNBUSDT", "BNBUSD",
+                "XAUUSD", "GOLD",
+                "PAXGUSDT", "PAXGUSD",
+            }
+            if clean_sym not in tier1_keys:
+                return _reject(
+                    f"Tier-1 Asset Firewall: '{proposal.symbol}' is not an authorized Tier-1 Institutional Asset. "
+                    f"Autonomous auto-execution is strictly locked to BTC, ETH, SOL, BNB, and Gold. "
+                    f"Altcoin opportunities operate in Advisory/Radar-Alert mode only (require manual confirmation or ALLOW_ALTCOIN_AUTO_EXECUTION=true)."
+                )
+
+        # -------------------------------------------------------------
         # INVARIANT 2d: Rolling Asset Performance Gate (True 20-Trade Rolling Window)
         # -------------------------------------------------------------
         try:
             with db_manager.get_trading_conn() as conn:
-                epoch_cur = conn.execute(
-                    "SELECT start_timestamp FROM burn_in_sessions WHERE status = 'ACTIVE' ORDER BY start_timestamp DESC LIMIT 1;"
-                )
-                epoch_row = epoch_cur.fetchone()
-                epoch_cutoff_ms = int(epoch_row["start_timestamp"]) if epoch_row and epoch_row["start_timestamp"] else 0
+                epoch_cutoff_ms = int(os.getenv("ASSET_GATE_EPOCH_MS", "1793469018542"))
 
                 p_cur = conn.execute(
                     """

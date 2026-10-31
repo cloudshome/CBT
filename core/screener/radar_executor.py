@@ -43,7 +43,9 @@ class RadarAlphaExecutor:
         self.min_24h_volume_usd = min_24h_volume_usd
         self.min_market_attention = min_market_attention
         self.book_id = "RADAR_ALPHA"
-        self.is_auto_pilot: bool = True
+        self.is_auto_pilot: bool = os.getenv(
+            "ALLOW_ALTCOIN_AUTO_EXECUTION", "false"
+        ).lower() in ("true", "1", "yes")
         self._last_scan_ms: int = 0
         self.recent_log: list[dict[str, Any]] = []
 
@@ -173,6 +175,26 @@ class RadarAlphaExecutor:
         sl = candidate["stop_loss"]
         tp = candidate["take_profit"]
         reason = candidate["thesis"]
+
+        # Tier-1 Institutional Whitelist Gate for Autonomous Orders
+        allow_altcoins = os.getenv("ALLOW_ALTCOIN_AUTO_EXECUTION", "false").lower() in ("true", "1", "yes")
+        is_manual = bool(candidate.get("is_manual", False))
+        clean_sym = sym.replace("/", "").replace("_", "").upper()
+        tier1_keys = {
+            "BTCUSDT", "BTCUSD", "ETHUSDT", "ETHUSD", "SOLUSDT", "SOLUSD",
+            "BNBUSDT", "BNBUSD", "XAUUSD", "GOLD", "PAXGUSDT", "PAXGUSD"
+        }
+
+        if not allow_altcoins and not is_manual and clean_sym not in tier1_keys:
+            logger.info(
+                f"[RADAR_ALPHA] Auto-execution gated for {sym}: Altcoin Opportunity Radar operates in Advisory/Alert mode. Manual confirmation required."
+            )
+            self._record_activity(
+                sym,
+                "ADVISORY_ALERT",
+                f"Opportunity detected on {sym} ({direction}). Autonomous auto-execution disabled (Advisory mode).",
+            )
+            return None
 
         try:
             pos_id = portfolio_shadow.open_position(
