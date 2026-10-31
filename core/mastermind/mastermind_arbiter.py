@@ -608,7 +608,6 @@ class MastermindArbiterCouncil:
             if not rejection_reason:
                 # Candidate Cleared Deterministic Arbiter Gates!
                 is_approved = True
-                self.record_proposal_for_calibration(proposal)
                 overlap_discount = overlap_discounts.get(proposal.proposal_id, 1.0)
                 base_notional = proposal.suggested_notional_usd or (current_eq * 0.02)
                 arena_weight = 1.0
