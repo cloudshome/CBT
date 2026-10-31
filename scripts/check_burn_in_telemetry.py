@@ -118,6 +118,50 @@ def main() -> None:
                 f"    • {t['position_id']} ({t['symbol']} {t['direction']}): PnL: {pnl_str} | "
                 f"Hold: {hold_min}m | Exit: {t['exit_reason']}{be_tag}"
             )
+
+    # 4. Check specialist agent Brier calibration in brain_memory.db
+    try:
+        b_conn = sqlite3.connect("data/brain_memory.db")
+        b_conn.row_factory = sqlite3.Row
+        b_cur = b_conn.cursor()
+        b_cur.execute(
+            """
+            SELECT 
+                specialist_id,
+                COUNT(*) as total_proposals,
+                SUM(CASE WHEN outcome IS NOT NULL THEN 1 ELSE 0 END) as resolved_trades,
+                SUM(CASE WHEN outcome = 1.0 THEN 1 ELSE 0 END) as wins,
+                ROUND(AVG(CASE WHEN outcome IS NOT NULL THEN brier_error ELSE NULL END), 4) as avg_brier,
+                ROUND(AVG(confidence_score), 2) as avg_confidence
+            FROM specialist_track_record
+            GROUP BY specialist_id
+            ORDER BY resolved_trades DESC, total_proposals DESC
+            LIMIT 8;
+            """
+        )
+        spec_stats = b_cur.fetchall()
+        print("\n[4] SPECIALIST AGENT BRIER CALIBRATION & LEARNING WEIGHTS:")
+        print(f"    {'Specialist Archetype':<24} | {'Proposals':<10} | {'Resolved':<9} | {'Win %':<6} | {'Avg Brier':<10} | {'Dynamic Weight'}")
+        print("    " + "-" * 80)
+        for s in spec_stats:
+            m = s['resolved_trades']
+            brier_val = s['avg_brier'] if s['avg_brier'] is not None else 0.2500
+            if m and m >= 5 and s['avg_brier'] is not None:
+                brier = float(s['avg_brier'])
+                weight = max(0.25, min(1.25, round(1.0 + 2.0 * (0.25 - brier), 3)))
+                wr_str = f"{(s['wins'] * 100.0 / m):.1f}%"
+                status_str = f"{weight:.2f}x (Calibrated)"
+            else:
+                wr_str = f"{(s['wins'] * 100.0 / m):.1f}%" if m > 0 else "N/A"
+                status_str = "1.00x (Warmup M<5)"
+            print(
+                f"    {s['specialist_id']:<24} | {s['total_proposals']:<10} | {s['resolved_trades']:<9} | "
+                f"{wr_str:<6} | {brier_val:<10.4f} | {status_str}"
+            )
+        b_conn.close()
+    except Exception as b_ex:
+        print(f"\n[4] SPECIALIST AGENT BRIER CALIBRATION: {b_ex}")
+
     print("=" * 86 + "\n")
     conn.close()
 
