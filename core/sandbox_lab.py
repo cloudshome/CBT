@@ -192,50 +192,88 @@ class SandboxLab:
 
             # Generate new entry signals
             if active_pos is None and i < len(candles) - 5:
-                # Built-in baseline momentum & FVG strategy trigger if no custom function provided
-                c_prev = candles[i - 1]
-                c_prev2 = candles[i - 2]
-                bull_signal = (
-                    c["close"] > c["open"]
-                    and c["low"] > c_prev2["high"]
-                    and c["close"] > c_prev["high"]
-                )
-                bear_signal = (
-                    c["close"] < c["open"]
-                    and c["high"] < c_prev2["low"]
-                    and c["close"] < c_prev["low"]
-                )
+                custom_sig = None
+                if strategy_logic_fn is not None:
+                    try:
+                        custom_sig = strategy_logic_fn(c, i)
+                    except Exception as sig_err:
+                        logger.debug(f"Custom strategy fn error at bar {i}: {sig_err}")
 
-                if bull_signal:
-                    entry = c["close"] * (1.0 + slippage_bps / 10000.0)
-                    sl = c["low"] * 0.995
-                    tp = entry + (entry - sl) * 2.0
+                if custom_sig is not None and "stop_loss" in custom_sig and "take_profit" in custom_sig:
+                    direction = custom_sig.get("direction", "LONG").upper()
+                    is_l = direction == "LONG"
+                    entry = custom_sig.get("entry", c["close"]) * (
+                        (1.0 + slippage_bps / 10000.0) if is_l else (1.0 - slippage_bps / 10000.0)
+                    )
+                    sl = custom_sig["stop_loss"]
+                    tp = custom_sig["take_profit"]
                     risk_usd = capital * risk_per_trade_pct
-                    units = risk_usd / abs(entry - sl)
-                    active_pos = {
-                        "direction": "LONG",
-                        "entry_price": entry,
-                        "stop_loss": sl,
-                        "take_profit": tp,
-                        "size_units": units,
-                        "entry_time": c_time,
-                        "entry_bar": i,
-                    }
-                elif bear_signal:
-                    entry = c["close"] * (1.0 - slippage_bps / 10000.0)
-                    sl = c["high"] * 1.005
-                    tp = entry - (sl - entry) * 2.0
-                    risk_usd = capital * risk_per_trade_pct
-                    units = risk_usd / abs(sl - entry)
-                    active_pos = {
-                        "direction": "SHORT",
-                        "entry_price": entry,
-                        "stop_loss": sl,
-                        "take_profit": tp,
-                        "size_units": units,
-                        "entry_time": c_time,
-                        "entry_bar": i,
-                    }
+                    risk_dist = abs(entry - sl)
+                    if risk_dist > 0:
+                        units = risk_usd / risk_dist
+                        # 3.0x Leverage Ceiling Invariant
+                        max_notional_usd = capital * 3.0
+                        units = min(units, max_notional_usd / entry)
+                        active_pos = {
+                            "direction": direction,
+                            "entry_price": entry,
+                            "stop_loss": sl,
+                            "take_profit": tp,
+                            "size_units": units,
+                            "entry_time": c_time,
+                            "entry_bar": i,
+                        }
+                else:
+                    # Built-in baseline momentum & FVG strategy trigger if no custom function provided
+                    c_prev = candles[i - 1]
+                    c_prev2 = candles[i - 2]
+                    bull_signal = (
+                        c["close"] > c["open"]
+                        and c["low"] > c_prev2["high"]
+                        and c["close"] > c_prev["high"]
+                    )
+                    bear_signal = (
+                        c["close"] < c["open"]
+                        and c["high"] < c_prev2["low"]
+                        and c["close"] < c_prev["low"]
+                    )
+
+                    if bull_signal:
+                        entry = c["close"] * (1.0 + slippage_bps / 10000.0)
+                        sl = c["low"] * 0.995
+                        tp = entry + (entry - sl) * 2.0
+                        risk_usd = capital * risk_per_trade_pct
+                        units = risk_usd / abs(entry - sl)
+                        # 3.0x Leverage Ceiling Invariant
+                        max_notional_usd = capital * 3.0
+                        units = min(units, max_notional_usd / entry)
+                        active_pos = {
+                            "direction": "LONG",
+                            "entry_price": entry,
+                            "stop_loss": sl,
+                            "take_profit": tp,
+                            "size_units": units,
+                            "entry_time": c_time,
+                            "entry_bar": i,
+                        }
+                    elif bear_signal:
+                        entry = c["close"] * (1.0 - slippage_bps / 10000.0)
+                        sl = c["high"] * 1.005
+                        tp = entry - (sl - entry) * 2.0
+                        risk_usd = capital * risk_per_trade_pct
+                        units = risk_usd / abs(sl - entry)
+                        # 3.0x Leverage Ceiling Invariant
+                        max_notional_usd = capital * 3.0
+                        units = min(units, max_notional_usd / entry)
+                        active_pos = {
+                            "direction": "SHORT",
+                            "entry_price": entry,
+                            "stop_loss": sl,
+                            "take_profit": tp,
+                            "size_units": units,
+                            "entry_time": c_time,
+                            "entry_bar": i,
+                        }
 
         # Reset causal clock to live mode
         causal_firewall.set_simulation_time(None)

@@ -628,29 +628,38 @@ class SovereignMasterAgent:
                 "decision": decision.to_dict(),
             }
 
-        # Open Position in Authoritative Shadow Ledger
+        # Route proposal through CentralTradingMind to enforce all 6 Constitutional Invariants
         direction_str = "LONG" if decision.decision == "BUY" else "SHORT"
         tp_primary = decision.take_profit_ladder.get("tp1", decision.current_price * 1.04)
 
-        reason_desc = (
-            f"[SOVEREIGN_MASTER] {decision.symbol} {direction_str} | "
-            f"EV: +{decision.expected_value_r:.2f}R | "
-            f"Conf: {decision.confidence_pct:.0f}%"
-        )
-        if override_reason:
-            reason_desc += f" | {override_reason}"
+        from core.central_mind import CentralTradingMind, TradeProposal
 
-        pos_id = portfolio_shadow.open_position(
+        mind = CentralTradingMind()
+        proposal = TradeProposal(
+            origin="SOVEREIGN_MASTER",
             symbol=decision.symbol,
             direction=direction_str,
-            size=decision.suggested_units,
-            entry_price=decision.current_price,
+            style="SWING" if "GOLD" in decision.symbol or "XAU" in decision.symbol else "INTRADAY",
+            planned_entry=decision.current_price,
             stop_loss=decision.stop_loss,
             take_profit=tp_primary,
-            entry_reason=reason_desc,
-            enforce_atomic_limits=True,
-            max_risk_usd=decision.suggested_risk_usd,
+            requested_size=decision.suggested_units,
+            confluence_score=decision.confidence_pct,
+            thesis=override_reason or decision.thesis,
         )
+
+        verdict = mind.evaluate_and_route(proposal)
+        if not verdict.is_approved:
+            return {
+                "success": False,
+                "executed": False,
+                "action": "REJECTED_BY_CENTRAL_MIND",
+                "symbol": decision.symbol,
+                "reason": verdict.rejection_reason,
+                "decision": decision.to_dict(),
+            }
+
+        pos_id = verdict.executed_position_id or f"POS_{decision.symbol.replace('/', '_')}_{int(time.time() * 1000)}"
 
         # Mirror to Binance Testnet (active with testnet fund)
         mirrored_ok = False

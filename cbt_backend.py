@@ -20,6 +20,8 @@ from pathlib import Path
 import uvicorn
 from dotenv import load_dotenv
 
+from app import app  # noqa: F401
+
 
 def _resolve_repo_root() -> Path:
     env_root = os.getenv("CBT_APP_ROOT")

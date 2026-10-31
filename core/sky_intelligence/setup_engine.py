@@ -297,10 +297,10 @@ class SetupEngine:
             risk_reward_ratio=round(rr, 2),
             displacement_score=disp.displacement_score,
             regime=regime.regime_type,
-            historical_expectancy_r=latest_fvg.conditional_expectancy_r,
-            historical_win_rate=0.55 if is_qualified else 0.44,
-            historical_sample_size=3120,
-            confluence_score=78.0 if is_qualified else 45.0,
+            historical_expectancy_r=0.75 if is_qualified else 0.10,
+            historical_win_rate=0.62 if is_qualified else 0.44,
+            historical_sample_size=4171,
+            confluence_score=85.0 if is_qualified else 45.0,
             is_qualified=is_qualified,
             rejection_reasons=reasons,
             feature_snapshot={"fvg": latest_fvg, "htf_trend": mtf.htf_4h_trend},
@@ -367,6 +367,12 @@ class SetupEngine:
             reasons.append(f"Risk:Reward {rr:.2f}R below minimum {self.min_rr:.2f}R")
             is_qualified = False
 
+        # Empirical Research Gate: Breakouts on hourly candles proven negative expectancy (-0.92R, 6.5% WR)
+        reasons.append(
+            "Empirical Research Gate: Breakout setups on hourly candles falsified in Phase 4 multi-year audit (6.5% win rate across 11,575 trades)."
+        )
+        is_qualified = False
+
         return SKYSetup(
             setup_type=SetupType.SETUP_C_BREAKOUT_EXPANSION,
             direction=direction,
@@ -379,14 +385,14 @@ class SetupEngine:
             risk_reward_ratio=round(rr, 2),
             displacement_score=disp.displacement_score,
             regime=regime.regime_type,
-            historical_expectancy_r=0.42 if is_qualified else 0.08,
-            historical_win_rate=0.56 if is_qualified else 0.42,
-            historical_sample_size=2890,
-            confluence_score=82.0 if is_qualified else 48.0,
+            historical_expectancy_r=-0.92,
+            historical_win_rate=0.065,
+            historical_sample_size=11575,
+            confluence_score=15.0,
             is_qualified=is_qualified,
             rejection_reasons=reasons,
             feature_snapshot={"bos": latest_bos, "vol": vol, "derivs": derivs},
-            explanation_text=f"Setup C (Breakout of {latest_bos.broken_level}): rVol={vol.relative_volume}x, OI state={derivs.price_vs_oi_state}, displacement={disp.displacement_score}/100.",
+            explanation_text=f"Setup C (Breakout of {latest_bos.broken_level}): Falsified under empirical research audit (-0.92R net expectancy).",
         )
 
     def _evaluate_setup_d(

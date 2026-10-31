@@ -282,6 +282,10 @@ EXPLICIT_ALLOWED_EDGES: Final[set[tuple[str, str]]] = {
     # Operational Trade & Execution Alerting to Telegram Bot
     ("core.portfolio_shadow", "core.telegram_bot"),
     ("core.mastermind.mastermind_arbiter", "core.telegram_bot"),
+    ("core.intelligence.forward_validation.suspension_controller", "core.telegram_bot"),
+    ("core.intelligence.forward_validation.drift_detector", "core.telegram_bot"),
+    # Layer 2 Autonomous Trader resting protection placement via connector
+    ("core.autonomous_trader", "core.execution.connectors.binance_connector"),
 }
 
 

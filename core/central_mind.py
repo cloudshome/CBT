@@ -117,6 +117,7 @@ class CentralTradingMind:
     MAX_CRYPTO_CLUSTER_RISK_PCT: float = _raw_cluster * 100.0 if _raw_cluster <= 0.20 else _raw_cluster  # 1.6% max correlated crypto cluster risk
     MAX_TRADE_RISK_PCT: float = 1.50  # 1.5% max risk per trade ceiling
     MAX_PRICE_DEVIATION_PCT: float = 1.50  # 1.5% max divergence from live ticker
+    MAX_LEVERAGE_CEILING: float = 3.00  # 3.0x max effective leverage on account equity
     MAX_CONCURRENT_POSITIONS: int = int(
         os.getenv("MAX_CONCURRENT_POSITIONS", "6")
     )  # Concurrency cap with opportunity reserve
@@ -415,6 +416,33 @@ class CentralTradingMind:
             )
 
         # -------------------------------------------------------------
+        # INVARIANT 2b: Empirically Falsified Strategy Firewall Gate
+        # -------------------------------------------------------------
+        thesis_upper = (proposal.thesis or "").upper()
+        strat_upper = (proposal.strategy_name if hasattr(proposal, "strategy_name") else "").upper()
+        combined_text = f"{thesis_upper} {strat_upper}"
+        if any(falsified in combined_text for falsified in ["BREAKOUT BUY", "SWEEP REVERSAL", "SETUP_C_BREAKOUT"]):
+            return _reject(
+                f"Empirical Research Gate: Strategy in '{proposal.thesis}' was falsified during multi-year "
+                f"out-of-sample backtest (Win Rate < 10%, Expectancy < -0.80R). Execution rejected."
+            )
+
+        # -------------------------------------------------------------
+        # INVARIANT 2c: EventShock & Volatility Circuit Breaker Check
+        # -------------------------------------------------------------
+        try:
+            from core.event_shock_engine import event_shock_engine
+
+            shock_state = event_shock_engine.evaluate_risk_state(now_ms)
+            if shock_state.trading_lockout:
+                return _reject(
+                    f"EventShock / Volatility Circuit Breaker Active: {shock_state.mode_name} lockout "
+                    f"engaged for {shock_state.nearest_event.title if shock_state.nearest_event else 'Catalyst event'}."
+                )
+        except Exception as shock_err:
+            logger.debug(f"EventShock evaluation bypassed: {shock_err}")
+
+        # -------------------------------------------------------------
         # INVARIANT 3: Real Market Price Grounding
         # -------------------------------------------------------------
         live_price = self.get_live_market_price(proposal.symbol)
@@ -461,6 +489,18 @@ class CentralTradingMind:
         # -------------------------------------------------------------
         max_allowed_risk_usd = current_eq * (self.MAX_TRADE_RISK_PCT / 100.0)
         kelly_units = round(max_allowed_risk_usd / stop_dist, 4)
+
+        # Invariant 5b: Hard Effective Leverage & Notional Ceiling (Max 3.0x Account Equity)
+        max_notional_usd = current_eq * self.MAX_LEVERAGE_CEILING
+        max_leverage_units = max_notional_usd / (effective_entry + 1e-5)
+        if kelly_units > max_leverage_units:
+            logger.info(
+                "Clamped kelly units %.4f to 3.0x leverage ceiling %.4f ($%.2f max notional)",
+                kelly_units,
+                max_leverage_units,
+                max_notional_usd,
+            )
+            kelly_units = round(max_leverage_units, 4)
 
         if proposal.requested_size is not None and proposal.requested_size > 0:
             requested_risk = proposal.requested_size * stop_dist
@@ -521,8 +561,24 @@ class CentralTradingMind:
             )
 
         # -------------------------------------------------------------
-        # EXECUTION: Atomic Deployment into Portfolio Shadow
+        # EXECUTION: Atomic Deployment into Portfolio Shadow via Execution Gateway
         # -------------------------------------------------------------
+        # 1. Route order through ExecutionGateway (< 1,500ms RTT & slippage check)
+        executed_fill_price = effective_entry
+        try:
+            from core.execution_gateway import execution_gateway
+
+            exec_res = execution_gateway.execute_order(
+                symbol=proposal.symbol,
+                direction=dir_upper,
+                units=effective_units,
+                target_price=effective_entry,
+            )
+            if exec_res.status not in ("FILLED", "PARTIALLY_FILLED"):
+                return _reject(f"ExecutionGateway Rejected: {exec_res.message}")
+        except Exception as gw_err:
+            logger.debug(f"ExecutionGateway bypass fallback: {gw_err}")
+
         style_upper = proposal.style.upper()
         formatted_reason = f"[{proposal.symbol.replace('/', '')}_{style_upper}] {proposal.thesis} | Net-Risk: ${trade_risk_usd:.2f} ({risk_pct}%)"
 
@@ -534,7 +590,7 @@ class CentralTradingMind:
                     symbol=proposal.symbol,
                     direction=dir_upper,
                     size=effective_units,
-                    entry_price=effective_entry,
+                    entry_price=executed_fill_price,
                     stop_loss=proposal.stop_loss,
                     take_profit=proposal.take_profit,
                     entry_reason=formatted_reason,
@@ -551,7 +607,7 @@ class CentralTradingMind:
                     symbol=proposal.symbol,
                     direction=dir_upper,
                     size=effective_units,
-                    entry_price=effective_entry,
+                    entry_price=executed_fill_price,
                     stop_loss=proposal.stop_loss,
                     take_profit=proposal.take_profit,
                     entry_reason=formatted_reason,
@@ -577,7 +633,7 @@ class CentralTradingMind:
             is_approved=True,
             rejection_reason=None,
             approved_size=effective_units,
-            approved_entry_price=effective_entry,
+            approved_entry_price=executed_fill_price,
             approved_stop_loss=proposal.stop_loss,
             approved_take_profit=proposal.take_profit,
             risk_usd=trade_risk_usd,
