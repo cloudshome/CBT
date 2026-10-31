@@ -23,6 +23,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
 
 from core.auth import require_api_key
+from core.loss_autopsy import LossAutopsyEngine
 from core.macro_trade_planner import macro_trade_planner
 from core.portfolio_shadow import portfolio_shadow
 
@@ -30,6 +31,7 @@ logger = logging.getLogger("sky.execution.paper_routes")
 
 BD_TZ = timezone(timedelta(hours=6))
 
+_loss_autopsy_engine = LossAutopsyEngine()
 paper_router = APIRouter(tags=["paper-trading"])
 
 
@@ -283,19 +285,33 @@ async def get_paper_desk_overview():
         if side == "SELL":
             pnl_pct = -pnl_pct
 
+        opened_at_ts = p.get("opened_at")
+        closed_at_ts = p.get("closed_at")
+        hold_sec = (
+            ((closed_at_ts - opened_at_ts) / 1000.0)
+            if (opened_at_ts and closed_at_ts)
+            else None
+        )
+        sl_val = float(p.get("stop_loss", 0.0)) or None
+
         if pnl >= 0:
             autopsy_cat = "VALIDATED_PROFIT"
             autopsy_cause = "Target liquidity cluster mitigated cleanly."
             autopsy_rec = "Execution thesis confirmed by SMC order flow."
         else:
-            autopsy_cat = "LIQUIDITY_FAILURE"
-            autopsy_cause = "Liquidity sweep fakeout & volatility spike prior to expansion."
-            autopsy_rec = (
-                "Widen invalidation boundary below swing low; await 15m displacement candle close."
+            report = _loss_autopsy_engine.conduct_autopsy(
+                trade_id=p.get("position_id", ""),
+                symbol=p.get("symbol", ""),
+                entry_price=entry,
+                exit_price=exit_p,
+                direction=p.get("direction", "LONG"),
+                pnl_usd=pnl,
+                hold_duration_sec=hold_sec,
+                stop_loss=sl_val,
             )
-
-        opened_at_ts = p.get("opened_at")
-        closed_at_ts = p.get("closed_at")
+            autopsy_cat = report.loss_category.value
+            autopsy_cause = report.primary_root_cause
+            autopsy_rec = report.preventative_recommendation
         opened_at_fmt = (
             datetime.fromtimestamp(opened_at_ts / 1000.0, tz=BD_TZ).strftime("%Y-%m-%d %H:%M:%S BST")
             if opened_at_ts

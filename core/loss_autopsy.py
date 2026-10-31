@@ -62,10 +62,35 @@ class LossAutopsyEngine:
         macro_shock_active: bool = False,
         regime_shifted_mid_trade: bool = False,
         data_quality_score: float = 1.0,
+        hold_duration_sec: float | None = None,
+        stop_loss: float | None = None,
     ) -> LossAutopsyReport:
         """
         Diagnoses root cause of a loss across the 11 taxonomic categories.
         """
+
+        # 0. Rapid Stop-Out or Micro-Stop Noise Sweep Check (< 5 min hold or < 0.35% stop distance)
+        effective_sl = stop_loss if stop_loss is not None else exit_price
+        stop_dist_pct = (
+            (abs(entry_price - effective_sl) / entry_price * 100.0) if entry_price > 0 else 1.0
+        )
+        is_rapid_stopout = hold_duration_sec is not None and hold_duration_sec < 300.0
+        is_micro_stop = stop_dist_pct < 0.35
+
+        if is_rapid_stopout or is_micro_stop:
+            dur_str = f", {hold_duration_sec:.0f}s hold" if hold_duration_sec is not None else ""
+            return LossAutopsyReport(
+                trade_id=trade_id,
+                symbol=symbol,
+                pnl_usd=pnl_usd,
+                loss_category=LossCategory.TIMING_FAILURE,
+                confidence=0.91,
+                primary_root_cause=f"Sub-ATR micro-stop swept by intra-bar noise ({stop_dist_pct:.2f}% distance{dur_str})",
+                forensic_evidence=[
+                    "Stop loss placed inside 1m/5m bid-ask volatility spread without structural buffer"
+                ],
+                preventative_recommendation="Enforce minimum 1.2x ATR stop distance floor and anchor beyond swing pivot.",
+            )
 
         # 1. Data Failure Check
         if data_quality_score < 0.95:

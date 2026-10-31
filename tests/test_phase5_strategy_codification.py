@@ -234,7 +234,7 @@ def test_setup_engine_qualifies_pullback_fvg_with_phase4_metrics():
     assert setup_b.historical_expectancy_r == 0.75
     assert setup_b.historical_win_rate == 0.62
     assert setup_b.historical_sample_size == 4171
-    assert setup_b.confluence_score == 85.0
+    assert setup_b.confluence_score == 86.0
 
 
 def test_sandbox_lab_portfolio_simulation_10k_equity():

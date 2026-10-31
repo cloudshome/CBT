@@ -443,6 +443,55 @@ class CentralTradingMind:
             logger.debug(f"EventShock evaluation bypassed: {shock_err}")
 
         # -------------------------------------------------------------
+        # INVARIANT 2d: Rolling Asset Performance Gate (True 20-Trade Rolling Window)
+        # -------------------------------------------------------------
+        try:
+            with db_manager.get_trading_conn() as conn:
+                epoch_cur = conn.execute(
+                    "SELECT start_timestamp FROM burn_in_sessions WHERE status = 'ACTIVE' ORDER BY start_timestamp DESC LIMIT 1;"
+                )
+                epoch_row = epoch_cur.fetchone()
+                epoch_cutoff_ms = int(epoch_row["start_timestamp"]) if epoch_row and epoch_row["start_timestamp"] else 0
+
+                p_cur = conn.execute(
+                    """
+                    SELECT 
+                        SUM(CASE WHEN realized_pnl > 0 THEN realized_pnl ELSE 0 END) as gross_win,
+                        SUM(CASE WHEN realized_pnl < 0 THEN ABS(realized_pnl) ELSE 0 END) as gross_loss,
+                        COUNT(*) as trade_count
+                    FROM (
+                        SELECT realized_pnl
+                        FROM shadow_positions
+                        WHERE symbol = ? AND status = 'CLOSED' AND opened_at >= ?
+                        ORDER BY closed_at DESC
+                        LIMIT 20
+                    );
+                    """,
+                    (proposal.symbol, epoch_cutoff_ms),
+                )
+                p_row = p_cur.fetchone()
+                if p_row and p_row["trade_count"] and p_row["trade_count"] >= 8:
+                    g_win = float(p_row["gross_win"] or 0.0)
+                    g_loss = float(p_row["gross_loss"] or 0.0)
+                    asset_pf = (
+                        (g_win / g_loss) if g_loss > 0 else (99.0 if g_win > 0 else 0.0)
+                    )
+
+                    if p_row["trade_count"] >= 10 and asset_pf < 0.40:
+                        return _reject(
+                            f"Asset Performance Gate HARD-PAUSE: Halting {proposal.symbol} (Rolling PF={asset_pf:.2f} < 0.40 across {p_row['trade_count']} trades)."
+                        )
+
+                    if asset_pf < 0.85:
+                        conf = proposal.confluence_score or 0.0
+                        if conf < 86.0:
+                            return _reject(
+                                f"Asset Performance Gate: Skipping {proposal.symbol} (Rolling 20-trade PF={asset_pf:.2f} < 0.85 across {p_row['trade_count']} trades, Confluence={conf:.1f} < 86.0)."
+                            )
+        except Exception as pf_err:
+            logger.debug(f"Rolling asset PF check error: {pf_err}")
+
+        # -------------------------------------------------------------
         # INVARIANT 3: Real Market Price Grounding
         # -------------------------------------------------------------
         live_price = self.get_live_market_price(proposal.symbol)
@@ -478,10 +527,22 @@ class CentralTradingMind:
                 f"Geometry Rejection: SHORT stop loss (${proposal.stop_loss:,.2f}) must be strictly above entry (${effective_entry:,.2f})."
             )
 
-        min_stop_dist = effective_entry * 0.001  # 10 bps minimum
+        # Invariant 4b: Enforce Minimum Stop Distance Floor (at least 45 bps / 0.45% from entry)
+        min_stop_dist = effective_entry * 0.0045  # 45 bps floor
         if stop_dist < min_stop_dist:
-            return _reject(
-                f"Geometry Rejection: Stop distance ${stop_dist:.2f} is too tight (minimum 10 bps)."
+            # Dynamically widen stop loss to meet minimum structural distance floor
+            if dir_upper == "LONG":
+                proposal.stop_loss = round(effective_entry - min_stop_dist, 6)
+                stop_dist = min_stop_dist
+                if (proposal.take_profit - effective_entry) < 2.0 * stop_dist:
+                    proposal.take_profit = round(effective_entry + 2.0 * stop_dist, 6)
+            else:
+                proposal.stop_loss = round(effective_entry + min_stop_dist, 6)
+                stop_dist = min_stop_dist
+                if (effective_entry - proposal.take_profit) < 2.0 * stop_dist:
+                    proposal.take_profit = round(effective_entry - 2.0 * stop_dist, 6)
+            logger.info(
+                f"Central Mind widened micro-stop for {proposal.symbol} to minimum floor {min_stop_dist:.2f} (SL: {proposal.stop_loss}, TP: {proposal.take_profit})"
             )
 
         # -------------------------------------------------------------

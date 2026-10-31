@@ -91,7 +91,15 @@ class SetupEngine:
         # SETUP B: Pullback + HTF Trend + FVG Reaction
         # ----------------------------------------------------
         setup_b = self._evaluate_setup_b(
-            symbol, timeframe, current_price, fvgs, mtf_context, displacement, regime_state, atr
+            symbol,
+            timeframe,
+            current_price,
+            fvgs,
+            mtf_context,
+            displacement,
+            regime_state,
+            atr,
+            candles=candles,
         )
         if setup_b:
             setups.append(setup_b)
@@ -244,6 +252,7 @@ class SetupEngine:
         disp: DisplacementFeature,
         regime: MarketRegimeState,
         atr: float,
+        candles: list[dict[str, Any]] | None = None,
     ) -> SKYSetup | None:
         active_fvgs = [
             f for f in fvgs if f.status in [FVGStatus.ACTIVE, FVGStatus.PARTIALLY_FILLED]
@@ -262,28 +271,97 @@ class SetupEngine:
             "BEAR" in mtf.htf_4h_trend and not is_bull
         )
 
-        if direction == DecisionAction.LONG:
-            entry = price
-            sl = latest_fvg.bottom_price - (0.2 * atr)
-            risk = entry - sl
-            tp = entry + (2.2 * risk) if risk > 0 else entry + (2.2 * atr)
+        # 1. Proximity Check: Price must have tested or entered the FVG zone (within 0.25 * atr)
+        zone_buffer = 0.25 * atr
+        if is_bull:
+            in_zone = (price <= latest_fvg.top_price + zone_buffer) and (
+                price >= latest_fvg.bottom_price - zone_buffer
+            )
         else:
-            entry = price
-            sl = latest_fvg.top_price + (0.2 * atr)
+            in_zone = (price >= latest_fvg.bottom_price - zone_buffer) and (
+                price <= latest_fvg.top_price + zone_buffer
+            )
+
+        # 2. Rejection / Displacement Confirmation on Closed Candle:
+        closed_candle_confirmed = True
+        if candles and len(candles) >= 2:
+            last_closed = candles[-2] if len(candles) > 2 else candles[-1]
+            c_open = float(last_closed.get("open", 0.0))
+            c_close = float(last_closed.get("close", 0.0))
+            if is_bull:
+                if c_close < latest_fvg.bottom_price or c_close < c_open:
+                    closed_candle_confirmed = False
+                    reasons.append("Last closed candle failed bullish confirmation above FVG bottom")
+            else:
+                if c_close > latest_fvg.top_price or c_close > c_open:
+                    closed_candle_confirmed = False
+                    reasons.append("Last closed candle failed bearish confirmation below FVG top")
+
+        entry = price
+
+        # 3. Structural + ATR Stop-Loss Floor
+        recent_bars = candles[-5:] if candles and len(candles) >= 5 else []
+        min_stop_dist = max(1.2 * atr, entry * 0.0045)  # Minimum 1.2x ATR or 0.45% from entry
+
+        if direction == DecisionAction.LONG:
+            recent_low = min(
+                (float(c["low"]) for c in recent_bars), default=latest_fvg.bottom_price
+            )
+            raw_sl = min(latest_fvg.bottom_price - (0.6 * atr), recent_low - (0.2 * atr))
+            sl = min(raw_sl, entry - min_stop_dist)
+            risk = entry - sl
+            if risk <= 0:
+                return None  # Inverted SL bug eliminated: never allow entry <= sl on LONG
+            tp = entry + max(2.2 * risk, 2.5 * atr)
+        else:
+            recent_high = max(
+                (float(c["high"]) for c in recent_bars), default=latest_fvg.top_price
+            )
+            raw_sl = max(latest_fvg.top_price + (0.6 * atr), recent_high + (0.2 * atr))
+            sl = max(raw_sl, entry + min_stop_dist)
             risk = sl - entry
-            tp = entry - (2.2 * risk) if risk > 0 else entry - (2.2 * atr)
+            if risk <= 0:
+                return None  # Inverted SL bug eliminated: never allow entry >= sl on SHORT
+            tp = entry - max(2.2 * risk, 2.5 * atr)
 
         risk_dist = abs(entry - sl)
         target_dist = abs(tp - entry)
         rr = target_dist / max(risk_dist, 0.0001)
 
         is_qualified = True
+        if not in_zone:
+            reasons.append(
+                f"Price (${price:,.2f}) has not tested active FVG zone [${latest_fvg.bottom_price:,.2f} - ${latest_fvg.top_price:,.2f}]"
+            )
+            is_qualified = False
+        if not closed_candle_confirmed:
+            is_qualified = False
         if not htf_aligned:
             reasons.append("Conflicting HTF trend direction")
             is_qualified = False
         if rr < self.min_rr:
             reasons.append(f"Risk:Reward {rr:.2f}R below minimum {self.min_rr:.2f}R")
             is_qualified = False
+
+        # Fix 3: Multi-factor Dynamic Confluence Score (Base 74.0, up to 95.0)
+        if is_qualified:
+            base_score = 74.0
+            if disp.displacement_score >= 70.0:
+                base_score += 6.0
+            h1_trend = getattr(mtf, "htf_1h_trend", "")
+            h4_trend = getattr(mtf, "htf_4h_trend", "")
+            stack = getattr(mtf, "stack_alignment", "")
+            if is_bull and (
+                ("BULL" in h1_trend and "BULL" in h4_trend) or stack == "BULLISH_CONFLUENT"
+            ):
+                base_score += 6.0
+            elif not is_bull and (
+                ("BEAR" in h1_trend and "BEAR" in h4_trend) or stack == "BEARISH_CONFLUENT"
+            ):
+                base_score += 6.0
+            confluence = min(95.0, base_score)
+        else:
+            confluence = 45.0
 
         return SKYSetup(
             setup_type=SetupType.SETUP_B_PULLBACK_FVG,
@@ -300,7 +378,7 @@ class SetupEngine:
             historical_expectancy_r=0.75 if is_qualified else 0.10,
             historical_win_rate=0.62 if is_qualified else 0.44,
             historical_sample_size=4171,
-            confluence_score=85.0 if is_qualified else 45.0,
+            confluence_score=confluence,
             is_qualified=is_qualified,
             rejection_reasons=reasons,
             feature_snapshot={"fvg": latest_fvg, "htf_trend": mtf.htf_4h_trend},
