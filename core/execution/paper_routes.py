@@ -308,6 +308,7 @@ async def get_paper_desk_overview():
                 pnl_usd=pnl,
                 hold_duration_sec=hold_sec,
                 stop_loss=sl_val,
+                breakeven_triggered=bool(p.get("breakeven_triggered", 0)),
             )
             autopsy_cat = report.loss_category.value
             autopsy_cause = report.primary_root_cause

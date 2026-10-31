@@ -64,20 +64,23 @@ class LossAutopsyEngine:
         data_quality_score: float = 1.0,
         hold_duration_sec: float | None = None,
         stop_loss: float | None = None,
+        breakeven_triggered: bool = False,
     ) -> LossAutopsyReport:
         """
         Diagnoses root cause of a loss across the 11 taxonomic categories.
         """
 
         # 0. Rapid Stop-Out or Micro-Stop Noise Sweep Check (< 5 min hold or < 0.35% stop distance)
+        # Note: If breakeven was triggered, stop was intentionally moved to entry_price (0.00% distance);
+        # do not misclassify a breakeven exit as an intra-bar micro-stop failure!
         effective_sl = stop_loss if stop_loss is not None else exit_price
         stop_dist_pct = (
             (abs(entry_price - effective_sl) / entry_price * 100.0) if entry_price > 0 else 1.0
         )
         is_rapid_stopout = hold_duration_sec is not None and hold_duration_sec < 300.0
-        is_micro_stop = stop_dist_pct < 0.35
+        is_micro_stop = (not breakeven_triggered) and (stop_dist_pct < 0.35)
 
-        if is_rapid_stopout or is_micro_stop:
+        if not breakeven_triggered and (is_rapid_stopout or is_micro_stop):
             dur_str = f", {hold_duration_sec:.0f}s hold" if hold_duration_sec is not None else ""
             return LossAutopsyReport(
                 trade_id=trade_id,

@@ -411,6 +411,19 @@ class PortfolioShadowManager:
             )
         except Exception as exc:
             logger.debug(f"SDCC open event emission deferred: {exc}")
+
+        # Cognitive Brain: Record Calibration Tracking Entry in specialist_track_record
+        try:
+            self._record_calibration_entry(
+                pos_id=pos_id,
+                symbol=symbol,
+                direction=direction,
+                entry_reason=reason_text,
+                confluence_score=confluence_score,
+            )
+        except Exception as cal_err:
+            logger.debug(f"Failed to record initial specialist calibration: {cal_err}")
+
         return pos_id
 
     def update_live_price(self, symbol: str, current_price: float) -> list[dict[str, Any]]:
@@ -625,6 +638,17 @@ class PortfolioShadowManager:
                     except Exception as cg_exc:
                         logger.debug(f"Cooldown governor notify error: {cg_exc}")
 
+                    # Resolve Specialist Track Record Calibration (Brier Score Feedback Loop)
+                    try:
+                        self._resolve_specialist_track_record(
+                            pos_id=pos_id,
+                            symbol=symbol,
+                            final_pnl=float(final_pnl),
+                            entry_reason=r["entry_reason"] if "entry_reason" in r.keys() else None,
+                        )
+                    except Exception as cal_err:
+                        logger.debug(f"Specialist track record resolve warning: {cal_err}")
+
                     # Audit Event & Loss Autopsy Integration
                     autopsy_report = None
                     if final_pnl < 0:
@@ -635,6 +659,7 @@ class PortfolioShadowManager:
                             exit_price=exit_fill_price,
                             direction=direction,
                             pnl_usd=final_pnl,
+                            breakeven_triggered=be_trig,
                         )
                         autopsy_report = autopsy.to_dict()
                         audit_bus.emit_event(
@@ -779,6 +804,17 @@ class PortfolioShadowManager:
             except Exception as cg_exc:
                 logger.debug(f"Cooldown governor notify error: {cg_exc}")
 
+            # Resolve Specialist Track Record Calibration (Brier Score Feedback Loop)
+            try:
+                self._resolve_specialist_track_record(
+                    pos_id=position_id,
+                    symbol=row["symbol"],
+                    final_pnl=float(pnl),
+                    entry_reason=row["entry_reason"] if "entry_reason" in row.keys() else None,
+                )
+            except Exception as cal_err:
+                logger.debug(f"Specialist track record resolve warning: {cal_err}")
+
             # Trigger Autopsy on Manual/API Loss Close
             autopsy_report = None
             if pnl < 0:
@@ -789,6 +825,7 @@ class PortfolioShadowManager:
                     exit_price=p_price,
                     direction=row["direction"],
                     pnl_usd=pnl,
+                    breakeven_triggered=bool(row["breakeven_triggered"]),
                 )
                 autopsy_report = autopsy.to_dict()
                 audit_bus.emit_event(
@@ -1272,6 +1309,152 @@ class PortfolioShadowManager:
             "total_active_risk_usd": round(total_active_risk_usd, 2),
             "active_risk_pct": active_risk_pct,
         }
+
+    def _parse_specialist_id(self, entry_reason: str | None, symbol: str) -> str:
+        """Parses or maps an entry reason to its responsible specialist agent archetype."""
+        if not entry_reason:
+            return f"spec_{symbol.replace('/', '_').lower()}"
+        reason = entry_reason.upper()
+        if "SOVEREIGN_MASTER" in reason:
+            return "sovereign_master"
+        if "spec_" in entry_reason:
+            m = re.search(r"spec_[a-zA-Z0-9_]+", entry_reason)
+            if m:
+                return m.group(0)
+        if "ETH_TREND" in reason or "ETH" in symbol:
+            return "spec_eth_structural"
+        if "BTC_TREND" in reason or "BTC" in symbol:
+            return "spec_btc_macro"
+        if "SOL_TREND" in reason or "SOL" in symbol:
+            return "spec_sol_momentum"
+        if "SETUP_A" in reason:
+            return "setup_a_sweep"
+        if "SETUP_B" in reason:
+            return "setup_b_pullback"
+        if "SETUP_D" in reason:
+            return "setup_d_range"
+        if "SETUP_E" in reason:
+            return "setup_e_vwap"
+        return f"spec_{symbol.replace('/', '_').lower()}"
+
+    def _ensure_track_record_table(self, conn) -> None:
+        """Ensures specialist_track_record schema exists in the brain database."""
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS specialist_track_record (
+                record_id TEXT PRIMARY KEY,
+                specialist_id TEXT NOT NULL,
+                proposal_id TEXT NOT NULL,
+                symbol TEXT NOT NULL,
+                direction TEXT NOT NULL,
+                confidence_score REAL NOT NULL,
+                expected_value_r REAL NOT NULL,
+                outcome REAL,
+                pnl_usd REAL,
+                brier_error REAL,
+                created_at_ms INTEGER NOT NULL,
+                resolved_at_ms INTEGER
+            );
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_spec_tr_spec ON specialist_track_record (specialist_id, outcome);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_spec_tr_prop ON specialist_track_record (proposal_id);"
+        )
+
+    def _record_calibration_entry(
+        self,
+        pos_id: str,
+        symbol: str,
+        direction: str,
+        entry_reason: str | None,
+        confluence_score: float | None = None,
+    ) -> None:
+        """Logs initial position entry in specialist_track_record for calibration tracking."""
+        spec_id = self._parse_specialist_id(entry_reason, symbol)
+        conf = (float(confluence_score) / 100.0) if confluence_score else 0.75
+        now_ms = int(time.time() * 1000)
+        rec_id = f"tr_{uuid.uuid4().hex[:12]}"
+        with db_manager.get_brain_conn() as conn:
+            self._ensure_track_record_table(conn)
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO specialist_track_record
+                    (record_id, specialist_id, proposal_id, symbol, direction,
+                     confidence_score, expected_value_r, outcome, pnl_usd, brier_error,
+                     created_at_ms, resolved_at_ms)
+                VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, NULL);
+                """,
+                (rec_id, spec_id, pos_id, symbol, direction.upper(), conf, 0.50, now_ms),
+            )
+            conn.commit()
+
+    def _resolve_specialist_track_record(
+        self,
+        pos_id: str,
+        symbol: str,
+        final_pnl: float,
+        entry_reason: str | None = None,
+    ) -> None:
+        """
+        Resolves pending specialist_track_record entries upon position closure,
+        computing empirical Brier score error: (confidence_score - outcome)^2.
+        """
+        outcome = 1.0 if final_pnl > 0 else 0.0
+        now_ms = int(time.time() * 1000)
+        with db_manager.get_brain_conn() as conn:
+            self._ensure_track_record_table(conn)
+            rows = conn.execute(
+                """
+                SELECT record_id, specialist_id, confidence_score
+                FROM specialist_track_record
+                WHERE (proposal_id = ? OR record_id = ?) AND outcome IS NULL;
+                """,
+                (pos_id, pos_id),
+            ).fetchall()
+
+            if not rows:
+                rows = conn.execute(
+                    """
+                    SELECT record_id, specialist_id, confidence_score
+                    FROM specialist_track_record
+                    WHERE symbol = ? AND outcome IS NULL
+                    ORDER BY created_at_ms DESC LIMIT 1;
+                    """,
+                    (symbol,),
+                ).fetchall()
+
+            if rows:
+                for r in rows:
+                    rec_id = r["record_id"]
+                    conf = float(r["confidence_score"])
+                    brier_error = round((conf - outcome) ** 2, 4)
+                    conn.execute(
+                        """
+                        UPDATE specialist_track_record
+                        SET outcome = ?, pnl_usd = ?, brier_error = ?, resolved_at_ms = ?
+                        WHERE record_id = ?;
+                        """,
+                        (outcome, float(final_pnl), brier_error, now_ms, rec_id),
+                    )
+            else:
+                spec_id = self._parse_specialist_id(entry_reason, symbol)
+                rec_id = f"tr_{uuid.uuid4().hex[:12]}"
+                conf = 0.70
+                brier_error = round((conf - outcome) ** 2, 4)
+                conn.execute(
+                    """
+                    INSERT INTO specialist_track_record
+                        (record_id, specialist_id, proposal_id, symbol, direction,
+                         confidence_score, expected_value_r, outcome, pnl_usd, brier_error,
+                         created_at_ms, resolved_at_ms)
+                    VALUES (?, ?, ?, ?, 'UNKNOWN', ?, 0.50, ?, ?, ?, ?, ?);
+                    """,
+                    (rec_id, spec_id, pos_id, symbol, conf, outcome, float(final_pnl), brier_error, now_ms, now_ms),
+                )
+            conn.commit()
 
 
 # Singleton
