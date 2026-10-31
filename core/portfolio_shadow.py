@@ -529,7 +529,11 @@ class PortfolioShadowManager:
 
             exit_fill_price = current_price
             if is_closed:
-                prior_realized_pnl = float(r["realized_pnl"] or 0.0)
+                prior_realized_pnl = (
+                    acc_realized_pnl
+                    if (be_trig and "acc_realized_pnl" in locals())
+                    else float(r["realized_pnl"] or 0.0)
+                )
                 if close_reason == "TAKE_PROFIT_HIT":
                     exit_fill_price = tp_p
                     remaining_pnl = ((tp_p - entry_p) * size) if is_long else ((entry_p - tp_p) * size)
@@ -556,6 +560,17 @@ class PortfolioShadowManager:
                         )
                         remaining_pnl = (entry_p - exit_fill_price) * size
                     final_pnl = prior_realized_pnl + remaining_pnl
+
+                    # Distinguish Breakeven and Trailing Stop closures from initial Stop-Loss failures
+                    if be_trig:
+                        if final_pnl > 0:
+                            close_reason = (
+                                "TRAILING_STOP_PROFIT"
+                                if (trailing_stop is not None and abs(active_sl - entry_p) > 1e-4)
+                                else "BREAKEVEN_AFTER_PARTIAL"
+                            )
+                        else:
+                            close_reason = "BREAKEVEN_STOP_HIT"
 
             # Update database
             with db_manager.get_trading_conn() as conn:
@@ -701,11 +716,18 @@ class PortfolioShadowManager:
 
             p_price = exit_price or row["current_price"]
             is_long = row["direction"] == "LONG"
-            pnl = (
+            prior_realized_pnl = float(row["realized_pnl"] or 0.0)
+            remaining_pnl = (
                 (p_price - row["entry_price"]) * row["size"]
                 if is_long
                 else (row["entry_price"] - p_price) * row["size"]
             )
+            pnl = prior_realized_pnl + remaining_pnl
+
+            # Correct exit reason if position had triggered breakeven/partial profit
+            effective_exit_reason = exit_reason
+            if row["breakeven_triggered"] and exit_reason == "STOP_LOSS_HIT":
+                effective_exit_reason = "BREAKEVEN_AFTER_PARTIAL" if pnl > 0 else "BREAKEVEN_STOP_HIT"
 
             conn.execute(
                 """
@@ -718,7 +740,7 @@ class PortfolioShadowManager:
                     exit_reason = ?
                 WHERE position_id = ?;
                 """,
-                (now, p_price, pnl, exit_reason, position_id),
+                (now, p_price, pnl, effective_exit_reason, position_id),
             )
             conn.commit()
 
