@@ -5,7 +5,7 @@
 > **Category:** `Monetary Policy & Debt Cycles` | **Source Type:** `RESEARCH_DOCUMENT`  
 > **Original Source:** [https://home.treasury.gov/data/treasury-international-capital-tic-system](https://home.treasury.gov/data/treasury-international-capital-tic-system)  
 > **Analyst / Speaker Attribution:** `SKY Quantitative Economics Desk`  
-> **Last Cross-Verified:** `2026-10-01 17:31:19 UTC` | **Epistemic Rigor Score:** `92.0%`
+> **Last Cross-Verified:** `2026-09-27 12:37:44 UTC` | **Epistemic Rigor Score:** `92.0%`
 
 ---
 
