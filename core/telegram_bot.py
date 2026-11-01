@@ -919,7 +919,7 @@ class TelegramBotDispatcher:
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    url, json=payload, timeout=aiohttp.ClientTimeout(total=8)
+                    url, json=payload, timeout=aiohttp.ClientTimeout(total=15)
                 ) as resp:
                     if resp.status != 200:
                         err_body = await resp.text()
@@ -944,7 +944,7 @@ class TelegramBotDispatcher:
                         return False
                     return True
         except Exception as e:
-            logger.error(f"Telegram dispatch failed: {e}")
+            logger.error(f"Telegram dispatch failed: {type(e).__name__}: {e or 'request timed out'}")
             return False
 
     async def send_message(

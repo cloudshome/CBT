@@ -571,8 +571,8 @@ class ResearchAutomationOrchestrator:
             try:
                 logger.info("Auto-crawling YouTube channel: %s (%s)", label, url)
                 job_id = youtube_agent.start_background_exploration(
-                    source_url=url,
-                    max_videos=max_vids,
+                    source_url_or_handle=url,
+                    limit=max_vids,
                 )
 
                 with db_manager.get_brain_conn() as conn:
