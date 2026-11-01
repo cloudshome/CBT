@@ -187,6 +187,14 @@ class CandidateOrderBlock:
     is_invalidated: bool = False
     expectancy_score: float = 0.50
 
+    @property
+    def bottom_price(self) -> float:
+        return self.zone_low
+
+    @property
+    def top_price(self) -> float:
+        return self.zone_high
+
 
 @dataclass(frozen=True)
 class DisplacementFeature:

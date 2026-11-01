@@ -227,7 +227,10 @@ class SetupEngine:
             zone_lo = min(entry_price, invalidation_sl) - (0.5 * atr)
             zone_hi = max(entry_price, invalidation_sl) + (0.5 * atr)
             has_ob = any(
-                (ob.bottom_price <= zone_hi and ob.top_price >= zone_lo)
+                (
+                    getattr(ob, "zone_low", getattr(ob, "bottom_price", 0.0)) <= zone_hi
+                    and getattr(ob, "zone_high", getattr(ob, "top_price", 0.0)) >= zone_lo
+                )
                 for ob in order_blocks
             )
             if has_ob:
