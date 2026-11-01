@@ -48,7 +48,7 @@ def check_closed_candle_confirmation(
     """
     if not candles or len(candles) < 2:
         return True
-    last_closed = candles[-2] if len(candles) > 2 else candles[-1]
+    last_closed = candles[-2]
     c_open = float(last_closed.get("open", 0.0))
     c_close = float(last_closed.get("close", 0.0))
     c_high = float(last_closed.get("high", 0.0))
@@ -315,6 +315,8 @@ class SetupEngine:
         latest_sweep = recent_sweeps[-1]
         reasons: list[str] = []
 
+        is_qualified = True
+
         is_bull_sweep = "BULLISH" in latest_sweep.meta.get("direction", "")
         matching_mss = (
             any(
@@ -360,7 +362,7 @@ class SetupEngine:
         target_dist = abs(tp - entry)
         rr = target_dist / max(risk_dist, 0.0001)
 
-        is_qualified = True
+        # is_qualified already tracked from risk-ceiling checks above; do not reset
         if not matching_mss:
             reasons.append("Missing confirmed Market Structure Shift (MSS)")
             is_qualified = False
@@ -452,6 +454,8 @@ class SetupEngine:
         latest_fvg = active_fvgs[-1]
         reasons: list[str] = []
 
+        is_qualified = True
+
         is_bull = latest_fvg.fvg_type == FVGType.BULLISH
         direction = DecisionAction.LONG if is_bull else DecisionAction.SHORT
 
@@ -518,7 +522,7 @@ class SetupEngine:
         target_dist = abs(tp - entry)
         rr = target_dist / max(risk_dist, 0.0001)
 
-        is_qualified = True
+        # is_qualified already tracked from risk-ceiling checks above; do not reset
         if not in_zone:
             reasons.append(
                 f"Price (${price:,.2f}) has not tested active FVG zone [${latest_fvg.bottom_price:,.2f} - ${latest_fvg.top_price:,.2f}]"
@@ -617,6 +621,8 @@ class SetupEngine:
         latest_bos = bos_events[-1]
         reasons: list[str] = []
 
+        is_qualified = True
+
         is_bull = latest_bos.event_type == StructureEventType.BOS_BULLISH
         direction = DecisionAction.LONG if is_bull else DecisionAction.SHORT
 
@@ -641,7 +647,7 @@ class SetupEngine:
         target_dist = abs(tp - entry)
         rr = target_dist / max(risk_dist, 0.0001)
 
-        is_qualified = True
+        # is_qualified already tracked; do not reset
         if not vol_confirmed:
             reasons.append(f"Volume rVol ({vol.relative_volume:.2f}x) insufficient for breakout")
             is_qualified = False
