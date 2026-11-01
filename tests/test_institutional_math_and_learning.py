@@ -292,3 +292,85 @@ def test_portfolio_shadow_resolves_specialist_track_record():
         # Brier error: (0.80 - 1.0)^2 = 0.04
         assert abs(resolved["brier_error"] - 0.04) < 1e-4
         assert resolved["resolved_at_ms"] is not None
+
+
+def test_setup_b_strictly_disqualifies_excessive_risk_ceiling():
+    """
+    INVARIANT: Setup B strictly sets is_qualified = False if risk distance exceeds
+    the 3.5% institutional ceiling (risk / entry > 0.035).
+    """
+    from core.sky_intelligence.types import FVGFeature, FVGType, FVGStatus
+
+    engine = SetupEngine(min_rr_ratio=1.5)
+    atr = 150.0
+    price = 2000.0
+
+    # Create an FVG deep away from entry so that raw_sl / risk is > 3.5% of entry (> $70)
+    fvg = FVGFeature(
+        fvg_type=FVGType.BULLISH,
+        symbol="ETH/USDT",
+        timeframe="15m",
+        creation_timestamp=1700000000,
+        creation_index=10,
+        top_price=2010.0,
+        bottom_price=1800.0,
+        mid_price=1905.0,
+        gap_size=210.0,
+        size_atr_ratio=1.4,
+        conditional_expectancy_r=0.75,
+        status=FVGStatus.ACTIVE,
+    )
+    mtf = MultiTimeframeContext(
+        timestamp=1700000000,
+        htf_1d_trend="BULLISH",
+        htf_4h_trend="BULLISH",
+        mtf_1h_state="PULLBACK",
+        mtf_15m_state="CONFLUENT",
+        ltf_5m_trigger="READY",
+        ltf_1m_trigger="READY",
+        confluence_score=85.0,
+        stack_alignment="BULLISH_CONFLUENT",
+    )
+    disp = DisplacementFeature(
+        candle_index=10,
+        timestamp=1700000000,
+        direction="BULLISH",
+        body_atr_ratio=1.5,
+        range_atr_ratio=2.0,
+        consecutive_directional_bars=2,
+        volume_expansion_ratio=2.0,
+        price_velocity=10.0,
+        breakout_distance=100.0,
+        close_location_in_range=0.9,
+        displacement_score=85.0,
+    )
+    regime = MarketRegimeState(
+        timestamp=1700000000,
+        regime_type=MarketRegimeType.TRENDING_BULL,
+        confidence=0.85,
+        trend_strength_adx=30.0,
+        volatility_state=VolatilityRegime.NORMAL_VOLATILITY,
+        is_mean_reverting=False,
+    )
+    candles = [
+        {"open": 1990.0, "high": 2005.0, "low": 1985.0, "close": 2002.0},
+        {"open": 2002.0, "high": 2010.0, "low": 1995.0, "close": 2005.0},
+        {"open": 2005.0, "high": 2015.0, "low": 1998.0, "close": 2000.0},
+    ]
+
+    setup_b = engine._evaluate_setup_b(
+        symbol="ETH/USDT",
+        timeframe="15m",
+        price=price,
+        fvgs=[fvg],
+        mtf=mtf,
+        disp=disp,
+        regime=regime,
+        atr=atr,
+        candles=candles,
+    )
+
+    assert setup_b is not None
+    assert any("exceeds 3.5% institutional ceiling" in r for r in setup_b.rejection_reasons)
+    assert setup_b.is_qualified is False
+

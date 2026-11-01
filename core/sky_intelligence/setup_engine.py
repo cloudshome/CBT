@@ -504,6 +504,7 @@ class SetupEngine:
                 return None  # Inverted SL bug eliminated: never allow entry <= sl on LONG
             if (risk / entry) > 0.035:
                 reasons.append(f"Risk {risk/entry*100:.2f}% exceeds 3.5% institutional ceiling")
+                is_qualified = False
             tp = entry + max(2.2 * risk, 2.5 * atr)
         else:
             recent_high = max(
@@ -516,6 +517,7 @@ class SetupEngine:
                 return None  # Inverted SL bug eliminated: never allow entry >= sl on SHORT
             if (risk / entry) > 0.035:
                 reasons.append(f"Risk {risk/entry*100:.2f}% exceeds 3.5% institutional ceiling")
+                is_qualified = False
             tp = entry - max(2.2 * risk, 2.5 * atr)
 
         risk_dist = abs(entry - sl)
@@ -632,15 +634,28 @@ class SetupEngine:
             not is_bull and derivs.price_vs_oi_state == "SHORT_EXPANSION"
         )
 
+        min_stop_dist = max(1.2 * atr, price * 0.0045)
         if direction == DecisionAction.LONG:
             entry = price
-            sl = latest_bos.broken_level - (0.5 * atr)
+            raw_sl = latest_bos.broken_level - (0.5 * atr)
+            sl = min(raw_sl, entry - min_stop_dist)
             risk = entry - sl
+            if risk <= 0:
+                return None  # Inverted stop guard
+            if (risk / entry) > 0.035:
+                reasons.append(f"Risk {risk/entry*100:.2f}% exceeds 3.5% institutional ceiling")
+                is_qualified = False
             tp = entry + (2.0 * risk) if risk > 0 else entry + (2.0 * atr)
         else:
             entry = price
-            sl = latest_bos.broken_level + (0.5 * atr)
+            raw_sl = latest_bos.broken_level + (0.5 * atr)
+            sl = max(raw_sl, entry + min_stop_dist)
             risk = sl - entry
+            if risk <= 0:
+                return None  # Inverted stop guard
+            if (risk / entry) > 0.035:
+                reasons.append(f"Risk {risk/entry*100:.2f}% exceeds 3.5% institutional ceiling")
+                is_qualified = False
             tp = entry - (2.0 * risk) if risk > 0 else entry - (2.0 * atr)
 
         risk_dist = abs(entry - sl)
