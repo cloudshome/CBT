@@ -18,7 +18,6 @@ import logging
 import os
 import re
 import shutil
-import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -54,7 +53,7 @@ class HermesAgentBridge:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10.0)
+            stdout, _stderr = await asyncio.wait_for(proc.communicate(), timeout=10.0)
             raw_out = stdout.decode("utf-8", errors="replace")
 
             model_match = re.search(r"Model:\s+([^\n\r]+)", raw_out)

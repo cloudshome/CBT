@@ -9,11 +9,11 @@ Independent Verification & Regression Test Suite for CBT Critical Defect Remedia
 """
 
 import os
-import sys
+
 import pytest
-from core.central_mind import CentralTradingMind, TradeProposal, PortfolioAction
+
+from core.central_mind import CentralTradingMind, PortfolioAction, TradeProposal
 from core.portfolio_shadow import portfolio_shadow
-from core.database import db_manager
 
 
 @pytest.fixture(autouse=True)
@@ -60,7 +60,7 @@ def test_d01_defense_in_depth_prevents_aggregate_risk_oversubscription():
 
     # Trade 3: Direct caller attempts to open SOL with $30 stop risk ($190 + $30 = $220 > $200)
     # Defense-in-depth inside open_position MUST reject deterministically
-    with pytest.raises(ValueError, match="Cumulative portfolio stop risk.*exceeds aggregate ceiling"):
+    with pytest.raises(ValueError, match=r"Cumulative portfolio stop risk.*exceeds aggregate ceiling"):
         portfolio_shadow.open_position(
             symbol="SOL/USDT",
             direction="LONG",

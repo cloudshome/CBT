@@ -12,12 +12,18 @@ Guarantees:
 from __future__ import annotations
 
 import os
-import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-from core.portfolio_shadow import portfolio_shadow
+import pytest
+
 from core.mastermind.mastermind_arbiter import MastermindArbiterCouncil
-from core.mastermind.specialist_base import CandidateProposal, DecisionAction, EpistemicGrade, SpecialistArchetype
+from core.mastermind.specialist_base import (
+    CandidateProposal,
+    DecisionAction,
+    EpistemicGrade,
+    SpecialistArchetype,
+)
+from core.portfolio_shadow import portfolio_shadow
 
 
 @pytest.fixture(autouse=True)

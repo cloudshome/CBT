@@ -1003,7 +1003,6 @@ class PortfolioShadowManager:
     def reset_all_positions(self) -> None:
         """Resets all shadow positions for clean benchmarking."""
         import core.cooldown_governor as cooldown_module
-        from core.cooldown_governor import CooldownGovernor
         with db_manager.get_trading_conn() as conn:
             conn.execute("DELETE FROM shadow_positions;")
             conn.commit()

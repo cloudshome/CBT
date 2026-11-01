@@ -1,9 +1,7 @@
-import pytest
-import numpy as np
 from fastapi.testclient import TestClient
+
 from app import app
 from core.monte_carlo_stress import (
-    MonteCarloStressTester,
     MonteCarloTrajectorySimulationResult,
     monte_carlo_stress_tester,
 )

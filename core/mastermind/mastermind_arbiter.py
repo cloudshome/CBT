@@ -633,8 +633,8 @@ class MastermindArbiterCouncil:
 
                 try:
                     # Route through Supreme Central Trading Mind & Risk Gateway (Finding D-01)
-                    from core.data_streamer import data_streamer
                     from core.central_mind import CentralTradingMind, TradeProposal
+                    from core.data_streamer import data_streamer
 
                     data_streamer._last_known_prices[sym] = cur_price
 
