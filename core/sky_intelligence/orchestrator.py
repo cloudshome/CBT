@@ -41,6 +41,7 @@ class SKYIntelligenceOrchestrator:
     def __init__(self, default_symbol: str = "BTC/USDT"):
         self.default_symbol = default_symbol
         self._bayesian_cache: dict[str, tuple[float, float, int, float]] = {}
+        self._last_signal_bar: dict[tuple[str, str], int] = {}
 
     def get_bayesian_setup_stats(
         self, symbol: str, setup_type_str: str, epoch_ms: int = 1793469018542
@@ -300,7 +301,8 @@ class SKYIntelligenceOrchestrator:
                 no_trade_reason=reason,
             )
 
-        # Qualified setup selected
+        # P3.1: Sort deterministically by Confluence Score descending, then Risk-Reward ratio descending
+        qualified_setups.sort(key=lambda s: (s.confluence_score, s.risk_reward_ratio), reverse=True)
         best_setup = qualified_setups[0]
         direction = best_setup.direction
 
@@ -313,6 +315,14 @@ class SKYIntelligenceOrchestrator:
         # Nudge win probability slightly by confluence score deviation from 75.0 baseline
         confluence = best_setup.confluence_score
         p_effective = min(0.72, max(0.35, p_win_hat + 0.004 * (confluence - 75.0)))
+
+        # Update dynamic Bayesian fields on SKYSetup (P1.2: Purge static legacy priors)
+        best_setup.bayesian_expectancy_r = round(r_win_hat, 3)
+        best_setup.bayesian_win_rate = round(p_effective, 3)
+        best_setup.bayesian_sample_size = sample_size
+        best_setup.historical_expectancy_r = round(r_win_hat, 3)
+        best_setup.historical_win_rate = round(p_effective, 3)
+        best_setup.historical_sample_size = sample_size
 
         # Dynamic Fee + Spread Friction in R (Realistic ~8 bps round-trip execution cost)
         stop_dist_pct = (
@@ -339,8 +349,20 @@ class SKYIntelligenceOrchestrator:
         # Risk Gate hurdle: Net EV must exceed +0.25R
         risk_passed = net_ev >= 0.25
 
-        final_decision = direction if risk_passed else DecisionAction.NO_TRADE
-        no_trade_reason = None if risk_passed else f"NET_EV_HURDLE_FAILED (+{net_ev:.2f}R < +0.25R)"
+        # P3.2: Multi-Setup Conflict Resolution (prevent duplicate signal within the same 15m candle bar)
+        bar_ts = int(candles[-1].get("timestamp", 0)) if candles else int(now_ms // 900000 * 900000)
+        sig_key = (symbol, direction.value)
+        if risk_passed and self._last_signal_bar.get(sig_key) == bar_ts:
+            risk_passed = False
+            final_decision = DecisionAction.NO_TRADE
+            no_trade_reason = f"DUPLICATE_BAR_SIGNAL_PREVENTED ({direction.value} {symbol} already fired in 15m bar {bar_ts})"
+        elif risk_passed:
+            self._last_signal_bar[sig_key] = bar_ts
+            final_decision = direction
+            no_trade_reason = None
+        else:
+            final_decision = DecisionAction.NO_TRADE
+            no_trade_reason = f"NET_EV_HURDLE_FAILED (+{net_ev:.2f}R < +0.25R)"
 
         dossier = {
             "setup_type": best_setup.setup_type.value,
@@ -351,6 +373,8 @@ class SKYIntelligenceOrchestrator:
             "risk_reward_ratio": best_setup.risk_reward_ratio,
             "displacement_score": best_setup.displacement_score,
             "regime": regime_state.regime_type.value,
+            "bayesian_expectancy_r": round(r_win_hat, 3),
+            "bayesian_win_rate": round(p_effective, 3),
             "historical_expectancy_r": round(r_win_hat, 3),
             "historical_win_rate": round(p_effective, 3),
             "confluence_score": best_setup.confluence_score,

@@ -319,6 +319,9 @@ class SKYSetup:
     rejection_reasons: list[str] = field(default_factory=list)
     feature_snapshot: dict[str, Any] = field(default_factory=dict)
     explanation_text: str = ""
+    bayesian_expectancy_r: float | None = None
+    bayesian_win_rate: float | None = None
+    bayesian_sample_size: int = 0
 
 
 @dataclass(frozen=True)

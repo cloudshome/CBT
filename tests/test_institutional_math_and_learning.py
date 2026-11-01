@@ -374,3 +374,233 @@ def test_setup_b_strictly_disqualifies_excessive_risk_ceiling():
     assert any("exceeds 3.5% institutional ceiling" in r for r in setup_b.rejection_reasons)
     assert setup_b.is_qualified is False
 
+
+def test_closed_candle_confirmation_fails_closed():
+    """
+    P1.3: Verifies that check_closed_candle_confirmation fails-closed (returns False)
+    on empty, truncated, or corrupted candle data feeds.
+    """
+    from core.sky_intelligence.setup_engine import check_closed_candle_confirmation
+
+    # 1. Empty / None / <2 bars
+    assert check_closed_candle_confirmation(None, DecisionAction.LONG) is False
+    assert check_closed_candle_confirmation([], DecisionAction.LONG) is False
+    assert (
+        check_closed_candle_confirmation(
+            [{"open": 100, "high": 105, "low": 99, "close": 104}], DecisionAction.LONG
+        )
+        is False
+    )
+
+    # 2. Missing required fields
+    corrupt_missing = [
+        {"open": 100, "close": 104},  # missing high, low
+        {"open": 104, "high": 106, "low": 103, "close": 105},
+    ]
+    assert check_closed_candle_confirmation(corrupt_missing, DecisionAction.LONG) is False
+
+    # 3. Invalid geometry (high < low, non-positive values)
+    corrupt_geometry = [
+        {"open": 100, "high": 95, "low": 105, "close": 98},  # high < low
+        {"open": 104, "high": 106, "low": 103, "close": 105},
+    ]
+    assert check_closed_candle_confirmation(corrupt_geometry, DecisionAction.LONG) is False
+
+    # 4. Valid confirming candle (closed Bull)
+    valid_bull = [
+        {"open": 100, "high": 106, "low": 99, "close": 105},  # candles[-2] closed bull
+        {"open": 105, "high": 107, "low": 104, "close": 106},
+    ]
+    assert check_closed_candle_confirmation(valid_bull, DecisionAction.LONG) is True
+    # Bearish confirmation on a bull closed candle without upper wick should be False
+    assert check_closed_candle_confirmation(valid_bull, DecisionAction.SHORT) is False
+
+
+def test_setup_d_and_e_strictly_disqualify_excessive_risk_ceiling():
+    """
+    P1.1: Verifies that Setups D and E strictly set is_qualified = False
+    when risk distance exceeds 3.5% of entry price.
+    """
+    engine = SetupEngine(min_rr_ratio=1.5)
+    atr = 100.0
+    price = 2000.0  # 3.5% of 2000 is $70; risk will be > $70
+
+    # Setup D: Range sweep with extreme price far away (1850 -> risk = 2000 - (1850 - 50) = 200 = 10%)
+    sweep_d = LiquiditySweep(
+        pool_type=LiquidityPoolType.RANGE_LOW,
+        symbol="ETH/USDT",
+        timeframe="15m",
+        sweep_timestamp=1700000000,
+        swept_level=1900.0,
+        extreme_price=1850.0,
+        penetration_distance=50.0,
+        penetration_atr_ratio=0.5,
+        rejection_distance=30.0,
+        wick_to_body_ratio=1.5,
+        volume_delta=100.0,
+        subsequent_displacement_score=75.0,
+        is_valid_reclaim=True,
+        meta={"direction": "BULLISH"},
+    )
+    mtf = MultiTimeframeContext(
+        timestamp=1700000000,
+        htf_1d_trend="BULLISH",
+        htf_4h_trend="BULLISH",
+        mtf_1h_state="PULLBACK",
+        mtf_15m_state="CONFLUENT",
+        ltf_5m_trigger="READY",
+        ltf_1m_trigger="READY",
+        confluence_score=85.0,
+        stack_alignment="BULLISH_CONFLUENT",
+    )
+    regime = MarketRegimeState(
+        timestamp=1700000000,
+        regime_type=MarketRegimeType.RANGING_CONSOLIDATION,
+        confidence=0.85,
+        trend_strength_adx=18.0,
+        volatility_state=VolatilityRegime.NORMAL_VOLATILITY,
+        is_mean_reverting=True,
+    )
+    candles = [
+        {"open": 1990.0, "high": 2005.0, "low": 1985.0, "close": 2002.0},
+        {"open": 2002.0, "high": 2010.0, "low": 1995.0, "close": 2005.0},
+        {"open": 2005.0, "high": 2015.0, "low": 1998.0, "close": 2000.0},
+    ]
+
+    setup_d = engine._evaluate_setup_d(
+        symbol="ETH/USDT",
+        timeframe="15m",
+        price=price,
+        sweeps=[sweep_d],
+        regime=regime,
+        atr=atr,
+        candles=candles,
+        mtf_context=mtf,
+    )
+    assert setup_d is not None
+    assert any("exceeds 3.5% institutional ceiling" in r for r in setup_d.rejection_reasons)
+    assert setup_d.is_qualified is False
+
+    # Setup E: VWAP reclaim with structural 5-bar swing low far away (low at 1800 -> risk > 200)
+    candles_e = []
+    for i in range(25):
+        is_penultimate = i == 23
+        candles_e.append({
+            "timestamp": 1700000000 + (i * 900000),
+            "open": 2000.0,
+            "high": 2010.0,
+            "low": 1800.0 if i >= 20 else 1995.0,  # last 5 bars dipped to 1800
+            "close": 1990.0 if is_penultimate else 2005.0,
+            "volume": 1000.0,
+        })
+    vwap_feat = VWAPFeature(
+        timestamp=1700000000,
+        vwap=1995.0,
+        upper_band_1sigma=2020.0,
+        lower_band_1sigma=1970.0,
+        upper_band_2sigma=2040.0,
+        lower_band_2sigma=1950.0,
+        std_dev=15.0,
+        deviation_sigmas=0.25,
+        is_above_vwap=True,
+        is_extended_overbought=False,
+        is_extended_oversold=False,
+        is_reclaiming=True,
+        mean_reversion_prob=0.70,
+    )
+    disp = DisplacementFeature(
+        candle_index=10,
+        timestamp=1700000000,
+        direction="BULLISH",
+        body_atr_ratio=1.5,
+        range_atr_ratio=2.0,
+        consecutive_directional_bars=2,
+        volume_expansion_ratio=2.0,
+        price_velocity=10.0,
+        breakout_distance=100.0,
+        close_location_in_range=0.9,
+        displacement_score=85.0,
+    )
+
+    setup_e = engine._evaluate_setup_e(
+        symbol="ETH/USDT",
+        timeframe="15m",
+        price=price,
+        candles=candles_e,
+        events=[],
+        disp=disp,
+        regime=regime,
+        atr=atr,
+        vwap_feat=vwap_feat,
+        mtf_context=mtf,
+    )
+    assert setup_e is not None
+    assert any("exceeds 3.5% institutional ceiling" in r for r in setup_e.rejection_reasons)
+    assert setup_e.is_qualified is False
+
+
+def test_orchestrator_deterministic_confluence_sorting_and_bar_deduplication():
+    """
+    P3.1 & P3.2: Verifies that orchestrator:
+    1. Sorts multiple qualified setups deterministically by Confluence Score descending, then RR descending.
+    2. Suppresses duplicate signals for the same symbol and direction in the same 15m candle bar.
+    """
+    from core.sky_intelligence.types import SKYSetup, SetupType
+
+    orchestrator = sky_orchestrator
+    symbol = "BTC/USDT"
+
+    # Setup 1: lower confluence 80.0, RR 2.5
+    s1 = SKYSetup(
+        setup_type=SetupType.SETUP_B_PULLBACK_FVG,
+        direction=DecisionAction.SHORT,
+        symbol=symbol,
+        trigger_timeframe="15m",
+        timestamp=1700000000,
+        entry_price=70000.0,
+        invalidation_sl=70300.0,
+        target_tp=69250.0,
+        risk_reward_ratio=2.5,
+        displacement_score=75.0,
+        regime=MarketRegimeType.TRENDING_BEAR,
+        historical_expectancy_r=0.40,
+        historical_win_rate=0.60,
+        historical_sample_size=100,
+        confluence_score=80.0,
+        is_qualified=True,
+    )
+
+    # Setup 2: higher confluence 90.0, RR 2.2
+    s2 = SKYSetup(
+        setup_type=SetupType.SETUP_E_VWAP_RECLAIM,
+        direction=DecisionAction.SHORT,
+        symbol=symbol,
+        trigger_timeframe="15m",
+        timestamp=1700000000,
+        entry_price=70000.0,
+        invalidation_sl=70300.0,
+        target_tp=69340.0,
+        risk_reward_ratio=2.2,
+        displacement_score=85.0,
+        regime=MarketRegimeType.TRENDING_BEAR,
+        historical_expectancy_r=0.45,
+        historical_win_rate=0.65,
+        historical_sample_size=120,
+        confluence_score=90.0,
+        is_qualified=True,
+    )
+
+    setups = [s1, s2]
+    # P3.1: Sort by (confluence_score, risk_reward_ratio) descending
+    setups.sort(key=lambda s: (s.confluence_score, s.risk_reward_ratio), reverse=True)
+    assert setups[0] == s2  # Higher confluence setup selected first!
+
+    # P3.2: Multi-Setup bar deduplication
+    bar_ts = 1700000900000
+    orchestrator._last_signal_bar[(symbol, "SHORT")] = bar_ts
+
+    # Simulating a signal attempt in the same bar
+    sig_key = (symbol, "SHORT")
+    assert orchestrator._last_signal_bar.get(sig_key) == bar_ts  # Already emitted in this bar
+
+

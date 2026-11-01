@@ -45,14 +45,27 @@ def check_closed_candle_confirmation(
     """
     Verifies that the last closed candle (candles[-2]) closed in the trade's direction
     or formed a significant (>35% of total bar range) rejection wick in that direction.
+    Fail-closed: Returns False if candles is empty, truncated (<2 bars), or missing required fields.
     """
     if not candles or len(candles) < 2:
-        return True
+        return False
     last_closed = candles[-2]
-    c_open = float(last_closed.get("open", 0.0))
-    c_close = float(last_closed.get("close", 0.0))
-    c_high = float(last_closed.get("high", 0.0))
-    c_low = float(last_closed.get("low", 0.0))
+    if not isinstance(last_closed, dict):
+        return False
+    for f in ("open", "close", "high", "low"):
+        if f not in last_closed:
+            return False
+    try:
+        c_open = float(last_closed["open"])
+        c_close = float(last_closed["close"])
+        c_high = float(last_closed["high"])
+        c_low = float(last_closed["low"])
+    except (ValueError, TypeError):
+        return False
+
+    if c_high <= 0 or c_low <= 0 or c_high < c_low:
+        return False
+
     rng = max(1e-6, c_high - c_low)
 
     if direction == DecisionAction.LONG:
