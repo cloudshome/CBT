@@ -546,10 +546,31 @@ export const api = {
    */
   async runMonteCarloStressTest(
     symbol: string,
-    timeframe: SupportedTimeframe = '15m'
+    timeframe: SupportedTimeframe = '15m',
+    options?: {
+      initialCapital?: number;
+      annualReturn?: number;
+      annualVolatility?: number;
+      horizonYears?: number;
+      numPaths?: number;
+      steps?: number;
+      autoCalibrate?: boolean;
+    }
   ): Promise<import('../types').MonteCarloStressReport> {
+    const params = new URLSearchParams({
+      symbol,
+      timeframe,
+    });
+    if (options?.initialCapital !== undefined) params.append('initial_capital', options.initialCapital.toString());
+    if (options?.annualReturn !== undefined) params.append('annual_return', options.annualReturn.toString());
+    if (options?.annualVolatility !== undefined) params.append('annual_volatility', options.annualVolatility.toString());
+    if (options?.horizonYears !== undefined) params.append('horizon_years', options.horizonYears.toString());
+    if (options?.numPaths !== undefined) params.append('num_paths', options.numPaths.toString());
+    if (options?.steps !== undefined) params.append('steps', options.steps.toString());
+    if (options?.autoCalibrate !== undefined) params.append('auto_calibrate', options.autoCalibrate ? 'true' : 'false');
+
     const res = await authFetch(
-      `${BASE_URL}/api/institutional/monte-carlo?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`,
+      `${BASE_URL}/api/institutional/monte-carlo?${params.toString()}`,
       { method: 'POST' }
     );
     return handleResponse<import('../types').MonteCarloStressReport>(res);

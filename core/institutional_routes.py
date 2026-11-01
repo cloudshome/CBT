@@ -168,8 +168,24 @@ async def get_psychology_status() -> dict[str, Any]:
 async def run_monte_carlo_stress_test(
     symbol: str = Query("BTC/USDT"),
     timeframe: str = Query("15m"),
+    initial_capital: float = Query(100000.0),
+    annual_return: float = Query(0.08),
+    annual_volatility: float = Query(0.18),
+    horizon_years: float = Query(5.0),
+    num_paths: int = Query(10000),
+    steps: int = Query(60),
+    auto_calibrate: bool = Query(False),
 ) -> dict[str, Any]:
-    """Runs 10,000-path Monte Carlo bootstrap simulation for ruin and drawdown estimation."""
+    """
+    Runs 10,000-path Monte Carlo stress test & forward multi-path trajectory simulation.
+    Combines:
+    1. Historical bootstrap return reshuffling.
+    2. Geometric Brownian Motion (GBM) continuous path simulation with percentile fan bands.
+    3. The 4 canonical path archetypes (Smooth Winner, Choppy Survivor, Deep Drawdown, Failure).
+    """
+    calibrated_mu = annual_return
+    calibrated_sigma = annual_volatility
+
     try:
         from core.data_streamer import data_streamer
 
@@ -180,13 +196,43 @@ async def run_monte_carlo_stress_test(
             c_curr = float(candles[i]["close"])
             if c_prev > 0:
                 returns.append((c_curr - c_prev) / c_prev)
+
+        if auto_calibrate and len(returns) >= 20:
+            import numpy as np
+
+            arr = np.array(returns, dtype=np.float64)
+            # Annualize based on 15m intervals (35,040 periods/year) or 1h (8,760) or 1d (365)
+            tf_clean = timeframe.lower()
+            periods_per_year = (
+                35040 if "15" in tf_clean else (8760 if "1h" in tf_clean else (365 if "1d" in tf_clean else 35040))
+            )
+            mean_ret = float(np.mean(arr))
+            std_ret = float(np.std(arr))
+            calibrated_mu = max(-0.5, min(1.5, mean_ret * periods_per_year))
+            calibrated_sigma = max(0.05, min(2.0, std_ret * np.sqrt(periods_per_year)))
     except Exception:
         returns = []
 
+    # 1. Historical bootstrap report (backward compatibility)
     report = _mc_tester.stress_test(returns)
     out = report.to_dict()
     out["covid_shock_survival_score"] = 92.4
     out["ftx_shock_survival_score"] = 89.1
+
+    # 2. Geometric Brownian Motion Trajectory Simulation (Hunid Capital Film 031 feature)
+    bounded_paths = max(500, min(20000, num_paths))
+    bounded_steps = max(12, min(120, steps))
+    traj = _mc_tester.simulate_gbm_trajectory(
+        initial_capital=initial_capital,
+        expected_return=calibrated_mu,
+        volatility=calibrated_sigma,
+        horizon_years=horizon_years,
+        steps=bounded_steps,
+        num_paths=bounded_paths,
+    )
+    out["trajectory"] = traj.to_dict()
+    out["calibrated_annual_return"] = round(calibrated_mu, 4)
+    out["calibrated_annual_volatility"] = round(calibrated_sigma, 4)
     return out
 
 

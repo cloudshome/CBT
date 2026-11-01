@@ -520,6 +520,42 @@ export interface TiltStatus {
   emotional_state_score: number; // 0 (calm) to 100 (extreme tilt)
 }
 
+export interface MonteCarloConeStep {
+  step: number;
+  time_label: string;
+  p5: number;
+  p25: number;
+  p50: number;
+  p75: number;
+  p95: number;
+  smooth_winner: number;
+  choppy_survivor: number;
+  deep_drawdown: number;
+  below_start: number;
+}
+
+export interface MonteCarloTrajectoryResult {
+  initial_capital: number;
+  expected_annual_return: number;
+  annual_volatility: number;
+  time_horizon_years: number;
+  num_paths: number;
+  steps_count: number;
+  steps: MonteCarloConeStep[];
+  p5_terminal: number;
+  p25_terminal: number;
+  p50_terminal: number;
+  p75_terminal: number;
+  p95_terminal: number;
+  probability_of_ruin: number;
+  probability_of_loss: number;
+  probability_of_target_hit: number;
+  target_capital: number;
+  median_max_drawdown_pct: number;
+  worst_case_max_drawdown_pct: number;
+  summary: string;
+}
+
 export interface MonteCarloStressReport {
   num_simulations: number;
   probability_of_ruin: number;
@@ -530,6 +566,9 @@ export interface MonteCarloStressReport {
   covid_shock_survival_score: number;
   ftx_shock_survival_score: number;
   summary: string;
+  trajectory?: MonteCarloTrajectoryResult;
+  calibrated_annual_return?: number;
+  calibrated_annual_volatility?: number;
 }
 
 export interface LeadSignal {

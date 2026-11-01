@@ -7,8 +7,7 @@ import {
   TrendingDown,
   Lock,
   Unlock,
-  Play,
-  RotateCw,
+
   Globe,
   Anchor,
   Compass,
@@ -23,6 +22,7 @@ import {
   SupportedTimeframe,
 } from '../types';
 import { api } from '../services/api';
+import { MonteCarloDistributionLab } from './MonteCarloDistributionLab';
 
 interface HedgeFundBrainSuiteProps {
   symbol: string;
@@ -53,8 +53,6 @@ export const HedgeFundBrainSuite: React.FC<HedgeFundBrainSuiteProps> = ({
   } | null>(null);
   const [hedge, setHedge] = useState<HedgeRecommendation | null>(null);
 
-  const [runningMC, setRunningMC] = useState(false);
-
   // Fetch initial telemetry
   useEffect(() => {
     let isMounted = true;
@@ -79,18 +77,7 @@ export const HedgeFundBrainSuite: React.FC<HedgeFundBrainSuiteProps> = ({
     };
   }, [symbol, timeframe, currentPrice]);
 
-  // Handle Monte Carlo Simulation Trigger
-  const handleRunMonteCarlo = async () => {
-    setRunningMC(true);
-    try {
-      const res = await api.runMonteCarloStressTest(symbol, timeframe);
-      setMonteCarlo(res);
-    } catch (err) {
-      console.error('Failed to run Monte Carlo test:', err);
-    } finally {
-      setRunningMC(false);
-    }
-  };
+
 
   return (
     <div className="flex flex-col bg-[#0b0f19] border border-[#1e293b] rounded-lg overflow-hidden text-slate-200">
@@ -434,63 +421,14 @@ export const HedgeFundBrainSuite: React.FC<HedgeFundBrainSuiteProps> = ({
           </div>
         )}
 
-        {/* 4. MONTE CARLO 10,000-PATH STRESS LAB */}
+        {/* 4. MONTE CARLO 10,000-PATH STRESS LAB (Hunid Capital Film 031 Feature) */}
         {activeTab === 'MONTE_CARLO' && (
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between bg-[#080c16] p-3 rounded border border-[#1e293b]">
-              <div>
-                <span className="font-bold text-sm text-slate-100 block">
-                  10,000-Path Monte Carlo & Black Swan Stress Lab
-                </span>
-                <span className="text-[11px] text-slate-400">
-                  Permutes and reshuffles historical return distributions to assess ruin probability.
-                </span>
-              </div>
-
-              <button
-                onClick={handleRunMonteCarlo}
-                disabled={runningMC}
-                className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded font-mono text-xs font-semibold transition-all disabled:opacity-50"
-              >
-                {runningMC ? <RotateCw size={13} className="animate-spin" /> : <Play size={13} />}
-                <span>{runningMC ? 'Simulating 10,000 Paths...' : 'Run 10,000 Monte Carlo Paths'}</span>
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono">
-              <div className="bg-[#080c16] border border-[#1e293b] p-2.5 rounded flex flex-col">
-                <span className="text-slate-400 text-[10px]">Probability of Ruin (&ge;20% DD)</span>
-                <span className="text-emerald-400 font-bold text-sm">
-                  {monteCarlo ? (monteCarlo.probability_of_ruin * 100).toFixed(2) : '0.35'}%
-                </span>
-                <span className="text-[9px] text-slate-500">Threshold &lt; 1.0%</span>
-              </div>
-              <div className="bg-[#080c16] border border-[#1e293b] p-2.5 rounded flex flex-col">
-                <span className="text-slate-400 text-[10px]">Median Drawdown (P50)</span>
-                <span className="text-slate-200 font-bold text-sm">
-                  {monteCarlo ? monteCarlo.p50_max_drawdown_pct : '5.8'}%
-                </span>
-              </div>
-              <div className="bg-[#080c16] border border-[#1e293b] p-2.5 rounded flex flex-col">
-                <span className="text-slate-400 text-[10px]">95th Percentile DD (P95)</span>
-                <span className="text-amber-400 font-bold text-sm">
-                  {monteCarlo ? monteCarlo.p95_max_drawdown_pct : '12.4'}%
-                </span>
-              </div>
-              <div className="bg-[#080c16] border border-[#1e293b] p-2.5 rounded flex flex-col">
-                <span className="text-emerald-400 text-[10px]">COVID Shock Survival</span>
-                <span className="text-emerald-400 font-bold text-sm">
-                  {monteCarlo ? monteCarlo.covid_shock_survival_score : '94.2'}/100
-                </span>
-              </div>
-            </div>
-
-            {monteCarlo && (
-              <p className="text-[11px] font-mono text-emerald-400 bg-emerald-950/20 border border-emerald-500/30 p-2 rounded">
-                ✓ {monteCarlo.summary}
-              </p>
-            )}
-          </div>
+          <MonteCarloDistributionLab
+            symbol={symbol}
+            timeframe={timeframe}
+            initialReport={monteCarlo}
+            onSimulationComplete={(rep) => setMonteCarlo(rep)}
+          />
         )}
 
         {/* 5. CROSS-ASSET LEAD-LAG RADAR */}

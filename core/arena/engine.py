@@ -107,6 +107,19 @@ class DarwinianArenaEngine:
         if not account:
             return None
 
+        if current_price <= 0:
+            return account
+
+        # Sanity check: protect against cross-symbol contamination or corrupted gateway data
+        if account.benchmark_current_price and account.benchmark_current_price > 0:
+            ratio = current_price / account.benchmark_current_price
+            if ratio > 10.0 or ratio < 0.10:
+                logger.warning(
+                    "Price tick anomaly rejected for %s: incoming price %.4f deviates >10x from baseline %.4f",
+                    symbol, current_price, account.benchmark_current_price
+                )
+                return account
+
         # 1. Update Benchmark Tracking
         if account.benchmark_initial_price is None or account.benchmark_initial_price <= 0:
             account.benchmark_initial_price = current_price
