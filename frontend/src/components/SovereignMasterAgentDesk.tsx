@@ -278,7 +278,7 @@ export const SovereignMasterAgentDesk: React.FC<SovereignMasterAgentDeskProps> =
                       <span className="text-xs text-slate-500">{sym}</span>
                     </div>
                     <div className="text-xs text-slate-400">
-                      Mark Price: <span className="font-bold text-white">${dec?.current_price.toLocaleString() || '---'}</span>
+                      Mark Price: <span className="font-bold text-white">${dec?.current_price != null ? dec.current_price.toLocaleString() : '---'}</span>
                     </div>
                   </div>
 
@@ -310,12 +310,12 @@ export const SovereignMasterAgentDesk: React.FC<SovereignMasterAgentDeskProps> =
                       <Database className="w-3 h-3 text-cyan-400" />
                       <span>Past Ledger Memory</span>
                     </span>
-                    <span className={`font-bold ${dec?.memory_dossier.net_pnl_usd && dec.memory_dossier.net_pnl_usd >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {dec?.memory_dossier.net_pnl_usd !== undefined ? (dec.memory_dossier.net_pnl_usd >= 0 ? `+$${dec.memory_dossier.net_pnl_usd}` : `-$${Math.abs(dec.memory_dossier.net_pnl_usd)}`) : '---'}
+                    <span className={`font-bold ${dec?.memory_dossier?.net_pnl_usd != null && dec.memory_dossier.net_pnl_usd >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {dec?.memory_dossier?.net_pnl_usd != null ? (dec.memory_dossier.net_pnl_usd >= 0 ? `+$${dec.memory_dossier.net_pnl_usd}` : `-$${Math.abs(dec.memory_dossier.net_pnl_usd)}`) : '---'}
                     </span>
                   </div>
                   <p className="text-slate-300 leading-relaxed text-[10px]">
-                    {dec?.memory_dossier.memory_guidance || 'Reading memory...'}
+                    {dec?.memory_dossier?.memory_guidance || 'Reading memory...'}
                   </p>
                 </div>
 
@@ -324,15 +324,15 @@ export const SovereignMasterAgentDesk: React.FC<SovereignMasterAgentDeskProps> =
                   <div className="p-2.5 rounded-lg bg-[#0a101f] border border-cyan-500/30 text-[11px] mb-3 space-y-1.5">
                     <div className="flex justify-between">
                       <span className="text-slate-500">Entry:</span>
-                      <span className="font-bold text-white">${dec?.current_price}</span>
+                      <span className="font-bold text-white">${dec?.current_price ?? '---'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500">Stop Loss:</span>
-                      <span className="font-bold text-rose-400">${dec?.stop_loss}</span>
+                      <span className="font-bold text-rose-400">${dec?.stop_loss ?? '---'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500">Target (TP1):</span>
-                      <span className="font-bold text-emerald-400">${dec?.take_profit_ladder.tp1} ({dec?.risk_reward_ratio}:1 R:R)</span>
+                      <span className="font-bold text-emerald-400">${dec?.take_profit_ladder?.tp1 ?? '---'} ({dec?.risk_reward_ratio ?? '---'}:1 R:R)</span>
                     </div>
                   </div>
                 ) : (
@@ -385,7 +385,7 @@ export const SovereignMasterAgentDesk: React.FC<SovereignMasterAgentDeskProps> =
               </h3>
             </div>
             <div className="text-xs text-slate-400">
-              Regime: <span className="text-cyan-300 font-bold">{currentDec.market_structure_dossier.regime}</span> (ADX {currentDec.market_structure_dossier.adx})
+              Regime: <span className="text-cyan-300 font-bold">{currentDec.market_structure_dossier?.regime ?? '---'}</span> (ADX {currentDec.market_structure_dossier?.adx ?? '---'})
             </div>
           </div>
 
@@ -408,9 +408,9 @@ export const SovereignMasterAgentDesk: React.FC<SovereignMasterAgentDeskProps> =
                 <span>588-Article Research Vault Alignment</span>
               </div>
               <div className="space-y-1 text-[11px] text-slate-300">
-                <div><span className="text-slate-500">Macro Regime:</span> {currentDec.research_dossier.macro_regime}</div>
-                <div><span className="text-slate-500">Historical Analog:</span> {currentDec.research_dossier.key_research_analog}</div>
-                <div><span className="text-slate-500">Invalidation Rule:</span> {currentDec.research_dossier.invalidation_rule}</div>
+                <div><span className="text-slate-500">Macro Regime:</span> {currentDec.research_dossier?.macro_regime ?? '---'}</div>
+                <div><span className="text-slate-500">Historical Analog:</span> {currentDec.research_dossier?.key_research_analog ?? '---'}</div>
+                <div><span className="text-slate-500">Invalidation Rule:</span> {currentDec.research_dossier?.invalidation_rule ?? '---'}</div>
               </div>
             </div>
 
@@ -579,7 +579,7 @@ export const SovereignMasterAgentDesk: React.FC<SovereignMasterAgentDeskProps> =
                   selfImprovement.recent_autopsies.slice(0, 3).map((a: any, idx: number) => (
                     <div key={idx} className="p-2.5 rounded bg-[#090e1a] border border-[#1e293b] space-y-1">
                       <div className="flex justify-between items-center text-[11px]">
-                        <span className="font-bold text-slate-200">{a.symbol} (${a.pnl_usd.toFixed(2)})</span>
+                        <span className="font-bold text-slate-200">{a.symbol} (${(a.pnl_usd ?? 0).toFixed(2)})</span>
                         <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-950 text-rose-300 font-bold">{a.loss_category}</span>
                       </div>
                       <div className="text-[10px] text-slate-300 leading-tight">

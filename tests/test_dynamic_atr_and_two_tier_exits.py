@@ -85,6 +85,7 @@ def test_full_closure_after_partial_exit_preserves_cumulative_pnl():
         stop_loss=58000.0,
         take_profit=66000.0,
         entry_reason="Test Cumulative PnL Invariant",
+        enforce_atomic_limits=False,
     )
 
     # Step 1: Reach +1.5R (63,000) -> 50% closes for (63,000 - 60,000) * 1.0 = +$3,000

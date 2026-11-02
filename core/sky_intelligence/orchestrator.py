@@ -40,6 +40,67 @@ class SKYIntelligenceOrchestrator:
 
     def __init__(self, default_symbol: str = "BTC/USDT"):
         self.default_symbol = default_symbol
+        self._bayesian_cache: dict[str, tuple[float, float, int, float]] = {}
+        self._last_signal_bar: dict[tuple[str, str], int] = {}
+
+    def get_bayesian_setup_stats(
+        self, symbol: str, setup_type_str: str, epoch_ms: int = 1793469018542
+    ) -> tuple[float, float, int]:
+        """
+        Computes dynamic Bayesian posterior win rate (p_hat) and empirical win expectancy (R_win_hat).
+        Backed by closed trades in shadow_positions after epoch_ms.
+        Returns:
+            (p_win_hat, r_win_hat, sample_size)
+        """
+        cache_key = f"{symbol}_{setup_type_str}"
+        now_sec = time.time()
+        if cache_key in self._bayesian_cache:
+            p_hat, r_hat, n_samples, exp_time = self._bayesian_cache[cache_key]
+            if now_sec < exp_time:
+                return p_hat, r_hat, n_samples
+
+        # Conservative prior: alpha_0 = 6.0, beta_0 = 6.0 (p_0 = 0.50), prior average win = 1.45R
+        alpha_0 = 6.0
+        beta_0 = 6.0
+        r_win_0 = 1.45
+
+        n_wins = 0
+        n_total = 0
+        sum_win_r = 0.0
+
+        try:
+            from core.database import db_manager
+
+            with db_manager.get_trading_conn() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT realized_pnl, size, entry_price, stop_loss
+                    FROM shadow_positions
+                    WHERE status = 'CLOSED'
+                      AND opened_at >= ?
+                      AND (entry_reason LIKE ? OR symbol = ?);
+                    """,
+                    (epoch_ms, f"%{setup_type_str}%", symbol),
+                ).fetchall()
+
+                for r in rows:
+                    pnl = float(r["realized_pnl"] or 0.0)
+                    sz = float(r["size"] or 0.0)
+                    ep = float(r["entry_price"] or 0.0)
+                    sl = float(r["stop_loss"] or 0.0)
+                    risk_usd = sz * abs(ep - sl) if (sz > 0 and abs(ep - sl) > 0) else 100.0
+                    n_total += 1
+                    if pnl > 0:
+                        n_wins += 1
+                        sum_win_r += (pnl / max(1.0, risk_usd))
+        except Exception as ex:
+            logger.debug("Bayesian stats fallback to prior: %s", ex)
+
+        p_win_hat = (alpha_0 + n_wins) / (alpha_0 + beta_0 + n_total)
+        r_win_hat = (alpha_0 * r_win_0 + sum_win_r) / (alpha_0 + n_wins)
+
+        self._bayesian_cache[cache_key] = (p_win_hat, r_win_hat, n_total, now_sec + 60.0)
+        return p_win_hat, r_win_hat, n_total
 
     def analyze_market(
         self,
@@ -240,25 +301,47 @@ class SKYIntelligenceOrchestrator:
                 no_trade_reason=reason,
             )
 
-        # Qualified setup selected
+        # P3.1: Sort deterministically by Confluence Score descending, then Risk-Reward ratio descending
+        qualified_setups.sort(key=lambda s: (s.confluence_score, s.risk_reward_ratio), reverse=True)
         best_setup = qualified_setups[0]
         direction = best_setup.direction
 
-        # Net EV calculation (deducting friction 0.05R + model uncertainty 0.08R)
-        raw_ev = best_setup.historical_expectancy_r
-        net_ev = max(0.0, raw_ev - 0.13)
+        # Dynamic Bayesian Setup Expectancy & Win Rate (Backed by post-patch shadow_positions)
+        p_win_hat, r_win_hat, sample_size = self.get_bayesian_setup_stats(
+            symbol=symbol,
+            setup_type_str=best_setup.setup_type.value,
+        )
 
-        # Conservative Half-Kelly Sizing
-        p_win = best_setup.historical_win_rate
+        # Nudge win probability slightly by confluence score deviation from 75.0 baseline
+        confluence = best_setup.confluence_score
+        p_effective = min(0.72, max(0.35, p_win_hat + 0.004 * (confluence - 75.0)))
+
+        # Update dynamic Bayesian fields on SKYSetup (P1.2: Purge static legacy priors)
+        best_setup.bayesian_expectancy_r = round(r_win_hat, 3)
+        best_setup.bayesian_win_rate = round(p_effective, 3)
+        best_setup.bayesian_sample_size = sample_size
+        best_setup.historical_expectancy_r = round(r_win_hat, 3)
+        best_setup.historical_win_rate = round(p_effective, 3)
+        best_setup.historical_sample_size = sample_size
+
+        # Dynamic Fee + Spread Friction in R (Realistic ~8 bps round-trip execution cost)
+        stop_dist_pct = (
+            abs(best_setup.entry_price - best_setup.invalidation_sl) / best_setup.entry_price
+            if best_setup.entry_price > 0
+            else 0.005
+        )
+        c_friction_r = max(0.08, 0.0008 / max(stop_dist_pct, 0.001))
+
+        # True Net EV in R-multiples
+        net_ev = (p_effective * r_win_hat) - ((1.0 - p_effective) * 1.0) - c_friction_r
+
+        # Conservative Half-Kelly Sizing using Empirical Posterior Probability
         b_ratio = max(1.5, best_setup.risk_reward_ratio)
-        q_loss = 1.0 - p_win
-        full_kelly = ((b_ratio * p_win) - q_loss) / b_ratio
+        q_loss = 1.0 - p_effective
+        full_kelly = ((b_ratio * p_effective) - q_loss) / b_ratio
         half_kelly = max(0.0, min(0.015, full_kelly * 0.5))  # Capped at 1.5% max account risk
 
         risk_budget_usd = account_equity_usd * half_kelly
-        stop_dist_pct = (
-            abs(best_setup.entry_price - best_setup.invalidation_sl) / best_setup.entry_price
-        )
         raw_position_size_usd = risk_budget_usd / max(stop_dist_pct, 0.005)
         # Cap single-position notional size to 1.0x account equity (max 100% portfolio allocation per setup)
         position_size_usd = min(raw_position_size_usd, account_equity_usd * 1.0)
@@ -266,8 +349,20 @@ class SKYIntelligenceOrchestrator:
         # Risk Gate hurdle: Net EV must exceed +0.25R
         risk_passed = net_ev >= 0.25
 
-        final_decision = direction if risk_passed else DecisionAction.NO_TRADE
-        no_trade_reason = None if risk_passed else f"NET_EV_HURDLE_FAILED (+{net_ev:.2f}R < +0.25R)"
+        # P3.2: Multi-Setup Conflict Resolution (prevent duplicate signal within the same 15m candle bar)
+        bar_ts = int(candles[-1].get("timestamp", 0)) if candles else int(now_ms // 900000 * 900000)
+        sig_key = (symbol, direction.value)
+        if risk_passed and self._last_signal_bar.get(sig_key) == bar_ts:
+            risk_passed = False
+            final_decision = DecisionAction.NO_TRADE
+            no_trade_reason = f"DUPLICATE_BAR_SIGNAL_PREVENTED ({direction.value} {symbol} already fired in 15m bar {bar_ts})"
+        elif risk_passed:
+            self._last_signal_bar[sig_key] = bar_ts
+            final_decision = direction
+            no_trade_reason = None
+        else:
+            final_decision = DecisionAction.NO_TRADE
+            no_trade_reason = f"NET_EV_HURDLE_FAILED (+{net_ev:.2f}R < +0.25R)"
 
         dossier = {
             "setup_type": best_setup.setup_type.value,
@@ -278,10 +373,14 @@ class SKYIntelligenceOrchestrator:
             "risk_reward_ratio": best_setup.risk_reward_ratio,
             "displacement_score": best_setup.displacement_score,
             "regime": regime_state.regime_type.value,
-            "historical_expectancy_r": best_setup.historical_expectancy_r,
-            "historical_win_rate": best_setup.historical_win_rate,
+            "bayesian_expectancy_r": round(r_win_hat, 3),
+            "bayesian_win_rate": round(p_effective, 3),
+            "historical_expectancy_r": round(r_win_hat, 3),
+            "historical_win_rate": round(p_effective, 3),
             "confluence_score": best_setup.confluence_score,
             "net_ev_r": round(net_ev, 3),
+            "friction_r": round(c_friction_r, 4),
+            "bayesian_samples": sample_size,
             "kelly_fraction": round(half_kelly, 4),
             "vwap": {
                 "vwap": vwap_feat.vwap,

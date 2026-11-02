@@ -475,9 +475,6 @@ class MastermindArbiterCouncil:
             rejection_reason = None
             approved_notional = 0.0
 
-            # Record proposal into calibration track record ledger
-            self.record_proposal_for_calibration(proposal)
-
             # Retrieve specialist calibration weighting
             calib = self.get_specialist_calibration(spec.specialist_id)
             calib_weight = calib["weight"]

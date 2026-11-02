@@ -187,6 +187,14 @@ class CandidateOrderBlock:
     is_invalidated: bool = False
     expectancy_score: float = 0.50
 
+    @property
+    def bottom_price(self) -> float:
+        return self.zone_low
+
+    @property
+    def top_price(self) -> float:
+        return self.zone_high
+
 
 @dataclass(frozen=True)
 class DisplacementFeature:
@@ -311,6 +319,9 @@ class SKYSetup:
     rejection_reasons: list[str] = field(default_factory=list)
     feature_snapshot: dict[str, Any] = field(default_factory=dict)
     explanation_text: str = ""
+    bayesian_expectancy_r: float | None = None
+    bayesian_win_rate: float | None = None
+    bayesian_sample_size: int = 0
 
 
 @dataclass(frozen=True)

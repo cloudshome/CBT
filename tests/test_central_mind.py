@@ -133,3 +133,41 @@ def test_central_mind_governance_report(clean_central_mind):
     assert "HALF_KELLY_1_5_PCT_CAP" in report["governance_invariants"]
     assert "REAL_PRICE_GROUNDING_STRICT" in report["governance_invariants"]
     assert "max_positions" in report
+
+
+def test_central_mind_tier1_asset_firewall_blocks_autonomous_altcoins(clean_central_mind, monkeypatch):
+    mind = clean_central_mind
+    monkeypatch.setattr(mind, "get_live_market_price", lambda sym: 1.50)
+
+    # 1. Autonomous proposal on micro-cap altcoin (AKE/USDT) -> MUST REJECT
+    prop_altcoin = TradeProposal(
+        origin="MASTERMIND_spec_opp_ake_usdt",
+        symbol="AKE/USDT",
+        direction="LONG",
+        style="DAY",
+        planned_entry=1.50,
+        stop_loss=1.40,
+        take_profit=1.80,
+        thesis="Breakout on AKE",
+        confluence_score=85.0,
+    )
+    v_alt = mind.evaluate_and_route(prop_altcoin)
+    assert v_alt.is_approved is False
+    assert "Tier-1 Asset Firewall" in (v_alt.rejection_reason or "")
+
+    # 2. Manual terminal approval on altcoin -> MUST ALLOW through firewall
+    prop_manual_alt = TradeProposal(
+        origin="TERMINAL_MANUAL_APPROVAL",
+        symbol="AKE/USDT",
+        direction="LONG",
+        style="DAY",
+        planned_entry=1.50,
+        stop_loss=1.40,
+        take_profit=1.80,
+        requested_size=50.0,
+        thesis="Manual Trader Confirmation",
+        confluence_score=85.0,
+    )
+    v_manual = mind.evaluate_and_route(prop_manual_alt)
+    assert v_manual.is_approved is True
+

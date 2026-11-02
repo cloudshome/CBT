@@ -149,10 +149,12 @@ class AutonomousTrader:
                     )
                     continue
 
-                latest_candle_ts = int(candles_15m[-1]["timestamp"])
+                # Guard 1: Closed-Candle Evaluation & Deduplication
+                # Distinguish candles_15m[-1] (forming candle) from candles_15m[-2] (last fully closed 15m candle)
+                last_closed_candle = candles_15m[-2] if len(candles_15m) >= 2 else candles_15m[-1]
+                closed_candle_ts = int(last_closed_candle["timestamp"])
 
-                # Guard 1: Candle Bar Deduplication — do not re-trade the exact same candle bar
-                if self._last_traded_candle_ts.get(sym) == latest_candle_ts:
+                if self._last_traded_candle_ts.get(sym) == closed_candle_ts:
                     continue
 
                 tf_map: dict[str, list[dict[str, Any]]] = {"15m": candles_15m}
@@ -260,31 +262,74 @@ class AutonomousTrader:
                         )
                         continue
 
-                    # Guard 2b: Rolling Asset Performance Gate (Cap Bleed on Negative PF Assets)
+                    # Guard 2b: Rolling Asset Performance Gate (True 20-Trade Rolling Window anchored to post-patch epoch)
                     with db_manager.get_trading_conn() as conn:
+                        epoch_cutoff_ms = int(os.getenv("ASSET_GATE_EPOCH_MS", "1793469018542"))
+
                         p_cur = conn.execute(
                             """
                             SELECT 
                                 SUM(CASE WHEN realized_pnl > 0 THEN realized_pnl ELSE 0 END) as gross_win,
                                 SUM(CASE WHEN realized_pnl < 0 THEN ABS(realized_pnl) ELSE 0 END) as gross_loss,
                                 COUNT(*) as trade_count
-                            FROM shadow_positions
-                            WHERE symbol = ? AND status = 'CLOSED';
+                            FROM (
+                                SELECT realized_pnl
+                                FROM shadow_positions
+                                WHERE symbol = ? AND status = 'CLOSED' AND opened_at >= ?
+                                ORDER BY closed_at DESC
+                                LIMIT 20
+                            );
                             """,
-                            (sym,),
+                            (sym, epoch_cutoff_ms),
                         )
                         p_row = p_cur.fetchone()
-                        if p_row and p_row["trade_count"] and p_row["trade_count"] >= 20:
+                        if p_row and p_row["trade_count"] and p_row["trade_count"] >= 8:
                             g_win = float(p_row["gross_win"] or 0.0)
                             g_loss = float(p_row["gross_loss"] or 0.0)
-                            asset_pf = (g_win / g_loss) if g_loss > 0 else 1.0
-                            if asset_pf < 0.70:
+                            asset_pf = (
+                                (g_win / g_loss) if g_loss > 0 else (99.0 if g_win > 0 else 0.0)
+                            )
+
+                            # Hard-pause symbol if severe recent bleed (PF < 0.40 over >= 10 trades)
+                            if p_row["trade_count"] >= 10 and asset_pf < 0.40:
+                                logger.warning(
+                                    f"Asset Performance Gate HARD-PAUSE: Halting {sym} (Rolling PF={asset_pf:.2f} < 0.40 across {p_row['trade_count']} trades). Preserving capital in 100% Cash."
+                                )
+                                continue
+
+                            if asset_pf < 0.85:
                                 confluence = float(getattr(setup, "confluence_score", 0.0) or 0.0)
-                                if confluence < 85.0:
+                                if confluence < 86.0:
                                     logger.info(
-                                        f"Asset Performance Gate: Skipping {sym} trade (Historical PF={asset_pf:.2f} < 0.70 across {p_row['trade_count']} trades, Confluence={confluence:.1f} < 85.0)."
+                                        f"Asset Performance Gate: Skipping {sym} trade (Rolling 20-trade PF={asset_pf:.2f} < 0.85 across {p_row['trade_count']} trades, Confluence={confluence:.1f} < 86.0)."
                                     )
                                     continue
+
+                    # Guard 2c: Closed-Candle Directional Confirmation Guard
+                    c_open = float(last_closed_candle.get("open", 0.0))
+                    c_close = float(last_closed_candle.get("close", 0.0))
+                    if decision_out.decision == DecisionAction.LONG and c_close < c_open:
+                        c_low = float(last_closed_candle.get("low", c_close))
+                        bar_range = max(
+                            float(last_closed_candle.get("high", c_close)) - c_low, 1e-4
+                        )
+                        lower_wick_ratio = (min(c_open, c_close) - c_low) / bar_range
+                        if lower_wick_ratio < 0.35:
+                            logger.info(
+                                f"AutonomousTrader skipping {sym} LONG: Last closed 15m bar was bearish without absorption wick ({lower_wick_ratio:.1%} < 35%)."
+                            )
+                            continue
+                    elif decision_out.decision == DecisionAction.SHORT and c_close > c_open:
+                        c_high = float(last_closed_candle.get("high", c_close))
+                        bar_range = max(
+                            c_high - float(last_closed_candle.get("low", c_close)), 1e-4
+                        )
+                        upper_wick_ratio = (c_high - max(c_open, c_close)) / bar_range
+                        if upper_wick_ratio < 0.35:
+                            logger.info(
+                                f"AutonomousTrader skipping {sym} SHORT: Last closed 15m bar was bullish without absorption wick ({upper_wick_ratio:.1%} < 35%)."
+                            )
+                            continue
 
                     # If setup entry is missing or divergent (>1.5% away from live price), anchor to live market
                     if (
@@ -298,16 +343,33 @@ class AutonomousTrader:
 
                     # Dynamic ATR Volatility Sizing Anchor (No Arbitrary Static Percentages)
                     vol_state = volatility_engine.compute_volatility(candles_15m)
-                    atr_val = vol_state.atr if vol_state and vol_state.atr > 0 else (cur_price * 0.015)
+                    atr_val = (
+                        vol_state.atr
+                        if vol_state and vol_state.atr > 0
+                        else (cur_price * 0.015)
+                    )
+
+                    # Fix 5: Strict Minimum Stop Distance Floor (at least 1.2x ATR or 0.45% from entry)
+                    min_sl_dist = max(1.2 * atr_val, entry_price * 0.0045)
+                    min_sl_dist = min(min_sl_dist, entry_price * 0.030)  # Bound within 3.0% to prevent ceiling breach
 
                     if setup and setup.invalidation_sl > 0:
-                        sl = setup.invalidation_sl
+                        raw_sl = setup.invalidation_sl
                     else:
-                        sl = (
+                        raw_sl = (
                             round(cur_price - 2.0 * atr_val, 6)
                             if decision_out.decision == DecisionAction.LONG
                             else round(cur_price + 2.0 * atr_val, 6)
                         )
+
+                    # Only widen if the stop is too tight (micro-stop)
+                    if abs(entry_price - raw_sl) < min_sl_dist:
+                        if decision_out.decision == DecisionAction.LONG:
+                            sl = round(entry_price - min_sl_dist, 6)
+                        else:
+                            sl = round(entry_price + min_sl_dist, 6)
+                    else:
+                        sl = raw_sl
 
                     risk_dist = abs(entry_price - sl)
                     sl_dist_pct = (risk_dist / entry_price * 100.0) if entry_price > 0 else 0.0
@@ -319,7 +381,11 @@ class AutonomousTrader:
 
                     min_tp_dist = max(risk_dist * 2.0, 3.0 * atr_val)
 
-                    if setup and setup.target_tp > 0 and abs(setup.target_tp - entry_price) >= risk_dist * 2.0:
+                    if (
+                        setup
+                        and setup.target_tp > 0
+                        and abs(setup.target_tp - entry_price) >= risk_dist * 2.0
+                    ):
                         tp = setup.target_tp
                     else:
                         # Target at least 2.0R to guarantee asymmetric positive mathematical expectancy
@@ -452,7 +518,7 @@ class AutonomousTrader:
                         continue
                     pos_id = verdict.executed_position_id or f"POS_{sym}_{int(time.time()*1000)}"
                     self.total_trades_executed += 1
-                    self._last_traded_candle_ts[sym] = latest_candle_ts
+                    self._last_traded_candle_ts[sym] = closed_candle_ts
 
                     action_record = {
                         "position_id": pos_id,
