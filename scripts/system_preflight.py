@@ -62,6 +62,18 @@ def check_db_integrity():
     conn.close()
 
 
+def check_proxy_contract():
+    res = subprocess.run(
+        [get_python_executable(), "-m", "pytest", "tests/test_proxy_route_contract.py", "-q"],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    assert res.returncode == 0, f"Proxy Route Contract Failed:\n{res.stdout}\n{res.stderr}"
+
+
 def check_pytest():
     env = os.environ.copy()
     env["PYTHONUTF8"] = "1"
@@ -173,6 +185,7 @@ def main():
 
     checks = [
         ("Database Schema Integrity", check_db_integrity),
+        ("Proxy Route Contract Parity", check_proxy_contract),
         ("M18 Certification Integrity", check_m18_certification),
         ("Python Linter & Formatter (Ruff)", check_ruff),
         ("TypeScript Linter (ESLint)", check_eslint),

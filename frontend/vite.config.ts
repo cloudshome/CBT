@@ -85,6 +85,8 @@ const PYTHON_PREFIXES = [
   '/api/trader',
   '/api/arena',
   '/api/temporal',
+  '/api/central-mind',
+  '/api/hermes',
   '/api/metrics',
   '/api/v1',
   '/api/web3',
