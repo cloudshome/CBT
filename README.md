@@ -10,6 +10,8 @@
 
 > **Crypto Brain Terminal (CBT)** is an institutional-grade quantitative research, paper trading, and automated risk governance platform designed according to the `FinalCBTaiTrading.tet` master specification. It implements a non-discretionary 12-layer quantitative architecture featuring point-in-time causal firewalls, high-dimensional standardized state vectors, empirical Smart Money Concepts (SMC), 10,000-path tri-model bootstrap trajectory simulations, uncertainty-penalized Net Expected Value (Net EV), multi-factor discounted Kelly allocation, an adversarial Bull/Bear/Skeptic debate council enforcing a ~70% NO-TRADE baseline, a 4-tier strategy quarantine league, 11-category loss autopsies, and a real-time dark "AI Exchange" web terminal with a bilingual Gemini 3.7 Flash copilot.
 
+> **AI / engineering orientation:** [Project inspection report](docs/PROJECT_INSPECTION_REPORT_AI.md) summarizes the current repository map, verified strengths, maturity risks, and recommended next steps. Re-check the code and current deployment state before relying on status claims.
+
 ---
 
 ## Table of Contents
@@ -406,4 +408,3 @@ paper/graduation gate.
 ## License
 
 This quantitative platform is licensed under the MIT License.
-

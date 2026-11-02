@@ -49,6 +49,10 @@ os.environ["MAX_PAPER_OPEN_POSITIONS"] = "1000"
 
 def _init_test_subsystem_schemas() -> None:
     """Initializes base database schemas and all subsystem tables in test sandboxes."""
+    import logging
+
+    logger = logging.getLogger("test_isolation")
+
     try:
         from core.database import db_manager
 
@@ -57,95 +61,72 @@ def _init_test_subsystem_schemas() -> None:
         db_manager.brain_db_path = Path(os.environ["BRAIN_DB_PATH"])
         db_manager.experiment_db_path = Path(os.environ["EXPERIMENT_DB_PATH"])
         db_manager.init_all_schemas()
+    except Exception as exc:
+        logger.error(f"[TEST ISOLATION FATAL] Core database schema init failed: {exc}", exc_info=True)
+        raise
 
-        # 1. Execution Idempotency & Reconciliation & Kill Switch State
+    subsystems = [
+        (
+            "execution_idempotency_and_kill_switch",
+            lambda: (
+                __import__("core.execution.idempotency", fromlist=["LiveOrderIdempotencyStore"]).LiveOrderIdempotencyStore()._ensure_schema(),
+                __import__("core.execution.kill_switch", fromlist=["live_kill_switch"]).live_kill_switch._ensure_schema(),
+            ),
+        ),
+        (
+            "intelligence_store",
+            lambda: __import__("core.intelligence.schema", fromlist=["IntelligenceStore"]).IntelligenceStore().init_schema(),
+        ),
+        (
+            "security_and_wallet_store",
+            lambda: (
+                __import__("core.auth.security_store", fromlist=["security_store"]).security_store._ensure_schema(),
+                __import__("core.web3.wallet_store", fromlist=["web3_wallet_store"]).web3_wallet_store._init_db(),
+            ),
+        ),
+        (
+            "research_storage_and_manifest",
+            lambda: (
+                __import__("core.autonomous_research.storage.research_storage", fromlist=["ResearchStorage"]).ResearchStorage().init_schemas(),
+                __import__("core.autonomous_research.storage.storage_manifest", fromlist=["StorageManifest"]).StorageManifest().init_schemas(),
+            ),
+        ),
+        (
+            "telegram_jobs_and_callbacks",
+            lambda: (
+                __import__("core.telegram.jobs", fromlist=["TelegramJobManager"]).TelegramJobManager()._ensure_table_exists(),
+                __import__("core.telegram.callbacks", fromlist=["callback_router"]).callback_router._ensure_table_exists(),
+                __import__("core.telegram.idempotency", fromlist=["idempotency_manager"]).idempotency_manager._ensure_table_exists(),
+            ),
+        ),
+        (
+            "youtube_discovery",
+            lambda: __import__("core.youtube.discovery", fromlist=["youtube_discovery"]).youtube_discovery._init_crawl_memory(),
+        ),
+        (
+            "telegram_rbac",
+            lambda: __import__("core.telegram.rbac", fromlist=["rbac_registry"]).rbac_registry.reset(),
+        ),
+        (
+            "macro_event_reporter",
+            lambda: (
+                __import__("core.macro_event_reporter", fromlist=["macro_event_reporter"]).macro_event_reporter._ensure_table_exists(),
+                __import__("core.macro_event_reporter", fromlist=["macro_event_reporter"]).macro_event_reporter._seed_default_macro_releases(),
+            ),
+        ),
+    ]
+
+    for name, init_fn in subsystems:
         try:
-            from core.execution.idempotency import LiveOrderIdempotencyStore
-            from core.execution.kill_switch import live_kill_switch
-
-            LiveOrderIdempotencyStore()._init_table()
-            live_kill_switch._ensure_schema()
-        except Exception:
-            pass
-
-        # 2. Intelligence Store
-        try:
-            from core.intelligence.schema import IntelligenceStore
-
-            IntelligenceStore().init_schema()
-        except Exception:
-            pass
-
-        # 3. Web3 Watch-Only Wallets & Security Store
-        try:
-            from core.auth.security_store import security_store
-            from core.web3.wallet_store import web3_wallet_store
-
-            security_store._ensure_schema()
-            web3_wallet_store._init_db()
-        except Exception:
-            pass
-
-        # 4. Autonomous Research Storage & Manifest
-        try:
-            from core.autonomous_research.storage.research_storage import ResearchStorage
-
-            ResearchStorage().init_schemas()
-        except Exception:
-            pass
-
-        try:
-            from core.autonomous_research.storage.storage_manifest import StorageManifest
-
-            StorageManifest().init_schema()
-        except Exception:
-            pass
-
-        # 5. Telegram & YouTube Subsystems
-        try:
-            from core.telegram.jobs import TelegramJobManager
-
-            TelegramJobManager()._ensure_table_exists()
-        except Exception:
-            pass
-
-        try:
-            from core.telegram.callbacks import callback_router
-
-            callback_router._ensure_table_exists()
-        except Exception:
-            pass
-
-        try:
-            from core.telegram.idempotency import idempotency_manager
-
-            idempotency_manager._ensure_table_exists()
-        except Exception:
-            pass
-
-        try:
-            from core.youtube.discovery import youtube_discovery
-
-            youtube_discovery._init_crawl_memory()
-        except Exception:
-            pass
-
-        try:
-            from core.telegram.rbac import rbac_registry
-
-            rbac_registry.reset()
-        except Exception:
-            pass
-
-        try:
-            from core.macro_event_reporter import macro_event_reporter
-
-            macro_event_reporter._ensure_table_exists()
-            macro_event_reporter._seed_default_macro_releases()
-        except Exception:
-            pass
-    except Exception:
-        pass
+            init_fn()
+        except Exception as exc:
+            logger.error(
+                f"[TEST ISOLATION ERROR] Subsystem schema initialization failed for '{name}': {exc}",
+                exc_info=True,
+            )
+            raise RuntimeError(
+                f"Test sandbox initialization failed for subsystem '{name}': {exc}"
+            ) from exc
 
 
 _init_test_subsystem_schemas()

@@ -70,11 +70,11 @@ jobs:
           node-version: 20
 
       - name: npm audit (backend)
-        run: npm audit --audit-level=high || echo "::warning::npm audit reported high/critical findings (backend)"
+        run: npm audit --audit-level=critical
 
       - name: npm audit (frontend)
         working-directory: frontend
-        run: npm audit --audit-level=high || echo "::warning::npm audit reported high/critical findings (frontend)"
+        run: npm audit --audit-level=critical
 
       - uses: actions/setup-python@v5
         with:
@@ -83,4 +83,4 @@ jobs:
       - name: pip-audit
         run: |
           python -m pip install --upgrade pip pip-audit
-          pip-audit -r requirements.txt --strict || echo "::warning::pip-audit reported findings"
+          pip-audit -r requirements.txt --strict

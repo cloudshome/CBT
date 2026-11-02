@@ -1,19 +1,19 @@
 # CBT / SKY — Institutional Architecture, Audit & AI Knowledge Brief
 ================================================================================
 **Project:** Crypto Brain Terminal (CBT) / SKY Market Intelligence Engine  
-**Version:** 2.50.0-institutional  
-**Primary Path:** `C:\Users\azims\CBT\`  
-**Operating Mode:** STRICT PAPER / SIMULATION / TESTNET ONLY (`REAL_CAPITAL_ENABLED = False`)  
+**Version:** 4.3.0-quant-alpha  
+**Primary Paths:** Linux Hub (`/home/cloudslover/CBT`) & Windows Office (`C:\Users\azims\CBT\`)  
+**Operating Modes:** Enforced via `docs/PRODUCT_CONTRACT.md` (`RESEARCH`, `SIMULATION`, `PAPER`, `TESTNET`, `LIVE_RESTRICTED`)  
 **Certification Status:** Milestone 18 Production Pass Certified (149/149 Passing Tests, SHA-256 `2acbff25f391...`)  
 
 ---
 
 ## 1. Executive Purpose & Governance Invariants
 
-This document serves as the **Single Source of Truth (SSOT)** for human engineers, quantitative researchers, and external AI agents (Claude, ChatGPT, Jules, AI Studio, Copilot, DeepSeek). It encapsulates the exact architecture, causal firewalls, database ledgers, multi-agent frameworks, known pitfalls, and verification commands.
+This document serves as the **Single Source of Truth (SSOT)** for human engineers, quantitative researchers, and external AI agents (Antigravity, Claude, ChatGPT, Jules, AI Studio, Copilot, DeepSeek). It encapsulates the exact architecture, causal firewalls, database ledgers, multi-agent frameworks, known pitfalls, and verification commands.
 
 ### Non-Negotiable Invariants:
-1. **`REAL_CAPITAL_ENABLED = False` Permanently Locked:** Live capital order routing, withdrawals, and direct exchange execution are strictly barred.
+1. **Product Contract & Mode Primacy:** Operating mode transitions are fail-closed per `docs/PRODUCT_CONTRACT.md`. Live execution without explicit hardware/HMAC clearance token is permanently barred.
 2. **Milestone 18 Certified Execution Surface (Frozen):** 14 critical execution files (`live_router.py`, `kill_switch.py`, `reconciliation_ledger.py`, `smart_order_router.py`, `connectors/`, etc.) cannot be modified without rerunning `python scripts/verify_m18_certification.py` and maintaining 149/149 green tests.
 3. **No Direct LLM/Agent Execution Authority:** LLMs, agents, sentiment scrapers, and research hypotheses NEVER place orders directly. Every trade candidate must be evaluated by the deterministic `RiskManager` (3.0% daily drawdown circuit breaker) and `HalfKellyPositionSizer`.
 4. **Test Sandbox Isolation:** Automated tests run strictly against ephemeral in-memory or sandbox databases (`tests/conftest.py`), never modifying production SQLite ledgers in `data/`.
@@ -24,7 +24,7 @@ This document serves as the **Single Source of Truth (SSOT)** for human engineer
 ## 2. Directory & Component Structure
 
 ```text
-C:\Users\azims\CBT\
+[Repository Root] /
 ├── app.py                           # Master FastAPI & WebSocket backend (Lifespan loops & background workers)
 ├── .env.example                     # Environment configuration reference
 ├── core/                            # Core Quantitative Engine

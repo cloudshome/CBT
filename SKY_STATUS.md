@@ -1,11 +1,13 @@
 # SKY — Project Status & Agent Handoff Document
 
-> **Last Updated:** 2026-10-19  
-> **Release Tag:** `v4.3.0-quant-alpha` (Two-Tier Partial Exits, Dynamic ATR Stops, Regime/Asset Gates & Screener Decomposition 🚀)  
-> **Branch:** `main`  
+> **Last Updated:** 2026-11-02  
+> **Release Tag:** `v4.3.0-quant-alpha` (Phase 13 Risk Ceiling Guards, Tier-1 Firewall, Bayesian Calibration & Hardened Fixtures 🚀)  
+> **Branch:** `main` (Aligned at commit `fd26e9e`)  
 > **Remote:** `https://github.com/cloudshome/CBT.git`  
 > **Lead Agent:** Antigravity  
-> **Milestone 18 Status:** PRODUCTION PASS (Certified & Active — 149/149 Tests)  
+> **Milestone 18 Status:** PRODUCTION PASS (Certified & Re-Validated Active — 149/149 Tests Green 🏛️)  
+> **Product Contract:** Enforced via `docs/PRODUCT_CONTRACT.md` (Fail-Closed Mode Boundaries: RESEARCH, SIMULATION, PAPER, TESTNET, LIVE_RESTRICTED)  
+> **Test Isolation Harness:** Hardened (`tests/conftest.py` — zero swallowed exceptions, explicit subsystem schema logging)  
 > **Multi-PC Status:** 100% SYNCHRONIZED (Ubuntu Hub & Windows Office PC aligned at `origin/main`)  
 > **Dynamic Screener & Swarm:** PRODUCTION ACTIVE (Scanning 3,732 Spot & 793 Futures Pairs, Long/Short Swarm Specialists Active)  
 > **Execution & Exit Engine:** TWO-TIER PARTIAL EXITS ACTIVE (+1.5R 50% Profit Lock, Breakeven SL, Dynamic ATR Volatility Anchors)  
