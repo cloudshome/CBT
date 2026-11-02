@@ -86,6 +86,8 @@ export interface PaperTrade {
   status: 'OPEN' | 'CLOSED' | 'CANCELLED';
   currentPrice?: number;
   pnl?: number;
+  feeUsd?: number;
+  netPnlUsd?: number;
   exitPrice?: number;
   breakevenTriggered?: boolean;
   trailingStop?: number | null;
@@ -109,6 +111,9 @@ export interface PaperDeskOverviewResponse {
     virtualEquity?: number;
     accountBalance: number;
     totalRealizedPnl: number;
+    totalFeesUsd?: number;
+    netRealizedPnl?: number;
+    grossRealizedPnl?: number;
     totalUnrealizedPnl: number;
     winRatePct: number;
     profitFactor: number;
@@ -131,6 +136,8 @@ export interface PaperDeskOverviewResponse {
     sl: number;
     tp: number;
     pnlUsd: number;
+    feeUsd?: number;
+    netPnlUsd?: number;
     pnlPct: number;
     status: string;
     breakevenTriggered: boolean;
@@ -162,6 +169,9 @@ export interface PaperDeskOverviewResponse {
     sl: number;
     tp: number;
     realizedPnlUsd: number;
+    feeUsd?: number;
+    netRealizedPnlUsd?: number;
+    grossRealizedPnlUsd?: number;
     realizedPnlPct: number;
     openedAt?: number | string;
     closedAt?: number | string;

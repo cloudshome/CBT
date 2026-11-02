@@ -257,6 +257,8 @@ async def get_paper_desk_overview():
                 "sl": sl_val,
                 "tp": tp_val,
                 "pnlUsd": round(pnl, 2),
+                "feeUsd": round(float(p.get("fee_usd", 0.0)), 4),
+                "netPnlUsd": round(pnl - float(p.get("fee_usd", 0.0)), 2),
                 "pnlPct": round(pnl_pct, 2),
                 "status": "OPEN",
                 "breakevenTriggered": be_trig,
@@ -332,6 +334,7 @@ async def get_paper_desk_overview():
             "TAKE_PROFIT_HIT" if pnl > 0 else "STOP_LOSS_HIT" if pnl < 0 else "MANUAL_CLOSE"
         )
 
+        past_fee_usd = round(float(p.get("fee_usd", 0.0)), 4)
         past.append(
             {
                 "id": p.get("position_id", ""),
@@ -343,6 +346,9 @@ async def get_paper_desk_overview():
                 "sl": float(p.get("stop_loss", 0.0)),
                 "tp": float(p.get("take_profit", 0.0)),
                 "realizedPnlUsd": round(pnl, 2),
+                "feeUsd": past_fee_usd,
+                "netRealizedPnlUsd": round(pnl, 2),
+                "grossRealizedPnlUsd": round(pnl + past_fee_usd, 2),
                 "realizedPnlPct": round(pnl_pct, 2),
                 "openedAt": opened_at_ts,
                 "closedAt": closed_at_ts,
@@ -467,6 +473,9 @@ async def get_paper_desk_overview():
             "virtualEquity": virtual_equity,
             "accountBalance": settled_cash,
             "totalRealizedPnl": round(total_realized, 2),
+            "totalFeesUsd": accounting.get("total_fees_usd", 0.0),
+            "netRealizedPnl": accounting.get("net_realized_pnl", round(total_realized, 2)),
+            "grossRealizedPnl": accounting.get("gross_realized_pnl", round(total_realized, 2)),
             "totalUnrealizedPnl": round(total_unrealized, 2),
             "winRatePct": win_rate,
             "profitFactor": pf,
@@ -558,6 +567,8 @@ async def get_paper_positions(book_id: str | None = Query(None)):
                 "size": p.get("size", 1.0),
                 "status": p.get("status", "OPEN"),
                 "pnl": round(pnl, 2),
+                "feeUsd": round(float(p.get("fee_usd", 0.0)), 4),
+                "netPnlUsd": round(pnl - float(p.get("fee_usd", 0.0)), 2),
                 "breakevenTriggered": be_trig,
                 "trailingStop": p.get("trailing_stop"),
                 "currentR": current_r,
