@@ -295,6 +295,87 @@ class DataStreamer:
         self._last_known_prices[symbol] = current_price
         return candles
 
+    def get_data_freshness_report(self, symbols: list[str] | None = None) -> dict[str, Any]:
+        """
+        Inspectable data quality, freshness, and provenance audit for market data feeds.
+        Addresses Priority 2 of Project Inspection Report.
+        """
+        target_symbols = symbols or self.active_symbols
+        now_ms = causal_firewall.get_current_time_ms()
+        report: dict[str, Any] = {
+            "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now_ms / 1000.0)),
+            "current_time_ms": now_ms,
+            "monitored_assets": len(target_symbols),
+            "assets": {},
+        }
+
+        with db_manager.get_market_conn() as conn:
+            for sym in target_symbols:
+                cursor = conn.execute(
+                    """
+                    SELECT timestamp, timeframe, open, high, low, close, volume, is_synthetic
+                    FROM candles
+                    WHERE symbol = ?
+                    ORDER BY timestamp DESC
+                    LIMIT 100;
+                    """,
+                    (sym,),
+                )
+                rows = cursor.fetchall()
+                if rows:
+                    latest_row = rows[0]
+                    latest_ts = int(latest_row["timestamp"])
+                    age_ms = max(0, now_ms - latest_ts)
+                    age_min = round(age_ms / 60000.0, 2)
+                    synthetic_count = sum(1 for r in rows if int(r["is_synthetic"] or 0) == 1)
+                    empirical_count = len(rows) - synthetic_count
+                    quality_pct = round((empirical_count / len(rows)) * 100.0, 1) if rows else 0.0
+
+                    # Freshness: fresh if age <= 30 minutes for crypto feeds
+                    is_fresh = age_ms <= (30 * 60 * 1000)
+                    evidence_grade = (
+                        EvidenceGrade.EMPIRICAL.label
+                        if quality_pct >= 80.0
+                        else EvidenceGrade.FABRICATED.label
+                    )
+
+                    report["assets"][sym] = {
+                        "symbol": sym,
+                        "market_type": "PERPETUAL_FUTURES" if "USDT" in sym else "SPOT_COMMODITY",
+                        "latest_candle_time_ms": latest_ts,
+                        "latest_candle_time_utc": time.strftime(
+                            "%Y-%m-%dT%H:%M:%SZ", time.gmtime(latest_ts / 1000.0)
+                        ),
+                        "age_ms": age_ms,
+                        "age_minutes": age_min,
+                        "freshness_status": "FRESH"
+                        if is_fresh
+                        else ("STALE" if age_ms <= (120 * 60 * 1000) else "DISCONNECTED"),
+                        "evidence_grade": evidence_grade,
+                        "sample_window_bars": len(rows),
+                        "empirical_bars": empirical_count,
+                        "synthetic_bars": synthetic_count,
+                        "quality_score_pct": quality_pct,
+                        "latest_close": float(latest_row["close"]),
+                    }
+                else:
+                    report["assets"][sym] = {
+                        "symbol": sym,
+                        "market_type": "PERPETUAL_FUTURES" if "USDT" in sym else "SPOT_COMMODITY",
+                        "latest_candle_time_ms": None,
+                        "latest_candle_time_utc": None,
+                        "age_ms": None,
+                        "age_minutes": None,
+                        "freshness_status": "NO_DATA",
+                        "evidence_grade": EvidenceGrade.FABRICATED.label,
+                        "sample_window_bars": 0,
+                        "empirical_bars": 0,
+                        "synthetic_bars": 0,
+                        "quality_score_pct": 0.0,
+                        "latest_close": self._last_known_prices.get(sym, 0.0),
+                    }
+        return report
+
 
 # Singleton
 data_streamer = DataStreamer()

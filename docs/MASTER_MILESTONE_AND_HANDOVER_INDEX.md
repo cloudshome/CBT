@@ -102,3 +102,4 @@ When beginning work on any feature or bug fix:
    `python scripts/verify_m18_certification.py`
 3. **Always verify pre-merge scorecard before declaring completion:**  
    `python scripts/system_preflight.py`
+

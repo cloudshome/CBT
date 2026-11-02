@@ -1525,7 +1525,22 @@ async def get_master_terminal_telemetry(
         "macroAndContext": macro_radar,
         "learningAndCoach": ai_coach,
         "provenance": provenance_graph,
+        "dataFreshness": data_streamer.get_data_freshness_report([norm_sym])
+        if data_streamer
+        else None,
     }
+
+
+@terminal_router.get("/api/terminal/data-freshness")
+async def get_market_data_freshness(symbol: str | None = Query(None)):
+    """
+    Returns live inspectable data source freshness, empirical coverage, and quality scores.
+    Directly satisfies Priority 2 of Project Inspection Report.
+    """
+    if not data_streamer:
+        raise HTTPException(status_code=503, detail="Data Streamer unavailable")
+    symbols = [symbol] if symbol else None
+    return data_streamer.get_data_freshness_report(symbols=symbols)
 
 
 # ==============================================================================
