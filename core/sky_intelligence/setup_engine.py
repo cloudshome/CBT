@@ -81,7 +81,7 @@ class SetupEngine:
     Algorithmic Trade Setup Detection & Qualification Engine.
     """
 
-    def __init__(self, min_rr_ratio: float = 1.8):
+    def __init__(self, min_rr_ratio: float = 2.0):
         self.min_rr = min_rr_ratio
 
     def scan_setups(

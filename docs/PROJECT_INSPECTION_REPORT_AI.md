@@ -1,8 +1,8 @@
 # CBT / SKY Project Inspection Report for AI
 
-**Inspection snapshot:** 2026-11-02  
-**Repository:** `cloudshome/CBT`  
-**Branch / inspected revision:** `main` / `fd26e9e`  
+**Inspection snapshot:** 2026-11-03
+**Repository:** `cloudshome/CBT`
+**Branch / inspected revision:** `main` / `b889dce`
 **Purpose:** Give future AI agents a reliable project map, identify demonstrated strengths and gaps, and define what is needed for CBT to be dependable real-world software.
 
 > This is a repository inspection, not a full line-by-line code review, security audit, production deployment check, or trading-performance evaluation. Claims below are labeled by evidence type. Re-check the current code and configuration before acting; this report is a map, not authority over the code.
@@ -46,7 +46,7 @@ The project is intentionally risk-first and emphasizes point-in-time data, no-lo
 | [`research/`](../research), [`ai/`](../ai), [`sky_agent/`](../sky_agent) | Research-support and agent-related modules; verify exact ownership and runtime use before assuming these are one cohesive subsystem. |
 | [`electron/`](../electron), [`packaging/`](../packaging) | Desktop/mobile packaging and companion clients. Treat them as additional product surfaces requiring their own release and compatibility validation. |
 
-**[FACT]** At this snapshot, Git lists 2,396 tracked files, including 1,139 Python files, 921 Markdown files, 76 TSX files, and 74 TypeScript files. These counts describe the repository, not the amount of production-ready functionality. Ignore untracked/generated local dependencies, builds, databases, and release artifacts when mapping source.
+**[FACT]** At this snapshot, Git lists 2,398 tracked files, including 1,139 Python files, 923 Markdown files, 76 TSX files, and 74 TypeScript files. These counts describe the repository, not the amount of production-ready functionality. Ignore untracked/generated local dependencies, builds, databases, and release artifacts when mapping source.
 
 ## Runtime shape and important seams
 
@@ -61,7 +61,7 @@ The project is intentionally risk-first and emphasizes point-in-time data, no-lo
 
 ## Demonstrated strengths
 
-1. **Risk and research governance are explicit.** [`docs/SKY_CONSTITUTION.md`](SKY_CONSTITUTION.md) states risk primacy, causal cutoffs, dataset provenance, experiment immutability, and credential isolation. These principles are more disciplined than a typical indicator dashboard.
+1. **Risk and research governance are explicit.** [`docs/SKY_CONSTITUTION.md`](SKY_CONSTITUTION.md) states risk primacy, causal cutoffs, dataset provenance, experiment immutability, and credential isolation. [`docs/PRODUCT_CONTRACT.md`](PRODUCT_CONTRACT.md) now defines operating modes and names Python FastAPI as the authoritative backend. These principles are more disciplined than a typical indicator dashboard.
 2. **There are real engineering surfaces.** The repo contains API services, CLI, UI, persistence, containerization, service health checks, backup/restore tooling, and desktop/mobile packaging.
 3. **Automated quality gates cover multiple stacks.** [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs Python lint/format and tests, Node lint/Jest, a frontend build, Docker Compose validation, and an overall build. This is useful integration coverage at the pipeline level.
 4. **Test data isolation is designed in.** [`tests/conftest.py`](../tests/conftest.py) configures temporary Python database paths before core database imports; this is a strong safeguard for tests.
@@ -73,17 +73,17 @@ These are architectural and repository-level strengths. They do not prove every 
 
 ## Weaknesses and maturity risks
 
-### 1. No single, current product/runtime truth
+### 1. Product contract exists; its alignment is not yet complete
 
-**[FACT]** The repo has many overlapping architecture, status, handover, certification, and AI-orientation documents. For example, [`docs/AI_KNOWLEDGE_BRIEF.md`](AI_KNOWLEDGE_BRIEF.md) calls itself the single source of truth but contains a Windows-specific path and an older version/certification snapshot; [`SKY_STATUS.md`](../SKY_STATUS.md) is dated 2026-10-19 and contains broad operational/certification claims. The current inspected revision is later than that status document.
+**[FACT]** [`docs/PRODUCT_CONTRACT.md`](PRODUCT_CONTRACT.md), added on 2026-11-02, now declares operating modes and service ownership. Some related status and topology details still differ from executable configuration: for example, the contract labels Node/Express as port 3001, while [`src/server.ts`](../src/server.ts) and [`docker-compose.yml`](../docker-compose.yml) configure port 3000. [`SKY_STATUS.md`](../SKY_STATUS.md) also reports alignment at `fd26e9e`, while this inspection is at `b889dce`.
 
-**Impact:** An AI agent or operator can follow a stale route map, version, operating mode, test count, or certification claim.
+**Impact:** The new contract is a useful authority, but it must be reconciled with runtime config and remaining status/handover documents before agents or operators can safely treat every detail as current.
 
-### 2. Backend ownership is split
+### 2. Backend ownership is declared but implementation still has legacy overlap
 
-**[FACT]** Python FastAPI is described as authoritative, while Node/Express retains parallel routes and Prisma/SQLite responsibilities. The Node application itself warns that these are legacy/direct-access routes that need parity or migration.
+**[FACT]** Python FastAPI is now explicitly named authoritative in the product contract, and Node/Express is designated legacy compatibility. However, [`src/server.ts`](../src/server.ts) still mounts direct Express route handlers for candles, scan, paper, desk, institutional, and terminal APIs; it is not solely a proxy facade.
 
-**Impact:** Duplicate business logic, mismatched auth/risk behavior, inconsistent persistence, and routing drift are likely maintenance hazards. A clearly bounded compatibility adapter is safer than two apparently authoritative implementations.
+**Impact:** The ownership decision is clearer, but duplicate route behavior and policy remain possible until legacy handlers are retired, converted to bounded forwarding, or covered by explicit compatibility contracts.
 
 ### 3. Breadth is ahead of demonstrated product focus
 
@@ -93,25 +93,25 @@ These are architectural and repository-level strengths. They do not prove every 
 
 **Impact:** More surface area creates more failure modes, while users and AI agents have trouble knowing which workflows are stable and production-supported.
 
-### 4. Documentation makes claims that require current reconciliation
+### 4. Safety modes are documented; runtime enforcement still needs proof
 
-**[FACT]** Some docs describe the system as paper/simulation-only or say live execution is permanently disabled, while the current Python app imports live execution routes/connectors and the repository contains testnet and execution code. This report does not determine whether live orders can be enabled in the current runtime.
+**[FACT]** The product contract now explicitly documents `RESEARCH`, `SIMULATION`, `PAPER`, `TESTNET`, and locked-by-default `LIVE_RESTRICTED` modes. The application imports live execution routes and connectors. This inspection did not trace every order path, environment flag, clearance token, deployment secret, and failure path to prove the contract is enforced end to end.
 
-**Impact:** A safety-critical mode boundary must be established from code, configuration, deployment, and tests—not copied from an older handover or AI brief.
+**Impact:** Mode documentation is an improvement, not evidence that a forbidden transition is impossible. Validate the safety boundary from code, configuration, deployment, and tests before relying on it.
 
-Other README material includes detailed capabilities and performance-posture examples. Such examples should be labeled as illustrative unless tied to a reproducible runtime result and an immutable evidence artifact.
+README material also includes detailed capabilities and performance-posture examples. Treat examples as illustrative unless tied to a reproducible runtime result and immutable evidence.
 
-### 5. Test isolation setup can hide initialization failures
+### 5. Core test-sandbox schema setup now fails loudly; cleanup still has best-effort catches
 
-**[FACT]** `tests/conftest.py` wraps several subsystem schema setups and the outer initialization in broad `except Exception: pass` handlers.
+**[FACT]** Since the earlier snapshot, `tests/conftest.py` now logs and raises when base or subsystem schema initialization fails, rather than silently continuing. Broad catches remain around best-effort position reset and teardown cleanup.
 
-**Impact:** A test run can proceed with subsystems silently uninitialized, weakening the meaning of green results. Isolation itself is good; setup failures should be surfaced or reported explicitly.
+**Impact:** The earlier schema-initialization concern is substantially addressed. Keep required setup fail-fast; make sure any remaining swallowed exceptions are limited to cleanup that cannot invalidate test isolation.
 
-### 6. Security/dependency scanning is advisory in CI
+### 6. Dependency audit is blocking for critical findings, not all severities
 
-**[FACT]** In [`.github/workflows/security.yml`](../.github/workflows/security.yml), CodeQL is configured with `continue-on-error`, while `npm audit` and `pip-audit` failures are converted to warnings with `|| echo`.
+**[FACT]** In [`.github/workflows/security.yml`](../.github/workflows/security.yml), `npm audit` and `pip-audit` now run as blocking checks at the critical threshold. CodeQL remains non-blocking (`continue-on-error`).
 
-**Impact:** The workflow provides visibility but does not currently enforce a blocking security/dependency release gate. This is a process observation, not a vulnerability finding.
+**Impact:** CI now blocks critical dependency findings, but high-severity dependency findings do not block these npm audit steps, and CodeQL availability/results are advisory. This is a process observation, not a vulnerability finding.
 
 ### 7. CI success is not a production or research qualification
 
@@ -129,14 +129,14 @@ Other README material includes detailed capabilities and performance-posture exa
 
 ### Priority 0 — Define the product contract and safety boundary
 
-- Publish one current statement of supported modes: research, simulation, paper, testnet, and (if applicable) live.
-- Define exactly which APIs and services are authoritative, including data ownership, auth, risk decisions, and persistence.
+- Keep [`docs/PRODUCT_CONTRACT.md`](PRODUCT_CONTRACT.md) authoritative and reconcile its ports, routes, status claims, and operating-mode descriptions against executable config and tests.
+- Define and enforce which APIs and services own data, auth, risk decisions, and persistence.
 - Make unsupported or dangerous modes impossible to enable accidentally; require explicit, auditable operator authorization for any mode transition.
 - Replace conflicting status claims with generated or verifiable release evidence.
 
 ### Priority 1 — Converge the user-facing backend
 
-- Choose one owner for each domain/API. Keep the second backend only where it has a documented, bounded purpose.
+- Complete the migration to the declared Python API ownership; keep Node only for explicitly bounded compatibility/dev needs.
 - Maintain a route matrix with method, path, owner, auth, request/response schema, persistence side effect, and tests.
 - Add contract tests for the proxy and both backend surfaces; remove duplicated policy decisions rather than merely documenting parity.
 
@@ -156,9 +156,9 @@ Other README material includes detailed capabilities and performance-posture exa
 
 ### Priority 4 — Make quality gates trustworthy
 
-- Remove silent test-fixture setup failures; make required schema/setup failures fail with actionable context.
+- Preserve the now fail-fast schema initialization; review remaining swallowed teardown/reset exceptions and keep them limited to nonessential cleanup.
 - Separate unit, integration, route-contract, UI, and end-to-end gates; report what each gate actually proves.
-- Promote required security/dependency checks to explicit policy gates, with documented exception/expiry handling.
+- Decide and document whether high-severity dependency findings and CodeQL results should block releases; retain an explicit exception/expiry process.
 - Tie release claims to a pinned commit, reproducible command, and machine-readable result.
 
 ### Priority 5 — Reduce cognitive and maintenance load
@@ -182,9 +182,11 @@ Before changing code:
 
 ## Evidence and verification status
 
-- **[FACT]** Working tree was clean at inspection; branch `main`; inspected HEAD `fd26e9e`.
+- **[FACT]** Before this report refresh, the working tree was clean; branch `main`; inspected HEAD `b889dce`.
 - **[FACT]** The repository contains Python/TypeScript automated test suites and multi-stack CI configuration.
-- **[UNVERIFIED]** No project test suite, build, deployment, API smoke test, security scan, data-quality audit, or strategy validation was run as part of this documentation inspection.
+- **[FACT]** `.venv/bin/python scripts/verify_m18_certification.py` completed successfully: it initially detected modified certified-surface files, reran the 149 M18 tests, and reported the certification re-validated.
+- **[FACT]** `.venv/bin/python -m pytest tests/test_milestone18_sor_and_slicing.py tests/test_milestone18_boss_adversarial.py tests/test_milestone18_final_certification.py tests/execution/test_milestone35_r_independent_audit.py -q` completed with 158 passed.
+- **[UNVERIFIED]** No full project test suite, build, deployment, API smoke test, security scan, data-quality audit, or strategy validation was run as part of this inspection.
 - **[UNVERIFIED]** Live service status, active exchange credentials, actual production configuration, current real-data coverage, and strategy profitability.
 
 ## Primary references
@@ -193,8 +195,8 @@ Before changing code:
 - [Project operating manual](../AGENTS.md)
 - [System constitution](SKY_CONSTITUTION.md)
 - [Project topology](PROJECT_TOPOLOGY_AND_MODULAR_TREE.md)
-- [AI knowledge brief (historical; reconcile before relying on claims)](AI_KNOWLEDGE_BRIEF.md)
-- [Current project status (dated 2026-10-19; verify against current checkout)](../SKY_STATUS.md)
+- [AI knowledge brief (cross-check against the product contract and runtime)](AI_KNOWLEDGE_BRIEF.md)
+- [Project status (verify commit and operational claims against current checkout)](../SKY_STATUS.md)
 - [Operations runbook](../RUNBOOK.md)
 - [CI workflow](../.github/workflows/ci.yml)
 - [Security scanning workflow](../.github/workflows/security.yml)

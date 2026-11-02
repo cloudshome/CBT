@@ -108,7 +108,7 @@ class SovereignMasterAgent:
         self.config_path = config_dir / "sovereign_agent_config.json"
         self.auto_pilot_enabled: bool = False
         self.scan_interval_sec: float = 20.0
-        self.min_confidence_pct: float = 70.0
+        self.min_confidence_pct: float = 80.0
         self.min_risk_reward: float = 2.0
         self.last_scan_ms: int = 0
         self.recent_activity_log: list[dict[str, Any]] = []
@@ -122,7 +122,7 @@ class SovereignMasterAgent:
                     data = json.load(f)
                     self.auto_pilot_enabled = bool(data.get("auto_pilot_enabled", False))
                     self.scan_interval_sec = float(data.get("scan_interval_sec", 20.0))
-                    self.min_confidence_pct = float(data.get("min_confidence_pct", 70.0))
+                    self.min_confidence_pct = float(data.get("min_confidence_pct", 80.0))
                     self.min_risk_reward = float(data.get("min_risk_reward", 2.0))
         except Exception as e:
             logger.warning(f"Could not load sovereign agent config: {e}")
@@ -550,11 +550,13 @@ class SovereignMasterAgent:
             sky_dec.risk_gate_passed
             and sky_dec.decision in (DecisionAction.LONG, DecisionAction.SHORT)
             and setup
+            and setup.confluence_score >= 80.0
+            and sky_dec.net_ev_r >= 0.5
         ):
-            # Qualified Setup Detected
+            # Qualified A+ Institutional Setup Detected (>=80.0 Confluence, >=0.50R Net EV)
             direction_str = "BUY" if sky_dec.decision == DecisionAction.LONG else "SELL"
             action = direction_str
-            conf_pct = min(96.0, max(72.0, setup.confluence_score))
+            conf_pct = min(96.0, max(80.0, setup.confluence_score))
             net_ev = sky_dec.net_ev_r
 
             entry_p = setup.entry_price if setup.entry_price > 0 else cur_p
@@ -591,6 +593,19 @@ class SovereignMasterAgent:
                 f"{conf_pct:.1f}% institutional confluence and +{net_ev:.2f}R net expected value. "
                 f"Targeting asymmetric {rr_ratio}:1 reward-to-risk ratio. "
                 f"Memory check passed: Historical track record permits entry."
+            )
+        elif (
+            sky_dec.decision in (DecisionAction.LONG, DecisionAction.SHORT)
+            and setup
+            and setup.confluence_score < 80.0
+        ):
+            action = "CASH"
+            conf_pct = round(setup.confluence_score, 1)
+            thesis = (
+                f"Master Agent Decision: STAND IN CASH. "
+                f"Candidate setup detected ({getattr(setup.setup_type, 'value', str(setup.setup_type))}), "
+                f"but institutional confluence ({setup.confluence_score:.1f}/100) is below the A+ threshold (>=80.0). "
+                f"Preserving capital for high-probability A+ setups."
             )
         else:
             action = "CASH"

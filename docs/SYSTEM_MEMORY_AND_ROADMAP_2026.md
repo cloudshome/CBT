@@ -117,3 +117,4 @@ $$\text{Confluence Score} = B_1 (\text{Structure}) + B_2 (\text{Order Flow}) + B
 3. **Causal Firewalls:** Past performance claims require out-of-sample backtests with $N \ge 30$, $p \le 0.05$, and Deflated Sharpe Ratio (DSR) $\ge 0.80$.
 4. **Zero-Lookahead Invariant:** Candle $t$ indicators close before bar $t+1$ execution.
 5. **Production SQLite Isolation:** All tests must run against ephemeral in-memory or temp SQLite sandboxes.
+
