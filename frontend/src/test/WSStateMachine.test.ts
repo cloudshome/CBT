@@ -169,3 +169,4 @@ describe('WSStateMachine Lifecycle & Heartbeat Watchdog', () => {
     expect(MockWebSocket.instances[1].url).toBe('wss://example.com/stream2');
   });
 });
+
