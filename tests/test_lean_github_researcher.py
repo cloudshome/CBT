@@ -24,7 +24,9 @@ def temp_researcher(tmp_path: Path):
 
 def test_rejects_heavy_files(temp_researcher: GitHubResearcher):
     # Create oversized code (> 256 KB)
-    heavy_code = "stop_loss = 0.01\n# Comment line padding\n" + ("# filler line\n" * 25000)  # > 300 KB
+    heavy_code = "stop_loss = 0.01\n# Comment line padding\n" + (
+        "# filler line\n" * 25000
+    )  # > 300 KB
     passed, reason = temp_researcher.filter_quality_hurdle(heavy_code)
     assert not passed
     assert "File size exceeds lean ceiling" in reason

@@ -308,16 +308,13 @@ class TelegramCallbackRouter:
         tf_clean = timeframe.upper()
 
         def tf_btn(tf_name: str) -> dict[str, str]:
-            is_active = (tf_clean == tf_name) or (
-                tf_name == "1M" and tf_clean in ("1M", "MONTHLY", "MONTH")
-            ) or (
-                tf_name == "1W" and tf_clean in ("1W", "WEEKLY", "WEEK")
-            ) or (
-                tf_name == "1D" and tf_clean in ("1D", "DAILY", "DAY")
-            ) or (
-                tf_name == "4H" and tf_clean in ("4H", "4HOURS")
-            ) or (
-                tf_name == "15M" and tf_clean in ("15M", "15")
+            is_active = (
+                (tf_clean == tf_name)
+                or (tf_name == "1M" and tf_clean in ("1M", "MONTHLY", "MONTH"))
+                or (tf_name == "1W" and tf_clean in ("1W", "WEEKLY", "WEEK"))
+                or (tf_name == "1D" and tf_clean in ("1D", "DAILY", "DAY"))
+                or (tf_name == "4H" and tf_clean in ("4H", "4HOURS"))
+                or (tf_name == "15M" and tf_clean in ("15M", "15"))
             )
             label = f"• {tf_name} •" if is_active else tf_name
             return {"text": label, "callback_data": f"chip:tf:{sym_clean}:{tf_name}"}
@@ -325,8 +322,14 @@ class TelegramCallbackRouter:
         return {
             "inline_keyboard": [
                 [
-                    {"text": "📈 What is the trend?", "callback_data": f"chip:trend:{sym_clean}:{tf_clean}"},
-                    {"text": "🧱 Active Setup?", "callback_data": f"chip:setup:{sym_clean}:{tf_clean}"},
+                    {
+                        "text": "📈 What is the trend?",
+                        "callback_data": f"chip:trend:{sym_clean}:{tf_clean}",
+                    },
+                    {
+                        "text": "🧱 Active Setup?",
+                        "callback_data": f"chip:setup:{sym_clean}:{tf_clean}",
+                    },
                 ],
                 [
                     tf_btn("15M"),
@@ -335,7 +338,10 @@ class TelegramCallbackRouter:
                     tf_btn("1M"),
                 ],
                 [
-                    {"text": "🗺️ Send Visual Chart", "callback_data": f"chip:chart:{sym_clean}:{tf_clean}"},
+                    {
+                        "text": "🗺️ Send Visual Chart",
+                        "callback_data": f"chip:chart:{sym_clean}:{tf_clean}",
+                    },
                     {"text": "💼 Open Trades", "callback_data": "chip:trades"},
                 ],
             ]

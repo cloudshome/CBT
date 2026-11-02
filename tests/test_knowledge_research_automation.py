@@ -27,8 +27,15 @@ from core.knowledge_os.research_automation_orchestrator import (
 
 @pytest.fixture(autouse=True)
 def init_schemas():
-    """Ensure all tables exist before each test."""
+    """Ensure all tables exist before each test and isolate queue state."""
     db_manager.init_all_schemas()
+    with db_manager.get_brain_conn() as conn:
+        try:
+            conn.execute("DELETE FROM hypothesis_queue;")
+            conn.execute("DELETE FROM research_automation_runs;")
+            conn.commit()
+        except Exception:
+            pass
     yield
 
 

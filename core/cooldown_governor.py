@@ -35,8 +35,8 @@ class CooldownGovernor:
 
     def __init__(
         self,
-        asset_cooldown_sec: float = 3600.0,      # 60 minutes
-        loss_global_cooldown_sec: float = 1800.0, # 30 minutes
+        asset_cooldown_sec: float = 3600.0,  # 60 minutes
+        loss_global_cooldown_sec: float = 1800.0,  # 30 minutes
         max_daily_trades: int = 10,
     ) -> None:
         self.asset_cooldown_sec = asset_cooldown_sec
@@ -76,7 +76,9 @@ class CooldownGovernor:
         if self._testing_mode:
             self._testing_mode = False
             self._initialize_from_database()
-            logger.info("CooldownGovernor testing mode DISABLED: institutional risk enforcement active.")
+            logger.info(
+                "CooldownGovernor testing mode DISABLED: institutional risk enforcement active."
+            )
 
     def _initialize_from_database(self) -> None:
         """Hydrates latest trade exit timestamps from SQLite shadow_positions."""
@@ -98,12 +100,24 @@ class CooldownGovernor:
                         continue
                     clean_sym = sym.replace("/", "").replace("_", "").upper()
                     # Only consider authorized Tier-1 assets and exclude administrative purges/dedupes
-                    if clean_sym not in {"BTCUSDT", "ETHUSDT", "XAUUSD", "PAXGUSDT", "SOLUSDT", "BNBUSDT"}:
+                    if clean_sym not in {
+                        "BTCUSDT",
+                        "ETHUSDT",
+                        "XAUUSD",
+                        "PAXGUSDT",
+                        "SOLUSDT",
+                        "BNBUSDT",
+                    }:
                         continue
-                    if "purge" in str(exit_reason or "").lower() or "de-duplicated" in str(exit_reason or "").lower():
+                    if (
+                        "purge" in str(exit_reason or "").lower()
+                        or "de-duplicated" in str(exit_reason or "").lower()
+                    ):
                         continue
                     # closed_at can be millisecond epoch or second epoch
-                    exit_sec = float(closed_at) / 1000.0 if float(closed_at) > 1e11 else float(closed_at)
+                    exit_sec = (
+                        float(closed_at) / 1000.0 if float(closed_at) > 1e11 else float(closed_at)
+                    )
                     norm_sym = self._normalize_sym(sym)
                     if norm_sym not in self._last_closed_trades:
                         self._last_closed_trades[norm_sym] = {
@@ -112,7 +126,9 @@ class CooldownGovernor:
                             "reason": str(exit_reason or ""),
                         }
                     # Track latest loss exit
-                    if (float(pnl or 0.0) < 0.0 or "Stop-Loss" in str(exit_reason or "")) and exit_sec > self._last_loss_exit_time:
+                    if (
+                        float(pnl or 0.0) < 0.0 or "Stop-Loss" in str(exit_reason or "")
+                    ) and exit_sec > self._last_loss_exit_time:
                         self._last_loss_exit_time = exit_sec
                         self._last_loss_symbol = norm_sym
         except Exception as e:
@@ -137,9 +153,7 @@ class CooldownGovernor:
 
         # If trade closed at a loss or triggered Stop Loss (and not an intentional portfolio reallocation/replacement)
         is_loss = (
-            realized_pnl < 0.0
-            or "Stop-Loss" in exit_reason
-            or "Invalidation" in exit_reason
+            realized_pnl < 0.0 or "Stop-Loss" in exit_reason or "Invalidation" in exit_reason
         ) and "REPLACE" not in exit_reason.upper()
         if is_loss:
             self._last_loss_exit_time = exit_time

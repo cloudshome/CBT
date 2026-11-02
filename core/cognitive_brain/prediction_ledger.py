@@ -152,7 +152,9 @@ class CognitivePredictionLedger:
                         float(record.forecast.target_price),
                         float(record.forecast.invalidation_price),
                         float(record.forecast.raw_confidence),
-                        float(record.forecast.calibrated_probability) if record.forecast.calibrated_probability is not None else None,
+                        float(record.forecast.calibrated_probability)
+                        if record.forecast.calibrated_probability is not None
+                        else None,
                         gov_action,
                         exec_status,
                         record.outcome.status.value,
@@ -177,7 +179,9 @@ class CognitivePredictionLedger:
             raise
         except Exception as e:
             logger.error("Failed to commit experience %s: %s", record.experience_id, e)
-            raise PersistenceError(f"Commit failed for experience {record.experience_id}: {e}") from e
+            raise PersistenceError(
+                f"Commit failed for experience {record.experience_id}: {e}"
+            ) from e
 
     def update_resolved_outcome(self, experience_id: str, outcome: OutcomePayload) -> bool:
         """
@@ -247,7 +251,9 @@ class CognitivePredictionLedger:
         self, asset: str | None = None, before_ts_ms: int | None = None
     ) -> list[TradingExperienceRecord]:
         """Queries unverified or pending experiences ready for outcome resolution."""
-        query = "SELECT raw_record_json FROM cognitive_experience_ledger WHERE resolution_status = ?"
+        query = (
+            "SELECT raw_record_json FROM cognitive_experience_ledger WHERE resolution_status = ?"
+        )
         params: list[Any] = [ResolutionStatus.PENDING.value]
 
         if asset:
@@ -263,4 +269,3 @@ class CognitivePredictionLedger:
             rows = conn.execute(query, tuple(params)).fetchall()
 
         return [TradingExperienceRecord.model_validate_json(r["raw_record_json"]) for r in rows]
-

@@ -296,6 +296,7 @@ class KnowledgeGraphEngine:
                     pass
 
             logger.info("SKY Knowledge & Discovery Graph schema initialized.")
+        self._seed_standard_variables()
 
     def _seed_standard_variables(self) -> None:
         """Seeds core quantitative observables across market and macro domains."""

@@ -34,12 +34,18 @@ logger = logging.getLogger("sky.mastermind.arbiter")
 
 # Authorized Tier-1 Institutional Assets for Main Desk ($10,000 Portfolio)
 ALLOWED_MAIN_DESK_SYMBOLS: set[str] = {
-    "BTC/USDT", "BTCUSDT",
-    "ETH/USDT", "ETHUSDT",
-    "SOL/USDT", "SOLUSDT",
-    "BNB/USDT", "BNBUSDT",
-    "XAU/USD", "XAUUSD",
-    "PAXG/USDT", "PAXGUSDT",
+    "BTC/USDT",
+    "BTCUSDT",
+    "ETH/USDT",
+    "ETHUSDT",
+    "SOL/USDT",
+    "SOLUSDT",
+    "BNB/USDT",
+    "BNBUSDT",
+    "XAU/USD",
+    "XAUUSD",
+    "PAXG/USDT",
+    "PAXGUSDT",
 }
 
 # Empirical Cross-Asset Correlation Priors (rho)
@@ -503,7 +509,9 @@ class MastermindArbiterCouncil:
                     all_props = [p for _, p in raw_candidates]
                     spec_candles = market_data_by_symbol.get(sym, {}).get("15m", [])
                     wm_state = (
-                        self.world_model.evaluate_state(asset=sym, timeframe="15m", raw_candles=spec_candles)
+                        self.world_model.evaluate_state(
+                            asset=sym, timeframe="15m", raw_candles=spec_candles
+                        )
                         if self.world_model
                         else None
                     )
@@ -513,20 +521,28 @@ class MastermindArbiterCouncil:
                             proposals=all_props,
                             target_asset=sym,
                         )
-                        effective_confidence = round(effective_confidence * meta_eval.confidence_scale_factor, 3)
+                        effective_confidence = round(
+                            effective_confidence * meta_eval.confidence_scale_factor, 3
+                        )
                         if not meta_eval.can_execute:
-                            rejection_reason = "Metacognitive Monitor ABSTENTION: " + "; ".join(meta_eval.rationale)
+                            rejection_reason = "Metacognitive Monitor ABSTENTION: " + "; ".join(
+                                meta_eval.rationale
+                            )
                 except Exception as meta_err:
                     logger.warning("Metacognitive evaluation skipped: %s", meta_err)
 
             # Opportunity Reserve Protocol: Determine effective portfolio capacity
-            elite_active_cap = int(os.getenv("MAX_ELITE_POSITIONS", str(max_active_portfolio_positions + 2)))
+            elite_active_cap = int(
+                os.getenv("MAX_ELITE_POSITIONS", str(max_active_portfolio_positions + 2))
+            )
             is_elite_proposal = (
                 effective_confidence >= 0.85
                 or getattr(proposal, "confluence_score", 0.0) >= 85.0
                 or getattr(proposal, "expected_value_r", 0.0) >= 1.50
             )
-            effective_cap = elite_active_cap if is_elite_proposal else max_active_portfolio_positions
+            effective_cap = (
+                elite_active_cap if is_elite_proposal else max_active_portfolio_positions
+            )
 
             # Guard 1: Master Risk Gate Primacy (Independent Circuit Breaker Veto)
             if not gate.is_trading_allowed:
@@ -537,12 +553,20 @@ class MastermindArbiterCouncil:
                 pass  # Deterministically preserve metacognitive veto
 
             # Guard 1c: Darwinian Arena Survival Gate (Veto Quarantined/Rejected Specialists)
-            elif self.arena_bridge and not self.arena_bridge.evaluate_specialist_for_mastermind(sym).is_eligible:
+            elif (
+                self.arena_bridge
+                and not self.arena_bridge.evaluate_specialist_for_mastermind(sym).is_eligible
+            ):
                 arena_assessment = self.arena_bridge.evaluate_specialist_for_mastermind(sym)
-                rejection_reason = arena_assessment.rejection_reason or f"Darwinian Arena Veto: Specialist for {sym} is not eligible."
+                rejection_reason = (
+                    arena_assessment.rejection_reason
+                    or f"Darwinian Arena Veto: Specialist for {sym} is not eligible."
+                )
 
             # Guard 1d: Asset Tier Firewall (Strict Tier-1 Institutional Assets Only on Main Desk)
-            elif sym.replace("/", "").upper() not in {s.replace("/", "").upper() for s in ALLOWED_MAIN_DESK_SYMBOLS}:
+            elif sym.replace("/", "").upper() not in {
+                s.replace("/", "").upper() for s in ALLOWED_MAIN_DESK_SYMBOLS
+            }:
                 rejection_reason = (
                     f"Asset Tier Firewall: {sym} is not an authorized Tier-1 Institutional Asset. "
                     f"Main Desk is strictly restricted to BTC, ETH, SOL, BNB, and GOLD. "
@@ -568,9 +592,7 @@ class MastermindArbiterCouncil:
 
             # Guard C: Portfolio Position Capacity (Max Cap with Opportunity Reserve)
             elif len(open_positions) >= effective_cap:
-                rejection_reason = (
-                    f"Max portfolio positions ({effective_cap}) reached."
-                )
+                rejection_reason = f"Max portfolio positions ({effective_cap}) reached."
 
             # Guard D: Symbol Deduplication
             elif sym in existing_symbols:
@@ -586,7 +608,9 @@ class MastermindArbiterCouncil:
             # Guard F: Institutional Stop-Loss & Take-Profit Geometry Bounds
             else:
                 cur_p = proposal.entry_price
-                sl_dist_pct = (abs(cur_p - proposal.stop_loss) / cur_p * 100.0) if cur_p > 0 else 0.0
+                sl_dist_pct = (
+                    (abs(cur_p - proposal.stop_loss) / cur_p * 100.0) if cur_p > 0 else 0.0
+                )
                 if proposal.stop_loss <= 0 or proposal.take_profit <= 0:
                     rejection_reason = "Invalid stop loss or take profit level."
                 elif proposal.take_profit <= 0.01:
@@ -612,8 +636,12 @@ class MastermindArbiterCouncil:
                 base_notional = proposal.suggested_notional_usd or (current_eq * 0.02)
                 arena_weight = 1.0
                 if self.arena_bridge:
-                    arena_weight = self.arena_bridge.evaluate_specialist_for_mastermind(sym).weight_multiplier
-                approved_notional = round(base_notional * calib_weight * overlap_discount * arena_weight, 2)
+                    arena_weight = self.arena_bridge.evaluate_specialist_for_mastermind(
+                        sym
+                    ).weight_multiplier
+                approved_notional = round(
+                    base_notional * calib_weight * overlap_discount * arena_weight, 2
+                )
 
                 # Open virtual paper position in Shadow Portfolio with 1.0% stop-risk cap
                 direction_str = proposal.direction.value
@@ -653,7 +681,8 @@ class MastermindArbiterCouncil:
                     if not verdict.is_approved:
                         logger.warning(
                             "Mastermind proposal rejected by Central Trading Mind: %s (%s)",
-                            sym, verdict.rejection_reason
+                            sym,
+                            verdict.rejection_reason,
                         )
                         is_approved = False
                         rejection_reason = f"Central Trading Mind: {verdict.rejection_reason}"
@@ -740,6 +769,7 @@ class MastermindArbiterCouncil:
                         ObservationType,
                         ProposalPayload,
                     )
+
                     obs_type = (
                         ObservationType.TRADE_PROPOSAL
                         if proposal.direction in (DecisionAction.LONG, DecisionAction.SHORT)
@@ -768,7 +798,9 @@ class MastermindArbiterCouncil:
                         target_price=proposal.take_profit,
                         invalidation_price=proposal.stop_loss,
                         raw_confidence=proposal.confidence_score,
-                        calibrated_probability=min(0.99, max(0.01, effective_confidence)) if calib_weight else None,
+                        calibrated_probability=min(0.99, max(0.01, effective_confidence))
+                        if calib_weight
+                        else None,
                         epistemic_grade=proposal.epistemic_grade,
                     )
                     prop_p = ProposalPayload(
@@ -801,7 +833,9 @@ class MastermindArbiterCouncil:
                         observation_timestamp_ms=now_ms,
                     )
                 except Exception as exp_err:
-                    logger.warning("Experience recording in Mastermind Arbiter skipped: %s", exp_err)
+                    logger.warning(
+                        "Experience recording in Mastermind Arbiter skipped: %s", exp_err
+                    )
 
         return decisions
 
@@ -877,6 +911,7 @@ class MastermindArbiterCouncil:
             try:
                 from core.arena import get_arena_engine
                 from core.arena.arbiter_bridge import ArenaArbiterBridge
+
                 self.arena_bridge = ArenaArbiterBridge(get_arena_engine())
             except Exception as bridge_err:
                 logger.debug("Arena bridge initialization deferred: %s", bridge_err)
@@ -885,6 +920,7 @@ class MastermindArbiterCouncil:
             try:
                 from core.temporal_intelligence.arbiter_bridge import TemporalArbiterBridge
                 from core.temporal_intelligence.forecaster import get_temporal_forecaster
+
                 self.temporal_bridge = TemporalArbiterBridge(get_temporal_forecaster())
             except Exception as bridge_err:
                 logger.debug("Temporal bridge initialization deferred: %s", bridge_err)

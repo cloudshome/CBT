@@ -46,4 +46,3 @@ async def get_dynamic_watchlist() -> dict[str, Any]:
 async def get_screener_health() -> dict[str, Any]:
     """Returns telemetry health metrics for the opportunity hunter scanner."""
     return opportunity_hunter.get_health()
-

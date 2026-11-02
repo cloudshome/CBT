@@ -67,15 +67,25 @@ class WatchlistState(StrEnum):
     RETIRED = "RETIRED"
 
 
-def build_tradingview_url(base_asset: str, quote_asset: str = "USDT", is_futures: bool = True) -> str:
+def build_tradingview_url(
+    base_asset: str, quote_asset: str = "USDT", is_futures: bool = True
+) -> str:
     sym = f"{base_asset.upper()}{quote_asset.upper()}"
-    return f"https://www.tradingview.com/chart/?symbol=BINANCE:{sym}.P" if is_futures else f"https://www.tradingview.com/chart/?symbol=BINANCE:{sym}"
+    return (
+        f"https://www.tradingview.com/chart/?symbol=BINANCE:{sym}.P"
+        if is_futures
+        else f"https://www.tradingview.com/chart/?symbol=BINANCE:{sym}"
+    )
 
 
 def build_binance_url(base_asset: str, quote_asset: str = "USDT", is_futures: bool = True) -> str:
     base = base_asset.upper()
     quote = quote_asset.upper()
-    return f"https://www.binance.com/en/futures/{base}{quote}" if is_futures else f"https://www.binance.com/en/trade/{base}_{quote}"
+    return (
+        f"https://www.binance.com/en/futures/{base}{quote}"
+        if is_futures
+        else f"https://www.binance.com/en/trade/{base}_{quote}"
+    )
 
 
 def build_bybit_url(base_asset: str, quote_asset: str = "USDT") -> str:
@@ -260,9 +270,7 @@ class OpportunityHunter:
             conn.commit()
         return opp_id
 
-    def update_attrition_lifecycle(
-        self, current_prices: dict[str, float]
-    ) -> dict[str, int]:
+    def update_attrition_lifecycle(self, current_prices: dict[str, float]) -> dict[str, int]:
         """
         Evaluates active un-resolved opportunities against elapsed time windows (15m, 1h, 4h)
         and updates their survival / decay status in the attrition ledger.
@@ -289,8 +297,16 @@ class OpportunityHunter:
                 opp_id = r["opportunity_id"]
                 direction = r["direction"]
                 entry_p = float(r["entry_price"])
-                inv_p = float(r["invalidation_level"]) if r["invalidation_level"] else (entry_p * 0.98 if direction == "LONG" else entry_p * 1.02)
-                tgt_p = float(r["target_price"]) if r["target_price"] else (entry_p * 1.05 if direction == "LONG" else entry_p * 0.95)
+                inv_p = (
+                    float(r["invalidation_level"])
+                    if r["invalidation_level"]
+                    else (entry_p * 0.98 if direction == "LONG" else entry_p * 1.02)
+                )
+                tgt_p = (
+                    float(r["target_price"])
+                    if r["target_price"]
+                    else (entry_p * 1.05 if direction == "LONG" else entry_p * 0.95)
+                )
                 age_ms = now_ms - int(r["discovered_at_ms"])
 
                 # Check terminal target / invalidation hits
@@ -580,11 +596,17 @@ class OpportunityHunter:
             # Timing stage determination
             if category == OpportunityCategory.PRE_BREAKOUT_COMPRESSION:
                 timing_stage = TimingStage.PRE_SPIKE.value
-            elif category in (OpportunityCategory.EMERGING_MOMENTUM, OpportunityCategory.CAPITULATION_RECOVERY):
+            elif category in (
+                OpportunityCategory.EMERGING_MOMENTUM,
+                OpportunityCategory.CAPITULATION_RECOVERY,
+            ):
                 timing_stage = TimingStage.EARLY.value
             elif category == OpportunityCategory.BLOW_OFF_EXHAUSTION:
                 timing_stage = TimingStage.EXHAUSTED.value
-            elif category in (OpportunityCategory.CONFIRMED_BREAKOUT, OpportunityCategory.BEARISH_CONTINUATION):
+            elif category in (
+                OpportunityCategory.CONFIRMED_BREAKOUT,
+                OpportunityCategory.BEARISH_CONTINUATION,
+            ):
                 timing_stage = TimingStage.ACTIVE.value
             else:
                 timing_stage = TimingStage.ACTIVE.value
@@ -596,7 +618,11 @@ class OpportunityHunter:
                 dist_pct = 2.5
 
             # Target reward-to-risk ratio (higher for early/pre-spike setups)
-            target_rr = 2.5 if timing_stage in (TimingStage.PRE_SPIKE.value, TimingStage.EARLY.value) else 2.0
+            target_rr = (
+                2.5
+                if timing_stage in (TimingStage.PRE_SPIKE.value, TimingStage.EARLY.value)
+                else 2.0
+            )
 
             # Tradability Stress Gate Check (2.5x trading fees + spread + depth-impact slippage)
             is_tradable, stress_fric_bps, target_move_pct = self.evaluate_tradability_stress(

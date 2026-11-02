@@ -80,3 +80,4 @@ Software test passes do **NOT** constitute proof of quantitative edge. Any produ
 1. **Unit & Integration Verification:** 100% green tests in sandboxed isolation (`tests/conftest.py`).
 2. **Milestone 18 Certification:** All 14 gates / 149 adversarial tests passing (`scripts/verify_m18_certification.py`).
 3. **Out-of-Sample Empirical Evidence:** Combinatorial Purged Cross-Validation (CPCV) with Deflated Sharpe Ratio ($DSR > 0.95$) and 3-tier fee/slippage friction modeling before capital allocation.
+

@@ -254,7 +254,11 @@ class DeterministicOutcomeResolver:
                 )
 
         # For proposals / executed trades:
-        net = realized_net_pnl_bps if realized_net_pnl_bps is not None else (counterfactual_net_pnl_bps or 0.0)
+        net = (
+            realized_net_pnl_bps
+            if realized_net_pnl_bps is not None
+            else (counterfactual_net_pnl_bps or 0.0)
+        )
 
         if resolution_status == ResolutionStatus.HIT_TARGET or gross_pnl_bps > 0:
             if net > 0:
@@ -272,4 +276,3 @@ class DeterministicOutcomeResolver:
             DiagnosticCategory.DIRECTION_FAILURE,
             f"Forecast failed: price hit invalidation ({net:.1f} bps net loss).",
         )
-

@@ -216,4 +216,3 @@ async def test_api_mastermind_opportunity_signals_and_deploy():
         assert dep_data["status"] == "DEPLOYED"
         assert dep_data["symbol"] == "SOXL/USDT"
         assert dep_data["direction"] == "LONG"
-

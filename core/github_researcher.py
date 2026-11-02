@@ -79,13 +79,19 @@ class GitHubResearcher:
         """
         # 1. File Size Gate
         if len(code_str.encode("utf-8")) > MAX_SINGLE_FILE_BYTES:
-            return False, f"File size exceeds lean ceiling ({MAX_SINGLE_FILE_BYTES / 1024:.0f}KB max)"
+            return (
+                False,
+                f"File size exceeds lean ceiling ({MAX_SINGLE_FILE_BYTES / 1024:.0f}KB max)",
+            )
 
         # 2. Repo Traction Gate (if metadata available)
         if repo_meta and "stars" in repo_meta:
             stars = repo_meta.get("stars", 0)
             if stars < MIN_REPO_STARS_DEFAULT:
-                return False, f"Repo stars ({stars}) below minimum quality hurdle ({MIN_REPO_STARS_DEFAULT})"
+                return (
+                    False,
+                    f"Repo stars ({stars}) below minimum quality hurdle ({MIN_REPO_STARS_DEFAULT})",
+                )
 
         # 3. Spam & Hype Filter
         lower_code = code_str.lower()
@@ -103,7 +109,9 @@ class GitHubResearcher:
                 return False, f"Flagged as promotional/spam content (matched: {pat})"
 
         # 4. Dangerous Unhedged / Martingale Filter
-        if "martingale" in lower_code and ("double" in lower_code or "*= 2" in lower_code or "* 2" in lower_code):
+        if "martingale" in lower_code and (
+            "double" in lower_code or "*= 2" in lower_code or "* 2" in lower_code
+        ):
             return False, "Dangerous Martingale position-doubling detected without risk limits"
 
         # 5. Mandatory Risk Logic Invariant
@@ -145,8 +153,13 @@ class GitHubResearcher:
                             if isinstance(val, int | float):
                                 params[target.id] = val
 
-            has_entry = any("entry" in f.lower() or "buy" in f.lower() or "signal" in f.lower() for f in functions)
-            has_risk = any("risk" in f.lower() or "stop" in f.lower() or "exit" in f.lower() for f in functions) or any(
+            has_entry = any(
+                "entry" in f.lower() or "buy" in f.lower() or "signal" in f.lower()
+                for f in functions
+            )
+            has_risk = any(
+                "risk" in f.lower() or "stop" in f.lower() or "exit" in f.lower() for f in functions
+            ) or any(
                 "sl" in k.lower() or "stop" in k.lower() or "risk" in k.lower() for k in params
             )
 
@@ -160,7 +173,12 @@ class GitHubResearcher:
                 "is_valid": len(classes) > 0 or len(functions) > 0,
             }
         except Exception as e:
-            return {"language": "Python", "error": str(e), "extracted_parameters": {}, "is_valid": False}
+            return {
+                "language": "Python",
+                "error": str(e),
+                "extracted_parameters": {},
+                "is_valid": False,
+            }
 
     def parse_pine_script(self, pine_code: str) -> dict[str, Any]:
         """
@@ -212,7 +230,11 @@ class GitHubResearcher:
         # 2. Simulated Edge Evaluation
         # If no explicit simulated edge passed, calculate from parameter plausibility
         params = strategy_dna.get("extracted_parameters", {})
-        edge = simulated_edge if simulated_edge is not None else self._estimate_mathematical_edge(strategy_dna)
+        edge = (
+            simulated_edge
+            if simulated_edge is not None
+            else self._estimate_mathematical_edge(strategy_dna)
+        )
 
         if edge < 0.15:  # Minimum 0.15R net expectancy hurdle
             self._record_autopsy(
@@ -254,7 +276,10 @@ class GitHubResearcher:
                     kid,
                     strat_name,
                     f"Extracted open-source algorithmic strategy from {source_ref}",
-                    json.dumps(strategy_dna.get("functions", []) or strategy_dna.get("strategy_entries", [])),
+                    json.dumps(
+                        strategy_dna.get("functions", [])
+                        or strategy_dna.get("strategy_entries", [])
+                    ),
                     json.dumps({"stop_loss": "ATR_PROTECTED", "take_profit": "2.0R_TARGET"}),
                     json.dumps(params),
                     strategy_dna.get("timeframe", "15m"),
@@ -268,7 +293,9 @@ class GitHubResearcher:
             )
             conn.commit()
 
-        logger.info(f"[PROMOTED_CANDIDATE] Strategy '{strat_name}' graduated to Candidates Vault (ID: {candidate_id})")
+        logger.info(
+            f"[PROMOTED_CANDIDATE] Strategy '{strat_name}' graduated to Candidates Vault (ID: {candidate_id})"
+        )
         return {
             "verdict": "PROMOTED_CANDIDATE",
             "candidate_id": candidate_id,
@@ -356,13 +383,19 @@ class GitHubResearcher:
             return {"verdict": "REJECTED", "reason": reason, "passed": False}
 
         # Step 2: Parse
-        is_pine = ".pine" in source_url.lower() or "strategy(" in code_str or "indicator(" in code_str
+        is_pine = (
+            ".pine" in source_url.lower() or "strategy(" in code_str or "indicator(" in code_str
+        )
         dna = self.parse_pine_script(code_str) if is_pine else self.parse_python_strategy(code_str)
         dna["name"] = name
         dna["source_url"] = source_url
 
         if not dna.get("is_valid"):
-            return {"verdict": "REJECTED", "reason": "Failed syntactic AST validation", "passed": False}
+            return {
+                "verdict": "REJECTED",
+                "reason": "Failed syntactic AST validation",
+                "passed": False,
+            }
 
         # Step 3: Test and Store/Purge
         result = self.test_strategy_before_storage(dna, simulated_edge=simulated_edge)

@@ -127,4 +127,3 @@ class SurvivalStateMachine:
             is_mastermind_eligible=True,
             arbiter_weight_multiplier=1.0,
         )
-

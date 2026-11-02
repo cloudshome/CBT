@@ -92,7 +92,7 @@ class SKYIntelligenceOrchestrator:
                     n_total += 1
                     if pnl > 0:
                         n_wins += 1
-                        sum_win_r += (pnl / max(1.0, risk_usd))
+                        sum_win_r += pnl / max(1.0, risk_usd)
         except Exception as ex:
             logger.debug("Bayesian stats fallback to prior: %s", ex)
 

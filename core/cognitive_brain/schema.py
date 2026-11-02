@@ -181,4 +181,3 @@ class TradingExperienceRecord(BaseModel):
 
     is_frozen: bool = True
     is_resolved: bool = False
-

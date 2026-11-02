@@ -64,6 +64,7 @@ def _generate_synthetic_candles(base_price=60000.0, count=30, trend=0.001):
 # BATTERY A: Stale, Missing, and Corrupted Data Feeds
 # ==============================================================================
 
+
 @pytest.mark.asyncio
 async def test_battery_a_empty_and_insufficient_candles():
     """Agents must handle empty or truncated candle histories safely without throwing unhandled exceptions."""
@@ -73,16 +74,29 @@ async def test_battery_a_empty_and_insufficient_candles():
 
     # Empty candle list
     prop_btc = await btc_spec.evaluate_market(candles_15m=[], multi_tf_candles={})
-    assert prop_btc.direction in (DecisionAction.WATCH, DecisionAction.NO_TRADE) or prop_btc.confidence_score <= 0.25
+    assert (
+        prop_btc.direction in (DecisionAction.WATCH, DecisionAction.NO_TRADE)
+        or prop_btc.confidence_score <= 0.25
+    )
     assert prop_btc.entry_price == 0.0
 
     # Truncated candle list (< 5 candles)
     short_candles = _generate_synthetic_candles(3000.0, count=3)
-    prop_eth = await eth_spec.evaluate_market(candles_15m=short_candles, multi_tf_candles={"15m": short_candles})
-    assert prop_eth.direction in (DecisionAction.WATCH, DecisionAction.NO_TRADE) or prop_eth.confidence_score <= 0.25
+    prop_eth = await eth_spec.evaluate_market(
+        candles_15m=short_candles, multi_tf_candles={"15m": short_candles}
+    )
+    assert (
+        prop_eth.direction in (DecisionAction.WATCH, DecisionAction.NO_TRADE)
+        or prop_eth.confidence_score <= 0.25
+    )
 
-    prop_lowcap = await lowcap_spec.evaluate_market(candles_15m=short_candles, multi_tf_candles={"15m": short_candles})
-    assert prop_lowcap.direction in (DecisionAction.WATCH, DecisionAction.NO_TRADE) or prop_lowcap.confidence_score <= 0.25
+    prop_lowcap = await lowcap_spec.evaluate_market(
+        candles_15m=short_candles, multi_tf_candles={"15m": short_candles}
+    )
+    assert (
+        prop_lowcap.direction in (DecisionAction.WATCH, DecisionAction.NO_TRADE)
+        or prop_lowcap.confidence_score <= 0.25
+    )
 
 
 @pytest.mark.asyncio
@@ -92,23 +106,30 @@ async def test_battery_a_missing_or_none_order_book():
     sol_spec = SolSpecialist()
 
     # None orderbook
-    prop_none = await sol_spec.evaluate_market(candles_15m=candles, multi_tf_candles={"15m": candles}, order_book=None)
+    prop_none = await sol_spec.evaluate_market(
+        candles_15m=candles, multi_tf_candles={"15m": candles}, order_book=None
+    )
     assert prop_none is not None
     assert isinstance(prop_none, CandidateProposal)
 
     # Empty orderbook dict
-    prop_empty = await sol_spec.evaluate_market(candles_15m=candles, multi_tf_candles={"15m": candles}, order_book={})
+    prop_empty = await sol_spec.evaluate_market(
+        candles_15m=candles, multi_tf_candles={"15m": candles}, order_book={}
+    )
     assert prop_empty is not None
     assert isinstance(prop_empty, CandidateProposal)
 
     # Malformed orderbook dict (missing asks)
-    prop_malformed = await sol_spec.evaluate_market(candles_15m=candles, multi_tf_candles={"15m": candles}, order_book={"bids": []})
+    prop_malformed = await sol_spec.evaluate_market(
+        candles_15m=candles, multi_tf_candles={"15m": candles}, order_book={"bids": []}
+    )
     assert prop_malformed is not None
 
 
 # ==============================================================================
 # BATTERY B: Adversarial Contradictory Evidence & False Breakout Traps
 # ==============================================================================
+
 
 def test_battery_b_upper_wick_rejection_forces_veto():
     """A bullish breakout candle that closes in the bottom 35% of its range must be vetoed into NO_TRADE."""
@@ -217,12 +238,15 @@ def test_battery_b_orderbook_wall_demotes_confidence():
     # Single contradiction without wick rejection discounts by 35%: 0.80 * 0.65 = 0.52
     assert reviewed.direction == DecisionAction.LONG
     assert reviewed.confidence_score == pytest.approx(0.52, abs=0.01)
-    assert any("Severe ask-side liquidity wall detected" in e for e in reviewed.disconfirming_evidence)
+    assert any(
+        "Severe ask-side liquidity wall detected" in e for e in reviewed.disconfirming_evidence
+    )
 
 
 # ==============================================================================
 # BATTERY C: Correlation Overlap & Macro Regime Clashes
 # ==============================================================================
+
 
 def test_battery_c_information_overlap_discount_for_correlated_altcoins():
     """Multiple correlated altcoins in the same direction must be discounted by effective N."""
@@ -320,17 +344,23 @@ async def test_battery_c_macro_divergence_penalizes_altcoin_long_when_btc_short(
         sui_dec = next((d for d in decisions if d.symbol == "SUI/USDT"), None)
         assert sui_dec is not None
         assert sui_dec.is_approved is False
-        assert "below threshold" in sui_dec.rejection_reason or "Effective Confidence" in sui_dec.rejection_reason or "Asset Tier Firewall" in sui_dec.rejection_reason
+        assert (
+            "below threshold" in sui_dec.rejection_reason
+            or "Effective Confidence" in sui_dec.rejection_reason
+            or "Asset Tier Firewall" in sui_dec.rejection_reason
+        )
 
 
 # ==============================================================================
 # BATTERY D: Absolute Risk-Gate Primacy & 1.5% Portfolio Ceiling Enforcement
 # ==============================================================================
 
+
 @pytest.mark.asyncio
 async def test_battery_d_absolute_1_point_5_percent_max_equity_cap():
     """Even under extreme specialist consensus with max confidence, risk cannot exceed 1.5% of equity."""
     from core.portfolio_shadow import portfolio_shadow
+
     portfolio_shadow.reset_all_positions()
     equity = 20_000.0
     arbiter = MastermindArbiterCouncil(account_equity_usd=equity)
@@ -369,7 +399,10 @@ async def test_battery_d_risk_governor_circuit_breaker_veto_primacy():
         reason="Daily drawdown 3.2% breached maximum 3.0% threshold. Total trading lockout active.",
     )
 
-    with patch("core.mastermind.mastermind_arbiter.risk_manager.evaluate_risk_gate", return_value=locked_gate):
+    with patch(
+        "core.mastermind.mastermind_arbiter.risk_manager.evaluate_risk_gate",
+        return_value=locked_gate,
+    ):
         decisions = await arbiter.evaluate_swarm(market_data)
         assert len(decisions) >= 2
         for d in decisions:
@@ -381,6 +414,7 @@ async def test_battery_d_risk_governor_circuit_breaker_veto_primacy():
 # ==============================================================================
 # BATTERY E: Friction Stress Gate & Closed-Loop Drift Feedback
 # ==============================================================================
+
 
 def test_battery_e_opportunity_hunter_tradability_stress_gate():
     """Opportunity Hunter must reject candidates where target cannot absorb 2.5x stress frictions."""

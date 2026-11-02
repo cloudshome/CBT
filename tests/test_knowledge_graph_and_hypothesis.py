@@ -95,6 +95,13 @@ async def test_cross_domain_discovery_and_hypothesis_workflow():
 @pytest.mark.asyncio
 async def test_full_graph_payload_retrieval():
     """Verifies that the full 6-node ontology graph is returned cleanly."""
+    if knowledge_graph_engine.get_full_graph_payload()["counts"]["sources_count"] == 0:
+        await universal_ingestor.ingest(
+            content="Baseline economic cycle observation across commodities and currencies.",
+            mode="RESEARCH",
+            title="Baseline Research Note",
+            author_creator="Quant Research",
+        )
     graph = knowledge_graph_engine.get_full_graph_payload()
     assert "nodes" in graph
     assert "edges" in graph

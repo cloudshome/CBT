@@ -234,7 +234,8 @@ class MonteCarloStressTester:
 
         # 2. Choppy Survivor: Terminal above initial capital, but high volatility/drawdown (> median DD)
         survivor_candidates = np.where(
-            (terminal_equity > initial_capital * 1.05) & (max_drawdowns > np.percentile(max_drawdowns, 60))
+            (terminal_equity > initial_capital * 1.05)
+            & (max_drawdowns > np.percentile(max_drawdowns, 60))
         )[0]
         if len(survivor_candidates) > 0:
             # Pick one with high path variance
@@ -245,7 +246,8 @@ class MonteCarloStressTester:
 
         # 3. Deep Drawdown: Path with high drawdown (around 95th percentile DD) that survives or recovers
         severe_dd_candidates = np.where(
-            (max_drawdowns >= np.percentile(max_drawdowns, 90)) & (max_drawdowns <= np.percentile(max_drawdowns, 99))
+            (max_drawdowns >= np.percentile(max_drawdowns, 90))
+            & (max_drawdowns <= np.percentile(max_drawdowns, 99))
         )[0]
         if len(severe_dd_candidates) > 0:
             deep_dd_idx = severe_dd_candidates[np.argmax(max_drawdowns[severe_dd_candidates])]
@@ -301,9 +303,9 @@ class MonteCarloStressTester:
         p95_dd = float(np.percentile(max_drawdowns, 95)) * 100.0
 
         summary = (
-            f"Monte Carlo GBM {num_paths:,} Paths ({horizon_years}Y, μ={expected_return*100:.1f}%, σ={volatility*100:.1f}%): "
+            f"Monte Carlo GBM {num_paths:,} Paths ({horizon_years}Y, μ={expected_return * 100:.1f}%, σ={volatility * 100:.1f}%): "
             f"Median Terminal: ${p50_series[-1]:,.2f} (50th), 90% Confidence Interval: [${p5_series[-1]:,.2f} – ${p95_series[-1]:,.2f}]. "
-            f"P(Loss Ending < Capital) = {prob_loss*100:.1f}%, P(Drawdown >= 20%) = {prob_ruin*100:.1f}%. "
+            f"P(Loss Ending < Capital) = {prob_loss * 100:.1f}%, P(Drawdown >= 20%) = {prob_ruin * 100:.1f}%. "
             f"Median DD: {median_dd:.1f}%, 95th Percentile DD: {p95_dd:.1f}%."
         )
 

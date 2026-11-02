@@ -177,8 +177,12 @@ class RealisticPaperFillSimulator:
 
         if ratio > 1.2:
             adjustment = min(2.5, 1.0 + 0.5 * (ratio - 1.0))
-            self.adverse_selection_factor = round(min(3.0, self.adverse_selection_factor * adjustment), 3)
-            self.market_order_latency_ms = round(min(250.0, self.market_order_latency_ms * adjustment), 1)
+            self.adverse_selection_factor = round(
+                min(3.0, self.adverse_selection_factor * adjustment), 3
+            )
+            self.market_order_latency_ms = round(
+                min(250.0, self.market_order_latency_ms * adjustment), 1
+            )
         elif ratio < 0.8:
             self.adverse_selection_factor = round(max(0.3, self.adverse_selection_factor * 0.95), 3)
             self.market_order_latency_ms = round(max(20.0, self.market_order_latency_ms * 0.95), 1)

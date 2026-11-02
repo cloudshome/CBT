@@ -675,9 +675,13 @@ def test_causal_synthesizer_sandbox_db_isolation(tmp_path):
 
     # Verify plan was persisted specifically into isolated_sandbox.db
     import sqlite3
+
     conn = sqlite3.connect(db_file)
     cursor = conn.cursor()
-    cursor.execute("SELECT plan_id, hypothesis_id FROM experiment_plans_ledger WHERE plan_id = ?", (plan.plan_id,))
+    cursor.execute(
+        "SELECT plan_id, hypothesis_id FROM experiment_plans_ledger WHERE plan_id = ?",
+        (plan.plan_id,),
+    )
     row = cursor.fetchone()
     conn.close()
     assert row is not None

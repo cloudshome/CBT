@@ -263,9 +263,8 @@ class SetupEngine:
         b2 += 10.0 * min(1.0, disp_score / 80.0)
         rvol = getattr(volume_feat, "relative_volume", 1.0) if volume_feat else 1.0
         p_ratio = getattr(volume_feat, "buy_sell_pressure_ratio", 1.0) if volume_feat else 1.0
-        vol_aligned = (
-            (direction == DecisionAction.LONG and p_ratio >= 1.0)
-            or (direction == DecisionAction.SHORT and p_ratio <= 1.0)
+        vol_aligned = (direction == DecisionAction.LONG and p_ratio >= 1.0) or (
+            direction == DecisionAction.SHORT and p_ratio <= 1.0
         )
         if rvol >= 1.05 or vol_aligned:
             b2 += 8.0
@@ -281,23 +280,31 @@ class SetupEngine:
         ):
             b3 += 15.0
         if (
-            (direction == DecisionAction.LONG and ("BULL" in htf_1h or stack == "BULLISH_CONFLUENT"))
-            or (direction == DecisionAction.SHORT and ("BEAR" in htf_1h or stack == "BEARISH_CONFLUENT"))
+            direction == DecisionAction.LONG and ("BULL" in htf_1h or stack == "BULLISH_CONFLUENT")
+        ) or (
+            direction == DecisionAction.SHORT and ("BEAR" in htf_1h or stack == "BEARISH_CONFLUENT")
         ):
             b3 += 10.0
         b3 = min(25.0, b3)
 
         # Bucket 4: Derivatives & Sentiment Filter (up to 15 pts)
         b4 = 0.0
-        fr = getattr(derivatives_state, "current_funding_rate", 0.0001) if derivatives_state else 0.0001
+        fr = (
+            getattr(derivatives_state, "current_funding_rate", 0.0001)
+            if derivatives_state
+            else 0.0001
+        )
         is_crowded = (direction == DecisionAction.LONG and fr > 0.0003) or (
             direction == DecisionAction.SHORT and fr < -0.0003
         )
         if not is_crowded:
             b4 += 10.0
         oi_state = getattr(derivatives_state, "price_vs_oi_state", "") if derivatives_state else ""
-        if (direction == DecisionAction.LONG and oi_state in ("LONG_EXPANSION", "SHORT_SQUEEZE")) or (
-            direction == DecisionAction.SHORT and oi_state in ("SHORT_EXPANSION", "LONG_LIQUIDATION")
+        if (
+            direction == DecisionAction.LONG and oi_state in ("LONG_EXPANSION", "SHORT_SQUEEZE")
+        ) or (
+            direction == DecisionAction.SHORT
+            and oi_state in ("SHORT_EXPANSION", "LONG_LIQUIDATION")
         ):
             b4 += 5.0
         b4 = min(15.0, b4)
@@ -357,7 +364,7 @@ class SetupEngine:
             if risk <= 0:
                 return None  # Inverted stop guard
             if (risk / entry) > 0.035:
-                reasons.append(f"Risk {risk/entry*100:.2f}% exceeds 3.5% institutional ceiling")
+                reasons.append(f"Risk {risk / entry * 100:.2f}% exceeds 3.5% institutional ceiling")
                 is_qualified = False
             tp = entry + max(2.2 * risk, 2.5 * atr)
         else:
@@ -367,7 +374,7 @@ class SetupEngine:
             if risk <= 0:
                 return None  # Inverted stop guard
             if (risk / entry) > 0.035:
-                reasons.append(f"Risk {risk/entry*100:.2f}% exceeds 3.5% institutional ceiling")
+                reasons.append(f"Risk {risk / entry * 100:.2f}% exceeds 3.5% institutional ceiling")
                 is_qualified = False
             tp = entry - max(2.2 * risk, 2.5 * atr)
 
@@ -516,20 +523,18 @@ class SetupEngine:
             if risk <= 0:
                 return None  # Inverted SL bug eliminated: never allow entry <= sl on LONG
             if (risk / entry) > 0.035:
-                reasons.append(f"Risk {risk/entry*100:.2f}% exceeds 3.5% institutional ceiling")
+                reasons.append(f"Risk {risk / entry * 100:.2f}% exceeds 3.5% institutional ceiling")
                 is_qualified = False
             tp = entry + max(2.2 * risk, 2.5 * atr)
         else:
-            recent_high = max(
-                (float(c["high"]) for c in recent_bars), default=latest_fvg.top_price
-            )
+            recent_high = max((float(c["high"]) for c in recent_bars), default=latest_fvg.top_price)
             raw_sl = max(latest_fvg.top_price + (0.6 * atr), recent_high + (0.2 * atr))
             sl = max(raw_sl, entry + min_stop_dist)
             risk = sl - entry
             if risk <= 0:
                 return None  # Inverted SL bug eliminated: never allow entry >= sl on SHORT
             if (risk / entry) > 0.035:
-                reasons.append(f"Risk {risk/entry*100:.2f}% exceeds 3.5% institutional ceiling")
+                reasons.append(f"Risk {risk / entry * 100:.2f}% exceeds 3.5% institutional ceiling")
                 is_qualified = False
             tp = entry - max(2.2 * risk, 2.5 * atr)
 
@@ -555,7 +560,12 @@ class SetupEngine:
             is_qualified = False
 
         if is_qualified:
-            if volume_feat is None and order_blocks is None and derivatives_state is None and not candles:
+            if (
+                volume_feat is None
+                and order_blocks is None
+                and derivatives_state is None
+                and not candles
+            ):
                 # Backward-compatible calculation for legacy Phase 5 unit test fixture
                 base_score = 74.0
                 if disp.displacement_score >= 70.0:
@@ -656,7 +666,7 @@ class SetupEngine:
             if risk <= 0:
                 return None  # Inverted stop guard
             if (risk / entry) > 0.035:
-                reasons.append(f"Risk {risk/entry*100:.2f}% exceeds 3.5% institutional ceiling")
+                reasons.append(f"Risk {risk / entry * 100:.2f}% exceeds 3.5% institutional ceiling")
                 is_qualified = False
             tp = entry + (2.0 * risk) if risk > 0 else entry + (2.0 * atr)
         else:
@@ -667,7 +677,7 @@ class SetupEngine:
             if risk <= 0:
                 return None  # Inverted stop guard
             if (risk / entry) > 0.035:
-                reasons.append(f"Risk {risk/entry*100:.2f}% exceeds 3.5% institutional ceiling")
+                reasons.append(f"Risk {risk / entry * 100:.2f}% exceeds 3.5% institutional ceiling")
                 is_qualified = False
             tp = entry - (2.0 * risk) if risk > 0 else entry - (2.0 * atr)
 
@@ -749,12 +759,21 @@ class SetupEngine:
 
         # Gate 1: Strict Regime Compatibility (Disallow counter-trend fades when ADX > 28)
         adx_val = getattr(regime, "adx", getattr(regime, "trend_strength_adx", 15.0))
-        if regime.regime_type in (MarketRegimeType.TRENDING_BULL, MarketRegimeType.TRENDING_BEAR) and adx_val > 28.0:
+        if (
+            regime.regime_type in (MarketRegimeType.TRENDING_BULL, MarketRegimeType.TRENDING_BEAR)
+            and adx_val > 28.0
+        ):
             htf_4h = getattr(mtf_context, "htf_4h_trend", "") if mtf_context else ""
-            if (direction == DecisionAction.SHORT and ("BULL" in regime.regime_type.value or "BULL" in htf_4h)) or (
-                direction == DecisionAction.LONG and ("BEAR" in regime.regime_type.value or "BEAR" in htf_4h)
+            if (
+                direction == DecisionAction.SHORT
+                and ("BULL" in regime.regime_type.value or "BULL" in htf_4h)
+            ) or (
+                direction == DecisionAction.LONG
+                and ("BEAR" in regime.regime_type.value or "BEAR" in htf_4h)
             ):
-                reasons.append(f"Regime incompatible: Counter-trend fade against strong trend (ADX {adx_val:.1f} > 28.0)")
+                reasons.append(
+                    f"Regime incompatible: Counter-trend fade against strong trend (ADX {adx_val:.1f} > 28.0)"
+                )
                 is_qualified = False
 
         # Universal Stop-Loss Floor (>= 1.2x ATR or 0.45%)
@@ -768,7 +787,7 @@ class SetupEngine:
             if risk <= 0:
                 return None  # Inverted stop guard
             if (risk / entry) > 0.035:
-                reasons.append(f"Risk {risk/entry*100:.2f}% exceeds 3.5% institutional ceiling")
+                reasons.append(f"Risk {risk / entry * 100:.2f}% exceeds 3.5% institutional ceiling")
                 is_qualified = False
             tp = entry + max(2.2 * risk, 2.5 * atr)
         else:
@@ -778,7 +797,7 @@ class SetupEngine:
             if risk <= 0:
                 return None  # Inverted stop guard
             if (risk / entry) > 0.035:
-                reasons.append(f"Risk {risk/entry*100:.2f}% exceeds 3.5% institutional ceiling")
+                reasons.append(f"Risk {risk / entry * 100:.2f}% exceeds 3.5% institutional ceiling")
                 is_qualified = False
             tp = entry - max(2.2 * risk, 2.5 * atr)
 
@@ -909,9 +928,15 @@ class SetupEngine:
 
         if is_reclaim_bull:
             direction = DecisionAction.LONG
-            if regime.regime_type in (MarketRegimeType.TRENDING_BULL, MarketRegimeType.TRENDING_BEAR) and adx_val > 28.0:
+            if (
+                regime.regime_type
+                in (MarketRegimeType.TRENDING_BULL, MarketRegimeType.TRENDING_BEAR)
+                and adx_val > 28.0
+            ):
                 if "BEAR" in regime.regime_type.value or "BEAR" in htf_4h:
-                    reasons.append(f"Regime incompatible: Counter-trend fade against strong trend (ADX {adx_val:.1f} > 28.0)")
+                    reasons.append(
+                        f"Regime incompatible: Counter-trend fade against strong trend (ADX {adx_val:.1f} > 28.0)"
+                    )
                     is_qualified = False
 
             # Anchor stop to 5-bar structural swing low (never closes[-5:])
@@ -922,7 +947,7 @@ class SetupEngine:
             if risk <= 0:
                 return None  # Inverted stop guard
             if (risk / price) > 0.035:
-                reasons.append(f"Risk {risk/price*100:.2f}% exceeds 3.5% institutional ceiling")
+                reasons.append(f"Risk {risk / price * 100:.2f}% exceeds 3.5% institutional ceiling")
                 is_qualified = False
             tp = price + max(2.2 * risk, 2.5 * atr)
             rr = abs(tp - price) / max(abs(price - sl), 0.0001)
@@ -978,9 +1003,15 @@ class SetupEngine:
             )
         elif is_reclaim_bear:
             direction = DecisionAction.SHORT
-            if regime.regime_type in (MarketRegimeType.TRENDING_BULL, MarketRegimeType.TRENDING_BEAR) and adx_val > 28.0:
+            if (
+                regime.regime_type
+                in (MarketRegimeType.TRENDING_BULL, MarketRegimeType.TRENDING_BEAR)
+                and adx_val > 28.0
+            ):
                 if "BULL" in regime.regime_type.value or "BULL" in htf_4h:
-                    reasons.append(f"Regime incompatible: Counter-trend fade against strong trend (ADX {adx_val:.1f} > 28.0)")
+                    reasons.append(
+                        f"Regime incompatible: Counter-trend fade against strong trend (ADX {adx_val:.1f} > 28.0)"
+                    )
                     is_qualified = False
 
             # Anchor stop to 5-bar structural swing high (never closes[-5:])
@@ -991,7 +1022,7 @@ class SetupEngine:
             if risk <= 0:
                 return None  # Inverted stop guard
             if (risk / price) > 0.035:
-                reasons.append(f"Risk {risk/price*100:.2f}% exceeds 3.5% institutional ceiling")
+                reasons.append(f"Risk {risk / price * 100:.2f}% exceeds 3.5% institutional ceiling")
                 is_qualified = False
             tp = price - max(2.2 * risk, 2.5 * atr)
             rr = abs(price - tp) / max(abs(sl - price), 0.0001)

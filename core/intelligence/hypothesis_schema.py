@@ -265,7 +265,14 @@ class HypothesisLedgerManager:
                 params.append(target_asset)
 
             count_query = query.replace("SELECT *", "SELECT COUNT(*)")
-            cursor.execute(count_query, params)
+            try:
+                cursor.execute(count_query, params)
+            except sqlite3.OperationalError as e:
+                if "no such table" in str(e).lower():
+                    self._init_db()
+                    cursor.execute(count_query, params)
+                else:
+                    raise
             total = cursor.fetchone()[0]
 
             query += " ORDER BY created_at_utc DESC LIMIT ? OFFSET ?"

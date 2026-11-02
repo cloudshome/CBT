@@ -48,7 +48,7 @@ def test_central_mind_blocks_falsified_breakout_proposal():
         planned_entry=81120.24,
         stop_loss=80438.25,
         take_profit=82742.64,
-        thesis="Breakout Buy above key resistance"
+        thesis="Breakout Buy above key resistance",
     )
 
     verdict = mind.evaluate_and_route(breakout_proposal)
@@ -73,7 +73,7 @@ def test_central_mind_blocks_sweep_reversal_proposal():
         planned_entry=81120.24,
         stop_loss=80438.25,
         take_profit=82742.64,
-        thesis="Sweep Reversal Buy on liquidity sweep"
+        thesis="Sweep Reversal Buy on liquidity sweep",
     )
 
     verdict = mind.evaluate_and_route(sweep_proposal)
@@ -156,7 +156,7 @@ def test_setup_engine_disqualifies_breakout_expansion():
         derivs=derivs,
         disp=disp,
         regime=regime,
-        atr=500.0
+        atr=500.0,
     )
 
     assert setup_c is not None
@@ -222,7 +222,12 @@ def test_setup_engine_qualifies_pullback_fvg_with_phase4_metrics():
         {"open": 60000.0, "high": 60200.0, "low": 59900.0, "close": 60150.0},
         {"open": 60150.0, "high": 60300.0, "low": 60050.0, "close": 60250.0},
         {"open": 60250.0, "high": 60400.0, "low": 60150.0, "close": 60350.0},
-        {"open": 60350.0, "high": 60600.0, "low": 60250.0, "close": 60550.0},  # candles[-2] closed BULL
+        {
+            "open": 60350.0,
+            "high": 60600.0,
+            "low": 60250.0,
+            "close": 60550.0,
+        },  # candles[-2] closed BULL
         {"open": 60550.0, "high": 60700.0, "low": 60400.0, "close": 60650.0},  # current bar
     ]
 
@@ -264,7 +269,7 @@ def test_sandbox_lab_portfolio_simulation_10k_equity():
             "high": p + 80.0,
             "low": p - 80.0,
             "close": p + 30.0,
-            "volume": 100.0
+            "volume": 100.0,
         }
         candles.append(c)
 
@@ -275,7 +280,7 @@ def test_sandbox_lab_portfolio_simulation_10k_equity():
         starting_capital=10000.0,
         risk_per_trade_pct=0.01,
         taker_fee_bps=5.0,
-        slippage_bps=3.0
+        slippage_bps=3.0,
     )
 
     assert report.total_trades > 0

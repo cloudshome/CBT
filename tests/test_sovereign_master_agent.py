@@ -33,7 +33,9 @@ async def test_sovereign_master_agent_restricts_to_tier1_assets():
 
     # Rejected non-tier-1 assets
     for invalid_sym in ["SOL/USDT", "DOGE/USDT", "PEPE/USDT", "ADA/USDT"]:
-        with pytest.raises(ValueError, match="Sovereign Master Agent is locked to Tier-1 assets only"):
+        with pytest.raises(
+            ValueError, match="Sovereign Master Agent is locked to Tier-1 assets only"
+        ):
             await sovereign_master_agent.synthesize_asset(invalid_sym)
 
 

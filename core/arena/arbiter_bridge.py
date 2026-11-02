@@ -58,7 +58,10 @@ class ArenaArbiterBridge:
                 weight_multiplier=1.0,
             )
 
-        if account.status in (SpecialistSurvivalStatus.QUARANTINED, SpecialistSurvivalStatus.REJECTED):
+        if account.status in (
+            SpecialistSurvivalStatus.QUARANTINED,
+            SpecialistSurvivalStatus.REJECTED,
+        ):
             reason = (
                 f"Darwinian Arena Veto: Specialist for {symbol} is {account.status.value} "
                 f"(Drawdown: {account.max_drawdown_pct:.1f}%, Reason: {account.quarantine_reason or 'Risk limit breached'})."
@@ -91,4 +94,3 @@ class ArenaArbiterBridge:
             rejection_reason=None,
             weight_multiplier=1.0,
         )
-

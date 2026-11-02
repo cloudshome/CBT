@@ -60,7 +60,9 @@ def test_d01_defense_in_depth_prevents_aggregate_risk_oversubscription():
 
     # Trade 3: Direct caller attempts to open SOL with $30 stop risk ($190 + $30 = $220 > $200)
     # Defense-in-depth inside open_position MUST reject deterministically
-    with pytest.raises(ValueError, match=r"Cumulative portfolio stop risk.*exceeds aggregate ceiling"):
+    with pytest.raises(
+        ValueError, match=r"Cumulative portfolio stop risk.*exceeds aggregate ceiling"
+    ):
         portfolio_shadow.open_position(
             symbol="SOL/USDT",
             direction="LONG",
@@ -173,68 +175,75 @@ def test_d04_correlated_crypto_cluster_cap_protects_gold_budget(monkeypatch):
     monkeypatch.setattr(mind, "get_live_market_price", lambda sym: prices.get(sym, 100.0))
 
     # 1. Open BTC Long - $70 risk
-    v_btc = mind.evaluate_and_route(TradeProposal(
-        origin="AUTONOMOUS_TRADER",
-        symbol="BTC/USDT",
-        direction="LONG",
-        style="SWING",
-        planned_entry=80000.0,
-        stop_loss=76500.0,  # $3500 dist * 0.02 = $70 risk
-        take_profit=88000.0,
-        requested_size=0.02,
-        thesis="BTC Anchor",
-        confluence_score=85.0,
-    ))
+    v_btc = mind.evaluate_and_route(
+        TradeProposal(
+            origin="AUTONOMOUS_TRADER",
+            symbol="BTC/USDT",
+            direction="LONG",
+            style="SWING",
+            planned_entry=80000.0,
+            stop_loss=76500.0,  # $3500 dist * 0.02 = $70 risk
+            take_profit=88000.0,
+            requested_size=0.02,
+            thesis="BTC Anchor",
+            confluence_score=85.0,
+        )
+    )
     assert v_btc.is_approved is True
 
     # 2. Open ETH Long - $80 risk
     # Total crypto LONG risk is now $70 + $80 = $150 / $160 cluster cap
-    v_eth = mind.evaluate_and_route(TradeProposal(
-        origin="AUTONOMOUS_TRADER",
-        symbol="ETH/USDT",
-        direction="LONG",
-        style="SWING",
-        planned_entry=3000.0,
-        stop_loss=2600.0,  # $400 dist * 0.20 = $80 risk
-        take_profit=3500.0,
-        requested_size=0.20,
-        thesis="ETH Anchor",
-        confluence_score=85.0,
-    ))
+    v_eth = mind.evaluate_and_route(
+        TradeProposal(
+            origin="AUTONOMOUS_TRADER",
+            symbol="ETH/USDT",
+            direction="LONG",
+            style="SWING",
+            planned_entry=3000.0,
+            stop_loss=2600.0,  # $400 dist * 0.20 = $80 risk
+            take_profit=3500.0,
+            requested_size=0.20,
+            thesis="ETH Anchor",
+            confluence_score=85.0,
+        )
+    )
     assert v_eth.is_approved is True
 
     # 3. Incoming SOL Long with $20 risk ($150 + $20 = $170 > $160 crypto cluster cap)
     # MUST be rejected by Correlated Crypto Cluster Guard
-    v_sol = mind.evaluate_and_route(TradeProposal(
-        origin="AUTONOMOUS_TRADER",
-        symbol="SOL/USDT",
-        direction="LONG",
-        style="DAY",
-        planned_entry=150.0,
-        stop_loss=130.0,  # $20 dist * 1.0 = $20 risk
-        take_profit=170.0,
-        requested_size=1.0,
-        thesis="SOL Momentum",
-        confluence_score=82.0,
-    ))
+    v_sol = mind.evaluate_and_route(
+        TradeProposal(
+            origin="AUTONOMOUS_TRADER",
+            symbol="SOL/USDT",
+            direction="LONG",
+            style="DAY",
+            planned_entry=150.0,
+            stop_loss=130.0,  # $20 dist * 1.0 = $20 risk
+            take_profit=170.0,
+            requested_size=1.0,
+            thesis="SOL Momentum",
+            confluence_score=82.0,
+        )
+    )
     assert v_sol.is_approved is False
     assert "Cluster Correlation Rejection" in v_sol.rejection_reason
 
     # 4. Incoming GOLD (PAXG/USDT) Long with $30 risk:
     # Gold is UNCORRELATED with the crypto cluster. Total portfolio risk: $150 + $30 = $180 <= $200 aggregate cap.
     # GOLD MUST BE APPROVED!
-    v_gold = mind.evaluate_and_route(TradeProposal(
-        origin="AUTONOMOUS_TRADER",
-        symbol="PAXG/USDT",
-        direction="LONG",
-        style="TREND",
-        planned_entry=2700.0,
-        stop_loss=2640.0,  # $60 dist * 0.50 = $30 risk
-        take_profit=2850.0,
-        requested_size=0.50,
-        thesis="Gold Safe Haven Diversification",
-        confluence_score=85.0,
-    ))
+    v_gold = mind.evaluate_and_route(
+        TradeProposal(
+            origin="AUTONOMOUS_TRADER",
+            symbol="PAXG/USDT",
+            direction="LONG",
+            style="TREND",
+            planned_entry=2700.0,
+            stop_loss=2640.0,  # $60 dist * 0.50 = $30 risk
+            take_profit=2850.0,
+            requested_size=0.50,
+            thesis="Gold Safe Haven Diversification",
+            confluence_score=85.0,
+        )
+    )
     assert v_gold.is_approved is True
     assert v_gold.portfolio_action == PortfolioAction.OPEN.value
-

@@ -102,7 +102,9 @@ class SovereignMasterAgent:
     def __init__(self, account_equity_usd: float = 10_000.0) -> None:
         self.account_equity_usd = account_equity_usd
         self.agent_id = "SOVEREIGN_MASTER_AGENT_V1"
-        config_dir = Path(os.environ.get("DATA_DIR", str(Path(__file__).resolve().parent.parent.parent / "data")))
+        config_dir = Path(
+            os.environ.get("DATA_DIR", str(Path(__file__).resolve().parent.parent.parent / "data"))
+        )
         self.config_path = config_dir / "sovereign_agent_config.json"
         self.auto_pilot_enabled: bool = False
         self.scan_interval_sec: float = 20.0
@@ -174,7 +176,9 @@ class SovereignMasterAgent:
             "recent_activity": self.recent_activity_log[-20:],
         }
 
-    async def set_auto_pilot(self, enabled: bool, options: dict[str, Any] | None = None) -> dict[str, Any]:
+    async def set_auto_pilot(
+        self, enabled: bool, options: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         self.auto_pilot_enabled = bool(enabled)
         if options:
             if "scan_interval_sec" in options:
@@ -183,7 +187,9 @@ class SovereignMasterAgent:
                 self.min_confidence_pct = float(options["min_confidence_pct"])
         self._save_config()
 
-        status_msg = f"Autonomous Auto-Pilot {'ACTIVATED' if self.auto_pilot_enabled else 'DEACTIVATED'}."
+        status_msg = (
+            f"Autonomous Auto-Pilot {'ACTIVATED' if self.auto_pilot_enabled else 'DEACTIVATED'}."
+        )
         self._record_activity("SYSTEM", "CONFIG", status_msg)
 
         if self.auto_pilot_enabled:
@@ -234,7 +240,11 @@ class SovereignMasterAgent:
                                 decision.confidence_pct >= self.min_confidence_pct
                                 and decision.risk_reward_ratio >= self.min_risk_reward
                             ):
-                                open_pos = portfolio_shadow.get_open_positions() if portfolio_shadow else []
+                                open_pos = (
+                                    portfolio_shadow.get_open_positions()
+                                    if portfolio_shadow
+                                    else []
+                                )
                                 already_open = any(
                                     normalize_symbol(p.get("symbol", "")) == normalize_symbol(sym)
                                     for p in open_pos
@@ -267,7 +277,9 @@ class SovereignMasterAgent:
                                     f"Signal {decision.decision} filtered: Conf {decision.confidence_pct:.0f}% < {self.min_confidence_pct}% or RR < {self.min_risk_reward}R",
                                 )
                     except Exception as sym_err:
-                        logger.error(f"[SOVEREIGN_MASTER][AUTOPILOT] Error evaluating {sym}: {sym_err}")
+                        logger.error(
+                            f"[SOVEREIGN_MASTER][AUTOPILOT] Error evaluating {sym}: {sym_err}"
+                        )
 
                 await asyncio.sleep(self.scan_interval_sec)
             except asyncio.CancelledError:
@@ -340,7 +352,9 @@ class SovereignMasterAgent:
                 "CRITICAL WARNING: ETH has suffered severe chop bleed from taking early breakouts in low-volatility ranges. "
                 "MANDATORY REQUIREMENT: Require trend ADX >= 22.0 and relative volume >= 1.1x to clear any trade."
             )
-            risk_adjustment_factor = 0.65  # Conservative discount on ETH until out-of-sample edge turns positive
+            risk_adjustment_factor = (
+                0.65  # Conservative discount on ETH until out-of-sample edge turns positive
+            )
         elif "XAU" in norm_sym or "PAXG" in norm_sym:
             guidance = (
                 f"Historical Edge Validated: {total_trades} trades, {win_rate}% win rate, net PnL: ${net_pnl:+.2f}. "
@@ -532,7 +546,11 @@ class SovereignMasterAgent:
                 f"Market structure is in low-energy consolidation (ADX={adx_val:.1f}, rVol={rvol:.2f}x). "
                 f"Historical memory warns of high false-breakout risk on {norm_sym}. Capital safeguarded."
             )
-        elif sky_dec.risk_gate_passed and sky_dec.decision in (DecisionAction.LONG, DecisionAction.SHORT) and setup:
+        elif (
+            sky_dec.risk_gate_passed
+            and sky_dec.decision in (DecisionAction.LONG, DecisionAction.SHORT)
+            and setup
+        ):
             # Qualified Setup Detected
             direction_str = "BUY" if sky_dec.decision == DecisionAction.LONG else "SELL"
             action = direction_str
@@ -540,12 +558,22 @@ class SovereignMasterAgent:
             net_ev = sky_dec.net_ev_r
 
             entry_p = setup.entry_price if setup.entry_price > 0 else cur_p
-            sl = setup.invalidation_sl if setup.invalidation_sl > 0 else (entry_p * 0.98 if direction_str == "BUY" else entry_p * 1.02)
+            sl = (
+                setup.invalidation_sl
+                if setup.invalidation_sl > 0
+                else (entry_p * 0.98 if direction_str == "BUY" else entry_p * 1.02)
+            )
             risk_dist = abs(entry_p - sl)
             min_tp_dist = max(risk_dist * 2.0, entry_p * 0.02)
 
-            tp1 = setup.target_tp if setup.target_tp > 0 and abs(setup.target_tp - entry_p) >= min_tp_dist else (
-                round(entry_p + min_tp_dist, 2) if direction_str == "BUY" else round(entry_p - min_tp_dist, 2)
+            tp1 = (
+                setup.target_tp
+                if setup.target_tp > 0 and abs(setup.target_tp - entry_p) >= min_tp_dist
+                else (
+                    round(entry_p + min_tp_dist, 2)
+                    if direction_str == "BUY"
+                    else round(entry_p - min_tp_dist, 2)
+                )
             )
             tp2 = round(entry_p + 1.5 * (tp1 - entry_p), 2)
             tp3 = round(entry_p + 2.2 * (tp1 - entry_p), 2)
@@ -577,7 +605,9 @@ class SovereignMasterAgent:
         current_eq = self.account_equity_usd
         risk_budget_usd = current_eq * 0.015 * memory["risk_adjustment_factor"]  # 1.5% max risk cap
         stop_dist = max(abs(cur_p - sl), cur_p * 0.005)
-        suggested_units = max(0.001, round(risk_budget_usd / stop_dist, 4)) if stop_dist > 0 else 0.001
+        suggested_units = (
+            max(0.001, round(risk_budget_usd / stop_dist, 4)) if stop_dist > 0 else 0.001
+        )
 
         return SovereignDecision(
             agent_id=self.agent_id,
@@ -659,7 +689,10 @@ class SovereignMasterAgent:
                 "decision": decision.to_dict(),
             }
 
-        pos_id = verdict.executed_position_id or f"POS_{decision.symbol.replace('/', '_')}_{int(time.time() * 1000)}"
+        pos_id = (
+            verdict.executed_position_id
+            or f"POS_{decision.symbol.replace('/', '_')}_{int(time.time() * 1000)}"
+        )
 
         # Mirror to Binance Testnet (active with testnet fund)
         mirrored_ok = False
@@ -669,12 +702,16 @@ class SovereignMasterAgent:
             from core.auth.credential_vault import credential_vault
             from core.execution.live_canary_runner import CanaryRunRequest, live_canary_runner
 
-            cred = credential_vault.get_credential("BINANCE_FUTURES", "TESTNET") or credential_vault.get_credential("BINANCE", "TESTNET")
+            cred = credential_vault.get_credential(
+                "BINANCE_FUTURES", "TESTNET"
+            ) or credential_vault.get_credential("BINANCE", "TESTNET")
             if cred and cred.is_active:
                 req = CanaryRunRequest(
                     exchange="BINANCE",
                     symbol=decision.symbol.replace("/", ""),
-                    notional_usd=min(25.0, max(15.0, decision.suggested_units * decision.current_price)),
+                    notional_usd=min(
+                        25.0, max(15.0, decision.suggested_units * decision.current_price)
+                    ),
                     side="BUY" if direction_str == "LONG" else "SELL",
                     order_type="MARKET",
                     price=decision.current_price,
@@ -769,11 +806,15 @@ class SovereignMasterAgent:
         try:
             with db_manager.get_trading_conn() as conn:
                 cur = conn.cursor()
-                cur.execute("SELECT MIN(opened_at) FROM shadow_positions WHERE opened_at IS NOT NULL;")
+                cur.execute(
+                    "SELECT MIN(opened_at) FROM shadow_positions WHERE opened_at IS NOT NULL;"
+                )
                 first_ts_row = cur.fetchone()
                 if first_ts_row and first_ts_row[0]:
                     first_ts = first_ts_row[0]
-                    first_sec = float(first_ts) / 1000.0 if float(first_ts) > 1e11 else float(first_ts)
+                    first_sec = (
+                        float(first_ts) / 1000.0 if float(first_ts) > 1e11 else float(first_ts)
+                    )
                     days_elapsed = max(1, int((time.time() - first_sec) / 86400.0) + 1)
         except Exception as e:
             logger.debug(f"Could not compute burn-in days_elapsed: {e}")
@@ -781,10 +822,12 @@ class SovereignMasterAgent:
         gate_1_passed = days_elapsed >= 14
         gate_2_passed = profit_factor >= 1.50
         gate_3_passed = drawdown_pct <= 3.0
-        gate_4_passed = (profit_factor >= 1.25 and win_rate >= 50.0 and days_elapsed >= 7)
+        gate_4_passed = profit_factor >= 1.25 and win_rate >= 50.0 and days_elapsed >= 7
         gate_5_passed = True  # M18 certified execution paths
 
-        passed_gates_count = sum([gate_1_passed, gate_2_passed, gate_3_passed, gate_4_passed, gate_5_passed])
+        passed_gates_count = sum(
+            [gate_1_passed, gate_2_passed, gate_3_passed, gate_4_passed, gate_5_passed]
+        )
         overall_readiness_pct = round((passed_gates_count / 5.0) * 100.0, 1)
 
         display_days = min(14, days_elapsed)
@@ -892,4 +935,3 @@ class SovereignMasterAgent:
 
 
 sovereign_master_agent = SovereignMasterAgent()
-

@@ -830,6 +830,9 @@ class CredentialVault:
         encrypted_str = self.encrypt(raw_bytes)
         now_ms = int(time.time() * 1000)
 
+        # Clear any revoked or cached capability state on fresh storage
+        self._capability_cache.pop((exch, env), None)
+
         with db_manager.get_trading_conn() as conn:
             conn.execute(
                 """
@@ -941,6 +944,9 @@ class CredentialVault:
                 )
 
         # Environment variable fallback for testnet / development runners
+        cap = self._capability_cache.get((exch, env))
+        if cap and cap.verification_status == "REVOKED":
+            return None
         if env == "TESTNET":
             if exch == "BINANCE_FUTURES":
                 k = os.getenv("BINANCE_FUTURES_TESTNET_API_KEY")

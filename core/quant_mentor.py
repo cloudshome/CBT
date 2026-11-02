@@ -101,9 +101,9 @@ class QuantMentor:
         lower = text.lower()
 
         # Monthly / Month / 1M / মাসিক / মাস
-        if (
-            re.search(r"\b(monthly|month|মাসিক|মাস)\b", lower)
-            or (re.search(r"\b1m\b", lower) and not re.search(r"\b(1\s*min|1\s*minute|১\s*মিনিট)\b", lower))
+        if re.search(r"\b(monthly|month|মাসিক|মাস)\b", lower) or (
+            re.search(r"\b1m\b", lower)
+            and not re.search(r"\b(1\s*min|1\s*minute|১\s*মিনিট)\b", lower)
         ):
             return "1M"
 
@@ -187,6 +187,7 @@ class QuantMentor:
         confluence = telemetry.get("confluence_score", 78.5)
         try:
             from core.portfolio_shadow import portfolio_shadow
+
             open_positions = portfolio_shadow.get_open_positions()
         except Exception:
             open_positions = telemetry.get("open_paper_positions", [])
@@ -619,7 +620,11 @@ class QuantMentor:
         # --------------------------------------------------------------------------
         # INTENT 6: GREETING / CASUAL CHAT / DEFAULT
         # --------------------------------------------------------------------------
-        pos_summary = f"`{len(open_positions)} active trade(s)`" if open_positions else "`0 active (Capital 100% Preserved in Cash)`"
+        pos_summary = (
+            f"`{len(open_positions)} active trade(s)`"
+            if open_positions
+            else "`0 active (Capital 100% Preserved in Cash)`"
+        )
         pos_names = ""
         if open_positions:
             syms = [p.get("symbol", "") for p in open_positions if p.get("symbol")]

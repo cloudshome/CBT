@@ -101,18 +101,26 @@ class TemporalPriceActionForecaster:
         # 2. Dynamic Price-Action Feature Conditioning (Zero Lookahead)
         # Momentum directionality from short & medium returns
         if feat.return_1bar_pct > 0.15:
-            lift_pump *= (1.0 + min(0.35, feat.return_1bar_pct * 0.4))
-            lift_dump *= (1.0 - min(0.30, feat.return_1bar_pct * 0.3))
+            lift_pump *= 1.0 + min(0.35, feat.return_1bar_pct * 0.4)
+            lift_dump *= 1.0 - min(0.30, feat.return_1bar_pct * 0.3)
         elif feat.return_1bar_pct < -0.15:
-            lift_dump *= (1.0 + min(0.35, abs(feat.return_1bar_pct) * 0.4))
-            lift_pump *= (1.0 - min(0.30, abs(feat.return_1bar_pct) * 0.3))
+            lift_dump *= 1.0 + min(0.35, abs(feat.return_1bar_pct) * 0.4)
+            lift_pump *= 1.0 - min(0.30, abs(feat.return_1bar_pct) * 0.3)
 
         if feat.return_4bar_pct > 0.30:
-            mult = 1.25 if horizon in (ForecastHorizon.H_30M, ForecastHorizon.H_1H, ForecastHorizon.H_2H) else 1.10
+            mult = (
+                1.25
+                if horizon in (ForecastHorizon.H_30M, ForecastHorizon.H_1H, ForecastHorizon.H_2H)
+                else 1.10
+            )
             lift_pump *= mult
             lift_dump *= 0.85
         elif feat.return_4bar_pct < -0.30:
-            mult = 1.25 if horizon in (ForecastHorizon.H_30M, ForecastHorizon.H_1H, ForecastHorizon.H_2H) else 1.10
+            mult = (
+                1.25
+                if horizon in (ForecastHorizon.H_30M, ForecastHorizon.H_1H, ForecastHorizon.H_2H)
+                else 1.10
+            )
             lift_dump *= mult
             lift_pump *= 0.85
 
@@ -134,13 +142,25 @@ class TemporalPriceActionForecaster:
         # 3. Validated Mathematical Laws evaluation
         for law in self.laws:
             if law.status == PriceActionLawStatus.VALIDATED and law.target_horizon == horizon:
-                if "MOMENTUM" in law.law_id and feat.return_1bar_pct >= 0.40 and feat.relative_volume >= 1.5:
+                if (
+                    "MOMENTUM" in law.law_id
+                    and feat.return_1bar_pct >= 0.40
+                    and feat.relative_volume >= 1.5
+                ):
                     lift_pump = max(lift_pump, law.lift_test)
                     active_laws.append(law.law_id)
-                elif "EXHAUSTION" in law.law_id and feat.return_1bar_pct >= 0.60 and feat.upper_wick_ratio >= 0.40:
+                elif (
+                    "EXHAUSTION" in law.law_id
+                    and feat.return_1bar_pct >= 0.60
+                    and feat.upper_wick_ratio >= 0.40
+                ):
                     lift_dump = max(lift_dump, law.lift_test)
                     active_laws.append(law.law_id)
-                elif "SWEEP" in law.law_id and feat.lower_wick_ratio >= 0.50 and feat.distance_to_swing_low_pct <= 0.10:
+                elif (
+                    "SWEEP" in law.law_id
+                    and feat.lower_wick_ratio >= 0.50
+                    and feat.distance_to_swing_low_pct <= 0.10
+                ):
                     lift_pump = max(lift_pump, law.lift_test)
                     active_laws.append(law.law_id)
 
@@ -192,7 +212,9 @@ class TemporalPriceActionForecaster:
                 target_p = feat.reference_price * (1.0 + (movement_threshold_pct / 100.0))
                 invalidation_p = feat.reference_price * (1.0 - (movement_threshold_pct / 100.0))
                 fc_payload = ForecastPayload(
-                    direction=DecisionAction.LONG if final_pump > final_dump else DecisionAction.SHORT,
+                    direction=DecisionAction.LONG
+                    if final_pump > final_dump
+                    else DecisionAction.SHORT,
                     target_price=round(target_p, 2),
                     invalidation_price=round(invalidation_p, 2),
                     raw_confidence=max(final_pump, final_dump),
@@ -217,7 +239,9 @@ class TemporalPriceActionForecaster:
                 )
                 self.ledger.freeze_experience(rec)
             except Exception as e:
-                logger.warning("Cognitive ledger recording skipped for forecast %s: %s", forecast_id, e)
+                logger.warning(
+                    "Cognitive ledger recording skipped for forecast %s: %s", forecast_id, e
+                )
 
         return payload
 
@@ -278,8 +302,10 @@ class TemporalPriceActionForecaster:
         median_ret = sorted_ret[n // 2]
         net_profit = round(mean_ret - 0.14, 3)  # Deduct 14 bps base friction
 
-        status = PriceActionLawStatus.VALIDATED if (n >= 30 and net_profit > 0.05) else (
-            PriceActionLawStatus.INCONCLUSIVE if n < 30 else PriceActionLawStatus.REJECTED
+        status = (
+            PriceActionLawStatus.VALIDATED
+            if (n >= 30 and net_profit > 0.05)
+            else (PriceActionLawStatus.INCONCLUSIVE if n < 30 else PriceActionLawStatus.REJECTED)
         )
 
         verdict = (

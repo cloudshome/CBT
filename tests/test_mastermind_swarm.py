@@ -145,7 +145,10 @@ async def test_risk_governor_absolute_veto_on_circuit_breaker():
         reason="Daily drawdown 3.2% breached maximum 3.0% threshold. Total trading lockout active.",
     )
 
-    with patch("core.mastermind.mastermind_arbiter.risk_manager.evaluate_risk_gate", return_value=locked_gate):
+    with patch(
+        "core.mastermind.mastermind_arbiter.risk_manager.evaluate_risk_gate",
+        return_value=locked_gate,
+    ):
         decisions = await arbiter.evaluate_swarm(market_data)
         assert len(decisions) >= 2
         for d in decisions:
@@ -162,6 +165,7 @@ async def test_arbiter_enforces_1_point_5_percent_max_equity_risk_cap():
     Verifies that position sizing strictly adheres to the 1.5% maximum equity risk cap.
     """
     from core.portfolio_shadow import portfolio_shadow
+
     portfolio_shadow.reset_all_positions()
     arbiter = MastermindArbiterCouncil(account_equity_usd=20_000.0)
     candles = _generate_synthetic_candles(60000.0, 25)
@@ -430,7 +434,11 @@ async def test_arbiter_macro_divergence_penalizes_altcoin_long_when_btc_short():
         # SUI LONG was evaluated against BTC SHORT:
         # Confidence 0.60 haircut by 30% -> 0.42 (< 0.50 hurdle rate)
         assert sui_dec.is_approved is False
-        assert "below threshold" in sui_dec.rejection_reason or "Effective Confidence" in sui_dec.rejection_reason or "Asset Tier Firewall" in sui_dec.rejection_reason
+        assert (
+            "below threshold" in sui_dec.rejection_reason
+            or "Effective Confidence" in sui_dec.rejection_reason
+            or "Asset Tier Firewall" in sui_dec.rejection_reason
+        )
         assert sui_dec.confidence_score <= 0.45
 
 

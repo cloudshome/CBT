@@ -144,10 +144,16 @@ def test_breakeven_pullback_after_partial_exit_retains_profit():
 def test_dynamic_atr_volatility_computation():
     """Invariant: Volatility engine calculates positive dynamic ATR on live-like candles."""
     synthetic_candles = [
-        {"timestamp": 1000 + i * 900, "open": 100.0 + i, "high": 102.0 + i, "low": 99.0 + i, "close": 101.0 + i, "volume": 500}
+        {
+            "timestamp": 1000 + i * 900,
+            "open": 100.0 + i,
+            "high": 102.0 + i,
+            "low": 99.0 + i,
+            "close": 101.0 + i,
+            "volume": 500,
+        }
         for i in range(30)
     ]
     vol_state = volatility_engine.compute_volatility(synthetic_candles)
     assert vol_state.atr > 0.0
     assert vol_state.atr == pytest.approx(3.0, abs=0.5)
-

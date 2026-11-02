@@ -37,11 +37,16 @@ class EpistemicGrade(StrEnum):
     Epistemic taxonomy grade classifying the certainty of claims in CandidateProposals.
     Strictly separates verifiable facts from mathematical inferences, hypotheses, and forecasts.
     """
-    FACT = "FACT"                  # Direct, observable market data (e.g. current bid/ask, exact volume, candle close)
-    INFERENCE = "INFERENCE"        # Derived indicator calculation (e.g. RSI, ATR ratio, CVD divergence)
-    HYPOTHESIS = "HYPOTHESIS"      # Testable structural setup (e.g. order block retest, FVG retest, sweep continuation)
-    FORECAST = "FORECAST"          # Forward probabilistic projection (e.g. target price, net expected value)
-    UNVERIFIED = "UNVERIFIED"      # Missing timestamps or uncorroborated telemetry
+
+    FACT = (
+        "FACT"  # Direct, observable market data (e.g. current bid/ask, exact volume, candle close)
+    )
+    INFERENCE = "INFERENCE"  # Derived indicator calculation (e.g. RSI, ATR ratio, CVD divergence)
+    HYPOTHESIS = "HYPOTHESIS"  # Testable structural setup (e.g. order block retest, FVG retest, sweep continuation)
+    FORECAST = (
+        "FORECAST"  # Forward probabilistic projection (e.g. target price, net expected value)
+    )
+    UNVERIFIED = "UNVERIFIED"  # Missing timestamps or uncorroborated telemetry
 
 
 @dataclass
@@ -144,9 +149,13 @@ class BaseSpecialistAgent(ABC):
         # 2. Volume Divergence Check
         recent_vols = [float(b.get("volume", 0.0)) for b in candles_15m[-10:-1]]
         avg_vol = sum(recent_vols) / max(1, len(recent_vols))
-        if avg_vol > 0 and (vol / avg_vol) < 0.50 and candidate_direction in (DecisionAction.LONG, DecisionAction.SHORT):
+        if (
+            avg_vol > 0
+            and (vol / avg_vol) < 0.50
+            and candidate_direction in (DecisionAction.LONG, DecisionAction.SHORT)
+        ):
             disconfirming.append(
-                f"Severe volume dry-up ({vol/avg_vol:.2f}x avg); move lacks institutional expansion volume."
+                f"Severe volume dry-up ({vol / avg_vol:.2f}x avg); move lacks institutional expansion volume."
             )
 
         # 3. Order Book Depth Wall Check (if L2 available)
@@ -156,13 +165,17 @@ class BaseSpecialistAgent(ABC):
             if bids and asks:
                 bid_vol = sum(float(s) for _, s in bids[:5])
                 ask_vol = sum(float(s) for _, s in asks[:5])
-                if candidate_direction == DecisionAction.LONG and ask_vol > 2.5 * max(1e-6, bid_vol):
+                if candidate_direction == DecisionAction.LONG and ask_vol > 2.5 * max(
+                    1e-6, bid_vol
+                ):
                     disconfirming.append(
-                        f"Severe ask-side liquidity wall detected ({ask_vol/max(1e-6, bid_vol):.1f}x bid depth); strong overhead resistance."
+                        f"Severe ask-side liquidity wall detected ({ask_vol / max(1e-6, bid_vol):.1f}x bid depth); strong overhead resistance."
                     )
-                elif candidate_direction == DecisionAction.SHORT and bid_vol > 2.5 * max(1e-6, ask_vol):
+                elif candidate_direction == DecisionAction.SHORT and bid_vol > 2.5 * max(
+                    1e-6, ask_vol
+                ):
                     disconfirming.append(
-                        f"Severe bid-side liquidity cushion detected ({bid_vol/max(1e-6, ask_vol):.1f}x ask depth); strong underlying support."
+                        f"Severe bid-side liquidity cushion detected ({bid_vol / max(1e-6, ask_vol):.1f}x ask depth); strong underlying support."
                     )
 
         return disconfirming
@@ -196,7 +209,9 @@ class BaseSpecialistAgent(ABC):
         proposal.disconfirming_evidence.extend(disconfirming)
 
         # If 2 or more disconfirming signals (or severe rejection wick), force NO_TRADE
-        if len(disconfirming) >= 2 or any("rejection wick" in e or "absorption wick" in e for e in disconfirming):
+        if len(disconfirming) >= 2 or any(
+            "rejection wick" in e or "absorption wick" in e for e in disconfirming
+        ):
             logger.warning(
                 "Specialist %s [%s] adversarial review triggered veto on %s: %s",
                 self.specialist_id,

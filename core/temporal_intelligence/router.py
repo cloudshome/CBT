@@ -94,19 +94,33 @@ async def get_btc_multi_horizon_forecast() -> list[TemporalForecastPayload]:
     """Returns point-in-time forecasts for BTC across supported horizons (15m, 30m, 1h, 2h)."""
     # 1. Prefer fresh live real-time candles from data_streamer
     from core.data_streamer import data_streamer
+
     candles = data_streamer.get_candles("BTC/USDT", "15m", limit=100)
     if not candles or len(candles) < 20:
         candles = get_historical_candles()
 
     if len(candles) < 20:
-        raise HTTPException(status_code=503, detail="Historical BTC dataset unavailable or insufficient")
+        raise HTTPException(
+            status_code=503, detail="Historical BTC dataset unavailable or insufficient"
+        )
 
     fc_engine = get_temporal_forecaster()
     forecasts: list[TemporalForecastPayload] = []
 
-    for horiz in [ForecastHorizon.H_15M, ForecastHorizon.H_30M, ForecastHorizon.H_1H, ForecastHorizon.H_2H]:
-        thresh = 0.30 if horiz == ForecastHorizon.H_15M else (0.50 if horiz == ForecastHorizon.H_30M else 0.70)
-        fc = fc_engine.forecast(candles, symbol="BTC/USDT", horizon=horiz, movement_threshold_pct=thresh)
+    for horiz in [
+        ForecastHorizon.H_15M,
+        ForecastHorizon.H_30M,
+        ForecastHorizon.H_1H,
+        ForecastHorizon.H_2H,
+    ]:
+        thresh = (
+            0.30
+            if horiz == ForecastHorizon.H_15M
+            else (0.50 if horiz == ForecastHorizon.H_30M else 0.70)
+        )
+        fc = fc_engine.forecast(
+            candles, symbol="BTC/USDT", horizon=horiz, movement_threshold_pct=thresh
+        )
         if fc:
             forecasts.append(fc)
 

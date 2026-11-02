@@ -135,7 +135,9 @@ def test_central_mind_governance_report(clean_central_mind):
     assert "max_positions" in report
 
 
-def test_central_mind_tier1_asset_firewall_blocks_autonomous_altcoins(clean_central_mind, monkeypatch):
+def test_central_mind_tier1_asset_firewall_blocks_autonomous_altcoins(
+    clean_central_mind, monkeypatch
+):
     mind = clean_central_mind
     monkeypatch.setattr(mind, "get_live_market_price", lambda sym: 1.50)
 
@@ -170,4 +172,3 @@ def test_central_mind_tier1_asset_firewall_blocks_autonomous_altcoins(clean_cent
     )
     v_manual = mind.evaluate_and_route(prop_manual_alt)
     assert v_manual.is_approved is True
-

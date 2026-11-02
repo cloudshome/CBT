@@ -20,10 +20,26 @@ def _reset_cooldown_governor():
     old_loss = cooldown_governor.loss_global_cooldown_sec
     cooldown_governor.asset_cooldown_sec = 0.0
     cooldown_governor.loss_global_cooldown_sec = 0.0
+    try:
+        from core.portfolio_shadow import portfolio_shadow
+
+        portfolio_shadow.reset_all_positions()
+    except Exception:
+        pass
     yield
     cooldown_governor.asset_cooldown_sec = old_asset
     cooldown_governor.loss_global_cooldown_sec = old_loss
     cooldown_governor.reset()
+    try:
+        from core.portfolio_shadow import portfolio_shadow
+
+        portfolio_shadow.reset_all_positions()
+    except Exception:
+        pass
+    # Defensively isolate test environment variables to prevent inter-suite leakage
+    os.environ.pop("MAX_AGGREGATE_RISK_PCT", None)
+    os.environ.pop("ENFORCE_AGGREGATE_RISK", None)
+
 
 # 1. Create isolated temporary directory for test databases
 _TEST_TEMP_DIR = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
@@ -62,57 +78,164 @@ def _init_test_subsystem_schemas() -> None:
         db_manager.experiment_db_path = Path(os.environ["EXPERIMENT_DB_PATH"])
         db_manager.init_all_schemas()
     except Exception as exc:
-        logger.error(f"[TEST ISOLATION FATAL] Core database schema init failed: {exc}", exc_info=True)
+        logger.error(
+            f"[TEST ISOLATION FATAL] Core database schema init failed: {exc}", exc_info=True
+        )
         raise
 
     subsystems = [
         (
             "execution_idempotency_and_kill_switch",
             lambda: (
-                __import__("core.execution.idempotency", fromlist=["LiveOrderIdempotencyStore"]).LiveOrderIdempotencyStore()._ensure_schema(),
-                __import__("core.execution.kill_switch", fromlist=["live_kill_switch"]).live_kill_switch._ensure_schema(),
+                __import__("core.execution.idempotency", fromlist=["LiveOrderIdempotencyStore"])
+                .LiveOrderIdempotencyStore()
+                ._ensure_schema(),
+                __import__(
+                    "core.execution.kill_switch", fromlist=["live_kill_switch"]
+                ).live_kill_switch._ensure_schema(),
             ),
         ),
         (
             "intelligence_store",
-            lambda: __import__("core.intelligence.schema", fromlist=["IntelligenceStore"]).IntelligenceStore().init_schema(),
+            lambda: (
+                __import__("core.intelligence.schema", fromlist=["IntelligenceStore"])
+                .IntelligenceStore()
+                .init_schema()
+            ),
         ),
         (
             "security_and_wallet_store",
             lambda: (
-                __import__("core.auth.security_store", fromlist=["security_store"]).security_store._ensure_schema(),
-                __import__("core.web3.wallet_store", fromlist=["web3_wallet_store"]).web3_wallet_store._init_db(),
+                __import__(
+                    "core.auth.security_store", fromlist=["security_store"]
+                ).security_store._ensure_schema(),
+                __import__(
+                    "core.web3.wallet_store", fromlist=["web3_wallet_store"]
+                ).web3_wallet_store._init_db(),
+                __import__(
+                    "core.auth.credential_vault", fromlist=["credential_vault"]
+                ).credential_vault._ensure_schema(),
             ),
         ),
         (
             "research_storage_and_manifest",
             lambda: (
-                __import__("core.autonomous_research.storage.research_storage", fromlist=["ResearchStorage"]).ResearchStorage().init_schemas(),
-                __import__("core.autonomous_research.storage.storage_manifest", fromlist=["StorageManifest"]).StorageManifest().init_schemas(),
+                __import__(
+                    "core.autonomous_research.storage.research_storage",
+                    fromlist=["ResearchStorage"],
+                )
+                .ResearchStorage()
+                .init_schemas(),
+                __import__(
+                    "core.autonomous_research.storage.storage_manifest",
+                    fromlist=["StorageManifest"],
+                )
+                .StorageManifest()
+                .init_schemas(),
             ),
         ),
         (
             "telegram_jobs_and_callbacks",
             lambda: (
-                __import__("core.telegram.jobs", fromlist=["TelegramJobManager"]).TelegramJobManager()._ensure_table_exists(),
-                __import__("core.telegram.callbacks", fromlist=["callback_router"]).callback_router._ensure_table_exists(),
-                __import__("core.telegram.idempotency", fromlist=["idempotency_manager"]).idempotency_manager._ensure_table_exists(),
+                __import__("core.telegram.jobs", fromlist=["TelegramJobManager"])
+                .TelegramJobManager()
+                ._ensure_table_exists(),
+                __import__(
+                    "core.telegram.callbacks", fromlist=["callback_router"]
+                ).callback_router._ensure_table_exists(),
+                __import__(
+                    "core.telegram.idempotency", fromlist=["idempotency_manager"]
+                ).idempotency_manager._ensure_table_exists(),
             ),
         ),
         (
             "youtube_discovery",
-            lambda: __import__("core.youtube.discovery", fromlist=["youtube_discovery"]).youtube_discovery._init_crawl_memory(),
+            lambda: __import__(
+                "core.youtube.discovery", fromlist=["youtube_discovery"]
+            ).youtube_discovery._init_crawl_memory(),
         ),
         (
             "telegram_rbac",
-            lambda: __import__("core.telegram.rbac", fromlist=["rbac_registry"]).rbac_registry.reset(),
+            lambda: __import__(
+                "core.telegram.rbac", fromlist=["rbac_registry"]
+            ).rbac_registry.reset(),
         ),
         (
             "macro_event_reporter",
             lambda: (
-                __import__("core.macro_event_reporter", fromlist=["macro_event_reporter"]).macro_event_reporter._ensure_table_exists(),
-                __import__("core.macro_event_reporter", fromlist=["macro_event_reporter"]).macro_event_reporter._seed_default_macro_releases(),
+                __import__(
+                    "core.macro_event_reporter", fromlist=["macro_event_reporter"]
+                ).macro_event_reporter._ensure_table_exists(),
+                __import__(
+                    "core.macro_event_reporter", fromlist=["macro_event_reporter"]
+                ).macro_event_reporter._seed_default_macro_releases(),
             ),
+        ),
+        (
+            "causal_hypotheses_ledger",
+            lambda: __import__(
+                "core.intelligence.hypothesis_schema", fromlist=["global_hypothesis_ledger"]
+            ).global_hypothesis_ledger._init_db(),
+        ),
+        (
+            "experiment_plans_ledger",
+            lambda: __import__(
+                "core.intelligence.plan_store", fromlist=["global_plan_ledger"]
+            ).global_plan_ledger._init_db(),
+        ),
+        (
+            "strategy_lineage",
+            lambda: __import__(
+                "core.strategy_lineage", fromlist=["strategy_lineage_graph"]
+            ).strategy_lineage_graph._init_db_schema(),
+        ),
+        (
+            "provenance_engine",
+            lambda: __import__(
+                "core.provenance_engine", fromlist=["provenance_engine"]
+            ).provenance_engine._init_tables(),
+        ),
+        (
+            "arena_ledger",
+            lambda: (
+                __import__("core.arena.ledger", fromlist=["ArenaLedger"]).ArenaLedger()._init_db()
+            ),
+        ),
+        (
+            "macro_cognitive_engine",
+            lambda: (
+                __import__("core.macro_cognitive_engine", fromlist=["MacroCognitiveEngine"])
+                .MacroCognitiveEngine()
+                ._init_db()
+            ),
+        ),
+        (
+            "empirical_accumulator",
+            lambda: (
+                __import__("core.empirical_accumulator", fromlist=["EmpiricalAccumulator"])
+                .EmpiricalAccumulator()
+                ._init_db()
+            ),
+        ),
+        (
+            "arbitrage_shadow_ledger",
+            lambda: (
+                __import__("core.arbitrage.shadow_ledger", fromlist=["ShadowLedgerManager"])
+                .ShadowLedgerManager()
+                ._init_db()
+            ),
+        ),
+        (
+            "knowledge_graph_and_hypothesis_queue",
+            lambda: __import__(
+                "core.knowledge_graph_engine", fromlist=["knowledge_graph_engine"]
+            ).knowledge_graph_engine._init_graph_tables(),
+        ),
+        (
+            "audit_bus",
+            lambda: __import__(
+                "core.audit_bus", fromlist=["audit_bus"]
+            ).audit_bus._ensure_table_exists(),
         ),
     ]
 

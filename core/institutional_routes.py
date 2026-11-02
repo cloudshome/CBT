@@ -204,7 +204,9 @@ async def run_monte_carlo_stress_test(
             # Annualize based on 15m intervals (35,040 periods/year) or 1h (8,760) or 1d (365)
             tf_clean = timeframe.lower()
             periods_per_year = (
-                35040 if "15" in tf_clean else (8760 if "1h" in tf_clean else (365 if "1d" in tf_clean else 35040))
+                35040
+                if "15" in tf_clean
+                else (8760 if "1h" in tf_clean else (365 if "1d" in tf_clean else 35040))
             )
             mean_ret = float(np.mean(arr))
             std_ret = float(np.std(arr))

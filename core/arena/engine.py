@@ -116,7 +116,9 @@ class DarwinianArenaEngine:
             if ratio > 10.0 or ratio < 0.10:
                 logger.warning(
                     "Price tick anomaly rejected for %s: incoming price %.4f deviates >10x from baseline %.4f",
-                    symbol, current_price, account.benchmark_current_price
+                    symbol,
+                    current_price,
+                    account.benchmark_current_price,
                 )
                 return account
 
@@ -149,7 +151,10 @@ class DarwinianArenaEngine:
         # 3. Update Equity & Drawdown (Enforcing Zero-Floor Sandbox Bankruptcy Clamp)
         account.unrealized_pnl_usd = round(unrealized, 4)
         account.current_equity_usd = max(0.0, round(account.current_cash_usd + unrealized, 4))
-        if account.current_equity_usd <= 0.0 and account.status != SpecialistSurvivalStatus.QUARANTINED:
+        if (
+            account.current_equity_usd <= 0.0
+            and account.status != SpecialistSurvivalStatus.QUARANTINED
+        ):
             account.status = SpecialistSurvivalStatus.QUARANTINED
             account.quarantine_reason = "Account equity fully depleted (Bankruptcy liquidation)"
 
@@ -157,7 +162,9 @@ class DarwinianArenaEngine:
             account.peak_equity_usd = account.current_equity_usd
 
         if account.peak_equity_usd > 0:
-            dd = ((account.peak_equity_usd - account.current_equity_usd) / account.peak_equity_usd) * 100.0
+            dd = (
+                (account.peak_equity_usd - account.current_equity_usd) / account.peak_equity_usd
+            ) * 100.0
             account.max_drawdown_pct = max(account.max_drawdown_pct, round(dd, 2))
 
         # 4. Compute Benchmark Metrics
@@ -210,8 +217,13 @@ class DarwinianArenaEngine:
             return None
 
         # Check survival eligibility
-        if account.status in (SpecialistSurvivalStatus.QUARANTINED, SpecialistSurvivalStatus.REJECTED):
-            logger.warning("Specialist %s is %s; trade blocked", specialist_id, account.status.value)
+        if account.status in (
+            SpecialistSurvivalStatus.QUARANTINED,
+            SpecialistSurvivalStatus.REJECTED,
+        ):
+            logger.warning(
+                "Specialist %s is %s; trade blocked", specialist_id, account.status.value
+            )
             return None
 
         if account.open_position is not None:
@@ -233,7 +245,9 @@ class DarwinianArenaEngine:
         account.fees_paid_usd += fee
 
         effective_entry_price = (
-            entry_price * (1.0 + SLIPPAGE_RATE) if direction == "LONG" else entry_price * (1.0 - SLIPPAGE_RATE)
+            entry_price * (1.0 + SLIPPAGE_RATE)
+            if direction == "LONG"
+            else entry_price * (1.0 - SLIPPAGE_RATE)
         )
         size_units = notional_usd / effective_entry_price
 
@@ -271,7 +285,9 @@ class DarwinianArenaEngine:
 
         # Apply simulated exit friction
         effective_exit = (
-            exit_price * (1.0 - SLIPPAGE_RATE) if pos.direction == "LONG" else exit_price * (1.0 + SLIPPAGE_RATE)
+            exit_price * (1.0 - SLIPPAGE_RATE)
+            if pos.direction == "LONG"
+            else exit_price * (1.0 + SLIPPAGE_RATE)
         )
         exit_notional = pos.size_units * effective_exit
         fee = exit_notional * TAKER_FEE_RATE
@@ -325,7 +341,9 @@ class DarwinianArenaEngine:
             account.peak_equity_usd = account.current_equity_usd
 
         if account.peak_equity_usd > 0:
-            dd = ((account.peak_equity_usd - account.current_equity_usd) / account.peak_equity_usd) * 100.0
+            dd = (
+                (account.peak_equity_usd - account.current_equity_usd) / account.peak_equity_usd
+            ) * 100.0
             account.max_drawdown_pct = max(account.max_drawdown_pct, round(dd, 2))
 
         # Re-evaluate survival state after closed trade
@@ -370,7 +388,10 @@ class DarwinianArenaEngine:
         # Cannot open trade if already in position or quarantined/rejected
         if account.open_position is not None:
             return None
-        if account.status in (SpecialistSurvivalStatus.QUARANTINED, SpecialistSurvivalStatus.REJECTED):
+        if account.status in (
+            SpecialistSurvivalStatus.QUARANTINED,
+            SpecialistSurvivalStatus.REJECTED,
+        ):
             return None
         if not candles or len(candles) < 15:
             return None
@@ -489,7 +510,9 @@ class DarwinianArenaEngine:
         accounts = self.ledger.get_all_accounts()
         total_equity = sum(a.current_equity_usd for a in accounts)
         active_count = sum(1 for a in accounts if a.status != SpecialistSurvivalStatus.QUARANTINED)
-        quarantined_count = sum(1 for a in accounts if a.status == SpecialistSurvivalStatus.QUARANTINED)
+        quarantined_count = sum(
+            1 for a in accounts if a.status == SpecialistSurvivalStatus.QUARANTINED
+        )
 
         return ArenaLeaderboardSnapshot(
             timestamp_ms=int(time.time() * 1000),
@@ -499,4 +522,3 @@ class DarwinianArenaEngine:
             quarantined_specialists_count=quarantined_count,
             specialists=accounts,
         )
-

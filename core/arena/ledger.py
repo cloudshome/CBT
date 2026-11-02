@@ -264,7 +264,9 @@ class ArenaLedger:
             )
             conn.commit()
 
-    def get_trades_for_specialist(self, specialist_id: str, limit: int = 50) -> list[ArenaTradeRecord]:
+    def get_trades_for_specialist(
+        self, specialist_id: str, limit: int = 50
+    ) -> list[ArenaTradeRecord]:
         """Fetches closed trades for a specialist."""
         with self._get_connection() as conn:
             rows = conn.execute(
@@ -329,4 +331,3 @@ class ArenaLedger:
             last_updated_ms=row["last_updated_ms"],
             open_position=pos,
         )
-

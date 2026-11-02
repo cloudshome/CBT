@@ -23,4 +23,3 @@ __all__ = [
     "opportunity_hunter",
     "screener_router",
 ]
-

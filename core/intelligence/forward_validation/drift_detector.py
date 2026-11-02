@@ -163,6 +163,7 @@ class MultiDimensionalDriftDetector:
         except Exception as e:
             logger.warning("Failed to dispatch drift alert to Telegram: %s", e)
             return False
+
     def evaluate_drift(
         self,
         scorecard: StrategyForwardScorecard,
@@ -277,7 +278,10 @@ class MultiDimensionalDriftDetector:
             )
 
         # Automated high-priority Telegram alert dispatch on SEVERE or DEGRADED drift
-        if self.auto_dispatch_telegram and overall_status in (DriftStatus.SEVERE, DriftStatus.DEGRADED):
+        if self.auto_dispatch_telegram and overall_status in (
+            DriftStatus.SEVERE,
+            DriftStatus.DEGRADED,
+        ):
             self.dispatch_drift_alert(report)
 
         return report

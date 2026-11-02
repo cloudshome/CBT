@@ -199,7 +199,11 @@ class SandboxLab:
                     except Exception as sig_err:
                         logger.debug(f"Custom strategy fn error at bar {i}: {sig_err}")
 
-                if custom_sig is not None and "stop_loss" in custom_sig and "take_profit" in custom_sig:
+                if (
+                    custom_sig is not None
+                    and "stop_loss" in custom_sig
+                    and "take_profit" in custom_sig
+                ):
                     direction = custom_sig.get("direction", "LONG").upper()
                     is_l = direction == "LONG"
                     entry = custom_sig.get("entry", c["close"]) * (

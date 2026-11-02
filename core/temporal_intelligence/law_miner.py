@@ -30,9 +30,9 @@ from core.temporal_intelligence.models import (
 logger = logging.getLogger("sky.temporal.law_miner")
 
 # 3-Tier Round-Trip Friction (fee + slippage across entry and exit)
-FRICTION_BASE_PCT = 0.14          # 14 bps
+FRICTION_BASE_PCT = 0.14  # 14 bps
 FRICTION_CONSERVATIVE_PCT = 0.24  # 24 bps
-FRICTION_STRESS_PCT = 0.40        # 40 bps
+FRICTION_STRESS_PCT = 0.40  # 40 bps
 
 
 class MathematicalLawMiner:
@@ -138,22 +138,35 @@ class MathematicalLawMiner:
                 and item["net_expectancy_r_base"] >= 0.10
             )
 
-            status = PriceActionLawStatus.VALIDATED if is_valid else (
-                PriceActionLawStatus.INCONCLUSIVE if item["effective_sample_size_train"] < 30.0
-                else PriceActionLawStatus.REJECTED
+            status = (
+                PriceActionLawStatus.VALIDATED
+                if is_valid
+                else (
+                    PriceActionLawStatus.INCONCLUSIVE
+                    if item["effective_sample_size_train"] < 30.0
+                    else PriceActionLawStatus.REJECTED
+                )
             )
 
             rejection_reason = None
             if not is_valid:
                 reasons = []
                 if item["effective_sample_size_train"] < 30.0:
-                    reasons.append(f"Insufficient Neff ({item['effective_sample_size_train']:.1f} < 30)")
+                    reasons.append(
+                        f"Insufficient Neff ({item['effective_sample_size_train']:.1f} < 30)"
+                    )
                 if item["adjusted_p_value"] >= 0.05:
-                    reasons.append(f"FDR adj p-value not significant ({item['adjusted_p_value']:.4f} >= 0.05)")
+                    reasons.append(
+                        f"FDR adj p-value not significant ({item['adjusted_p_value']:.4f} >= 0.05)"
+                    )
                 if item["brier_skill_score_test"] <= 0.0:
-                    reasons.append(f"Failed out-of-sample BSS ({item['brier_skill_score_test']:.3f} <= 0)")
+                    reasons.append(
+                        f"Failed out-of-sample BSS ({item['brier_skill_score_test']:.3f} <= 0)"
+                    )
                 if item["net_expectancy_r_base"] < 0.10:
-                    reasons.append(f"Net expectancy below 0.10R ({item['net_expectancy_r_base']:.2f}R)")
+                    reasons.append(
+                        f"Net expectancy below 0.10R ({item['net_expectancy_r_base']:.2f}R)"
+                    )
                 rejection_reason = "; ".join(reasons)
 
             law = PriceActionLaw(
@@ -199,8 +212,8 @@ class MathematicalLawMiner:
         # 1. In-Sample Train Evaluation
         train_matches = []
         train_all_targets = []
-        is_absolute_target = (law_id == "LAW_04_VOLATILITY_EXPANSION")
-        is_dump_target = (threshold < 0)
+        is_absolute_target = law_id == "LAW_04_VOLATILITY_EXPANSION"
+        is_dump_target = threshold < 0
 
         for i in range(20, self.train_split_idx - horizon_bars):
             feat = self.features[i]
@@ -224,7 +237,9 @@ class MathematicalLawMiner:
                 train_matches.append((hit, ret_fwd))
 
         n_train = len(train_matches)
-        base_rate_train = (sum(train_all_targets) / len(train_all_targets) * 100.0) if train_all_targets else 50.0
+        base_rate_train = (
+            (sum(train_all_targets) / len(train_all_targets) * 100.0) if train_all_targets else 50.0
+        )
         success_train = sum(m[0] for m in train_matches)
         cond_rate_train = (success_train / n_train * 100.0) if n_train > 0 else 0.0
         lift_train = round(cond_rate_train / base_rate_train, 2) if base_rate_train > 0 else 1.0
@@ -273,7 +288,9 @@ class MathematicalLawMiner:
                 test_matches.append((hit, ret_fwd))
 
         n_test = len(test_matches)
-        base_rate_test = (sum(test_all_targets) / len(test_all_targets) * 100.0) if test_all_targets else 50.0
+        base_rate_test = (
+            (sum(test_all_targets) / len(test_all_targets) * 100.0) if test_all_targets else 50.0
+        )
         success_test = sum(m[0] for m in test_matches)
         cond_rate_test = (success_test / n_test * 100.0) if n_test > 0 else 0.0
         lift_test = round(cond_rate_test / base_rate_test, 2) if base_rate_test > 0 else 1.0
@@ -282,16 +299,8 @@ class MathematicalLawMiner:
         p_model = cond_rate_train / 100.0 if n_train > 0 else p0
         p_base = base_rate_test / 100.0
 
-        bs_model = (
-            sum((p_model - m[0]) ** 2 for m in test_matches) / n_test
-            if n_test > 0
-            else 0.25
-        )
-        bs_base = (
-            sum((p_base - m[0]) ** 2 for m in test_matches) / n_test
-            if n_test > 0
-            else 0.25
-        )
+        bs_model = sum((p_model - m[0]) ** 2 for m in test_matches) / n_test if n_test > 0 else 0.25
+        bs_base = sum((p_base - m[0]) ** 2 for m in test_matches) / n_test if n_test > 0 else 0.25
         bss_test = round(1.0 - (bs_model / bs_base), 3) if bs_base > 0 else 0.0
 
         # Economic Expectancy in R after 3-tier friction:
@@ -301,8 +310,12 @@ class MathematicalLawMiner:
         mean_ret = sum(returns) / len(returns) if returns else 0.0
 
         exp_base = round((mean_ret - FRICTION_BASE_PCT) / risk_unit, 2) if risk_unit > 0 else 0.0
-        exp_cons = round((mean_ret - FRICTION_CONSERVATIVE_PCT) / risk_unit, 2) if risk_unit > 0 else 0.0
-        exp_stress = round((mean_ret - FRICTION_STRESS_PCT) / risk_unit, 2) if risk_unit > 0 else 0.0
+        exp_cons = (
+            round((mean_ret - FRICTION_CONSERVATIVE_PCT) / risk_unit, 2) if risk_unit > 0 else 0.0
+        )
+        exp_stress = (
+            round((mean_ret - FRICTION_STRESS_PCT) / risk_unit, 2) if risk_unit > 0 else 0.0
+        )
 
         return {
             "law_id": law_id,

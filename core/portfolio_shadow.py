@@ -24,20 +24,30 @@ logger = logging.getLogger("ai_quant_sentinel.portfolio_shadow")
 
 # Authorized Tier-1 Institutional Assets for Main Desk & Shadow Portfolio
 ALLOWED_TIER1_ASSETS: set[str] = {
-    "BTC/USDT", "BTCUSDT",
-    "ETH/USDT", "ETHUSDT",
-    "SOL/USDT", "SOLUSDT",
-    "BNB/USDT", "BNBUSDT",
-    "XAU/USD", "XAUUSD",
-    "PAXG/USDT", "PAXGUSDT",
+    "BTC/USDT",
+    "BTCUSDT",
+    "ETH/USDT",
+    "ETHUSDT",
+    "SOL/USDT",
+    "SOLUSDT",
+    "BNB/USDT",
+    "BNBUSDT",
+    "XAU/USD",
+    "XAUUSD",
+    "PAXG/USDT",
+    "PAXGUSDT",
 }
 
 # The Primary Core Anchors of CBT (BTC, ETH, GOLD)
 CORE_ANCHOR_SYMBOLS: set[str] = {
-    "BTC/USDT", "BTCUSDT",
-    "ETH/USDT", "ETHUSDT",
-    "XAU/USD", "XAUUSD",
-    "PAXG/USDT", "PAXGUSDT",
+    "BTC/USDT",
+    "BTCUSDT",
+    "ETH/USDT",
+    "ETHUSDT",
+    "XAU/USD",
+    "XAUUSD",
+    "PAXG/USDT",
+    "PAXGUSDT",
     "GOLD",
 }
 
@@ -87,7 +97,11 @@ class PortfolioShadowManager:
                 if "exit_reason" not in cols:
                     conn.execute("ALTER TABLE shadow_positions ADD COLUMN exit_reason TEXT;")
                 if "book_id" not in cols:
-                    conn.execute("ALTER TABLE shadow_positions ADD COLUMN book_id TEXT DEFAULT 'MAIN_SOVEREIGN';")
+                    conn.execute(
+                        "ALTER TABLE shadow_positions ADD COLUMN book_id TEXT DEFAULT 'MAIN_SOVEREIGN';"
+                    )
+                if "initial_stop_loss" not in cols:
+                    conn.execute("ALTER TABLE shadow_positions ADD COLUMN initial_stop_loss REAL;")
                 conn.commit()
         except Exception as e:
             logger.debug(f"Shadow positions column verification check: {e}")
@@ -111,9 +125,9 @@ class PortfolioShadowManager:
         confluence_score: float | None = None,
     ) -> str:
         # Multi-Book Institutional Asset Firewall
-        is_test_env = "test" in os.environ.get(
-            "TRADING_LOGS_DB_PATH", ""
-        ).lower() or bool(os.getenv("PYTEST_CURRENT_TEST"))
+        is_test_env = "test" in os.environ.get("TRADING_LOGS_DB_PATH", "").lower() or bool(
+            os.getenv("PYTEST_CURRENT_TEST")
+        )
         clean_sym = symbol.replace("/", "").replace("_", "").upper()
         allowed_tier1 = {s.replace("/", "").replace("_", "").upper() for s in ALLOWED_TIER1_ASSETS}
 
@@ -248,7 +262,7 @@ class PortfolioShadowManager:
                     (book_id, book_id),
                 )
                 open_count = cursor.fetchone()[0]
-                if book_id == "MAIN_SOVEREIGN" and not is_test_env:
+                if book_id == "MAIN_SOVEREIGN":
                     base_cap = int(os.getenv("MAX_CONCURRENT_POSITIONS", "6"))
                     elite_cap = int(os.getenv("MAX_ELITE_POSITIONS", str(base_cap + 2)))
                     # Opportunity Reserve Protocol: Reserve headroom for elite / high-conviction opportunities
@@ -256,7 +270,13 @@ class PortfolioShadowManager:
                         entry_reason
                         and any(
                             kw in entry_reason.upper()
-                            for kw in ["CONFLUENCE: 9", "CONFLUENCE: 8", "ELITE", "A+", "HIGH CONVICTION"]
+                            for kw in [
+                                "CONFLUENCE: 9",
+                                "CONFLUENCE: 8",
+                                "ELITE",
+                                "A+",
+                                "HIGH CONVICTION",
+                            ]
                         )
                     )
                     default_eff = elite_cap if is_elite else base_cap
@@ -285,6 +305,7 @@ class PortfolioShadowManager:
 
                 # Nervous System Cooldown Governor Guard
                 from core.cooldown_governor import cooldown_governor
+
                 can_enter, cooldown_reason = cooldown_governor.evaluate_entry_clearance(symbol)
                 if not can_enter:
                     conn.rollback()
@@ -310,7 +331,9 @@ class PortfolioShadowManager:
                             f"Risk Gate Rejection: cumulative {symbol} risk ${(existing_sym_risk + trade_risk):.2f} exceeds allowable cap ${max_risk_usd:.2f}."
                         )
 
-                if book_id == "MAIN_SOVEREIGN" and not is_test_env:
+                if book_id == "MAIN_SOVEREIGN" and (
+                    not is_test_env or os.getenv("MAX_AGGREGATE_RISK_PCT") is not None
+                ):
                     trade_stop_risk = float(size) * abs(float(entry_price) - float(stop_loss))
                     raw_max_agg = float(os.getenv("MAX_AGGREGATE_RISK_PCT", "2.0"))
                     max_agg_pct = raw_max_agg * 100.0 if raw_max_agg <= 0.20 else raw_max_agg
@@ -353,9 +376,9 @@ class PortfolioShadowManager:
                     position_id, opened_at, closed_at, symbol, direction, size,
                     entry_price, current_price, stop_loss, take_profit,
                     unrealized_pnl, realized_pnl, status, trailing_stop, breakeven_triggered,
-                    entry_reason, exit_reason, book_id
+                    entry_reason, exit_reason, book_id, initial_stop_loss
                 )
-                VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, 0.0, 0.0, 'OPEN', NULL, 0, ?, NULL, ?);
+                VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, 0.0, 0.0, 'OPEN', NULL, 0, ?, NULL, ?, ?);
                 """,
                 (
                     pos_id,
@@ -369,6 +392,7 @@ class PortfolioShadowManager:
                     float(take_profit),
                     reason_text,
                     book_id,
+                    float(stop_loss),
                 ),
             )
             conn.commit()
@@ -549,7 +573,9 @@ class PortfolioShadowManager:
                 )
                 if close_reason == "TAKE_PROFIT_HIT":
                     exit_fill_price = tp_p
-                    remaining_pnl = ((tp_p - entry_p) * size) if is_long else ((entry_p - tp_p) * size)
+                    remaining_pnl = (
+                        ((tp_p - entry_p) * size) if is_long else ((entry_p - tp_p) * size)
+                    )
                     final_pnl = prior_realized_pnl + remaining_pnl
                 elif close_reason == "STOP_LOSS_HIT":
                     # Realistic Exchange Stop-Loss Fill Model:
@@ -629,6 +655,7 @@ class PortfolioShadowManager:
                     # Notify Nervous System Cooldown Governor
                     try:
                         from core.cooldown_governor import cooldown_governor
+
                         cooldown_governor.record_trade_closed(
                             symbol=symbol,
                             realized_pnl=float(final_pnl),
@@ -752,7 +779,9 @@ class PortfolioShadowManager:
             # Correct exit reason if position had triggered breakeven/partial profit
             effective_exit_reason = exit_reason
             if row["breakeven_triggered"] and exit_reason == "STOP_LOSS_HIT":
-                effective_exit_reason = "BREAKEVEN_AFTER_PARTIAL" if pnl > 0 else "BREAKEVEN_STOP_HIT"
+                effective_exit_reason = (
+                    "BREAKEVEN_AFTER_PARTIAL" if pnl > 0 else "BREAKEVEN_STOP_HIT"
+                )
 
             conn.execute(
                 """
@@ -795,6 +824,7 @@ class PortfolioShadowManager:
             # Notify Nervous System Cooldown Governor
             try:
                 from core.cooldown_governor import cooldown_governor
+
                 cooldown_governor.record_trade_closed(
                     symbol=row["symbol"],
                     realized_pnl=float(pnl),
@@ -948,7 +978,9 @@ class PortfolioShadowManager:
             old_row = old_cur.fetchone()
             if not old_row:
                 conn.rollback()
-                raise ValueError(f"Replace Rejection: Target position {close_position_id} is not OPEN or does not exist.")
+                raise ValueError(
+                    f"Replace Rejection: Target position {close_position_id} is not OPEN or does not exist."
+                )
 
             old_exit_price = old_row["current_price"] or old_row["entry_price"]
             old_is_long = old_row["direction"] == "LONG"
@@ -1001,9 +1033,9 @@ class PortfolioShadowManager:
                     position_id, opened_at, closed_at, symbol, direction, size,
                     entry_price, current_price, stop_loss, take_profit,
                     unrealized_pnl, realized_pnl, status, trailing_stop, breakeven_triggered,
-                    entry_reason, exit_reason, book_id
+                    entry_reason, exit_reason, book_id, initial_stop_loss
                 )
-                VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, 0.0, 0.0, 'OPEN', NULL, 0, ?, NULL, ?);
+                VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, 0.0, 0.0, 'OPEN', NULL, 0, ?, NULL, ?, ?);
                 """,
                 (
                     new_pos_id,
@@ -1017,6 +1049,7 @@ class PortfolioShadowManager:
                     float(take_profit),
                     reason_text,
                     book_id,
+                    float(stop_loss),
                 ),
             )
             conn.commit()
@@ -1048,12 +1081,18 @@ class PortfolioShadowManager:
             conn.execute(
                 """
                 UPDATE shadow_positions SET
+                    stop_loss = ?,
                     trailing_stop = CASE WHEN ? THEN ? ELSE trailing_stop END,
-                    stop_loss = CASE WHEN ? THEN stop_loss ELSE ? END,
                     breakeven_triggered = CASE WHEN ? THEN 1 ELSE breakeven_triggered END
                 WHERE position_id = ?;
                 """,
-                (1 if be_trig else 0, new_sl, 1 if be_trig else 0, new_sl, 1 if be_trig else 0, position_id),
+                (
+                    new_sl,
+                    1 if be_trig else 0,
+                    new_sl,
+                    1 if be_trig else 0,
+                    position_id,
+                ),
             )
             conn.commit()
             logger.info(
@@ -1064,6 +1103,7 @@ class PortfolioShadowManager:
     def reset_all_positions(self) -> None:
         """Resets all shadow positions for clean benchmarking."""
         import core.cooldown_governor as cooldown_module
+
         with db_manager.get_trading_conn() as conn:
             conn.execute("DELETE FROM shadow_positions;")
             conn.commit()
@@ -1082,7 +1122,9 @@ class PortfolioShadowManager:
                 return []
             if "book_id" not in cols and clean_book_id:
                 try:
-                    conn.execute("ALTER TABLE shadow_positions ADD COLUMN book_id TEXT DEFAULT 'MAIN_SOVEREIGN';")
+                    conn.execute(
+                        "ALTER TABLE shadow_positions ADD COLUMN book_id TEXT DEFAULT 'MAIN_SOVEREIGN';"
+                    )
                     conn.commit()
                     cols.add("book_id")
                 except Exception:
@@ -1100,7 +1142,9 @@ class PortfolioShadowManager:
             rows = cursor.fetchall()
         return [dict(r) for r in rows]
 
-    def get_all_positions(self, limit: int = 50, book_id: str | None = None) -> list[dict[str, Any]]:
+    def get_all_positions(
+        self, limit: int = 50, book_id: str | None = None
+    ) -> list[dict[str, Any]]:
         clean_book_id = book_id if isinstance(book_id, str) and book_id else None
         with db_manager.get_trading_conn() as conn:
             cursor = conn.execute("PRAGMA table_info(shadow_positions);")
@@ -1109,7 +1153,9 @@ class PortfolioShadowManager:
                 return []
             if "book_id" not in cols and clean_book_id:
                 try:
-                    conn.execute("ALTER TABLE shadow_positions ADD COLUMN book_id TEXT DEFAULT 'MAIN_SOVEREIGN';")
+                    conn.execute(
+                        "ALTER TABLE shadow_positions ADD COLUMN book_id TEXT DEFAULT 'MAIN_SOVEREIGN';"
+                    )
                     conn.commit()
                     cols.add("book_id")
                 except Exception:
@@ -1154,7 +1200,16 @@ class PortfolioShadowManager:
             sz = float(pos.get("size", 0.0))
             entry_p = float(pos.get("entry_price", 0.0))
             sl_p = float(pos.get("stop_loss", 0.0)) if pos.get("stop_loss") is not None else entry_p
-            tr_p = float(pos.get("trailing_stop", 0.0)) if pos.get("trailing_stop") is not None else None
+            init_sl = (
+                float(pos.get("initial_stop_loss"))
+                if pos.get("initial_stop_loss") is not None
+                else sl_p
+            )
+            tr_p = (
+                float(pos.get("trailing_stop", 0.0))
+                if pos.get("trailing_stop") is not None
+                else None
+            )
             dir_str = str(pos.get("direction", "LONG")).upper()
             be_trig = bool(pos.get("breakeven_triggered", 0))
 
@@ -1165,7 +1220,7 @@ class PortfolioShadowManager:
                 if eff_stop >= entry_p or be_trig:
                     locked_profit = (sz * (eff_stop - entry_p)) if eff_stop > entry_p else 0.0
                     remaining_risk = max(0.0, friction_reserve - locked_profit)
-                    initial_risk = sz * abs(entry_p - sl_p) if sl_p < entry_p else 0.0
+                    initial_risk = sz * abs(entry_p - init_sl) if init_sl < entry_p else 0.0
                     released_risk_usd += max(0.0, initial_risk - remaining_risk)
                 else:
                     nominal_stop_risk = sz * max(0.0, entry_p - eff_stop)
@@ -1175,7 +1230,7 @@ class PortfolioShadowManager:
                 if eff_stop <= entry_p or be_trig:
                     locked_profit = (sz * (entry_p - eff_stop)) if eff_stop < entry_p else 0.0
                     remaining_risk = max(0.0, friction_reserve - locked_profit)
-                    initial_risk = sz * abs(sl_p - entry_p) if sl_p > entry_p else 0.0
+                    initial_risk = sz * abs(init_sl - entry_p) if init_sl > entry_p else 0.0
                     released_risk_usd += max(0.0, initial_risk - remaining_risk)
                 else:
                     nominal_stop_risk = sz * max(0.0, eff_stop - entry_p)
@@ -1213,7 +1268,11 @@ class PortfolioShadowManager:
             "core_anchor_count": len(core_anchor_positions),
             "satellite_count": len(satellite_positions),
             "aggregate_stop_risk_usd": round(aggregate_stop_risk_usd, 2),
-            "aggregate_stop_risk_pct": round((aggregate_stop_risk_usd / account_equity_usd) * 100.0, 3) if account_equity_usd > 0 else 0.0,
+            "aggregate_stop_risk_pct": round(
+                (aggregate_stop_risk_usd / account_equity_usd) * 100.0, 3
+            )
+            if account_equity_usd > 0
+            else 0.0,
             "released_risk_usd": round(released_risk_usd, 2),
             "max_aggregate_risk_usd": max_risk_usd,
             "available_risk_budget_usd": available_risk_budget_usd,
@@ -1452,7 +1511,18 @@ class PortfolioShadowManager:
                          created_at_ms, resolved_at_ms)
                     VALUES (?, ?, ?, ?, 'UNKNOWN', ?, 0.50, ?, ?, ?, ?, ?);
                     """,
-                    (rec_id, spec_id, pos_id, symbol, conf, outcome, float(final_pnl), brier_error, now_ms, now_ms),
+                    (
+                        rec_id,
+                        spec_id,
+                        pos_id,
+                        symbol,
+                        conf,
+                        outcome,
+                        float(final_pnl),
+                        brier_error,
+                        now_ms,
+                        now_ms,
+                    ),
                 )
             conn.commit()
 

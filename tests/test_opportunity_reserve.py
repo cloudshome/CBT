@@ -50,7 +50,7 @@ def test_portfolio_shadow_opportunity_reserve():
             entry_price=100.0 * (i + 1),
             stop_loss=98.0 * (i + 1),
             take_profit=106.0 * (i + 1),
-            entry_reason=f"Standard setup {i+1}",
+            entry_reason=f"Standard setup {i + 1}",
             confluence_score=75.0,  # Standard setup (< 85)
             style_tag=f"[TAG_{i}]",
             allow_multi_style=True,
@@ -187,17 +187,26 @@ async def test_mastermind_arbiter_opportunity_reserve():
     market_data = {"BTC/USDT": {"15m": candles, "multi_tf": {"15m": candles}}}
 
     # Test standard proposal rejection at base cap 6
-    with patch("core.mastermind.mastermind_arbiter.portfolio_shadow.get_open_positions", return_value=mock_positions), \
-         patch.object(arbiter.specialists[0], "evaluate_market", return_value=standard_proposal):
+    with (
+        patch(
+            "core.mastermind.mastermind_arbiter.portfolio_shadow.get_open_positions",
+            return_value=mock_positions,
+        ),
+        patch.object(arbiter.specialists[0], "evaluate_market", return_value=standard_proposal),
+    ):
         decisions_std = await arbiter.evaluate_swarm(market_data)
         assert len(decisions_std) >= 1
         assert decisions_std[0].is_approved is False
         assert "Max portfolio positions" in decisions_std[0].rejection_reason
 
     # Test elite proposal approval using Opportunity Reserve headroom
-    with patch("core.mastermind.mastermind_arbiter.portfolio_shadow.get_open_positions", return_value=mock_positions), \
-         patch.object(arbiter.specialists[0], "evaluate_market", return_value=elite_proposal):
+    with (
+        patch(
+            "core.mastermind.mastermind_arbiter.portfolio_shadow.get_open_positions",
+            return_value=mock_positions,
+        ),
+        patch.object(arbiter.specialists[0], "evaluate_market", return_value=elite_proposal),
+    ):
         decisions_elite = await arbiter.evaluate_swarm(market_data)
         assert len(decisions_elite) >= 1
         assert decisions_elite[0].is_approved is True
-

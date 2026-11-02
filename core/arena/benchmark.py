@@ -45,7 +45,11 @@ class AssetBenchmarkEngine:
         p1 = current_price
 
         bench_ret = ((p1 - p0) / p0) * 100.0 if p0 > 0 else 0.0
-        spec_ret = ((current_equity - initial_equity) / initial_equity) * 100.0 if initial_equity > 0 else 0.0
+        spec_ret = (
+            ((current_equity - initial_equity) / initial_equity) * 100.0
+            if initial_equity > 0
+            else 0.0
+        )
         alpha = spec_ret - bench_ret
 
         return BenchmarkMetrics(
@@ -56,4 +60,3 @@ class AssetBenchmarkEngine:
             alpha_pct=round(alpha, 2),
             is_outperforming=alpha > 0.0,
         )
-

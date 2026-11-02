@@ -43,9 +43,11 @@ class RadarAlphaExecutor:
         self.min_24h_volume_usd = min_24h_volume_usd
         self.min_market_attention = min_market_attention
         self.book_id = "RADAR_ALPHA"
-        self.is_auto_pilot: bool = os.getenv(
-            "ALLOW_ALTCOIN_AUTO_EXECUTION", "false"
-        ).lower() in ("true", "1", "yes")
+        self.is_auto_pilot: bool = os.getenv("ALLOW_ALTCOIN_AUTO_EXECUTION", "false").lower() in (
+            "true",
+            "1",
+            "yes",
+        )
         self._last_scan_ms: int = 0
         self.recent_log: list[dict[str, Any]] = []
 
@@ -107,7 +109,11 @@ class RadarAlphaExecutor:
                 continue
 
             cat = opp.opportunity_category.value
-            direction = opp.recommended_direction.upper() if opp.recommended_direction in ("LONG", "SHORT") else "LONG"
+            direction = (
+                opp.recommended_direction.upper()
+                if opp.recommended_direction in ("LONG", "SHORT")
+                else "LONG"
+            )
             thesis = opp.primary_rationale
 
             # Directional Classification:
@@ -115,7 +121,12 @@ class RadarAlphaExecutor:
             # Momentum / compression / reclaim -> LONG
             if cat in ("BLOW_OFF_EXHAUSTION", "BEARISH_CONTINUATION"):
                 direction = "SHORT"
-            elif cat in ("EMERGING_MOMENTUM", "CONFIRMED_BREAKOUT", "PRE_BREAKOUT_COMPRESSION", "CAPITULATION_RECOVERY"):
+            elif cat in (
+                "EMERGING_MOMENTUM",
+                "CONFIRMED_BREAKOUT",
+                "PRE_BREAKOUT_COMPRESSION",
+                "CAPITULATION_RECOVERY",
+            ):
                 direction = "LONG"
             else:
                 continue
@@ -177,12 +188,26 @@ class RadarAlphaExecutor:
         reason = candidate["thesis"]
 
         # Tier-1 Institutional Whitelist Gate for Autonomous Orders
-        allow_altcoins = os.getenv("ALLOW_ALTCOIN_AUTO_EXECUTION", "false").lower() in ("true", "1", "yes")
+        allow_altcoins = os.getenv("ALLOW_ALTCOIN_AUTO_EXECUTION", "false").lower() in (
+            "true",
+            "1",
+            "yes",
+        )
         is_manual = bool(candidate.get("is_manual", False))
         clean_sym = sym.replace("/", "").replace("_", "").upper()
         tier1_keys = {
-            "BTCUSDT", "BTCUSD", "ETHUSDT", "ETHUSD", "SOLUSDT", "SOLUSD",
-            "BNBUSDT", "BNBUSD", "XAUUSD", "GOLD", "PAXGUSDT", "PAXGUSD"
+            "BTCUSDT",
+            "BTCUSD",
+            "ETHUSDT",
+            "ETHUSD",
+            "SOLUSDT",
+            "SOLUSD",
+            "BNBUSDT",
+            "BNBUSD",
+            "XAUUSD",
+            "GOLD",
+            "PAXGUSDT",
+            "PAXGUSD",
         }
 
         if not allow_altcoins and not is_manual and clean_sym not in tier1_keys:
@@ -214,7 +239,7 @@ class RadarAlphaExecutor:
             self._record_activity(
                 sym,
                 "EXECUTE",
-                f"Opened {direction} on $2,000 Alpha Desk (Risk: ${candidate['risk_usd']:.2f}, Vol: ${candidate['volume_24h_usd']/1e6:.1f}M)",
+                f"Opened {direction} on $2,000 Alpha Desk (Risk: ${candidate['risk_usd']:.2f}, Vol: ${candidate['volume_24h_usd'] / 1e6:.1f}M)",
             )
             logger.info(
                 f"[RADAR_ALPHA] Successfully executed {direction} {sym} on $2,000 Alpha Book: {pos_id}"

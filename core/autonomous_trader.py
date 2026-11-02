@@ -244,9 +244,17 @@ class AutonomousTrader:
                     st_type = getattr(setup, "setup_type", None)
                     st_val = getattr(st_type, "value", str(st_type)) if st_type else ""
                     vol_dossier = decision_out.explanation_dossier.get("volume", {})
-                    rvol = float(vol_dossier.get("relative_volume", 1.0)) if isinstance(vol_dossier, dict) else 1.0
+                    rvol = (
+                        float(vol_dossier.get("relative_volume", 1.0))
+                        if isinstance(vol_dossier, dict)
+                        else 1.0
+                    )
 
-                    if (adx_val < 20.0 or rvol < 0.85) and regime_name in ("RANGING_CONSOLIDATION", "COMPRESSION_SQUEEZE", "LOW_VOLATILITY"):
+                    if (adx_val < 20.0 or rvol < 0.85) and regime_name in (
+                        "RANGING_CONSOLIDATION",
+                        "COMPRESSION_SQUEEZE",
+                        "LOW_VOLATILITY",
+                    ):
                         if st_val != "SETUP_D_RANGE_SWEEP_RECLAIM":
                             logger.info(
                                 f"AutonomousTrader Chop Filter: Skipping {sym} ({st_val or 'SMC'}) in low-volatility chop "
@@ -344,14 +352,14 @@ class AutonomousTrader:
                     # Dynamic ATR Volatility Sizing Anchor (No Arbitrary Static Percentages)
                     vol_state = volatility_engine.compute_volatility(candles_15m)
                     atr_val = (
-                        vol_state.atr
-                        if vol_state and vol_state.atr > 0
-                        else (cur_price * 0.015)
+                        vol_state.atr if vol_state and vol_state.atr > 0 else (cur_price * 0.015)
                     )
 
                     # Fix 5: Strict Minimum Stop Distance Floor (at least 1.2x ATR or 0.45% from entry)
                     min_sl_dist = max(1.2 * atr_val, entry_price * 0.0045)
-                    min_sl_dist = min(min_sl_dist, entry_price * 0.030)  # Bound within 3.0% to prevent ceiling breach
+                    min_sl_dist = min(
+                        min_sl_dist, entry_price * 0.030
+                    )  # Bound within 3.0% to prevent ceiling breach
 
                     if setup and setup.invalidation_sl > 0:
                         raw_sl = setup.invalidation_sl
@@ -494,6 +502,7 @@ class AutonomousTrader:
                     )
 
                     from core.central_mind import CentralTradingMind, TradeProposal
+
                     data_streamer._last_known_prices[sym] = entry_price
 
                     mind = getattr(self, "central_mind", None) or CentralTradingMind()
@@ -516,7 +525,7 @@ class AutonomousTrader:
                             f"Central Trading Mind REJECTED [{style_tag}] {sym}: {verdict.rejection_reason}"
                         )
                         continue
-                    pos_id = verdict.executed_position_id or f"POS_{sym}_{int(time.time()*1000)}"
+                    pos_id = verdict.executed_position_id or f"POS_{sym}_{int(time.time() * 1000)}"
                     self.total_trades_executed += 1
                     self._last_traded_candle_ts[sym] = closed_candle_ts
 
@@ -763,7 +772,9 @@ class AutonomousTrader:
                 candles_15m = data_streamer.get_candles(symbol, "15m", limit=30)
                 if not candles_15m or len(candles_15m) < 15:
                     try:
-                        fresh_candles = await data_streamer.fetch_external_ohlcv(symbol, "15m", limit=30)
+                        fresh_candles = await data_streamer.fetch_external_ohlcv(
+                            symbol, "15m", limit=30
+                        )
                         if fresh_candles:
                             candles_15m = fresh_candles
                     except Exception as ex:

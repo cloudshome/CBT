@@ -262,7 +262,9 @@ class LiveCanaryRunner:
                 logger.debug(f"[CanaryRunner] Real-time market discovery fallback for {sym}: {e}")
 
         if not ref_price or ref_price <= 0:
-            base_asset = sym.replace("/USDT", "").replace("USDT", "").replace("/USD", "").replace("USD", "")
+            base_asset = (
+                sym.replace("/USDT", "").replace("USDT", "").replace("/USD", "").replace("USD", "")
+            )
             ref_price = account_probe.reference_prices.get(base_asset, 65000.0)
 
         # 1. Microstructure Symbol Feasibility Check

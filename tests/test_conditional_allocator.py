@@ -26,8 +26,10 @@ from core.portfolio_shadow import is_core_anchor, portfolio_shadow
 @pytest.fixture(autouse=True)
 def clean_shadow_state():
     """Ensure completely clean shadow portfolio before and after each test."""
-    with patch("core.telegram_bot.telegram_bot.notify_trade_entry_sync", return_value=True), \
-         patch("core.telegram_bot.telegram_bot.notify_trade_exit_sync", return_value=True):
+    with (
+        patch("core.telegram_bot.telegram_bot.notify_trade_entry_sync", return_value=True),
+        patch("core.telegram_bot.telegram_bot.notify_trade_exit_sync", return_value=True),
+    ):
         portfolio_shadow.reset_all_positions()
         yield
         portfolio_shadow.reset_all_positions()
@@ -87,7 +89,10 @@ def test_breakeven_trailed_stop_releases_risk_budget():
 
     # Nominal calculation without friction drops fully to $0.00
     budget_nominal = portfolio_shadow.calculate_aggregate_risk_budget(
-        book_id="MAIN_SOVEREIGN", account_equity_usd=10000.0, max_aggregate_risk_pct=2.0, include_friction_reserve=False
+        book_id="MAIN_SOVEREIGN",
+        account_equity_usd=10000.0,
+        max_aggregate_risk_pct=2.0,
+        include_friction_reserve=False,
     )
     assert budget_nominal["aggregate_stop_risk_usd"] == 0.0
     assert budget_nominal["available_risk_budget_usd"] == 200.0
@@ -254,46 +259,52 @@ def test_replace_protocol_closes_stagnant_satellite_for_elite_opportunity(monkey
     os.environ["MAX_ELITE_POSITIONS"] = "3"
 
     # 1. Open BTC (Core Anchor)
-    mind.evaluate_and_route(TradeProposal(
-        origin="AUTONOMOUS_TRADER",
-        symbol="BTC/USDT",
-        direction="LONG",
-        style="SWING",
-        planned_entry=80000.0,
-        stop_loss=78000.0,
-        take_profit=84000.0,
-        requested_size=0.01,
-        thesis="BTC Anchor",
-        confluence_score=85.0,
-    ))
+    mind.evaluate_and_route(
+        TradeProposal(
+            origin="AUTONOMOUS_TRADER",
+            symbol="BTC/USDT",
+            direction="LONG",
+            style="SWING",
+            planned_entry=80000.0,
+            stop_loss=78000.0,
+            take_profit=84000.0,
+            requested_size=0.01,
+            thesis="BTC Anchor",
+            confluence_score=85.0,
+        )
+    )
 
     # 2. Open ETH (Core Anchor)
-    mind.evaluate_and_route(TradeProposal(
-        origin="AUTONOMOUS_TRADER",
-        symbol="ETH/USDT",
-        direction="LONG",
-        style="SWING",
-        planned_entry=3000.0,
-        stop_loss=2900.0,
-        take_profit=3200.0,
-        requested_size=0.1,
-        thesis="ETH Anchor",
-        confluence_score=85.0,
-    ))
+    mind.evaluate_and_route(
+        TradeProposal(
+            origin="AUTONOMOUS_TRADER",
+            symbol="ETH/USDT",
+            direction="LONG",
+            style="SWING",
+            planned_entry=3000.0,
+            stop_loss=2900.0,
+            take_profit=3200.0,
+            requested_size=0.1,
+            thesis="ETH Anchor",
+            confluence_score=85.0,
+        )
+    )
 
     # 3. Open SOL (Satellite coin)
-    mind.evaluate_and_route(TradeProposal(
-        origin="AUTONOMOUS_TRADER",
-        symbol="SOL/USDT",
-        direction="LONG",
-        style="DAY",
-        planned_entry=150.0,
-        stop_loss=140.0,
-        take_profit=160.0,
-        requested_size=1.0,
-        thesis="SOL Satellite",
-        confluence_score=82.0,
-    ))
+    mind.evaluate_and_route(
+        TradeProposal(
+            origin="AUTONOMOUS_TRADER",
+            symbol="SOL/USDT",
+            direction="LONG",
+            style="DAY",
+            planned_entry=150.0,
+            stop_loss=140.0,
+            take_profit=160.0,
+            requested_size=1.0,
+            thesis="SOL Satellite",
+            confluence_score=82.0,
+        )
+    )
 
     open_pos = portfolio_shadow.get_open_positions()
     assert len(open_pos) == 3

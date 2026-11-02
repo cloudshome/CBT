@@ -94,7 +94,11 @@ class CognitiveWorldModel:
             )
 
         # Evaluate freshness
-        source_ts_ms = state_vector.timestamp if state_vector else (raw_candles[-1].get("timestamp", now_ms) if raw_candles else now_ms)
+        source_ts_ms = (
+            state_vector.timestamp
+            if state_vector
+            else (raw_candles[-1].get("timestamp", now_ms) if raw_candles else now_ms)
+        )
         age_sec = max(0.0, (now_ms - source_ts_ms) / 1000.0)
 
         if age_sec > self.stale_threshold_sec:
@@ -185,4 +189,3 @@ class CognitiveWorldModel:
             state_vector_hash=state_hash,
             summary_thesis=f"World Model State: {primary_regime.value} (confidence={max_prob:.1%}, uncertainty={uncertainty:.2f})",
         )
-

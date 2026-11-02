@@ -108,13 +108,21 @@ class CentralTradingMind:
 
     NORMAL_CONCURRENT_POSITIONS: int = 3  # Normal operating target
     _raw_agg = float(os.getenv("MAX_AGGREGATE_RISK_PCT", "2.00"))
-    MAX_AGGREGATE_RISK_PCT: float = _raw_agg * 100.0 if _raw_agg <= 0.20 else _raw_agg  # 2.0% ($200 on $10k) aggregate live stop risk
+    MAX_AGGREGATE_RISK_PCT: float = (
+        _raw_agg * 100.0 if _raw_agg <= 0.20 else _raw_agg
+    )  # 2.0% ($200 on $10k) aggregate live stop risk
     _raw_trade = float(os.getenv("NORMAL_TRADE_RISK_PCT", "0.50"))
-    NORMAL_TRADE_RISK_PCT: float = _raw_trade * 100.0 if _raw_trade <= 0.20 else _raw_trade  # 0.5% ($50 on $10k) planned risk per trade
+    NORMAL_TRADE_RISK_PCT: float = (
+        _raw_trade * 100.0 if _raw_trade <= 0.20 else _raw_trade
+    )  # 0.5% ($50 on $10k) planned risk per trade
     _raw_heat = float(os.getenv("MAX_PORTFOLIO_HEAT_PCT", "7.50"))
-    MAX_PORTFOLIO_HEAT_PCT: float = _raw_heat * 100.0 if _raw_heat <= 0.20 else _raw_heat  # 7.5% max cumulative portfolio heat
+    MAX_PORTFOLIO_HEAT_PCT: float = (
+        _raw_heat * 100.0 if _raw_heat <= 0.20 else _raw_heat
+    )  # 7.5% max cumulative portfolio heat
     _raw_cluster = float(os.getenv("MAX_CRYPTO_CLUSTER_RISK_PCT", "1.60"))
-    MAX_CRYPTO_CLUSTER_RISK_PCT: float = _raw_cluster * 100.0 if _raw_cluster <= 0.20 else _raw_cluster  # 1.6% max correlated crypto cluster risk
+    MAX_CRYPTO_CLUSTER_RISK_PCT: float = (
+        _raw_cluster * 100.0 if _raw_cluster <= 0.20 else _raw_cluster
+    )  # 1.6% max correlated crypto cluster risk
     MAX_TRADE_RISK_PCT: float = 1.50  # 1.5% max risk per trade ceiling
     MAX_PRICE_DEVIATION_PCT: float = 1.50  # 1.5% max divergence from live ticker
     MAX_LEVERAGE_CEILING: float = 3.00  # 3.0x max effective leverage on account equity
@@ -155,9 +163,13 @@ class CentralTradingMind:
                 cur = conn.execute("PRAGMA table_info(central_mind_decisions);")
                 cols = [r[1] for r in cur.fetchall()]
                 if "portfolio_action" not in cols:
-                    conn.execute("ALTER TABLE central_mind_decisions ADD COLUMN portfolio_action TEXT DEFAULT 'OPEN';")
+                    conn.execute(
+                        "ALTER TABLE central_mind_decisions ADD COLUMN portfolio_action TEXT DEFAULT 'OPEN';"
+                    )
                 if "replaced_position_id" not in cols:
-                    conn.execute("ALTER TABLE central_mind_decisions ADD COLUMN replaced_position_id TEXT;")
+                    conn.execute(
+                        "ALTER TABLE central_mind_decisions ADD COLUMN replaced_position_id TEXT;"
+                    )
                 conn.execute(
                     "CREATE INDEX IF NOT EXISTS idx_cmd_ts ON central_mind_decisions (timestamp_ms DESC);"
                 )
@@ -257,9 +269,13 @@ class CentralTradingMind:
         # preserving risk budget for uncorrelated macro assets (e.g. GOLD / PAXG / XAU).
         is_incoming_crypto = not any(g in proposal.symbol.upper() for g in ("XAU", "PAXG", "GOLD"))
         if is_incoming_crypto:
-            max_cluster_risk_usd = round(account_equity_usd * (self.MAX_CRYPTO_CLUSTER_RISK_PCT / 100.0), 2)
+            max_cluster_risk_usd = round(
+                account_equity_usd * (self.MAX_CRYPTO_CLUSTER_RISK_PCT / 100.0), 2
+            )
             existing_crypto_cluster_risk = 0.0
-            for pos in budget.get("core_anchor_positions", []) + budget.get("satellite_positions", []):
+            for pos in budget.get("core_anchor_positions", []) + budget.get(
+                "satellite_positions", []
+            ):
                 pos_sym = pos.get("symbol", "")
                 pos_dir = pos.get("direction", "LONG").upper()
                 pos_is_crypto = not any(g in pos_sym.upper() for g in ("XAU", "PAXG", "GOLD"))
@@ -325,8 +341,7 @@ class CentralTradingMind:
         if is_elite and budget.get("satellite_positions"):
             # Core anchors (BTC, ETH, GOLD) are IMMUTABLE against replacement by satellite coins
             replaceable = [
-                p for p in budget["satellite_positions"]
-                if not p.get("is_breakeven_or_profit")
+                p for p in budget["satellite_positions"] if not p.get("is_breakeven_or_profit")
             ]
             if replaceable:
                 target_p = min(replaceable, key=lambda p: float(p.get("unrealized_pnl", 0.0)))
@@ -421,7 +436,10 @@ class CentralTradingMind:
         thesis_upper = (proposal.thesis or "").upper()
         strat_upper = (proposal.strategy_name if hasattr(proposal, "strategy_name") else "").upper()
         combined_text = f"{thesis_upper} {strat_upper}"
-        if any(falsified in combined_text for falsified in ["BREAKOUT BUY", "SWEEP REVERSAL", "SETUP_C_BREAKOUT"]):
+        if any(
+            falsified in combined_text
+            for falsified in ["BREAKOUT BUY", "SWEEP REVERSAL", "SETUP_C_BREAKOUT"]
+        ):
             return _reject(
                 f"Empirical Research Gate: Strategy in '{proposal.thesis}' was falsified during multi-year "
                 f"out-of-sample backtest (Win Rate < 10%, Expectancy < -0.80R). Execution rejected."
@@ -449,19 +467,31 @@ class CentralTradingMind:
         # autonomous execution is strictly limited to Tier-1 Institutional Assets:
         # BTC, ETH, SOL, BNB, and XAU/PAXG (Gold).
         # Microcaps and satellite altcoins operate in Advisory/Radar-Alert mode only.
-        allow_altcoins = os.getenv("ALLOW_ALTCOIN_AUTO_EXECUTION", "false").lower() in ("true", "1", "yes")
+        allow_altcoins = os.getenv("ALLOW_ALTCOIN_AUTO_EXECUTION", "false").lower() in (
+            "true",
+            "1",
+            "yes",
+        )
         origin_upper = proposal.origin.upper()
-        is_manual_approval = any(m in origin_upper for m in ("MANUAL", "TERMINAL_MANUAL", "UI_CONFIRMED"))
+        is_manual_approval = any(
+            m in origin_upper for m in ("MANUAL", "TERMINAL_MANUAL", "UI_CONFIRMED")
+        )
 
         if not allow_altcoins and not is_manual_approval:
             clean_sym = proposal.symbol.replace("/", "").replace("_", "").upper()
             tier1_keys = {
-                "BTCUSDT", "BTCUSD",
-                "ETHUSDT", "ETHUSD",
-                "SOLUSDT", "SOLUSD",
-                "BNBUSDT", "BNBUSD",
-                "XAUUSD", "GOLD",
-                "PAXGUSDT", "PAXGUSD",
+                "BTCUSDT",
+                "BTCUSD",
+                "ETHUSDT",
+                "ETHUSD",
+                "SOLUSDT",
+                "SOLUSD",
+                "BNBUSDT",
+                "BNBUSD",
+                "XAUUSD",
+                "GOLD",
+                "PAXGUSDT",
+                "PAXGUSD",
             }
             if clean_sym not in tier1_keys:
                 return _reject(
@@ -497,9 +527,7 @@ class CentralTradingMind:
                 if p_row and p_row["trade_count"] and p_row["trade_count"] >= 8:
                     g_win = float(p_row["gross_win"] or 0.0)
                     g_loss = float(p_row["gross_loss"] or 0.0)
-                    asset_pf = (
-                        (g_win / g_loss) if g_loss > 0 else (99.0 if g_win > 0 else 0.0)
-                    )
+                    asset_pf = (g_win / g_loss) if g_loss > 0 else (99.0 if g_win > 0 else 0.0)
 
                     if p_row["trade_count"] >= 10 and asset_pf < 0.40:
                         return _reject(

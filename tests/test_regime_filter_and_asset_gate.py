@@ -103,4 +103,3 @@ def test_trend_regime_filter_chop_rejection_logic():
     adx_trend = 28.5
     is_chop_trend = adx_trend < 20.0
     assert (is_chop_trend and is_breakout) is False
-

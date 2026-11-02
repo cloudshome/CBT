@@ -118,4 +118,3 @@ class ArenaLeaderboardSnapshot(BaseModel):
     active_specialists_count: int
     quarantined_specialists_count: int
     specialists: list[ArenaSpecialistAccount]
-

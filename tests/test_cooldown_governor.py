@@ -27,7 +27,9 @@ def test_cooldown_governor_asset_cooldown():
     assert in_cd is False
 
     # Record trade exit on ETH/USDT
-    gov.record_trade_closed("ETH/USDT", realized_pnl=50.0, exit_reason="TAKE_PROFIT_HIT", closed_at_sec=now)
+    gov.record_trade_closed(
+        "ETH/USDT", realized_pnl=50.0, exit_reason="TAKE_PROFIT_HIT", closed_at_sec=now
+    )
 
     # In cooldown immediately after
     in_cd, reason, remaining = gov.is_asset_in_cooldown("ETH/USDT")
@@ -46,7 +48,9 @@ def test_cooldown_governor_global_loss_pause():
     now = time.time()
 
     # Record Stop Loss hit on ETH
-    gov.record_trade_closed("ETH/USDT", realized_pnl=-93.73, exit_reason="STOP_LOSS_HIT", closed_at_sec=now)
+    gov.record_trade_closed(
+        "ETH/USDT", realized_pnl=-93.73, exit_reason="STOP_LOSS_HIT", closed_at_sec=now
+    )
 
     # Global loss pause must be active for any asset
     in_loss_cd, reason, remaining = gov.is_global_in_loss_cooldown()
@@ -96,7 +100,7 @@ def test_geometry_sanity_bounds():
 
     sl_dist_pct = (abs(entry - bad_sl) / entry) * 100.0
     assert sl_dist_pct > 3.5  # Must exceed 3.5% ceiling!
-    assert bad_tp <= 0.01     # Must be flagged as irrational target!
+    assert bad_tp <= 0.01  # Must be flagged as irrational target!
 
 
 def test_portfolio_shadow_zero_bypass_geometry_hardwall():

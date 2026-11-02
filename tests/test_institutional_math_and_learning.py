@@ -45,15 +45,17 @@ def test_setup_e_anchors_to_swing_low_and_enforces_universal_stop_floor():
     # Construct 25 candles where candle [-2] closed below VWAP (1990 < 1998) with low at 1980
     candles = []
     for i in range(25):
-        is_penultimate = (i == 23)
-        candles.append({
-            "timestamp": 1700000000 + (i * 900000),
-            "open": 2000.0,
-            "high": 2010.0,
-            "low": 1980.0 if i >= 20 else 1995.0,  # last 5 bars dipped to 1980
-            "close": 1990.0 if is_penultimate else 2005.0,
-            "volume": 1000.0,
-        })
+        is_penultimate = i == 23
+        candles.append(
+            {
+                "timestamp": 1700000000 + (i * 900000),
+                "open": 2000.0,
+                "high": 2010.0,
+                "low": 1980.0 if i >= 20 else 1995.0,  # last 5 bars dipped to 1980
+                "close": 1990.0 if is_penultimate else 2005.0,
+                "volume": 1000.0,
+            }
+        )
 
     regime = MarketRegimeState(
         timestamp=1700000000,
@@ -142,10 +144,17 @@ def test_setups_reject_inverted_stop_losses():
         meta={"direction": "BULLISH"},
     )
     disp = DisplacementFeature(
-        candle_index=1, timestamp=1700000000, direction="BULLISH",
-        body_atr_ratio=1.0, range_atr_ratio=1.0, consecutive_directional_bars=1,
-        volume_expansion_ratio=1.0, price_velocity=1.0, breakout_distance=0.0,
-        close_location_in_range=0.8, displacement_score=75.0,
+        candle_index=1,
+        timestamp=1700000000,
+        direction="BULLISH",
+        body_atr_ratio=1.0,
+        range_atr_ratio=1.0,
+        consecutive_directional_bars=1,
+        volume_expansion_ratio=1.0,
+        price_velocity=1.0,
+        breakout_distance=0.0,
+        close_location_in_range=0.8,
+        displacement_score=75.0,
     )
     vol = VolumeFeature(
         timestamp=1700000000,
@@ -243,7 +252,7 @@ def test_portfolio_shadow_resolves_specialist_track_record():
     INVARIANT: Closing a shadow position must resolve the corresponding
     entry in specialist_track_record and compute the quadratic Brier error.
     """
-    pos_id = f"pos_brier_test_{int(time.time()*1000)}"
+    pos_id = f"pos_brier_test_{int(time.time() * 1000)}"
     symbol = "ETH/USDT"
 
     # 1. Open shadow position
@@ -481,14 +490,16 @@ def test_setup_d_and_e_strictly_disqualify_excessive_risk_ceiling():
     candles_e = []
     for i in range(25):
         is_penultimate = i == 23
-        candles_e.append({
-            "timestamp": 1700000000 + (i * 900000),
-            "open": 2000.0,
-            "high": 2010.0,
-            "low": 1800.0 if i >= 20 else 1995.0,  # last 5 bars dipped to 1800
-            "close": 1990.0 if is_penultimate else 2005.0,
-            "volume": 1000.0,
-        })
+        candles_e.append(
+            {
+                "timestamp": 1700000000 + (i * 900000),
+                "open": 2000.0,
+                "high": 2010.0,
+                "low": 1800.0 if i >= 20 else 1995.0,  # last 5 bars dipped to 1800
+                "close": 1990.0 if is_penultimate else 2005.0,
+                "volume": 1000.0,
+            }
+        )
     vwap_feat = VWAPFeature(
         timestamp=1700000000,
         vwap=1995.0,
@@ -598,5 +609,3 @@ def test_orchestrator_deterministic_confluence_sorting_and_bar_deduplication():
     # Simulating a signal attempt in the same bar
     sig_key = (symbol, "SHORT")
     assert orchestrator._last_signal_bar.get(sig_key) == bar_ts  # Already emitted in this bar
-
-

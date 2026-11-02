@@ -21,8 +21,8 @@ from pydantic import BaseModel
 class ForecastHorizon(StrEnum):
     H_15M = "15m"  # 1 bar
     H_30M = "30m"  # 2 bars
-    H_1H = "1h"    # 4 bars
-    H_2H = "2h"    # 8 bars
+    H_1H = "1h"  # 4 bars
+    H_2H = "2h"  # 8 bars
 
 
 class PriceActionLawStatus(StrEnum):
@@ -35,9 +35,9 @@ class PriceActionLawStatus(StrEnum):
 
 
 class FrictionScenario(StrEnum):
-    BASE = "BASE"                  # 5 bps fee + 2 bps slippage per side = 14 bps round-trip
+    BASE = "BASE"  # 5 bps fee + 2 bps slippage per side = 14 bps round-trip
     CONSERVATIVE = "CONSERVATIVE"  # 7 bps fee + 5 bps slippage per side = 24 bps round-trip
-    STRESS = "STRESS"              # 10 bps fee + 10 bps slippage per side = 40 bps round-trip
+    STRESS = "STRESS"  # 10 bps fee + 10 bps slippage per side = 40 bps round-trip
 
 
 class TemporalFeatureVector(BaseModel):
@@ -46,16 +46,16 @@ class TemporalFeatureVector(BaseModel):
     timestamp_ms: int
     symbol: str
     reference_price: float
-    return_1bar_pct: float          # 15m return
-    return_2bar_pct: float          # 30m return
-    return_4bar_pct: float          # 1h return
-    relative_volume: float          # Volume_t / SMA(Volume, 20)
-    volatility_ratio: float         # Bar Range / ATR(14)
-    body_to_range_ratio: float      # abs(Close - Open) / (High - Low)
-    upper_wick_ratio: float         # (High - max(Open, Close)) / (High - Low)
-    lower_wick_ratio: float         # (min(Open, Close) - Low) / (High - Low)
+    return_1bar_pct: float  # 15m return
+    return_2bar_pct: float  # 30m return
+    return_4bar_pct: float  # 1h return
+    relative_volume: float  # Volume_t / SMA(Volume, 20)
+    volatility_ratio: float  # Bar Range / ATR(14)
+    body_to_range_ratio: float  # abs(Close - Open) / (High - Low)
+    upper_wick_ratio: float  # (High - max(Open, Close)) / (High - Low)
+    lower_wick_ratio: float  # (min(Open, Close) - Low) / (High - Low)
     distance_to_swing_high_pct: float  # (High_20 - Close) / Close * 100
-    distance_to_swing_low_pct: float   # (Close - Low_20) / Close * 100
+    distance_to_swing_low_pct: float  # (Close - Low_20) / Close * 100
     is_out_of_distribution: bool = False
 
 

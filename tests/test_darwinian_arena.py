@@ -50,6 +50,7 @@ def arena_engine(isolated_ledger: ArenaLedger) -> DarwinianArenaEngine:
 # 1. SANDBOX ISOLATION & INITIALIZATION
 # ==============================================================================
 
+
 def test_arena_initializes_10_isolated_specialists_with_100_usd(arena_engine: DarwinianArenaEngine):
     """Verifies that all 10 specialists are initialized with exactly $1,000 virtual equity."""
     accounts = arena_engine.ledger.get_all_accounts()
@@ -59,8 +60,16 @@ def test_arena_initializes_10_isolated_specialists_with_100_usd(arena_engine: Da
     assert total_equity == pytest.approx(10000.0, abs=0.01)
 
     expected_symbols = {
-        "BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "XRP/USDT",
-        "LINK/USDT", "DOGE/USDT", "AVAX/USDT", "SUI/USDT", "ZEC/USDT",
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "XRP/USDT",
+        "LINK/USDT",
+        "DOGE/USDT",
+        "AVAX/USDT",
+        "SUI/USDT",
+        "ZEC/USDT",
     }
     actual_symbols = {a.symbol for a in accounts}
     assert actual_symbols == expected_symbols
@@ -100,6 +109,7 @@ def test_specialist_trading_does_not_mutate_other_specialists(arena_engine: Darw
 # ==============================================================================
 # 2. REALISTIC FRICTION (FEES & SLIPPAGE) & PNL ATTRIBUTION
 # ==============================================================================
+
 
 def test_realistic_friction_applied_on_entry_and_exit(arena_engine: DarwinianArenaEngine):
     """
@@ -144,6 +154,7 @@ def test_realistic_friction_applied_on_entry_and_exit(arena_engine: DarwinianAre
 # 3. BENCHMARK RELATIVE ALPHA CALCULATION
 # ==============================================================================
 
+
 def test_benchmark_relative_alpha_calculation():
     """
     Verifies that Buy-and-Hold return and relative alpha are calculated mathematically:
@@ -164,6 +175,7 @@ def test_benchmark_relative_alpha_calculation():
 # ==============================================================================
 # 4. SURVIVAL STATE MACHINE & ELIMINATION
 # ==============================================================================
+
 
 def test_drawdown_triggers_probation_state(arena_engine: DarwinianArenaEngine):
     """Drawdown >= 10% transitions specialist to PROBATION (sizing halved)."""
@@ -218,8 +230,11 @@ def test_consecutive_losses_trigger_quarantine(arena_engine: DarwinianArenaEngin
 # 5. MASTERMIND ARBITER BRIDGE & VETO PRIMACY
 # ==============================================================================
 
+
 @pytest.mark.asyncio
-async def test_arbiter_bridge_vetoes_quarantined_specialist_proposals(arena_engine: DarwinianArenaEngine):
+async def test_arbiter_bridge_vetoes_quarantined_specialist_proposals(
+    arena_engine: DarwinianArenaEngine,
+):
     """
     Verifies that when a specialist is QUARANTINED in the Arena,
     the Mastermind Arbiter Council strictly rejects its proposal
@@ -263,7 +278,17 @@ async def test_arbiter_bridge_vetoes_quarantined_specialist_proposals(arena_engi
         suggested_notional_usd=500.0,
     )
 
-    candles = [{"timestamp": int(time.time() * 1000) - i * 60000, "open": 0.15, "high": 0.16, "low": 0.14, "close": 0.15, "volume": 1000.0} for i in range(25)]
+    candles = [
+        {
+            "timestamp": int(time.time() * 1000) - i * 60000,
+            "open": 0.15,
+            "high": 0.16,
+            "low": 0.14,
+            "close": 0.15,
+            "volume": 1000.0,
+        }
+        for i in range(25)
+    ]
     market_data = {"DOGE/USDT": {"15m": candles}}
 
     spec = arbiter.deploy_dynamic_specialist("DOGE/USDT", SpecialistArchetype.MEME_MOMENTUM_SPIKE)
@@ -300,6 +325,7 @@ def test_winner_multiplier_is_disabled_and_remains_1_point_0(arena_engine: Darwi
 # 6. REST API LEADERBOARD ENDPOINTS
 # ==============================================================================
 
+
 def test_api_leaderboard_endpoint(arena_engine: DarwinianArenaEngine):
     """Tests /api/arena/leaderboard endpoint contract and data serialization."""
     set_arena_engine(arena_engine)
@@ -332,6 +358,7 @@ def test_api_specialist_detail_endpoint(arena_engine: DarwinianArenaEngine):
 # 7. LIVE FEED SIGNAL EVALUATION & AUTONOMOUS INTEGRATION
 # ==============================================================================
 
+
 def test_evaluate_specialist_signal_triggers_breakout_trade(arena_engine: DarwinianArenaEngine):
     """Verifies that evaluate_specialist_signal triggers a sandbox trade upon valid breakout setup."""
     now_ms = int(time.time() * 1000)
@@ -339,14 +366,16 @@ def test_evaluate_specialist_signal_triggers_breakout_trade(arena_engine: Darwin
     candles = []
     base_price = 140.0
     for i in range(20):
-        candles.append({
-            "timestamp": now_ms - (20 - i) * 900_000,
-            "open": base_price + (i % 3),
-            "high": base_price + 5.0,
-            "low": base_price - 5.0,
-            "close": base_price + (i % 4),
-            "volume": 1000.0,
-        })
+        candles.append(
+            {
+                "timestamp": now_ms - (20 - i) * 900_000,
+                "open": base_price + (i % 3),
+                "high": base_price + 5.0,
+                "low": base_price - 5.0,
+                "close": base_price + (i % 4),
+                "volume": 1000.0,
+            }
+        )
 
     # Breakout price above 145.0
     breakout_price = 152.0
@@ -370,7 +399,9 @@ def test_evaluate_specialist_signal_triggers_breakout_trade(arena_engine: Darwin
 
 
 @pytest.mark.asyncio
-async def test_autonomous_trader_scan_and_update_arena_runs(arena_engine: DarwinianArenaEngine, monkeypatch):
+async def test_autonomous_trader_scan_and_update_arena_runs(
+    arena_engine: DarwinianArenaEngine, monkeypatch
+):
     """Verifies autonomous_trader.scan_and_update_arena updates all 10 specialists."""
     from unittest.mock import AsyncMock
 
@@ -382,10 +413,21 @@ async def test_autonomous_trader_scan_and_update_arena_runs(arena_engine: Darwin
 
     # Mock ticker to return $100.0 for any coin
     monkeypatch.setattr(data_streamer, "get_live_ticker", AsyncMock(return_value=100.0))
-    monkeypatch.setattr(data_streamer, "get_candles", lambda sym, tf, limit=30: [
-        {"timestamp": int(time.time() * 1000) - (30 - i) * 60000, "open": 100.0, "high": 102.0, "low": 98.0, "close": 100.0, "volume": 500.0}
-        for i in range(30)
-    ])
+    monkeypatch.setattr(
+        data_streamer,
+        "get_candles",
+        lambda sym, tf, limit=30: [
+            {
+                "timestamp": int(time.time() * 1000) - (30 - i) * 60000,
+                "open": 100.0,
+                "high": 102.0,
+                "low": 98.0,
+                "close": 100.0,
+                "volume": 500.0,
+            }
+            for i in range(30)
+        ],
+    )
 
     await autonomous_trader.scan_and_update_arena()
 
@@ -393,5 +435,3 @@ async def test_autonomous_trader_scan_and_update_arena_runs(arena_engine: Darwin
     assert len(accounts) == 10
     for acc in accounts:
         assert acc.benchmark_current_price == 100.0
-
-

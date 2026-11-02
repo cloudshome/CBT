@@ -74,8 +74,13 @@ class MetacognitiveMonitor:
         can_execute = True
 
         # 1. Out of Distribution / Stale Data Check
-        if world_state.is_out_of_distribution or world_state.primary_regime == MarketRegimeType.OUT_OF_DISTRIBUTION:
-            rationale.append("Market is OUT_OF_DISTRIBUTION or data feed is stale; mandatory ABSTENTION enforced.")
+        if (
+            world_state.is_out_of_distribution
+            or world_state.primary_regime == MarketRegimeType.OUT_OF_DISTRIBUTION
+        ):
+            rationale.append(
+                "Market is OUT_OF_DISTRIBUTION or data feed is stale; mandatory ABSTENTION enforced."
+            )
             return MetacognitiveAssessment(
                 advice=MetacognitiveAdvice.ABSTAIN,
                 confidence_scale_factor=0.0,
@@ -99,10 +104,16 @@ class MetacognitiveMonitor:
         # 2. Elevated Epistemic Uncertainty Check
         if world_state.epistemic_uncertainty > 0.70:
             scale_factor *= 0.60
-            rationale.append(f"Elevated regime uncertainty ({world_state.epistemic_uncertainty:.2f} > 0.70); scaled down confidence by 40%.")
+            rationale.append(
+                f"Elevated regime uncertainty ({world_state.epistemic_uncertainty:.2f} > 0.70); scaled down confidence by 40%."
+            )
 
         # 3. Specialist Disagreement Dispersion
-        active_directions = [p.direction for p in proposals if p.direction in (DecisionAction.LONG, DecisionAction.SHORT)]
+        active_directions = [
+            p.direction
+            for p in proposals
+            if p.direction in (DecisionAction.LONG, DecisionAction.SHORT)
+        ]
         has_long = DecisionAction.LONG in active_directions
         has_short = DecisionAction.SHORT in active_directions
 
@@ -110,7 +121,9 @@ class MetacognitiveMonitor:
         if has_long and has_short:
             dispersion = 1.0
             scale_factor *= 0.50
-            rationale.append("Severe specialist conflict: opposing LONG and SHORT proposals exist concurrently; 50% sizing discount applied.")
+            rationale.append(
+                "Severe specialist conflict: opposing LONG and SHORT proposals exist concurrently; 50% sizing discount applied."
+            )
 
         # 4. Calibration Track Record (if ledger available)
         calibration_status = "UNVERIFIED"
@@ -125,12 +138,16 @@ class MetacognitiveMonitor:
 
                     if n < 10:
                         calibration_status = "INSUFFICIENT_SAMPLES"
-                        rationale.append(f"Track record sample size N={n} < 10; calibration unverified.")
+                        rationale.append(
+                            f"Track record sample size N={n} < 10; calibration unverified."
+                        )
                     elif avg_brier is not None:
                         if avg_brier > 0.25:
                             calibration_status = "DEGRADED"
                             scale_factor *= 0.75
-                            rationale.append(f"Historical Brier score degraded ({avg_brier:.3f} > 0.25); applied 25% caution haircut.")
+                            rationale.append(
+                                f"Historical Brier score degraded ({avg_brier:.3f} > 0.25); applied 25% caution haircut."
+                            )
                         else:
                             calibration_status = "WELL_CALIBRATED"
             except Exception as e:
@@ -155,4 +172,3 @@ class MetacognitiveMonitor:
             rationale=rationale,
             can_execute=can_execute,
         )
-

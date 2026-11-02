@@ -944,7 +944,9 @@ class TelegramBotDispatcher:
                         return False
                     return True
         except Exception as e:
-            logger.error(f"Telegram dispatch failed: {type(e).__name__}: {e or 'request timed out'}")
+            logger.error(
+                f"Telegram dispatch failed: {type(e).__name__}: {e or 'request timed out'}"
+            )
             return False
 
     async def send_message(
@@ -1193,7 +1195,9 @@ class TelegramBotDispatcher:
         sl = float(trade.get("stop_loss", 0.0))
         tp = float(trade.get("take_profit", 0.0))
         pos_id = trade.get("position_id", "N/A")
-        reason = trade.get("entry_reason") or "Quantitative Multi-Concept Structure & Liquidity Inflow"
+        reason = (
+            trade.get("entry_reason") or "Quantitative Multi-Concept Structure & Liquidity Inflow"
+        )
         opened_at = trade.get("opened_at", int(time.time() * 1000))
         dt_str = datetime.datetime.fromtimestamp(opened_at / 1000.0, tz=datetime.UTC).strftime(
             "%Y-%m-%d %H:%M:%S UTC"
@@ -2106,9 +2110,26 @@ class TelegramBotDispatcher:
 
             caption_lower = (caption or text or "").lower()
             trade_keywords = [
-                "trade", "enter", "entry", "stop loss", "stoploss", "sl", "tp",
-                "take profit", "should i", "where is", "buy", "sell", "long", "short",
-                "target", "signal", "question", "should", "best", "strategy",
+                "trade",
+                "enter",
+                "entry",
+                "stop loss",
+                "stoploss",
+                "sl",
+                "tp",
+                "take profit",
+                "should i",
+                "where is",
+                "buy",
+                "sell",
+                "long",
+                "short",
+                "target",
+                "signal",
+                "question",
+                "should",
+                "best",
+                "strategy",
             ]
             is_trade_question = any(k in caption_lower for k in trade_keywords) or not caption
 
@@ -2360,7 +2381,15 @@ class TelegramBotDispatcher:
             raw_sym = parts[2] if len(parts) > 2 else "BTCUSDT"
             tf = parts[3] if len(parts) > 3 else "15M"
 
-            sym = "BTC/USDT" if "BTC" in raw_sym else ("ETH/USDT" if "ETH" in raw_sym else ("SOL/USDT" if "SOL" in raw_sym else "XAU/USD"))
+            sym = (
+                "BTC/USDT"
+                if "BTC" in raw_sym
+                else (
+                    "ETH/USDT"
+                    if "ETH" in raw_sym
+                    else ("SOL/USDT" if "SOL" in raw_sym else "XAU/USD")
+                )
+            )
             modern_kb = callback_router.build_modern_interactive_keyboard(sym, tf)
 
             if action == "trend":
@@ -2372,7 +2401,9 @@ class TelegramBotDispatcher:
             elif action == "setup":
                 await self.answer_callback_query(cb_id, f"Scanning {sym} {tf} Setup...")
                 setup_reply = await self.state_mind.handle_conversational_query(
-                    f"give me {sym} trade plan for {tf} timeframe", chat_id=chat_id, identity=identity
+                    f"give me {sym} trade plan for {tf} timeframe",
+                    chat_id=chat_id,
+                    identity=identity,
                 )
                 await self.send_message(setup_reply, reply_markup=modern_kb, chat_id=chat_id)
                 return {"status": "CHIP_SETUP_EXECUTED"}
@@ -2387,7 +2418,9 @@ class TelegramBotDispatcher:
                 return {"status": "CHIP_TF_SWITCHED"}
 
             elif action == "chart":
-                await self.answer_callback_query(cb_id, f"Rendering {sym} {tf} Candlestick Chart...")
+                await self.answer_callback_query(
+                    cb_id, f"Rendering {sym} {tf} Candlestick Chart..."
+                )
                 await self._dispatch_agentic_chart(sym, tf, chat_id=chat_id, keyboard=modern_kb)
                 return {"status": "CHIP_CHART_DISPATCHED"}
 
@@ -2791,9 +2824,12 @@ class TelegramBotDispatcher:
                         not self.chat_id or str(chat_id) == str(self.chat_id) or not chat_id
                     ):
                         from core.quant_mentor import quant_mentor
+
                         target_sym = quant_mentor._detect_symbol(asset_prompt, default="BTC/USDT")
                         target_tf = quant_mentor._detect_timeframe(asset_prompt, default="15M")
-                        modern_kb = callback_router.build_modern_interactive_keyboard(target_sym, target_tf)
+                        modern_kb = callback_router.build_modern_interactive_keyboard(
+                            target_sym, target_tf
+                        )
                         await self.send_message(ai_reply, reply_markup=modern_kb, chat_id=chat_id)
                     telegram_audit.log_command_execution(
                         identity,
@@ -2838,6 +2874,7 @@ class TelegramBotDispatcher:
             )
             if ai_reply and (not self.chat_id or str(chat_id) == str(self.chat_id) or not chat_id):
                 from core.quant_mentor import quant_mentor
+
                 target_sym = quant_mentor._detect_symbol(text, default="BTC/USDT")
                 target_tf = quant_mentor._detect_timeframe(text, default="15M")
                 modern_kb = callback_router.build_modern_interactive_keyboard(target_sym, target_tf)
@@ -2864,9 +2901,13 @@ class TelegramBotDispatcher:
         from core.data_streamer import data_streamer
         from core.telegram.charts import telegram_charts
 
-        tf_normalized = "15m" if timeframe.upper() in ("15M", "15") else (
-            "4h" if timeframe.upper() in ("4H", "4") else (
-                "1d" if timeframe.upper() in ("1D", "DAILY", "DAY", "1W", "1M") else "15m"
+        tf_normalized = (
+            "15m"
+            if timeframe.upper() in ("15M", "15")
+            else (
+                "4h"
+                if timeframe.upper() in ("4H", "4")
+                else ("1d" if timeframe.upper() in ("1D", "DAILY", "DAY", "1W", "1M") else "15m")
             )
         )
         try:
@@ -2948,7 +2989,9 @@ class TelegramBotDispatcher:
         pnl_tot_sign = f"+${total_pnl:.2f}" if total_pnl >= 0 else f"-${abs(total_pnl):.2f}"
         lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         lines.append(f"💰 **Total Desk Unrealized PnL:** `{pnl_tot_sign}` | Mode: `SIMULATION`")
-        lines.append("🛡️ **Two-Tier Shield:** At `+1.5R`, 50% profit locks and SL moves to breakeven.")
+        lines.append(
+            "🛡️ **Two-Tier Shield:** At `+1.5R`, 50% profit locks and SL moves to breakeven."
+        )
         return "\n".join(lines)
 
     async def _generate_chip_trend_response(self, symbol: str, timeframe: str = "15M") -> str:
@@ -2964,7 +3007,9 @@ class TelegramBotDispatcher:
 
         trend_status = "BULLISH MOMENTUM" if chg >= 0 else "BEARISH MITIGATION"
         adx_est = 26.5 if abs(chg) > 1.5 else 18.2
-        chop_state = "Clean Directional Expansion" if adx_est >= 20 else "Low-Volatility Compression"
+        chop_state = (
+            "Clean Directional Expansion" if adx_est >= 20 else "Low-Volatility Compression"
+        )
 
         return (
             f"📈 **CBT Agentic Trend Intelligence • `{symbol}` [{tf_clean}]**\n"

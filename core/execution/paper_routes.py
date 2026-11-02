@@ -16,7 +16,7 @@ import logging
 import os
 import re
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -104,7 +104,9 @@ def enforce_paper_risk_gate(order: PaperTradeRequest) -> None:
     All limits come from environment variables; in production they MUST be set.
     """
     open_count = len(portfolio_shadow.get_open_positions())
-    max_open = int(os.getenv("MAX_CONCURRENT_POSITIONS", os.getenv("MAX_PAPER_OPEN_POSITIONS", "6")))
+    max_open = int(
+        os.getenv("MAX_CONCURRENT_POSITIONS", os.getenv("MAX_PAPER_OPEN_POSITIONS", "6"))
+    )
     if open_count >= max_open:
         raise HTTPException(
             status_code=422,
@@ -225,7 +227,7 @@ async def get_paper_desk_overview():
 
         opened_at_ts = p.get("opened_at")
         opened_at_fmt = (
-            datetime.fromtimestamp(opened_at_ts / 1000.0, tz=BD_TZ).strftime("%Y-%m-%d %H:%M:%S BST")
+            datetime.fromtimestamp(opened_at_ts / 1000.0, tz=UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
             if opened_at_ts
             else None
         )
@@ -235,9 +237,13 @@ async def get_paper_desk_overview():
         be_trig = bool(p.get("breakeven_triggered", 0))
         current_r = 0.0
         if sl_dist > 0:
-            current_r = round(((cur - entry) / sl_dist) if side == "BUY" else ((entry - cur) / sl_dist), 2)
+            current_r = round(
+                ((cur - entry) / sl_dist) if side == "BUY" else ((entry - cur) / sl_dist), 2
+            )
         milestone_r = 1.5
-        progress_pct = 100.0 if be_trig else round(min(100.0, max(0.0, (current_r / milestone_r) * 100.0)), 1)
+        progress_pct = (
+            100.0 if be_trig else round(min(100.0, max(0.0, (current_r / milestone_r) * 100.0)), 1)
+        )
         partial_pnl = round(float(p.get("realized_pnl") or 0.0), 2)
 
         current.append(
@@ -288,9 +294,7 @@ async def get_paper_desk_overview():
         opened_at_ts = p.get("opened_at")
         closed_at_ts = p.get("closed_at")
         hold_sec = (
-            ((closed_at_ts - opened_at_ts) / 1000.0)
-            if (opened_at_ts and closed_at_ts)
-            else None
+            ((closed_at_ts - opened_at_ts) / 1000.0) if (opened_at_ts and closed_at_ts) else None
         )
         sl_val = float(p.get("stop_loss", 0.0)) or None
 
@@ -314,12 +318,12 @@ async def get_paper_desk_overview():
             autopsy_cause = report.primary_root_cause
             autopsy_rec = report.preventative_recommendation
         opened_at_fmt = (
-            datetime.fromtimestamp(opened_at_ts / 1000.0, tz=BD_TZ).strftime("%Y-%m-%d %H:%M:%S BST")
+            datetime.fromtimestamp(opened_at_ts / 1000.0, tz=UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
             if opened_at_ts
             else None
         )
         closed_at_fmt = (
-            datetime.fromtimestamp(closed_at_ts / 1000.0, tz=BD_TZ).strftime("%Y-%m-%d %H:%M:%S BST")
+            datetime.fromtimestamp(closed_at_ts / 1000.0, tz=UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
             if closed_at_ts
             else None
         )
@@ -533,9 +537,13 @@ async def get_paper_positions(book_id: str | None = Query(None)):
         be_trig = bool(p.get("breakeven_triggered", 0))
         current_r = 0.0
         if sl_dist > 0:
-            current_r = round(((cur - entry) / sl_dist) if side == "BUY" else ((entry - cur) / sl_dist), 2)
+            current_r = round(
+                ((cur - entry) / sl_dist) if side == "BUY" else ((entry - cur) / sl_dist), 2
+            )
         milestone_r = 1.5
-        progress_pct = 100.0 if be_trig else round(min(100.0, max(0.0, (current_r / milestone_r) * 100.0)), 1)
+        progress_pct = (
+            100.0 if be_trig else round(min(100.0, max(0.0, (current_r / milestone_r) * 100.0)), 1)
+        )
         partial_pnl = round(float(p.get("realized_pnl") or 0.0), 2)
 
         mapped.append(
@@ -606,7 +614,9 @@ async def place_paper_trade(order: PaperTradeRequest):
             take_profit=order.tp,
             entry_reason=order.reason,
             enforce_atomic_limits=True,
-            max_open_limit=int(os.getenv("MAX_CONCURRENT_POSITIONS", os.getenv("MAX_PAPER_OPEN_POSITIONS", "6"))),
+            max_open_limit=int(
+                os.getenv("MAX_CONCURRENT_POSITIONS", os.getenv("MAX_PAPER_OPEN_POSITIONS", "6"))
+            ),
             max_risk_usd=balance * max_risk_pct,
             prevent_duplicate_symbol=True,
             allow_multi_style=True,

@@ -24,37 +24,49 @@ from engine.signal_engine import analyze_frame_at
 # 1. CAUSALITY & FUTURE DATA MUTATION INVARIANCE
 # ==============================================================================
 
+
 def test_future_data_mutation_invariance():
     """
     INVARIANT: Modifying candle data strictly AFTER decision bar T must NOT alter
     signals, indicators, features, or plans generated at or before bar T.
     """
     from data.store import CandleStore
+
     store = CandleStore()
     df = store.read("binance", "perp", "BTCUSDT", "1h").head(250).copy()
     assert len(df) == 250
-    
+
     ind_orig = add_all_indicators(df)
     T = 160
-    out_orig = analyze_frame_at(ind_orig, df, T, symbol="BTCUSDT", timeframe="1h", min_confidence=50)
+    out_orig = analyze_frame_at(
+        ind_orig, df, T, symbol="BTCUSDT", timeframe="1h", min_confidence=50
+    )
 
     # Mutate all future candles (T+1 to end) by +100% price pump and 5x volume
     df_mut = df.copy()
-    df_mut.loc[T + 1:, "open"] *= 2.0
-    df_mut.loc[T + 1:, "high"] *= 2.0
-    df_mut.loc[T + 1:, "low"] *= 2.0
-    df_mut.loc[T + 1:, "close"] *= 2.0
-    df_mut.loc[T + 1:, "volume"] *= 5.0
+    df_mut.loc[T + 1 :, "open"] *= 2.0
+    df_mut.loc[T + 1 :, "high"] *= 2.0
+    df_mut.loc[T + 1 :, "low"] *= 2.0
+    df_mut.loc[T + 1 :, "close"] *= 2.0
+    df_mut.loc[T + 1 :, "volume"] *= 5.0
     ind_mut = add_all_indicators(df_mut)
 
-    out_mut = analyze_frame_at(ind_mut, df_mut, T, symbol="BTCUSDT", timeframe="1h", min_confidence=50)
+    out_mut = analyze_frame_at(
+        ind_mut, df_mut, T, symbol="BTCUSDT", timeframe="1h", min_confidence=50
+    )
 
     # Verify that decision at bar T is 100% bit-for-bit identical
-    plans_orig = [(p.get("type"), p.get("action"), p.get("entry"), p.get("stop_loss")) for p in out_orig.plans]
-    plans_mut = [(p.get("type"), p.get("action"), p.get("entry"), p.get("stop_loss")) for p in out_mut.plans]
+    plans_orig = [
+        (p.get("type"), p.get("action"), p.get("entry"), p.get("stop_loss")) for p in out_orig.plans
+    ]
+    plans_mut = [
+        (p.get("type"), p.get("action"), p.get("entry"), p.get("stop_loss")) for p in out_mut.plans
+    ]
 
     assert plans_orig == plans_mut, "Leakage detected: Future mutation altered plans at bar T!"
-    assert out_orig.features == out_mut.features, "Leakage detected: Features at bar T differed after future mutation!"
+    assert out_orig.features == out_mut.features, (
+        "Leakage detected: Features at bar T differed after future mutation!"
+    )
 
 
 def test_prefix_invariance():
@@ -63,26 +75,34 @@ def test_prefix_invariance():
     plans to evaluating bar T in an extended series [0..N].
     """
     from data.store import CandleStore
+
     store = CandleStore()
     df = store.read("binance", "perp", "BTCUSDT", "1h").head(200).copy()
     T = 150
 
     ind_full = add_all_indicators(df)
-    out_full = analyze_frame_at(ind_full, df, T, symbol="BTCUSDT", timeframe="1h", min_confidence=50)
+    out_full = analyze_frame_at(
+        ind_full, df, T, symbol="BTCUSDT", timeframe="1h", min_confidence=50
+    )
 
-    df_trunc = df.iloc[:T + 1].copy()
+    df_trunc = df.iloc[: T + 1].copy()
     ind_trunc = add_all_indicators(df_trunc)
-    out_trunc = analyze_frame_at(ind_trunc, df_trunc, T, symbol="BTCUSDT", timeframe="1h", min_confidence=50)
+    out_trunc = analyze_frame_at(
+        ind_trunc, df_trunc, T, symbol="BTCUSDT", timeframe="1h", min_confidence=50
+    )
 
     plans_full = [(p.get("type"), p.get("action"), p.get("entry")) for p in out_full.plans]
     plans_trunc = [(p.get("type"), p.get("action"), p.get("entry")) for p in out_trunc.plans]
 
-    assert plans_full == plans_trunc, "Prefix invariance violated between truncated and full series!"
+    assert plans_full == plans_trunc, (
+        "Prefix invariance violated between truncated and full series!"
+    )
 
 
 # ==============================================================================
 # 2. TRADE EXECUTION & CONSERVATIVE STOP-FIRST RULE
 # ==============================================================================
+
 
 def test_stop_first_ambiguous_candle_rule():
     """
@@ -90,14 +110,16 @@ def test_stop_first_ambiguous_candle_rule():
     the backtester must deterministically grade the outcome as LOSS and flag ambiguous_bar=True.
     """
     # 5 candles: bar 0 is entry, bar 1 is an extreme wick touching both SL (90) and TP (120)
-    df = pd.DataFrame({
-        "ts": [1000, 2000, 3000],
-        "open": [100.0, 100.0, 105.0],
-        "high": [101.0, 125.0, 110.0],  # Bar 1 high touches TP1=120
-        "low": [99.0, 85.0, 102.0],     # Bar 1 low touches SL=90
-        "close": [100.0, 105.0, 108.0],
-        "volume": [10.0, 50.0, 10.0]
-    })
+    df = pd.DataFrame(
+        {
+            "ts": [1000, 2000, 3000],
+            "open": [100.0, 100.0, 105.0],
+            "high": [101.0, 125.0, 110.0],  # Bar 1 high touches TP1=120
+            "low": [99.0, 85.0, 102.0],  # Bar 1 low touches SL=90
+            "close": [100.0, 105.0, 108.0],
+            "volume": [10.0, 50.0, 10.0],
+        }
+    )
     df.attrs["timeframe"] = "1h"
     df.attrs["symbol"] = "BTCUSDT"
 
@@ -108,28 +130,32 @@ def test_stop_first_ambiguous_candle_rule():
         "stop_loss": 90.0,
         "take_profits": [120.0],
         "confidence": 80,
-        "status": "active"
+        "status": "active",
     }
 
     # Grade plan at bar 0 over 2 bars forward
     res = _evaluate(plan, df, i=0, horizon_bars=2)
     assert res.outcome == "LOSS", f"Expected LOSS on ambiguous candle, got {res.outcome}"
     assert res.rr_achieved == -1.0
-    assert res.ambiguous_bar is True, "Ambiguous bar flag must be True when both SL and TP are touched"
+    assert res.ambiguous_bar is True, (
+        "Ambiguous bar flag must be True when both SL and TP are touched"
+    )
 
 
 def test_long_and_short_payoff_symmetry():
     """
     INVARIANT: A short trade must yield positive R when price falls to TP, and negative R when price rises to SL.
     """
-    df_short = pd.DataFrame({
-        "ts": [1000, 2000],
-        "open": [100.0, 95.0],
-        "high": [101.0, 96.0],
-        "low": [99.0, 80.0],    # touches TP=85
-        "close": [100.0, 82.0],
-        "volume": [10.0, 20.0]
-    })
+    df_short = pd.DataFrame(
+        {
+            "ts": [1000, 2000],
+            "open": [100.0, 95.0],
+            "high": [101.0, 96.0],
+            "low": [99.0, 80.0],  # touches TP=85
+            "close": [100.0, 82.0],
+            "volume": [10.0, 20.0],
+        }
+    )
     df_short.attrs["timeframe"] = "1h"
     df_short.attrs["symbol"] = "BTCUSDT"
 
@@ -137,10 +163,10 @@ def test_long_and_short_payoff_symmetry():
         "type": "Sell Pullback",
         "action": "SELL",
         "entry": 100.0,
-        "stop_loss": 110.0,     # Risk = 10
-        "take_profits": [80.0], # Target = 20 (2R)
+        "stop_loss": 110.0,  # Risk = 10
+        "take_profits": [80.0],  # Target = 20 (2R)
         "confidence": 85,
-        "status": "active"
+        "status": "active",
     }
     res = _evaluate(short_plan, df_short, i=0, horizon_bars=1)
     assert res.outcome == "PARTIAL_WIN"
@@ -150,6 +176,7 @@ def test_long_and_short_payoff_symmetry():
 # ==============================================================================
 # 3. POSITION SIZING & INDEPENDENT HAND-CALCULATION VERIFICATION
 # ==============================================================================
+
 
 def test_independent_hand_calculation_user_example():
     """
@@ -210,7 +237,7 @@ def test_half_kelly_sizer_clamps_ultra_tight_stop():
         stop_loss=81020.24,  # $100 stop distance = 0.12%
         take_profit=82742.64,
         symbol="BTCUSDT",
-        win_probability=0.55
+        win_probability=0.55,
     )
     # Without ceiling, $150 / $100 = 1.5 BTC ($121k notional = 12.1x leverage!)
     # Sizer must clamp to max_notional_pct (2.0x = $20,000)
@@ -236,7 +263,7 @@ def test_central_mind_enforces_3x_leverage_ceiling():
         planned_entry=81120.24,
         stop_loss=81020.24,
         take_profit=82742.64,
-        thesis="TIGHT_STOP_3X_CLAMP_TEST"
+        thesis="TIGHT_STOP_3X_CLAMP_TEST",
     )
 
     verdict = mind.evaluate_and_route(proposal)
@@ -244,4 +271,6 @@ def test_central_mind_enforces_3x_leverage_ceiling():
     notional = verdict.approved_size * 81120.24
     effective_lev = notional / 10000.0
     # Must NOT be 12.17x! Must be <= 3.0x (with minor rounding tolerance)
-    assert effective_lev <= 3.05, f"LEVERAGE CEILING VIOLATION: Approved {effective_lev:.2f}x leverage (ceiling is 3.0x)!"
+    assert effective_lev <= 3.05, (
+        f"LEVERAGE CEILING VIOLATION: Approved {effective_lev:.2f}x leverage (ceiling is 3.0x)!"
+    )

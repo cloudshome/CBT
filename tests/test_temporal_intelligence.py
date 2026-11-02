@@ -52,6 +52,7 @@ def btc_15m_candles() -> list[dict]:
 # 1. ZERO LOOKAHEAD LEAKAGE AUDIT
 # ==============================================================================
 
+
 def test_zero_lookahead_leakage_audit(btc_15m_candles: list[dict]):
     """
     CRITICAL CAUSALITY TEST:
@@ -94,6 +95,7 @@ def test_zero_lookahead_leakage_audit(btc_15m_candles: list[dict]):
 # 2. DATA RESOLUTION GATE & BOUNDARY HANDLING
 # ==============================================================================
 
+
 def test_feature_extractor_boundary_handling(btc_15m_candles: list[dict]):
     """Requires at least 20 historical bars for rolling lookbacks."""
     assert ZeroLookaheadFeatureExtractor.extract_features(btc_15m_candles, 5) is None
@@ -104,6 +106,7 @@ def test_feature_extractor_boundary_handling(btc_15m_candles: list[dict]):
 # ==============================================================================
 # 3. MATHEMATICAL LAW DISCOVERY & FDR CONTROL ON 9,008 BARS
 # ==============================================================================
+
 
 def test_mathematical_law_miner_evaluates_hypotheses_with_fdr(btc_15m_candles: list[dict]):
     """
@@ -121,7 +124,9 @@ def test_mathematical_law_miner_evaluates_hypotheses_with_fdr(btc_15m_candles: l
     for law in laws:
         # Statistical audit
         assert law.sample_size_train > 0
-        assert law.effective_sample_size_train <= law.sample_size_train  # Neff <= N with positive autocorrelation
+        assert (
+            law.effective_sample_size_train <= law.sample_size_train
+        )  # Neff <= N with positive autocorrelation
         assert 0.0 <= law.p_value <= 1.0
         assert 0.0 <= law.adjusted_p_value_fdr <= 1.0
         assert law.adjusted_p_value_fdr >= law.p_value  # FDR adjustment never decreases p-value
@@ -141,6 +146,7 @@ def test_mathematical_law_miner_evaluates_hypotheses_with_fdr(btc_15m_candles: l
 # ==============================================================================
 # 4. PROBABILITY NORMALIZATION & BARRIER MODEL
 # ==============================================================================
+
 
 def test_probability_normalization_and_barrier_model(btc_15m_candles: list[dict]):
     """
@@ -165,13 +171,18 @@ def test_probability_normalization_and_barrier_model(btc_15m_candles: list[dict]
     assert prob_sum == pytest.approx(1.0, abs=0.01)
 
     # Barrier path probabilities must sum to 1.0
-    path_sum = fc.prob_hit_upper_barrier_first + fc.prob_hit_lower_barrier_first + fc.prob_neither_barrier_hit
+    path_sum = (
+        fc.prob_hit_upper_barrier_first
+        + fc.prob_hit_lower_barrier_first
+        + fc.prob_neither_barrier_hit
+    )
     assert path_sum == pytest.approx(1.0, abs=0.01)
 
 
 # ==============================================================================
 # 5. COGNITIVE PREDICTION LEDGER PERSISTENCE
 # ==============================================================================
+
 
 def test_forecaster_freezes_prediction_in_cognitive_ledger(
     btc_15m_candles: list[dict],
@@ -206,6 +217,7 @@ def test_forecaster_freezes_prediction_in_cognitive_ledger(
 # 6. TRADER INTERACTIVE SCENARIO EVALUATION
 # ==============================================================================
 
+
 def test_trader_interactive_scenario_query(btc_15m_candles: list[dict]):
     """
     Tests: 'What happened historically when BTC rose >= 0.50% with RVOL >= 2.0x?'
@@ -221,13 +233,17 @@ def test_trader_interactive_scenario_query(btc_15m_candles: list[dict]):
     )
 
     assert eval_res.historical_matches_count > 0
-    assert eval_res.prob_continuation_pump + eval_res.prob_reversal_dump + eval_res.prob_range_chop == pytest.approx(1.0, abs=0.01)
+    assert (
+        eval_res.prob_continuation_pump + eval_res.prob_reversal_dump + eval_res.prob_range_chop
+        == pytest.approx(1.0, abs=0.01)
+    )
     assert "Historically observed" in eval_res.verdict
 
 
 # ==============================================================================
 # 7. READ-ONLY MASTERMIND ARBITER BRIDGE
 # ==============================================================================
+
 
 def test_temporal_arbiter_bridge_advisory_context(btc_15m_candles: list[dict]):
     """
@@ -248,6 +264,7 @@ def test_temporal_arbiter_bridge_advisory_context(btc_15m_candles: list[dict]):
 # ==============================================================================
 # 8. REST API ENDPOINTS
 # ==============================================================================
+
 
 def test_api_temporal_endpoints():
     """Verifies FastAPI contracts for /api/temporal/btc/forecast, /laws, and /evaluate-condition."""

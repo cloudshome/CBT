@@ -103,6 +103,7 @@ def _generate_forward_candles(
 # 1. POINT-IN-TIME FREEZE & DURABLE PERSISTENCE
 # ==============================================================================
 
+
 def test_point_in_time_freeze_records_timestamps_and_is_idempotent(engine: TradingExperienceEngine):
     """Verifies observation and commit timestamps are recorded and re-freeze is idempotent."""
     now_ms = int(time.time() * 1000)
@@ -173,6 +174,7 @@ def test_persistence_failure_raises_explicit_exception(tmp_path: Path):
 # ==============================================================================
 # 2. MATHEMATICAL MFE & MAE CALCULATIONS
 # ==============================================================================
+
 
 def test_long_mfe_and_signed_mae_calculation():
     """
@@ -263,6 +265,7 @@ def test_short_mfe_and_signed_mae_calculation():
 # 3. INTRABAR AMBIGUITY & CHRONOLOGICAL RESOLUTION
 # ==============================================================================
 
+
 def test_intrabar_touch_of_target_and_invalidation_flags_ambiguity():
     """
     When a single candle touches BOTH target and invalidation levels,
@@ -306,6 +309,7 @@ def test_intrabar_touch_of_target_and_invalidation_flags_ambiguity():
 # 4. SEPARATION OF FORECAST ACCURACY FROM TRADE PROFITABILITY
 # ==============================================================================
 
+
 def test_forecast_accuracy_vs_cost_erosion_diagnostic():
     """
     Forecast of +20 bps gain is directionally correct, but 12 bps of fees + slippage
@@ -340,13 +344,13 @@ def test_forecast_accuracy_vs_cost_erosion_diagnostic():
         ),
     )
 
-    candles = [
-        {"timestamp": now_ms + 1000, "high": 1001.0, "low": 999.0, "close": 1001.0}
-    ]
+    candles = [{"timestamp": now_ms + 1000, "high": 1001.0, "low": 999.0, "close": 1001.0}]
 
     outcome = resolver.resolve_experience(rec, candles)
     assert outcome.status == ResolutionStatus.HIT_TARGET
-    assert outcome.realized_net_pnl_bps == pytest.approx(-2.0, abs=0.01)  # 10 bps gross - 12 bps friction = -2 bps net
+    assert outcome.realized_net_pnl_bps == pytest.approx(
+        -2.0, abs=0.01
+    )  # 10 bps gross - 12 bps friction = -2 bps net
     assert outcome.diagnostic_category == DiagnosticCategory.ACCURATE_COST_EROSION
     assert "wiped out by friction" in outcome.diagnostic_summary
 
@@ -354,6 +358,7 @@ def test_forecast_accuracy_vs_cost_erosion_diagnostic():
 # ==============================================================================
 # 5. COUNTERFACTUAL POLICY FOR DISCIPLINED NO_TRADE
 # ==============================================================================
+
 
 def test_disciplined_no_trade_records_counterfactual_only():
     """
@@ -386,9 +391,7 @@ def test_disciplined_no_trade_records_counterfactual_only():
     )
 
     # Market dumps to invalidation (0.088)
-    candles = [
-        {"timestamp": now_ms + 1000, "high": 0.101, "low": 0.088, "close": 0.089}
-    ]
+    candles = [{"timestamp": now_ms + 1000, "high": 0.101, "low": 0.088, "close": 0.089}]
 
     outcome = resolver.resolve_experience(rec, candles)
     assert outcome.status == ResolutionStatus.HIT_INVALIDATION
@@ -403,6 +406,7 @@ def test_disciplined_no_trade_records_counterfactual_only():
 # ==============================================================================
 # 6. CALIBRATION REPORTING & SAMPLE-SIZE TRANSPARENCY
 # ==============================================================================
+
 
 def test_calibration_reporting_requires_minimum_sample_size(engine: TradingExperienceEngine):
     """
@@ -449,6 +453,7 @@ def test_calibration_reporting_requires_minimum_sample_size(engine: TradingExper
 # 7. END-TO-END EXPERIENCE RESOLUTION LIFECYCLE
 # ==============================================================================
 
+
 def test_end_to_end_experience_engine_resolution_lifecycle(engine: TradingExperienceEngine):
     """
     Full lifecycle test:
@@ -475,16 +480,16 @@ def test_end_to_end_experience_engine_resolution_lifecycle(engine: TradingExperi
 
     # 15m later: candle hits target 157.0
     future_candles = {
-        "SOL/USDT": [
-            {"timestamp": now_ms + 900_000, "high": 157.0, "low": 149.0, "close": 156.5}
-        ]
+        "SOL/USDT": [{"timestamp": now_ms + 900_000, "high": 157.0, "low": 149.0, "close": 156.5}]
     }
 
     resolved = engine.resolve_pending(future_candles)
     assert len(resolved) == 1
     assert resolved[0].experience_id == rec.experience_id
     assert resolved[0].outcome.status == ResolutionStatus.HIT_TARGET
-    assert resolved[0].outcome.mfe_bps == pytest.approx(466.67, abs=1.0)  # (157 - 150)/150 = +4.667% = 466.67 bps
+    assert resolved[0].outcome.mfe_bps == pytest.approx(
+        466.67, abs=1.0
+    )  # (157 - 150)/150 = +4.667% = 466.67 bps
 
     # Retrieve from DB to verify persistence and immutability
     reloaded = engine.ledger.get_experience(rec.experience_id)
@@ -498,6 +503,7 @@ def test_end_to_end_experience_engine_resolution_lifecycle(engine: TradingExperi
 # ==============================================================================
 # 8. COGNITIVE WORLD MODEL (PHASE C)
 # ==============================================================================
+
 
 def test_world_model_detects_stale_data_and_marks_out_of_distribution():
     """
@@ -560,6 +566,7 @@ def test_world_model_classifies_bull_regime_probabilistically():
 # ==============================================================================
 # 9. METACOGNITIVE MONITOR (PHASE D)
 # ==============================================================================
+
 
 def test_metacognitive_monitor_enforces_abstain_on_out_of_distribution():
     """
@@ -666,6 +673,7 @@ def test_metacognitive_monitor_penalizes_opposing_specialist_proposals():
 # 10. ARBITER & EXPERIENCE ENGINE INTEGRATION (PHASE E)
 # ==============================================================================
 
+
 @pytest.mark.asyncio
 async def test_arbiter_records_experience_in_cognitive_ledger(tmp_path: Path):
     """
@@ -758,5 +766,3 @@ async def test_arbiter_metacognitive_monitor_blocks_trade_during_feed_blackout(t
     # Trade MUST be rejected due to Metacognitive ABSTENTION
     assert d.is_approved is False
     assert "Metacognitive Monitor ABSTENTION" in d.rejection_reason
-
-

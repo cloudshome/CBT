@@ -509,4 +509,3 @@ class DynamicOpportunitySpecialist(BaseSpecialistAgent):
             },
         )
         return self.apply_adversarial_review(prop, candles_15m, order_book)
-

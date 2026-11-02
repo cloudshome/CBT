@@ -1082,31 +1082,40 @@ async def get_master_terminal_telemetry(
         risk_pct = round((risk_usd / 10000.0) * 100.0, 2)
         unrealized = float(pos.get("unrealized_pnl", 0.0))
 
-        blotter_entries.append({
-            "id": pos.get("position_id"),
-            "symbol": str(pos.get("symbol", clean_sym)).replace("/", ""),
-            "style": "INTRADAY",
-            "side": direction,
-            "score": 85,
-            "qualityBadge": "A",
-            "entryPrice": entry_p,
-            "entryZone": [round(entry_p * 0.999, 2), round(entry_p * 1.001, 2)],
-            "invalidationPrice": sl_p,
-            "stopLoss": sl_p,
-            "tpLadder": {"tp1": tp_p, "tp2": round(entry_p + 1.5 * (tp_p - entry_p), 2), "tp3": round(entry_p + 2.0 * (tp_p - entry_p), 2)},
-            "riskRewardRatio": rr,
-            "suggestedRiskPct": risk_pct,
-            "notionalUsd": notional,
-            "halfKellyMultiplier": 0.5,
-            "state": "EXECUTED",
-            "stableDurationSecs": int(time.time() - float(pos.get("opened_at", time.time() * 1000)) / 1000),
-            "reaffirmsCount": 5,
-            "cooldownRemainingSecs": 0,
-            "thesis": pos.get("entry_reason") or f"Autonomous {direction} position on {pos.get('symbol')}",
-            "createdAt": int(pos.get("opened_at", time.time() * 1000)),
-            "executedAt": int(pos.get("opened_at", time.time() * 1000)),
-            "unrealizedPnlUsd": round(unrealized, 2),
-        })
+        blotter_entries.append(
+            {
+                "id": pos.get("position_id"),
+                "symbol": str(pos.get("symbol", clean_sym)).replace("/", ""),
+                "style": "INTRADAY",
+                "side": direction,
+                "score": 85,
+                "qualityBadge": "A",
+                "entryPrice": entry_p,
+                "entryZone": [round(entry_p * 0.999, 2), round(entry_p * 1.001, 2)],
+                "invalidationPrice": sl_p,
+                "stopLoss": sl_p,
+                "tpLadder": {
+                    "tp1": tp_p,
+                    "tp2": round(entry_p + 1.5 * (tp_p - entry_p), 2),
+                    "tp3": round(entry_p + 2.0 * (tp_p - entry_p), 2),
+                },
+                "riskRewardRatio": rr,
+                "suggestedRiskPct": risk_pct,
+                "notionalUsd": notional,
+                "halfKellyMultiplier": 0.5,
+                "state": "EXECUTED",
+                "stableDurationSecs": int(
+                    time.time() - float(pos.get("opened_at", time.time() * 1000)) / 1000
+                ),
+                "reaffirmsCount": 5,
+                "cooldownRemainingSecs": 0,
+                "thesis": pos.get("entry_reason")
+                or f"Autonomous {direction} position on {pos.get('symbol')}",
+                "createdAt": int(pos.get("opened_at", time.time() * 1000)),
+                "executedAt": int(pos.get("opened_at", time.time() * 1000)),
+                "unrealizedPnlUsd": round(unrealized, 2),
+            }
+        )
 
     # B. Pending signals from signal_blotter for human approval
     for s in signal_blotter:
@@ -1127,32 +1136,34 @@ async def get_master_terminal_telemetry(
         realized = float(cp.get("realized_pnl", 0.0))
         realized_r = round(realized / max(size * risk_dist, 1e-4), 2)
 
-        blotter_entries.append({
-            "id": cp.get("position_id"),
-            "symbol": str(cp.get("symbol", clean_sym)).replace("/", ""),
-            "style": "INTRADAY",
-            "side": direction,
-            "score": 80,
-            "qualityBadge": "A",
-            "entryPrice": entry_p,
-            "entryZone": [entry_p, entry_p],
-            "invalidationPrice": sl_p,
-            "stopLoss": sl_p,
-            "tpLadder": {"tp1": tp_p, "tp2": tp_p, "tp3": tp_p},
-            "riskRewardRatio": rr,
-            "suggestedRiskPct": 1.0,
-            "notionalUsd": round(size * entry_p, 2),
-            "halfKellyMultiplier": 0.5,
-            "state": "CLOSED",
-            "stableDurationSecs": 0,
-            "reaffirmsCount": 0,
-            "cooldownRemainingSecs": 0,
-            "thesis": cp.get("exit_reason") or "Closed Position",
-            "createdAt": int(cp.get("opened_at", time.time() * 1000)),
-            "closedAt": int(cp.get("closed_at", time.time() * 1000)),
-            "realizedPnlUsd": round(realized, 2),
-            "realizedR": realized_r,
-        })
+        blotter_entries.append(
+            {
+                "id": cp.get("position_id"),
+                "symbol": str(cp.get("symbol", clean_sym)).replace("/", ""),
+                "style": "INTRADAY",
+                "side": direction,
+                "score": 80,
+                "qualityBadge": "A",
+                "entryPrice": entry_p,
+                "entryZone": [entry_p, entry_p],
+                "invalidationPrice": sl_p,
+                "stopLoss": sl_p,
+                "tpLadder": {"tp1": tp_p, "tp2": tp_p, "tp3": tp_p},
+                "riskRewardRatio": rr,
+                "suggestedRiskPct": 1.0,
+                "notionalUsd": round(size * entry_p, 2),
+                "halfKellyMultiplier": 0.5,
+                "state": "CLOSED",
+                "stableDurationSecs": 0,
+                "reaffirmsCount": 0,
+                "cooldownRemainingSecs": 0,
+                "thesis": cp.get("exit_reason") or "Closed Position",
+                "createdAt": int(cp.get("opened_at", time.time() * 1000)),
+                "closedAt": int(cp.get("closed_at", time.time() * 1000)),
+                "realizedPnlUsd": round(realized, 2),
+                "realizedR": realized_r,
+            }
+        )
 
     active_blotter = blotter_entries if blotter_entries else signal_blotter
 
@@ -1537,7 +1548,9 @@ async def update_signal_approval(req: SignalApprovalRequest):
         open_pos = portfolio_shadow.get_open_positions()
         matching_pos = next((p for p in open_pos if p.get("position_id") == req.signalId), None)
         if matching_pos and action == "CLOSE":
-            closed_ok = portfolio_shadow.close_position(req.signalId, exit_reason="MANUAL_TERMINAL_CLOSE")
+            closed_ok = portfolio_shadow.close_position(
+                req.signalId, exit_reason="MANUAL_TERMINAL_CLOSE"
+            )
             return {
                 "success": closed_ok,
                 "signalId": req.signalId,
@@ -2049,17 +2062,27 @@ async def get_multi_desk_summary():
     from core.screener.radar_executor import radar_alpha_executor
 
     # 1. Sovereign Main Desk ($10,000)
-    main_acc = portfolio_shadow.get_portfolio_accounting(starting_capital=10000.0, book_id="MAIN_SOVEREIGN")
+    main_acc = portfolio_shadow.get_portfolio_accounting(
+        starting_capital=10000.0, book_id="MAIN_SOVEREIGN"
+    )
     main_open = portfolio_shadow.get_open_positions(book_id="MAIN_SOVEREIGN")
 
     # 2. Alpha Opportunity Radar Desk ($2,000)
     radar_summary = radar_alpha_executor.get_desk_summary()
 
     # 3. Darwinian Survival Arena Desk ($1,000)
-    arena_data: dict[str, Any] = {"specialists_count": 10, "initial_capital_per_specialist": 1000.0, "status": "ACTIVE_SURVIVAL"}
+    arena_data: dict[str, Any] = {
+        "specialists_count": 10,
+        "initial_capital_per_specialist": 1000.0,
+        "status": "ACTIVE_SURVIVAL",
+    }
 
     # 4. Canary Live Testnet Desk ($5,000)
-    canary_data: dict[str, Any] = {"venue": "BINANCE_FUTURES_TESTNET", "allocated_capital_usd": 5000.0, "status": "ARMED_HEALTHY"}
+    canary_data: dict[str, Any] = {
+        "venue": "BINANCE_FUTURES_TESTNET",
+        "allocated_capital_usd": 5000.0,
+        "status": "ARMED_HEALTHY",
+    }
 
     return {
         "sovereign_main_desk": {
@@ -2085,13 +2108,17 @@ async def get_multi_desk_summary():
 @terminal_router.get("/api/terminal/radar-alpha/candidates")
 async def get_radar_alpha_candidates():
     from core.screener.radar_executor import radar_alpha_executor
+
     return await radar_alpha_executor.evaluate_radar_candidates()
 
 
 @terminal_router.post("/api/terminal/radar-alpha/execute")
 async def execute_radar_alpha_candidate(candidate: dict[str, Any]):
     from core.screener.radar_executor import radar_alpha_executor
+
     pos_id = await radar_alpha_executor.execute_top_candidate(candidate)
     if not pos_id:
-        raise HTTPException(status_code=400, detail="Failed to execute candidate on $2,000 Alpha Desk.")
+        raise HTTPException(
+            status_code=400, detail="Failed to execute candidate on $2,000 Alpha Desk."
+        )
     return {"status": "SUCCESS", "position_id": pos_id}
