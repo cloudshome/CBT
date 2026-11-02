@@ -145,15 +145,16 @@ export class WSStateMachine {
 
   private startHeartbeatWatchdog(): void {
     this.clearHeartbeatWatchdog();
+    const checkInterval = Math.min(5000, Math.max(1000, Math.floor(this.heartbeatTimeoutMs / 2)));
     this.heartbeatTimer = setInterval(() => {
       const now = Date.now();
-      if (now - this.lastMessageTime > this.heartbeatTimeoutMs) {
+      if (now - this.lastMessageTime >= this.heartbeatTimeoutMs) {
         // Silent connection drop detected — force reconnect
         if (this.ws) {
           this.ws.close();
         }
       }
-    }, 5000);
+    }, checkInterval);
   }
 
   private resetHeartbeatWatchdog(): void {

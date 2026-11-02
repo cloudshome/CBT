@@ -125,6 +125,11 @@ def check_jest():
     assert res.returncode == 0, f"Jest failed:\n{res.stdout}\n{res.stderr}"
 
 
+def check_frontend_vitest():
+    res = run_npm("--prefix", "frontend", "test")
+    assert res.returncode == 0, f"Frontend Vitest failed:\n{res.stdout}\n{res.stderr}"
+
+
 def check_frontend_build():
     res = run_npm("--prefix", "frontend", "run", "build")
     assert res.returncode == 0, f"Frontend build failed:\n{res.stdout}\n{res.stderr}"
@@ -191,6 +196,7 @@ def main():
         ("TypeScript Linter (ESLint)", check_eslint),
         ("Pytest Quantitative Test Suite", check_pytest),
         ("Jest Desk & Backend Test Suite", check_jest),
+        ("Frontend Vitest UI Suite", check_frontend_vitest),
         ("Frontend Vite Production Build", check_frontend_build),
     ]
 

@@ -117,3 +117,4 @@ To ensure that development (`vite.config.ts`) and production (`nginx.conf` and `
    Any route prefix registered on `app.py` that is missing from `frontend/vite.config.ts` or `frontend/nginx.conf` immediately fails the test gate with an actionable error.
 3. **No Hidden Seams:**  
    Node Express only receives `/api/readiness`, `/api/metrics/*` (Node-specific metrics), and strictly labeled legacy fallback traffic with `X-Backend-Service: CTB-Express-Legacy` and `X-Authoritative-Backend: Python-FastAPI` response headers.
+
