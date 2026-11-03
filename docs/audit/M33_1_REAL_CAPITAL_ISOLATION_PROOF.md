@@ -74,3 +74,4 @@ All isolation invariants were verified green in `tests/test_milestone33_1_advers
 - `test_m33_1_compound_adversarial_injection_fails_closed` $\to$ **PASS**
 
 **Conclusion:** The live-capital boundary is mathematically closed and permanent.
+

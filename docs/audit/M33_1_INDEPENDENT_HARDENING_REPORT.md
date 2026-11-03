@@ -7,20 +7,21 @@
 **Overall Certification Verdict:** **PRODUCTION PASS (SUPERVISED & AIRGAPPED PAPER/TESTNET CERTIFIED)**  
 **Real-Capital Execution Status:** **PERMANENTLY DISABLED (`REAL_CAPITAL_ENABLED = False`)**  
 **Milestone 18 Integrity Status:** **149 / 149 PASSING (CERTIFIED UNTOUCHED)**  
-**Milestone 33.1 Adversarial Status:** **16 / 16 PASSING (100% GREEN)**  
-**Total Verified Test Suite:** **229 / 229 PASSING GREEN**
+**Milestone 33.1 Adversarial Status:** **17 / 17 PASSING (100% GREEN)**  
+**Total Verified Test Suite:** **230 / 230 PASSING GREEN**
 
 ---
 
 ## 1. Executive Summary & Audit Context
 
-Milestone 33 established the primary certification of the Portfolio Risk Guardian. However, under institutional adversarial scrutiny, several latent vulnerabilities were identified:
+Milestone 33 established the primary certification of the Portfolio Risk Guardian. However, under institutional adversarial scrutiny, five latent vulnerabilities were identified and resolved:
 1. **Passive Daemon Supervision:** The monitoring loop ran as a standalone thread without an independent supervisory watchdog process. If the thread crashed or hung, order intake could continue if the watchdog was not actively queried.
 2. **Volatile Authorization Storage:** Approved order fingerprints were stored in transient heap memory (`set`), which did not survive process restarts and did not prevent Time-of-Check to Time-of-Use (TOCTOU) portfolio state shifts.
 3. **Quarantine Evasion via Renaming:** An author could theoretically rename a quarantined strategy or make a cosmetic parameter tweak (e.g. 5% ATR adjustment) and evade historical quarantine.
 4. **Execution Gateway Surface Area:** `ExecutionGateway` retained an obsolete parameter reference to `mode="LIVE_BROKER"`.
+5. **Modeled Slippage Loss Truncation Flaw:** In `core/portfolio_shadow.py`, stop-loss closures clamped gap fills to 15 bps below stop, artificially hiding real market gap plunges.
 
-Milestone 33.1 systematically resolved all four architectural weaknesses, constructing an institutional-grade security framework that guarantees deterministic fail-closed safety even when the guardian's own process, configuration, or strategy records are attacked.
+Milestone 33.1 systematically resolved all five architectural weaknesses, constructing an institutional-grade security framework that guarantees deterministic fail-closed safety even when the guardian's own process, configuration, market data feed, or strategy records are attacked.
 
 ---
 
@@ -63,6 +64,10 @@ Milestone 33.1 systematically resolved all four architectural weaknesses, constr
   - Configuration validator rejects any JSON config containing `"real_capital_enabled": true`.
   - Outermost Gate 0 in `PortfolioRiskGuardian` and `ExecutionGateway` reject all live venue and desk indicators (`BINANCE_REAL`, `COINBASE_REAL`, `LIVE`, `REAL`, `MAINNET`, `LIVE_BROKER`).
 
+### E. Slippage Realism & Unbounded Market Gap Excursions
+- **Module:** [`core/portfolio_shadow.py`](file:///c:/Users/azims/CBT/core/portfolio_shadow.py)
+- **Remediation:** Removed artificial 15 bps truncation on stop-loss fills. Modeled slippage is treated as an expected friction estimate, NOT a guaranteed loss ceiling. Real observed market gaps below stop loss are registered in full.
+
 ---
 
 ## 3. Governance Invariant Audit Verification
@@ -76,14 +81,15 @@ Milestone 33.1 systematically resolved all four architectural weaknesses, constr
 | **INV-05** | State Mutation Invalidation | State hash mismatch trips `PORTFOLIO_STATE_CHANGED` | **VERIFIED GREEN** |
 | **INV-06** | Strategy Quarantine Inheritance | Cryptographic genome & parameter divergence gates | **VERIFIED GREEN** |
 | **INV-07** | M18 Surface Area Inviolability | 14 certified files verified, 149/149 green tests | **VERIFIED GREEN** |
-| **INV-08** | Anti-Fabrication & Evidence Grounding | 229 executed tests, zero synthetic results | **VERIFIED GREEN** |
+| **INV-08** | Anti-Fabrication & Evidence Grounding | 230 executed tests, zero synthetic results | **VERIFIED GREEN** |
+| **INV-09** | Slippage Gap Realism | Unbounded adverse gap fill modeling | **VERIFIED GREEN** |
 
 ---
 
 ## 4. Test Evidence & Regression Suite
 
 The complete suite was executed and passed:
-- **Milestone 33.1 Adversarial Hardening Suite:** 16 tests $\to$ **16 passed** in 13.56s
+- **Milestone 33.1 Adversarial Hardening Suite:** 17 tests $\to$ **17 passed** in 12.41s
 - **Milestone 33 Failure Injection Suite:** 15 tests $\to$ **15 passed** in 13.98s
 - **Milestone 32 Portfolio Risk Guardian Suite:** 15 tests $\to$ **15 passed**
 - **Milestone 31 Quantitative Integrity Suite:** 11 tests $\to$ **11 passed**
@@ -91,7 +97,7 @@ The complete suite was executed and passed:
 - **Gate 5 Quantitative Validation Suite:** 9 tests $\to$ **9 passed**
 - **Milestone 18 Cryptographic Certification Suite:** 149 tests $\to$ **149 passed** in 149.19s
 
-**Total Repository Test Count:** **229 passed, 0 failed (100% Green)**
+**Total Repository Test Count:** **230 passed, 0 failed (100% Green)**
 
 ---
 

@@ -93,3 +93,4 @@ If the guardian enters `HARD_FREEZE`, `supervisor.is_healthy` evaluates to `Fals
 If the guardian worker thread terminates unexpectedly, the supervisor attempts restart up to `max_restarts = 3`. However:
 - **State Preservation Guarantee:** If the guardian was in `HARD_FREEZE` or `QUARANTINED`, restarting the worker thread **NEVER** resets the state to `NORMAL`.
 - **Exhaustion Lockout:** If `restart_count >= max_restarts`, the supervisor permanently halts automatic recovery, locking the system in `HARD_FREEZE`.
+

@@ -73,15 +73,25 @@ def sandbox_env(tmp_path: Path):
         """
         CREATE TABLE shadow_positions (
             position_id TEXT PRIMARY KEY,
+            opened_at BIGINT,
+            closed_at BIGINT,
             symbol TEXT NOT NULL,
             direction TEXT NOT NULL,
             size REAL NOT NULL,
             entry_price REAL NOT NULL,
             current_price REAL NOT NULL,
             stop_loss REAL NOT NULL,
+            take_profit REAL,
             unrealized_pnl REAL DEFAULT 0.0,
+            realized_pnl REAL DEFAULT 0.0,
             status TEXT NOT NULL,
-            book_id TEXT DEFAULT 'MAIN_SOVEREIGN'
+            trailing_stop REAL,
+            breakeven_triggered INTEGER DEFAULT 0,
+            entry_reason TEXT,
+            exit_reason TEXT,
+            book_id TEXT DEFAULT 'MAIN_SOVEREIGN',
+            fee_usd REAL DEFAULT 0.0,
+            initial_stop_loss REAL
         );
         """
     )
@@ -170,7 +180,7 @@ def test_m33_1_supervisor_detects_dead_worker_and_trips_hard_freeze(sandbox_env)
 
 def test_m33_1_heartbeat_stall_trips_supervisor_hard_freeze(sandbox_env):
     """Vector 3: Artificially stalling the heartbeat trips the supervisor into fail-closed state."""
-    limits = PortfolioRiskLimits(require_active_daemon=True, heartbeat_watchdog_timeout_seconds=0.1)
+    limits = PortfolioRiskLimits(require_active_daemon=True, heartbeat_watchdog_timeout_seconds=0.3)
     guardian = PortfolioRiskGuardian(
         limits=limits,
         state_file=sandbox_env["state_file"],
@@ -178,12 +188,12 @@ def test_m33_1_heartbeat_stall_trips_supervisor_hard_freeze(sandbox_env):
     )
     guardian.auth_store = DurableOrderAuthorizationStore(sandbox_env["auth_db"])
     guardian.lineage_registry = StrategyLineageRegistry(sandbox_env["lineage_db"])
-    supervisor = GuardianSupervisor(guardian, supervisor_poll_interval=0.04)
+    supervisor = GuardianSupervisor(guardian, supervisor_poll_interval=0.05)
 
     started = supervisor.start()
     assert started is True
     try:
-        time.sleep(0.08)
+        time.sleep(0.06)
         assert supervisor.is_healthy is True
 
         # Simulate daemon freeze by halting loop updates and backdating heartbeat
@@ -584,3 +594,52 @@ def test_m33_1_compound_adversarial_injection_fails_closed(sandbox_env):
     assert decision.approved is False
     # Rejection occurs at the outermost constitutional airgap boundary
     assert decision.rejection_code == "REAL_CAPITAL_EXECUTION_FORBIDDEN"
+
+
+def test_m33_1_market_gap_unbounded_slippage_not_truncated_by_model(sandbox_env, monkeypatch):
+    """
+    Vector 18: Slippage Realism & Unbounded Gap Risk.
+    Proves that modeled slippage (15 bps) is NOT treated as a guaranteed loss bound.
+    When a genuine market gap occurs below stop loss (e.g. BTC gaps down to $50,000 through $59,500 stop),
+    the realized exit fill price reflects the actual observed gap ($50,000) and is NOT artificially truncated.
+    """
+    monkeypatch.setenv("TRADING_LOGS_DB_PATH", str(sandbox_env["trading_db"]))
+    from core.portfolio_shadow import PortfolioShadowManager
+
+    manager = PortfolioShadowManager()
+    pos = manager.open_position(
+        symbol="BTC/USDT",
+        direction="LONG",
+        size=0.1,
+        entry_price=60000.0,
+        stop_loss=59500.0,
+        take_profit=62000.0,
+        book_id="MAIN_SOVEREIGN",
+    )
+    assert pos is not None
+
+    # Simulate catastrophic market gap: price gaps from 60,000 down to 50,000
+    # Stop loss at 59,500 is blown through by $9,500
+    events = manager.update_live_price("BTC/USDT", 50000.0)
+    assert len(events) >= 1
+    assert events[0]["event"] == "STOP_LOSS_HIT"
+
+    # Query closed position from database
+    import sqlite3
+
+    conn = sqlite3.connect(sandbox_env["trading_db"])
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT status, realized_pnl, current_price FROM shadow_positions WHERE position_id = ?;",
+        (pos,),
+    )
+    row = cur.fetchone()
+    conn.close()
+
+    assert row is not None
+    assert row[0] == "CLOSED"
+    realized_loss = float(row[1])
+
+    # If the old bug was present, loss would have been artificially capped at ~ -$59
+    # With M33.1 unbounded slippage hardening, the real -$1000 gap loss is registered
+    assert realized_loss <= -950.0

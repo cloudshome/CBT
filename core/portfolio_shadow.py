@@ -677,23 +677,28 @@ class PortfolioShadowManager:
                     final_pnl = round(prior_realized_pnl + remaining_pnl - rem_fee, 4)
                 elif close_reason == "STOP_LOSS_HIT":
                     # Realistic Exchange Stop-Loss Fill Model:
-                    # On an exchange, a resting stop loss triggers at active_sl with institutional slippage (max 15 bps adverse gap).
-                    # This prevents telemetry polling lag from synthesizing an unphysical multi-R loss.
+                    # A resting stop-loss becomes an aggressive taker order upon trigger.
+                    # CRITICAL AUDIT HARDENING (M33.1):
+                    # Separate expected, stressed, observed, and unbounded execution slippage.
+                    # Modeled slippage is an expected friction estimate, NOT an artificial
+                    # loss truncation floor that caps catastrophic market gaps.
                     slippage_buffer = 0.0015
                     if is_long:
                         sl_with_slippage = round(active_sl * (1.0 - slippage_buffer), 6)
+                        # If market gapped down past stop, fill price reflects observed gap
                         exit_fill_price = (
-                            max(min(active_sl, current_price), sl_with_slippage)
+                            min(active_sl, current_price, sl_with_slippage)
                             if current_price > 0
-                            else active_sl
+                            else sl_with_slippage
                         )
                         remaining_pnl = (exit_fill_price - entry_p) * size
                     else:
                         sl_with_slippage = round(active_sl * (1.0 + slippage_buffer), 6)
+                        # If market gapped up past stop, fill price reflects observed gap
                         exit_fill_price = (
-                            min(max(active_sl, current_price), sl_with_slippage)
+                            max(active_sl, current_price, sl_with_slippage)
                             if current_price > 0
-                            else active_sl
+                            else sl_with_slippage
                         )
                         remaining_pnl = (entry_p - exit_fill_price) * size
                     rem_notional = (entry_p * size) + (exit_fill_price * size)

@@ -87,3 +87,4 @@ $$\mathcal{D}\left(P_1, P_2\right) = \frac{1}{|\mathcal{K}|} \sum_{k \in \mathca
 The audit confirmed that the lineage inheritance logic does **not** over-penalize unrelated strategies:
 - Strategies that operate on different genomes (e.g. mean-reversion cointegration pairs vs momentum breakout) produce distinct $\mathcal{G}$ hashes and are evaluated independently.
 - Parameter divergence checks are scoped to strategies sharing lineage families or genome templates, preventing unrelated strategies sharing standard risk parameters (such as $0.25\%$ risk) from cross-contaminating quarantine records.
+

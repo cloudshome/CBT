@@ -1,0 +1,44 @@
+{
+  "manifest_id": "M33_1_CERTIFICATION_MANIFEST",
+  "version": "1.0.0",
+  "certification_date": "2026-11-03T18:45:00Z",
+  "certification_verdict": "PRODUCTION PASS (SUPERVISED & AIRGAPPED PAPER/TESTNET CERTIFIED)",
+  "real_capital_enabled": false,
+  "governance_invariants": {
+    "INV-01": "REAL_CAPITAL_ENABLED = False permanently locked and immutable",
+    "INV-02": "Independent supervisor actively monitors guardian heartbeat and thread vitality",
+    "INV-03": "Durable single-use order authorizations stored in SQLite with atomic CAS consumption",
+    "INV-04": "Portfolio state versioning invalidates stale approvals on state shift",
+    "INV-05": "Strategy Lineage Registry cryptographically enforces quarantine inheritance",
+    "INV-06": "Unbounded market gap slippage is respected; modeled slippage is never a loss truncation floor",
+    "INV-07": "M18 certified surface area remains 100% untouched and passing (149/149 green)",
+    "INV-08": "Historical 52-trade strategy remains in permanent QUARANTINED status"
+  },
+  "verified_test_counts": {
+    "m33_1_adversarial_tests": 17,
+    "m33_failure_injection_tests": 15,
+    "m32_risk_guardian_tests": 15,
+    "m31_quantitative_integrity_tests": 11,
+    "gate5_adversarial_forensics_tests": 14,
+    "gate5_quantitative_validation_tests": 9,
+    "milestone18_cryptographic_tests": 149,
+    "total_verified_green_tests": 230
+  },
+  "certified_file_hashes": {
+    "core/risk/execution_isolation.py": "f6ab0e445f5e58fa9bf6bf7e422de832b3287b7a0d36b5e13aa754480246eff8",
+    "core/risk/guardian_supervisor.py": "4a9203bcafdac56945992628f9e1f493ddd8a25e201a9f5792a36209b2be5d04",
+    "core/risk/order_authorization.py": "baf31a3cdee8fee500b02ac3186238e2ed7fb95b96dcc1921bce41e32d4c3f52",
+    "core/risk/portfolio_risk_guardian.py": "961ae673ba2681840f12caf6bd2fdd168e2fb3dfabb245adf3d32d44303d1b9a",
+    "core/risk/strategy_lineage_registry.py": "e5d4e3e4ea71f3664451ea28443797ec5cef97b75d20b445a7e1fbee7ad2abbe",
+    "core/portfolio_shadow.py": "dd3e49ffc82e8bb0316bba43ecb6b179229fa776d0750fd7905aba5d7285116f",
+    "core/execution_gateway.py": "d6f6f8973eb8c2479add54df16ff31951c4650fa343420c95efd1dd8bdcbd11f",
+    "tests/test_milestone33_1_adversarial.py": "6629b9fcded887050ded84c5a602e005c69863e4cbd8e3e57d7020154349ca5e",
+    "tests/test_milestone33_failure_injection.py": "894349a82444f95299e68d7257df0187c6b620b802abfe80cf0c49943e617ee6"
+  },
+  "m18_certification_reference": {
+    "certified_commit": "c9cc1cad780453b81032f6b1b1b81117d41c060f",
+    "certified_test_count": 149,
+    "test_identity_sha256": "2acbff25f391249cb1881bd40a4440384cecdd7682c6f83b91487d8744d0b57b",
+    "status": "ACTIVE_PRODUCTION_PASS"
+  }
+}

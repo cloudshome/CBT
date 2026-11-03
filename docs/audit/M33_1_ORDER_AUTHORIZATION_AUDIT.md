@@ -76,3 +76,4 @@ Any post-approval mutation of size (e.g. attempting to scale from $0.05 \to 0.50
 The exact risk state of the portfolio at the instant of evaluation is captured:
 $$\text{Version} = \text{SHA256}\left(\text{CircuitBreakerState} \parallel E_{\text{MtM}} \parallel N_{\text{open\_positions}} \parallel \text{Drawdown}_{\%}\right)$$
 If an order approval is delayed while another position fills or drawdown worsens, the current state version diverges from the evaluated version, triggering immediate fail-closed invalidation.
+
