@@ -31,6 +31,16 @@ export function createApp(): Express {
       'comma-separated origin allowlist (not "*") when NODE_ENV=production.'
     );
   }
+
+  // --- API Key Fail-Closed Check in Production ---
+  if (
+    process.env.NODE_ENV === 'production' &&
+    (!process.env.API_KEY || process.env.API_KEY.trim().length < 16)
+  ) {
+    throw new Error(
+      'Security misconfiguration: API_KEY must be configured with at least 16 characters when NODE_ENV=production.'
+    );
+  }
   app.use(cors({
     origin: corsOrigin && !allowWildcard ? corsOrigin.split(',').map(o => o.trim()) : '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -122,7 +132,7 @@ export function createApp(): Express {
 
 export const app = createApp();
 
-const PORT = process.env.NODE_PORT || 3000;
+const PORT = process.env.NODE_PORT || process.env.PORT || 3000;
 
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {

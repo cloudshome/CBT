@@ -42,6 +42,7 @@ from core.analogue_engine import analogue_engine
 from core.api_health_guard import api_health_guard
 from core.arbitrage.cexdex_routes import router as cexdex_router
 from core.arbitrage.routes import router as arbitrage_router
+from core.arena import arena_router
 from core.asset_dossier_engine import asset_dossier_engine
 from core.audit_bus import audit_bus
 from core.auth import (
@@ -50,6 +51,7 @@ from core.auth import (
     mask_secret,
     require_api_key,
     sanitize_text,
+    validate_production_security_config,
 )
 from core.auth.hardware_key_routes import hardware_key_router
 from core.autonomous_auditor import autonomous_risk_auditor
@@ -64,10 +66,6 @@ from core.autonomous_research.storage.storage_manager import storage_manager
 from core.autonomous_research.storage.storage_manifest import storage_manifest
 from core.autonomous_trader import autonomous_trader
 from core.collective.routes import router as collective_router
-from core.screener import screener_router
-from core.arena import arena_router
-from core.temporal_intelligence import temporal_router
-from core.screener.opportunity_hunter import opportunity_hunter
 from core.collective.sync_daemon import cluster_sync_daemon
 from core.command_executor import command_executor
 from core.conservative_kelly import conservative_kelly
@@ -162,6 +160,8 @@ from core.risk_engine.routes import router as risk_engine_router
 from core.sandbox_lab import sandbox_lab
 from core.scenario_engine import scenario_engine
 from core.scenario_monitor import scenario_monitor
+from core.screener import screener_router
+from core.screener.opportunity_hunter import opportunity_hunter
 from core.sentiment_engine import sentiment_engine
 from core.setup_service import setup_router
 from core.shadow_burn_in_orchestrator import shadow_burn_in_orchestrator
@@ -189,6 +189,7 @@ from core.strategy_league import strategy_league_manager
 from core.system_evolver import system_evolver
 from core.telegram.jobs import job_manager
 from core.telegram_bot import telegram_bot
+from core.temporal_intelligence import temporal_router
 from core.terminal_routes import terminal_router
 from core.ttl_cache import market_state_cache, sky_decision_cache
 from core.uncertainty_engine import uncertainty_engine
@@ -219,6 +220,9 @@ logger = logging.getLogger("ai_quant_sentinel.app")
 @asynccontextmanager
 async def lifespan_ctx(_app: FastAPI) -> AsyncIterator[None]:
     """Startup/shutdown lifecycle (replaces deprecated @app.on_event)."""
+    # Enforce fail-closed security configuration in production
+    validate_production_security_config()
+
     db_manager.init_all_schemas()
     # Reconcile any orphaned running jobs on boot
     job_manager.reconcile_orphaned_jobs()
@@ -235,6 +239,7 @@ async def lifespan_ctx(_app: FastAPI) -> AsyncIterator[None]:
         asyncio.create_task(telegram_bot.start_polling()),
         asyncio.create_task(telegram_bot.start_continuous_broadcaster(interval_seconds=180)),
         asyncio.create_task(sky_decision_cache.start_sweeper_loop(interval_sec=60)),
+        asyncio.create_task(market_state_cache.start_sweeper_loop(interval_sec=60)),
         asyncio.create_task(autonomous_trader.start_loop()),
         asyncio.create_task(shadow_burn_in_orchestrator.start_loop()),
         asyncio.create_task(hf_telemetry_pipeline.start_flush_loop()),
@@ -4122,8 +4127,8 @@ async def get_mastermind_opportunity_signals(
     Returns live qualified market opportunities enriched with dynamic specialist signals,
     earlyness/timing classification, risk-reward ratios, and multi-venue links.
     """
-    from core.screener.opportunity_hunter import opportunity_hunter
     from core.mastermind.mastermind_arbiter import mastermind_arbiter
+    from core.screener.opportunity_hunter import opportunity_hunter
 
     opps = await opportunity_hunter.scan_market(force_refresh=force_refresh)
 

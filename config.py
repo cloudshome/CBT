@@ -218,7 +218,7 @@ PAPER_MAX_CANDLES_PER_CHECK = int(os.getenv("PAPER_MAX_CANDLES_PER_CHECK", "1000
 BACKTEST_HORIZONS = [float(h) for h in os.getenv("BACKTEST_HORIZONS", "1,4,24").split(",")]
 BACKTEST_MIN_BARS = int(os.getenv("BACKTEST_MIN_BARS", "120"))
 BACKTEST_STEP = int(os.getenv("BACKTEST_STEP", "1"))
-EXECUTION_MODEL = os.getenv("EXECUTION_MODEL", "none")  # none | slip | impact
+EXECUTION_MODEL = os.getenv("EXECUTION_MODEL", "slip")  # none | slip | impact
 
 # ── Calibration (self-improvement) ───────────────────────────────────────
 # Trust thresholds follow the roadmap: >=100 backtest samples and >=20 decided

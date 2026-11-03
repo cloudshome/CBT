@@ -9,6 +9,7 @@ services:
     restart: always
     environment:
       - PORT=8000
+      - APP_ENV=production
       - ENVIRONMENT=production
       - DATA_DIR=/app/data
       - API_KEY=${API_KEY}

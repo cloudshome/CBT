@@ -49,7 +49,7 @@ To eliminate dual-backend divergence, the service responsibilities are frozen as
        ┌─────────────────────────┐     ┌─────────────────────────┐
        │     PYTHON FASTAPI      │     │      NODE / EXPRESS     │
        │    (AUTHORITATIVE)      │     │   (LEGACY COMPATIBILITY)│
-       │   Port 8000 / app.py    │     │   Port 3001 / server.ts │
+       │   Port 8000 / app.py    │     │   Port 3000 / server.ts │
        └────────────┬────────────┘     └────────────┬────────────┘
                     │                               │
                     │ All Quant, Risk, Orders       │ Legacy metrics & dev

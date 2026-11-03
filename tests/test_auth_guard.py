@@ -91,3 +91,60 @@ def test_strategy_compile_protected_by_auth(client, monkeypatch):
     )
     assert res_with_key.status_code == 200
     assert "status" in res_with_key.json()
+
+
+def test_validate_production_security_config_in_development(monkeypatch):
+    """In development mode, validate_production_security_config does not raise."""
+    monkeypatch.setenv("APP_ENV", "development")
+    monkeypatch.setenv("ENVIRONMENT", "development")
+    monkeypatch.setattr(auth_mod, "API_KEY", "")
+    monkeypatch.delenv("CORS_ORIGIN", raising=False)
+    # Should not raise
+    auth_mod.validate_production_security_config()
+
+
+def test_validate_production_security_config_missing_or_short_key(monkeypatch):
+    """In production mode, missing or < 16-char API_KEY raises RuntimeError."""
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("CORS_ORIGIN", "https://terminal.skylabs.io")
+
+    # Empty key
+    monkeypatch.setattr(auth_mod, "API_KEY", "")
+    monkeypatch.delenv("API_KEY", raising=False)
+    with pytest.raises(RuntimeError, match="API_KEY must be configured with at least 16 characters"):
+        auth_mod.validate_production_security_config()
+
+    # Short key (<16 chars)
+    monkeypatch.setattr(auth_mod, "API_KEY", "short-key-123")
+    monkeypatch.setenv("API_KEY", "short-key-123")
+    with pytest.raises(RuntimeError, match="API_KEY must be configured with at least 16 characters"):
+        auth_mod.validate_production_security_config()
+
+
+def test_validate_production_security_config_wildcard_cors(monkeypatch):
+    """In production mode, wildcard or empty CORS_ORIGIN raises RuntimeError."""
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setattr(auth_mod, "API_KEY", "super-secret-key-that-is-long-enough-32char")
+    monkeypatch.setenv("API_KEY", "super-secret-key-that-is-long-enough-32char")
+
+    # Wildcard CORS
+    monkeypatch.setenv("CORS_ORIGIN", "*")
+    with pytest.raises(RuntimeError, match="CORS_ORIGIN must be set to an explicit allowlist"):
+        auth_mod.validate_production_security_config()
+
+    # Empty CORS
+    monkeypatch.delenv("CORS_ORIGIN", raising=False)
+    with pytest.raises(RuntimeError, match="CORS_ORIGIN must be set to an explicit allowlist"):
+        auth_mod.validate_production_security_config()
+
+
+def test_validate_production_security_config_valid(monkeypatch):
+    """In production mode with valid key and explicit CORS, passes cleanly."""
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setattr(auth_mod, "API_KEY", "super-secret-key-that-is-long-enough-32char")
+    monkeypatch.setenv("API_KEY", "super-secret-key-that-is-long-enough-32char")
+    monkeypatch.setenv("CORS_ORIGIN", "https://terminal.skylabs.io,https://app.skylabs.io")
+
+    # Should not raise
+    auth_mod.validate_production_security_config()
+

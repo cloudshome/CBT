@@ -106,4 +106,44 @@ describe('API Key Authentication Middleware', () => {
       expect(res.body.data).toEqual({ trade: 'ETH' });
     });
   });
+
+  describe('Production Environment Fail-Closed Startup', () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalCorsOrigin = process.env.CORS_ORIGIN;
+    const originalApiKey = process.env.API_KEY;
+
+    afterEach(() => {
+      process.env.NODE_ENV = originalNodeEnv;
+      process.env.CORS_ORIGIN = originalCorsOrigin;
+      process.env.API_KEY = originalApiKey;
+    });
+
+    it('should throw an error when starting in production without API_KEY', () => {
+      process.env.NODE_ENV = 'production';
+      process.env.CORS_ORIGIN = 'https://app.skylabs.io';
+      delete process.env.API_KEY;
+
+      jest.isolateModules(() => {
+        expect(() => {
+          require('../src/server');
+        }).toThrow(
+          /Security misconfiguration: API_KEY must be configured with at least 16 characters/
+        );
+      });
+    });
+
+    it('should throw an error when starting in production with API_KEY < 16 chars', () => {
+      process.env.NODE_ENV = 'production';
+      process.env.CORS_ORIGIN = 'https://app.skylabs.io';
+      process.env.API_KEY = 'short-key-123';
+
+      jest.isolateModules(() => {
+        expect(() => {
+          require('../src/server');
+        }).toThrow(
+          /Security misconfiguration: API_KEY must be configured with at least 16 characters/
+        );
+      });
+    });
+  });
 });

@@ -93,6 +93,28 @@ async def require_api_key(
         )
 
 
+def validate_production_security_config() -> None:
+    """
+    Fail-closed security check executed at server boot.
+    In production (APP_ENV or ENVIRONMENT == 'production'):
+      - API_KEY must be set and >= 16 characters.
+      - CORS_ORIGIN must be set to an explicit allowlist (not unset, empty, or wildcard '*').
+    Raises RuntimeError on any misconfiguration.
+    """
+    env = os.getenv("APP_ENV", os.getenv("ENVIRONMENT", "development")).lower()
+    if env == "production":
+        key = globals().get("API_KEY", "") or os.getenv("API_KEY", "")
+        if not key or len(key.strip()) < 16:
+            raise RuntimeError(
+                "Production Security Misconfiguration: API_KEY must be configured with at least 16 characters in production."
+            )
+        cors_origin = os.getenv("CORS_ORIGIN", "")
+        if not cors_origin or cors_origin.strip() == "*":
+            raise RuntimeError(
+                "Production Security Misconfiguration: CORS_ORIGIN must be set to an explicit allowlist (not wildcard '*') in production."
+            )
+
+
 __all__ = [
     "API_KEY",
     "BinanceSigner",
@@ -109,5 +131,6 @@ __all__ = [
     "require_api_key",
     "sanitize_dict",
     "sanitize_text",
+    "validate_production_security_config",
     "zeroize_bytes",
 ]

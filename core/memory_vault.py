@@ -19,6 +19,8 @@ from core.database import db_manager
 
 logger = logging.getLogger("ai_quant_sentinel.memory_vault")
 
+MAX_IN_MEMORY_VECTORS = int(os.getenv("MAX_IN_MEMORY_VECTORS", "10000"))
+
 
 class SemanticVectorStore:
     """
@@ -26,8 +28,9 @@ class SemanticVectorStore:
     Eliminates whole-file JSON rewriting and provides sub-millisecond matrix-multiplication queries.
     """
 
-    def __init__(self, storage_path: Path):
+    def __init__(self, storage_path: Path, max_in_memory_vectors: int | None = None):
         self.storage_path = storage_path
+        self.max_in_memory_vectors = max_in_memory_vectors or MAX_IN_MEMORY_VECTORS
         self.embeddings: list[np.ndarray] = []
         self.documents: list[str] = []
         self.metadatas: list[dict[str, Any]] = []
@@ -98,16 +101,19 @@ class SemanticVectorStore:
             except Exception as e:
                 logger.warning(f"Legacy vector migration notice: {e}")
 
-        # 2. Load from SQLite
+        # 2. Load from SQLite bounded by max_in_memory_vectors
         self.documents = []
         self.metadatas = []
         self.embeddings = []
         try:
             with db_manager.get_brain_conn() as conn:
                 cursor = conn.execute(
-                    "SELECT doc_id, text, metadata_json, embedding FROM semantic_vectors ORDER BY created_at ASC"
+                    "SELECT doc_id, text, metadata_json, embedding FROM semantic_vectors "
+                    "ORDER BY created_at DESC LIMIT ?",
+                    (self.max_in_memory_vectors,),
                 )
-                for row in cursor.fetchall():
+                rows = cursor.fetchall()
+                for row in reversed(rows):
                     d_id, txt, meta_str, embed_bytes = row
                     meta = json.loads(meta_str) if meta_str else {}
                     meta["id"] = d_id
@@ -167,10 +173,16 @@ class SemanticVectorStore:
         self.documents.append(text)
         self.metadatas.append(meta)
         self.embeddings.append(vec)
-        if self.embeddings_matrix is None:
-            self.embeddings_matrix = np.expand_dims(vec, axis=0)
+        if len(self.documents) > self.max_in_memory_vectors:
+            self.documents.pop(0)
+            self.metadatas.pop(0)
+            self.embeddings.pop(0)
+            self.embeddings_matrix = np.vstack(self.embeddings)
         else:
-            self.embeddings_matrix = np.vstack([self.embeddings_matrix, vec])
+            if self.embeddings_matrix is None:
+                self.embeddings_matrix = np.expand_dims(vec, axis=0)
+            else:
+                self.embeddings_matrix = np.vstack([self.embeddings_matrix, vec])
 
     def query(self, query_text: str, top_k: int = 5) -> list[dict[str, Any]]:
         """Executes ultra-fast vectorized matrix multiplication similarity search."""
