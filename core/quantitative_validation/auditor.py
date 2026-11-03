@@ -19,6 +19,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from core.audit.hash_chained_ledger import HashChainedEvidenceLedger
+
 from .metrics import TradeReturn
 from .state_machine import Gate5EvaluationResult, evaluate_gate5_lifecycle
 
@@ -224,6 +226,61 @@ def compute_evidence_digest(db_path: Path | str) -> str:
     return hashlib.sha256(canonical_data.encode("utf-8")).hexdigest()
 
 
+def compute_evidence_chain_tip(db_path: Path | str) -> str:
+    """
+    Constructs a sequential cryptographic hash chain over all closed trades
+    and returns the verifiable chain-tip SHA-256 hash.
+    """
+    target = Path(db_path)
+    if not target.exists():
+        return "DATABASE_NOT_FOUND"
+
+    conn = sqlite3.connect(target)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    tables = {r[0] for r in cur.fetchall()}
+    if "shadow_positions" not in tables:
+        conn.close()
+        return "NO_DATA"
+
+    cur.execute("PRAGMA table_info(shadow_positions);")
+    pos_cols = {col[1] for col in cur.fetchall()}
+    id_col = "position_id" if "position_id" in pos_cols else "id"
+    curr_expr = "current_price" if "current_price" in pos_cols else "entry_price AS current_price"
+
+    cur.execute(
+        f"SELECT {id_col} AS trade_id, symbol, direction, entry_price, {curr_expr}, size, "
+        f"stop_loss, realized_pnl, opened_at, closed_at, status "
+        f"FROM shadow_positions WHERE status = 'CLOSED' ORDER BY COALESCE(closed_at, opened_at) ASC;"
+    )
+    rows = cur.fetchall()
+    conn.close()
+
+    chain = HashChainedEvidenceLedger()
+    for r in rows:
+        ep = float(r["entry_price"] or 1.0)
+        curr_p = float(r["current_price"] or ep)
+        sl = float(r["stop_loss"] or (ep * 0.98))
+        sz = float(r["size"] or 1.0)
+        risk_usd = max(25.0, abs(ep - sl) * sz)
+        t_dict = {
+            "trade_id": str(r["trade_id"]),
+            "symbol": str(r["symbol"]),
+            "direction": str(r["direction"]),
+            "entry_price": ep,
+            "exit_price": curr_p,
+            "size": sz,
+            "realized_pnl_usd": float(r["realized_pnl"] or 0.0),
+            "initial_risk_usd": risk_usd,
+            "opened_at_ms": int(r["opened_at"] or 0),
+            "closed_at_ms": int(r["closed_at"] or 0),
+        }
+        chain.append_trade(t_dict)
+
+    return chain.chain_tip
+
+
 def generate_audit_manifest(
     result: Gate5EvaluationResult,
     db_path: Path | str | None = None,
@@ -233,6 +290,7 @@ def generate_audit_manifest(
     Generates a cryptographic, machine-readable audit manifest.
     Computes a SHA-256 fingerprint binding:
     - Input trade evidence digest
+    - Cryptographic hash-chain tip
     - Database path
     - Code Git commit SHA
     - Configuration and statistical methodology
@@ -241,15 +299,17 @@ def generate_audit_manifest(
     """
     db_target = Path(db_path) if db_path else (ROOT_DIR / "data" / "trading_logs.db")
     evidence_digest = compute_evidence_digest(db_target)
+    chain_tip = compute_evidence_chain_tip(db_target)
     git_sha = get_git_commit_sha()
     now_utc = datetime.now(UTC).isoformat()
 
     manifest_payload: dict[str, Any] = {
-        "manifest_version": "2.1.0",
+        "manifest_version": "2.2.0",
         "timestamp_utc": now_utc,
         "git_commit_sha": git_sha,
         "database_inspected": str(db_target),
         "evidence_digest_sha256": evidence_digest,
+        "chain_tip_hash_sha256": chain_tip,
         "methodology": {
             "bootstrap_samples": 2000,
             "bootstrap_seed": 42,
@@ -331,5 +391,16 @@ def verify_audit_manifest(
             f"TAMPERED_EVIDENCE: Database digest {current_evidence_digest} "
             f"does not match recorded digest {recorded_digest}",
         )
+
+    # 3. Verify cryptographic hash chain tip
+    if "chain_tip_hash_sha256" in manifest:
+        current_chain_tip = compute_evidence_chain_tip(target_db)
+        recorded_chain_tip = manifest.get("chain_tip_hash_sha256")
+        if current_chain_tip != recorded_chain_tip:
+            return (
+                False,
+                f"TAMPERED_HASH_CHAIN: Computed chain tip {current_chain_tip} "
+                f"does not match recorded chain tip {recorded_chain_tip}",
+            )
 
     return True, "VERIFIED_AUTHENTIC"
