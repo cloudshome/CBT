@@ -39,6 +39,8 @@ services:
       - HOST=0.0.0.0
       - PORT=8000
       - DATA_DIR=/app/data
+      - API_KEY=${API_KEY:-}
+      - CORS_ORIGIN=${CORS_ORIGIN:-}
       # Behind the Caddy proxy → allow trusted X-Forwarded-For for rate limiting
       - TRUST_PROXY_XFF=true
       # Paper-trading risk gate (FastAPI) — deterministic limits
@@ -86,6 +88,8 @@ services:
       - PORT=3000
       - ENABLE_LEGACY_EXPRESS_ROUTES=false
       - DATABASE_URL=file:/app/data/dev.db
+      - API_KEY=${API_KEY:-}
+      - CORS_ORIGIN=${CORS_ORIGIN:-}
       # Behind the Caddy proxy → allow trusted X-Forwarded-For for rate limiting
       - TRUST_PROXY_XFF=true
     depends_on:

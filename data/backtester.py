@@ -30,7 +30,7 @@ import pandas as pd
 
 from config import BACKTEST_HORIZONS, BACKTEST_MIN_BARS, BACKTEST_STEP, EXECUTION_MODEL
 from data.binance_client import TIMEFRAME_TO_MS
-from data.costs import calculate_trade_cost
+from data.costs import DEFAULT_HALF_SPREAD, SPREADS, calculate_trade_cost
 from data.symbols import normalize_symbol
 from engine.execution import adjust_for_slip
 from engine.indicators import add_all_indicators
@@ -267,6 +267,8 @@ def _evaluate(
     # Default "none" keeps the backtest honest (no model = raw fill).
     # When set to "slip" or "impact", the graded R is reduced by the predicted
     # market impact of the order size vs. average volume (execution.py).
+    raw_gross_r = gp.rr_achieved
+    exec_slip_r = 0.0
     if EXECUTION_MODEL != "none":
         try:
             row = df.iloc[i]
@@ -278,26 +280,50 @@ def _evaluate(
                 df.attrs.get("symbol", "BTCUSDT"),
                 EXECUTION_MODEL,
             )
+            exec_slip_r = max(0.0, round(raw_gross_r - gp.rr_achieved, 4))
         except Exception:
             pass  # execution model failure must not break the backtest
 
     # ── P12.6 trade costs & net R (E_net = E_gross − fees − slip − funding) ─
     if gp.outcome in ("LOSS", "FULL_WIN", "PARTIAL_WIN"):
         try:
+            is_passive = bool(
+                plan.get("status") == "waiting" or plan.get("trigger_level") is not None
+            )
             cost = calculate_trade_cost(
                 entry=entry,
                 stop_loss=sl,
                 action=side or "BUY",
-                gross_r=gp.rr_achieved,
+                gross_r=raw_gross_r,
                 holding_hours=gp.holding_hours,
                 symbol=df.attrs.get("symbol", "BTCUSDT"),
                 ts=gp.ts,
+                is_passive_limit=is_passive,
             )
             gp.fee_r = cost.fee_r
-            gp.slip_r = cost.slip_r
             gp.funding_r = cost.funding_r
-            gp.cost_r = cost.total_cost_r
-            gp.rr_net = cost.net_r
+
+            # Deduplicate entry spread between adjust_for_slip and calculate_trade_cost:
+            # When EXECUTION_MODEL != "none", adjust_for_slip already accounted for entry
+            # spread and size/volatility impact (exec_slip_r).
+            # We ensure round-trip fees, spread, impact, and funding are deducted exactly
+            # once without double-counting entry spread:
+            if EXECUTION_MODEL != "none" and exec_slip_r > 0:
+                half_spread = SPREADS.get(
+                    df.attrs.get("symbol", "BTCUSDT").upper(), DEFAULT_HALF_SPREAD
+                )
+                entry_spread_r = (
+                    round(half_spread / cost.stop_dist_pct, 4)
+                    if not is_passive and cost.stop_dist_pct > 0
+                    else 0.0
+                )
+                impact_r = max(0.0, round(exec_slip_r - entry_spread_r, 4))
+                gp.slip_r = round(cost.slip_r + impact_r, 4)
+            else:
+                gp.slip_r = cost.slip_r
+
+            gp.cost_r = round(gp.fee_r + gp.slip_r + gp.funding_r, 4)
+            gp.rr_net = round(raw_gross_r - gp.cost_r, 3)
         except Exception:
             gp.rr_net = gp.rr_achieved
 

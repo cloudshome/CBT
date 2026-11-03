@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import pytest
+
+import data.backtester as bt
 from data.backtester import (
     OUTCOMES,
     WIN_SET,
@@ -10,6 +13,12 @@ from data.backtester import (
     _evaluate,
     run_backtest,
 )
+
+
+@pytest.fixture(autouse=True)
+def _default_execution_model(monkeypatch):
+    """Backtester unit tests test the raw grader invariants; slip is tested in test_execution.py."""
+    monkeypatch.setattr(bt, "EXECUTION_MODEL", "none")
 
 
 def test_aggregate_empty():

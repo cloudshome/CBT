@@ -36,10 +36,88 @@ def get_db_files(data_dir: Path) -> list[Path]:
     ]
 
 
-def prune_old_uploads(uploads_dir: Path, max_age_days: int = 14) -> dict[str, Any]:
+def _is_file_recorded(file_path: Path, data_dir: Path) -> bool:
+    """Checks whether file SHA-256 hash, filename, or source_id exists in provenance/vault databases."""
+    import hashlib
+
+    try:
+        hasher = hashlib.sha256()
+        with open(file_path, "rb") as f:
+            while chunk := f.read(65536):
+                hasher.update(chunk)
+        file_sha256 = hasher.hexdigest()
+    except Exception:
+        file_sha256 = None
+
+    filename = file_path.name
+    stem = file_path.stem
+
+    for db_name in ("brain_memory.db", "trading_logs.db"):
+        db_file = data_dir / db_name
+        if not db_file.exists():
+            continue
+        try:
+            conn = sqlite3.connect(str(db_file), timeout=5.0)
+            cur = conn.cursor()
+            cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
+            tables = {row[0] for row in cur.fetchall()}
+
+            # 1. immutable_sources: content_hash, source_id, source_uri
+            if "immutable_sources" in tables:
+                if file_sha256:
+                    cur.execute(
+                        "SELECT 1 FROM immutable_sources WHERE content_hash = ? OR source_id = ? OR source_uri LIKE ? LIMIT 1;",
+                        (file_sha256, stem, f"%{filename}%"),
+                    )
+                    if cur.fetchone():
+                        conn.close()
+                        return True
+
+            # 2. research_provenance_sources: source_id, source_uri
+            if "research_provenance_sources" in tables:
+                cur.execute(
+                    "SELECT 1 FROM research_provenance_sources WHERE source_id = ? OR source_uri LIKE ? LIMIT 1;",
+                    (stem, f"%{filename}%"),
+                )
+                if cur.fetchone():
+                    conn.close()
+                    return True
+
+            # 3. research_provenance_ledger: knowledge_id, source_uri
+            if "research_provenance_ledger" in tables:
+                cur.execute(
+                    "SELECT 1 FROM research_provenance_ledger WHERE source_uri LIKE ? OR knowledge_id = ? LIMIT 1;",
+                    (f"%{filename}%", stem),
+                )
+                if cur.fetchone():
+                    conn.close()
+                    return True
+
+            # 4. semantic_vectors: metadata_json
+            if "semantic_vectors" in tables:
+                cur.execute(
+                    "SELECT 1 FROM semantic_vectors WHERE metadata_json LIKE ? LIMIT 1;",
+                    (f"%{filename}%",),
+                )
+                if cur.fetchone():
+                    conn.close()
+                    return True
+
+            conn.close()
+        except Exception:
+            pass
+
+    return False
+
+
+def prune_old_uploads(
+    uploads_dir: Path, max_age_days: int = 14, require_provenance: bool = False
+) -> dict[str, Any]:
     """
     Deletes raw upload files older than max_age_days whose text and embeddings
     are safely extracted and indexed in semantic_vectors / knowledge vault.
+    When require_provenance=True or when provenance databases exist alongside uploads,
+    verifies content hash or filename is recorded before unlinking.
     """
     if not uploads_dir.exists():
         return {"pruned_count": 0, "reclaimed_kb": 0.0}
@@ -48,12 +126,20 @@ def prune_old_uploads(uploads_dir: Path, max_age_days: int = 14) -> dict[str, An
     cutoff_sec = max_age_days * 86400.0
     pruned_count = 0
     reclaimed_bytes = 0
+    data_dir = uploads_dir.parent
+
+    # Determine if provenance verification is active:
+    has_dbs = any((data_dir / db).exists() for db in ("brain_memory.db", "trading_logs.db"))
+    check_provenance = require_provenance or has_dbs
 
     for file_path in uploads_dir.glob("**/*"):
         if file_path.is_file():
             try:
                 mtime = file_path.stat().st_mtime
                 if (now - mtime) > cutoff_sec:
+                    if check_provenance and not _is_file_recorded(file_path, data_dir):
+                        logger.debug(f"Skipping unverified upload {file_path.name}")
+                        continue
                     fsize = file_path.stat().st_size
                     file_path.unlink()
                     pruned_count += 1
@@ -71,6 +157,7 @@ def prune_old_uploads(uploads_dir: Path, max_age_days: int = 14) -> dict[str, An
 def optimize_database(db_path: Path, vacuum_threshold_mb: float = 500.0) -> dict[str, Any]:
     """Performs WAL truncate, integrity check, reindex, optimize, and conditional vacuum."""
     size_before_bytes = db_path.stat().st_size
+    size_after_bytes = size_before_bytes
     try:
         conn = sqlite3.connect(str(db_path), timeout=60.0)
         conn.execute("PRAGMA busy_timeout = 5000;")
@@ -84,7 +171,8 @@ def optimize_database(db_path: Path, vacuum_threshold_mb: float = 500.0) -> dict
         # 2. Quick Integrity check
         cursor = conn.cursor()
         cursor.execute("PRAGMA quick_check;")
-        integrity = cursor.fetchone()[0]
+        row = cursor.fetchone()
+        integrity = row[0] if row else "unknown"
 
         # 3. Re-index
         conn.execute("REINDEX;")
@@ -100,7 +188,7 @@ def optimize_database(db_path: Path, vacuum_threshold_mb: float = 500.0) -> dict
 
         conn.close()
 
-        size_after_bytes = db_path.stat().st_size
+        size_after_bytes = db_path.stat().st_size if db_path.exists() else size_before_bytes
         reclaimed_kb = max(0.0, round((size_before_bytes - size_after_bytes) / 1024, 2))
 
         logger.info(
@@ -117,6 +205,7 @@ def optimize_database(db_path: Path, vacuum_threshold_mb: float = 500.0) -> dict
         }
     except Exception as e:
         logger.error(f"Maintenance failed on {db_path.name}: {e}")
+        size_after_bytes = db_path.stat().st_size if db_path.exists() else size_before_bytes
         return {
             "database": db_path.name,
             "status": "FAILED",

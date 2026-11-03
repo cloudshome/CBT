@@ -318,3 +318,61 @@ def test_gold_symbol_prefixes_match_common_variants():
     assert is_gold_symbol("gold-futures")
     assert not is_gold_symbol("BTCXAU")  # suffix, not prefix
     assert not is_gold_symbol("PAXGUSDT")  # tokenized gold, not spot gold
+
+
+def test_execution_type_cost_hierarchy():
+    """Verify that taker > maker_in_taker_out > maker for fee_r and slip_r."""
+    entry = 100_000.0
+    sl = 99_177.0  # ~0.823% stop distance
+
+    cost_taker = calculate_trade_cost(
+        entry=entry, stop_loss=sl, execution_type="taker", symbol="BTCUSDT"
+    )
+    cost_passive = calculate_trade_cost(
+        entry=entry, stop_loss=sl, execution_type="maker_in_taker_out", symbol="BTCUSDT"
+    )
+    cost_maker = calculate_trade_cost(
+        entry=entry, stop_loss=sl, execution_type="maker", symbol="BTCUSDT"
+    )
+
+    # Fee round trip:
+    # taker: 2 * 0.05% = 0.10% -> 0.1215R
+    # maker_in_taker_out: 0.02% + 0.05% = 0.07% -> 0.0007 / 0.00823 = 0.0851R
+    # maker: 2 * 0.02% = 0.04% -> 0.0004 / 0.00823 = 0.0486R
+    assert cost_taker.fee_r > cost_passive.fee_r > cost_maker.fee_r
+    assert cost_passive.fee_r == pytest.approx(0.0851, abs=1e-4)
+    assert cost_maker.fee_r == pytest.approx(0.0486, abs=1e-4)
+
+    # Spread + slip:
+    # taker: (2 * 0.02%) + (2 * 0.005%) = 0.05% -> 0.0005 / 0.00823 = 0.0608R
+    # maker_in_taker_out: (1 * 0.02%) + (1 * 0.005%) = 0.025% -> 0.00025 / 0.00823 = 0.0304R
+    # maker: 0.005% -> 0.00005 / 0.00823 = 0.0061R
+    assert cost_taker.slip_r > cost_passive.slip_r > cost_maker.slip_r
+    assert cost_taker.total_cost_r > cost_passive.total_cost_r > cost_maker.total_cost_r
+
+
+def test_is_passive_limit_auto_resolution():
+    """Verify is_passive_limit automatically resolves to maker_in_taker_out when execution_type is auto or default."""
+    entry = 50_000.0
+    sl = 49_000.0
+
+    # default execution_type with is_passive_limit=True
+    cost_passive = calculate_trade_cost(
+        entry=entry, stop_loss=sl, is_passive_limit=True, symbol="BTCUSDT"
+    )
+    cost_taker = calculate_trade_cost(
+        entry=entry, stop_loss=sl, is_passive_limit=False, symbol="BTCUSDT"
+    )
+    assert cost_passive.fee_r < cost_taker.fee_r
+    assert cost_passive.slip_r < cost_taker.slip_r
+
+    # auto execution_type
+    cost_auto_passive = calculate_trade_cost(
+        entry=entry, stop_loss=sl, is_passive_limit=True, execution_type="auto", symbol="BTCUSDT"
+    )
+    cost_auto_taker = calculate_trade_cost(
+        entry=entry, stop_loss=sl, is_passive_limit=False, execution_type="auto", symbol="BTCUSDT"
+    )
+    assert cost_auto_passive.fee_r == cost_passive.fee_r
+    assert cost_auto_taker.fee_r == cost_taker.fee_r
+

@@ -210,6 +210,8 @@ def calculate_trade_cost(
     ts: int | None = None,
     cost_model: CostModel | None = None,
     store=None,
+    is_passive_limit: bool = False,
+    execution_type: str | None = None,
 ) -> TradeCost:
     """Compute fees, spread/slippage, funding, and net R for one trade.
 
@@ -220,6 +222,12 @@ def calculate_trade_cost(
     *cost_model_for_symbol()* -- gold instruments get a spot model with
     spread-based costs and no funding; everything else keeps the default
     crypto-perp model.
+
+    Supports *is_passive_limit* and *execution_type* ("taker", "maker_in_taker_out", "maker", "auto"):
+      - "maker_in_taker_out": resting limit entry (maker fee 2 bps, 0 entry spread) +
+        taker exit (taker fee 5 bps, 1x exit half-spread + slip).
+      - "maker": resting limit on both entry and exit (maker fees only, 0 spread crossing).
+      - "taker": market order crossing on both sides.
     """
     model = cost_model if cost_model is not None else cost_model_for_symbol(symbol)
     if not model.enabled or model.execution_type == "none":
@@ -234,6 +242,15 @@ def calculate_trade_cost(
             holding_hours=holding_hours,
             funding_rate_8h=0.0,
         )
+
+    # Resolve effective execution type
+    eff_exec_type = execution_type or model.execution_type
+    if eff_exec_type == "auto":
+        eff_exec_type = "maker_in_taker_out" if is_passive_limit else "taker"
+    elif is_passive_limit and execution_type is None and eff_exec_type == "taker":
+        env_exec = os.getenv("EXECUTION_TYPE", "").lower()
+        if env_exec not in ("taker", "taker_force"):
+            eff_exec_type = "maker_in_taker_out"
 
     # 1. Stop distance as fraction of entry (the 1R denominator)
     if entry is not None and stop_loss is not None and entry > 0:
@@ -251,11 +268,11 @@ def calculate_trade_cost(
     if model.market == "spot":
         fee_round_trip = 2.0 * model.spot_fee_pct
     else:
-        if model.execution_type == "taker":
+        if eff_exec_type == "taker":
             fee_round_trip = 2.0 * model.taker_fee_pct
-        elif model.execution_type == "maker_in_taker_out":
+        elif eff_exec_type == "maker_in_taker_out":
             fee_round_trip = model.maker_fee_pct + model.taker_fee_pct
-        elif model.execution_type == "maker":
+        elif eff_exec_type == "maker":
             fee_round_trip = 2.0 * model.maker_fee_pct
         else:
             fee_round_trip = 2.0 * model.taker_fee_pct
@@ -268,7 +285,15 @@ def calculate_trade_cost(
         if model.spread_pct is not None
         else SPREADS.get(sym, DEFAULT_HALF_SPREAD)
     )
-    spread_and_slip = (2.0 * half_spread) + (2.0 * model.slip_pct)
+    if eff_exec_type == "maker_in_taker_out":
+        # Resting limit entry earns queue priority and crosses 0 spread; exit crosses half-spread
+        spread_and_slip = (1.0 * half_spread) + (1.0 * model.slip_pct)
+    elif eff_exec_type == "maker":
+        # Maker limit on both legs avoids spread crossing completely
+        spread_and_slip = model.slip_pct
+    else:
+        # Standard taker crossing on both entry and exit
+        spread_and_slip = (2.0 * half_spread) + (2.0 * model.slip_pct)
     slip_r = round(spread_and_slip / stop_dist_pct, 4)
 
     # 4. Funding rate (perp only; spot has no funding)

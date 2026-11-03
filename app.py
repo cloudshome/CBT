@@ -220,6 +220,14 @@ logger = logging.getLogger("ai_quant_sentinel.app")
 RUN_BACKGROUND_DAEMONS = os.getenv("RUN_BACKGROUND_DAEMONS", "true").lower() == "true"
 
 
+def should_run_background_daemons() -> bool:
+    """Determines at runtime whether heavy background daemons run in-process."""
+    env_val = os.getenv("RUN_BACKGROUND_DAEMONS")
+    if env_val is not None:
+        return env_val.strip().lower() == "true"
+    return bool(RUN_BACKGROUND_DAEMONS)
+
+
 @asynccontextmanager
 async def lifespan_ctx(_app: FastAPI) -> AsyncIterator[None]:
     """Startup/shutdown lifecycle (replaces deprecated @app.on_event)."""
@@ -244,8 +252,10 @@ async def lifespan_ctx(_app: FastAPI) -> AsyncIterator[None]:
         asyncio.create_task(hf_telemetry_pipeline.start_flush_loop()),
     ]
 
+    run_daemons = should_run_background_daemons()
+
     # Heavy background daemons can be decoupled to dedicated worker process (core/worker.py)
-    if RUN_BACKGROUND_DAEMONS:
+    if run_daemons:
         tasks.extend(
             [
                 asyncio.create_task(empirical_accumulator_loop()),
@@ -272,7 +282,7 @@ async def lifespan_ctx(_app: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
-        if RUN_BACKGROUND_DAEMONS:
+        if run_daemons:
             await cluster_sync_daemon.stop()
             shadow_burn_in_orchestrator.stop()
             research_automation_orchestrator.stop()
