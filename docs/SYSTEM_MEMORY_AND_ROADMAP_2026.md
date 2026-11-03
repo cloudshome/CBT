@@ -103,9 +103,9 @@ $$\text{Confluence Score} = B_1 (\text{Structure}) + B_2 (\text{Order Flow}) + B
 
 | Priority | Action Item | Target Modules | Status |
 |:---:|:---|:---|:---:|
-| **P-1** | **Confluence Hurdle Hardening** | `core/sky_intelligence/setup_engine.py`<br>`core/mastermind/sovereign_master_agent.py` | Ready to Implement |
-| **P-2** | **Backend Proxy Convergence** | `src/routes/paper.ts`<br>`src/routes/scan.ts` | Ready to Audit & Bridge |
-| **P-3** | **Live Telemetry & WebSocket Heartbeat** | `core/terminal_routes.py`<br>`frontend/src/providers/DataProvider.tsx` | Ready to Inspect |
+| **P-1** | **Confluence Hurdle Hardening** | `core/sky_intelligence/setup_engine.py`<br>`core/mastermind/sovereign_master_agent.py` | COMPLETED (commit ac075d4) |
+| **P-2** | **Backend Proxy Convergence** | `src/routes/paper.ts`<br>`src/routes/scan.ts` | COMPLETED & AUDITED |
+| **P-3** | **Live Telemetry & WebSocket Heartbeat** | `core/terminal_routes.py`<br>`frontend/src/providers/DataProvider.tsx` | COMPLETED (commits 115903d, 181af99) |
 | **P-4** | **Testnet Paper Forward Validation** | `core/execution/paper_routes.py`<br>`data/trading_logs.db` | Active |
 
 ---

@@ -10,6 +10,13 @@ const router = Router();
 // Apply rate limiting (60 req/min per IP)
 router.use(defaultRateLimiter);
 
+// Institutional governance header: flag legacy Express fallback
+router.use((_req: Request, res: Response, next) => {
+  res.setHeader('X-Legacy-Fallback', 'true');
+  res.setHeader('X-Authoritative-Intelligence-Service', 'FastAPI:8000');
+  next();
+});
+
 /**
  * GET /api/scan?symbol=BTCUSDT&timeframe=15m&limit=100
  *
