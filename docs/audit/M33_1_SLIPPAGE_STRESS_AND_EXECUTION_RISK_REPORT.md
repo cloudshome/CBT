@@ -103,3 +103,4 @@ The unbounded slippage mechanism was directly tested and verified in `tests/test
 - **Adverse Gap:** Price plunged to $\$50,000$.
 - **Observed Result:** Position closed with `STOP_LOSS_HIT`, realized loss $\le -\$950.00$ ($-\$1,000.00$ gross).
 - **Verdict:** **PASS**. Modeled slippage does not act as an artificial loss truncation floor.
+
