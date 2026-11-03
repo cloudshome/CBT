@@ -26,6 +26,12 @@ def _reset_cooldown_governor():
         portfolio_shadow.reset_all_positions()
     except Exception:
         pass
+    try:
+        from core.event_shock_engine import event_shock_engine
+
+        event_shock_engine.reset()
+    except Exception:
+        pass
     yield
     cooldown_governor.asset_cooldown_sec = old_asset
     cooldown_governor.loss_global_cooldown_sec = old_loss
@@ -34,6 +40,12 @@ def _reset_cooldown_governor():
         from core.portfolio_shadow import portfolio_shadow
 
         portfolio_shadow.reset_all_positions()
+    except Exception:
+        pass
+    try:
+        from core.event_shock_engine import event_shock_engine
+
+        event_shock_engine.reset()
     except Exception:
         pass
     # Defensively isolate test environment variables to prevent inter-suite leakage

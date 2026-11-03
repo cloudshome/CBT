@@ -40,12 +40,14 @@ def test_event_shock_risk_switcher():
         scheduled_timestamp_ms=now + (25 * 60 * 1000),
     )
     event_shock_engine.add_event(event)
-
-    state = event_shock_engine.evaluate_risk_state(now)
-    assert state.is_event_risk_active
-    assert state.ev_hurdle_multiplier == 1.50
-    assert state.position_size_multiplier == 0.50
-    assert state.mode_name == "EVENT_RISK_MODE"
+    try:
+        state = event_shock_engine.evaluate_risk_state(now)
+        assert state.is_event_risk_active
+        assert state.ev_hurdle_multiplier == 1.50
+        assert state.position_size_multiplier == 0.50
+        assert state.mode_name == "EVENT_RISK_MODE"
+    finally:
+        event_shock_engine.remove_event("TEST_CPI")
 
 
 def test_macro_sentinel_snapshot():

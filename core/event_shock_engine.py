@@ -80,6 +80,17 @@ class EventShockEngine:
         self._events.append(event)
         self._events.sort(key=lambda x: x.scheduled_timestamp_ms)
 
+    def remove_event(self, event_id: str) -> bool:
+        """Removes a macro event by ID."""
+        initial_len = len(self._events)
+        self._events = [e for e in self._events if e.event_id != event_id]
+        return len(self._events) < initial_len
+
+    def reset(self) -> None:
+        """Resets the event shock engine to default calendar and releases any emergency pauses."""
+        self._emergency_pause = False
+        self._seed_default_calendar()
+
     def force_emergency_lockout(self, paused: bool) -> None:
         """Enforces or releases an authoritative system-wide execution halt."""
         self._emergency_pause = bool(paused)
