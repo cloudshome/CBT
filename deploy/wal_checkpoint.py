@@ -41,6 +41,7 @@ DATABASES = [
     "brain_memory.db",
     "trading_logs.db",
     "experiment_store.db",
+    "security.db",
 ]
 
 

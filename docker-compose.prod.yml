@@ -11,6 +11,7 @@ services:
       - PORT=8000
       - APP_ENV=production
       - ENVIRONMENT=production
+      - RUN_BACKGROUND_DAEMONS=false
       - DATA_DIR=/app/data
       - API_KEY=${API_KEY}
       - CORS_ORIGIN=${CORS_ORIGIN:?CORS_ORIGIN must be an explicit origin allowlist in production}
@@ -35,6 +36,40 @@ services:
         max-size: "50m"
         max-file: "10"
 
+  python-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "-m", "core.worker"]
+    restart: always
+    environment:
+      - APP_ENV=production
+      - ENVIRONMENT=production
+      - DATA_DIR=/app/data
+      - API_KEY=${API_KEY}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - TELEGRAM_WEBHOOK_SECRET=${TELEGRAM_WEBHOOK_SECRET:-}
+      - MAX_PAPER_OPEN_POSITIONS=3
+      - MAX_PAPER_ACCOUNT_BALANCE=100000
+      - MAX_PAPER_RISK_PCT=0.02
+    volumes:
+      - ./data:/app/data
+      - ./.env:/app/.env:ro
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 3072M
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "10"
+
   backend:
     build:
       context: .
@@ -43,6 +78,7 @@ services:
     environment:
       - PORT=3000
       - NODE_ENV=production
+      - ENABLE_LEGACY_EXPRESS_ROUTES=false
       - DATABASE_URL=file:/app/data/dev.db
       - API_KEY=${API_KEY}
       - CORS_ORIGIN=${CORS_ORIGIN:?CORS_ORIGIN must be an explicit origin allowlist in production}

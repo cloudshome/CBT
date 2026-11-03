@@ -217,6 +217,9 @@ logger = logging.getLogger("ai_quant_sentinel.app")
 
 
 # Background Real-Time Telemetry Broadcaster, Poller & Empirical Accumulator
+RUN_BACKGROUND_DAEMONS = os.getenv("RUN_BACKGROUND_DAEMONS", "true").lower() == "true"
+
+
 @asynccontextmanager
 async def lifespan_ctx(_app: FastAPI) -> AsyncIterator[None]:
     """Startup/shutdown lifecycle (replaces deprecated @app.on_event)."""
@@ -233,30 +236,46 @@ async def lifespan_ctx(_app: FastAPI) -> AsyncIterator[None]:
             f"CRITICAL DISK WARNING ON STARTUP: Only {disk_vitals.get('free_gb')} GB free disk remaining."
         )
 
+    # Lightweight in-process loops always run in FastAPI web process
     tasks = [
         asyncio.create_task(telemetry_broadcaster_loop()),
-        asyncio.create_task(empirical_accumulator_loop()),
-        asyncio.create_task(telegram_bot.start_polling()),
-        asyncio.create_task(telegram_bot.start_continuous_broadcaster(interval_seconds=180)),
         asyncio.create_task(sky_decision_cache.start_sweeper_loop(interval_sec=60)),
         asyncio.create_task(market_state_cache.start_sweeper_loop(interval_sec=60)),
-        asyncio.create_task(autonomous_trader.start_loop()),
-        asyncio.create_task(shadow_burn_in_orchestrator.start_loop()),
         asyncio.create_task(hf_telemetry_pipeline.start_flush_loop()),
-        asyncio.create_task(research_automation_orchestrator.start_loop()),
-        asyncio.create_task(mastermind_arbiter.start_loop(interval_sec=60.0)),
-        asyncio.create_task(cluster_sync_daemon.start()),
     ]
-    logger.info(
-        "AI Quant Sentinel FastAPI online with Autonomous Trader, Mastermind Swarm, "
-        "Burn-In Orchestrator, Telemetry Pipeline, Research Automation Orchestrator & Cluster Sync Daemon."
-    )
+
+    # Heavy background daemons can be decoupled to dedicated worker process (core/worker.py)
+    if RUN_BACKGROUND_DAEMONS:
+        tasks.extend(
+            [
+                asyncio.create_task(empirical_accumulator_loop()),
+                asyncio.create_task(telegram_bot.start_polling()),
+                asyncio.create_task(
+                    telegram_bot.start_continuous_broadcaster(interval_seconds=180)
+                ),
+                asyncio.create_task(autonomous_trader.start_loop()),
+                asyncio.create_task(shadow_burn_in_orchestrator.start_loop()),
+                asyncio.create_task(research_automation_orchestrator.start_loop()),
+                asyncio.create_task(mastermind_arbiter.start_loop(interval_sec=60.0)),
+                asyncio.create_task(cluster_sync_daemon.start()),
+            ]
+        )
+        logger.info(
+            "AI Quant Sentinel FastAPI online with Autonomous Trader, Mastermind Swarm, "
+            "Burn-In Orchestrator, Telemetry Pipeline, Research Automation Orchestrator & Cluster Sync Daemon."
+        )
+    else:
+        logger.info(
+            "AI Quant Sentinel FastAPI online in Web-Only mode (RUN_BACKGROUND_DAEMONS=False; daemons managed by external worker)."
+        )
+
     try:
         yield
     finally:
-        await cluster_sync_daemon.stop()
-        shadow_burn_in_orchestrator.stop()
-        research_automation_orchestrator.stop()
+        if RUN_BACKGROUND_DAEMONS:
+            await cluster_sync_daemon.stop()
+            shadow_burn_in_orchestrator.stop()
+            research_automation_orchestrator.stop()
         hf_telemetry_pipeline.flush_to_sqlite()
         for task in tasks:
             task.cancel()

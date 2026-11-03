@@ -44,4 +44,18 @@ describe('Express Server Hardening & Convergence (Option 2)', () => {
     expect(res.status).toBe(201);
     expect(res.body.trade).toHaveProperty('id');
   });
+
+  it('should return 404 for legacy routes when ENABLE_LEGACY_EXPRESS_ROUTES is false', async () => {
+    const originalFlag = process.env.ENABLE_LEGACY_EXPRESS_ROUTES;
+    try {
+      process.env.ENABLE_LEGACY_EXPRESS_ROUTES = 'false';
+      const { createApp } = await import('../src/server');
+      const isolatedApp = createApp();
+      const res = await request(isolatedApp).get('/api/candles?symbol=BTCUSDT');
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe('Endpoint not found');
+    } finally {
+      process.env.ENABLE_LEGACY_EXPRESS_ROUTES = originalFlag;
+    }
+  });
 });

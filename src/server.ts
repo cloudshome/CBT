@@ -91,23 +91,26 @@ export function createApp(): Express {
     });
   });
 
-  // NOTE: The React terminal is served by nginx, which routes the full
-  // intelligence surface (/api/candles .. /api/auditor) to the FastAPI
-  // Python backend. These Express routers are the LEGACY / direct-access
-  // implementation (dev convenience + API compatibility) — FastAPI is the
-  // authoritative implementation. Keep behavior in sync or migrate callers.
-  // --- Public Read-Only Routes (no auth required) ---
-  app.use('/api/candles', candlesRouter);
-  app.use('/api/mtf', mtfRouter);
-  app.use('/api/scan', scanRouter);
-  app.use('/api/sky', skyRouter);
-  app.use('/api/tickers', tickersRouter);
+  // NOTE: The React terminal is served by nginx/caddy, which routes the authoritative
+  // intelligence surface (/api/candles .. /api/auditor) to the FastAPI Python backend.
+  // In production, Node/Express acts strictly as a compatibility, readiness, and metrics gateway.
+  // Legacy domain routers are mounted ONLY when ENABLE_LEGACY_EXPRESS_ROUTES=true.
+  const enableLegacyRoutes = process.env.ENABLE_LEGACY_EXPRESS_ROUTES === 'true';
 
-  // --- Sensitive Routes (auth required when API_KEY is set) ---
-  app.use('/api/paper', apiKeyAuth, paperRouter);
-  app.use('/api/desk', apiKeyAuth, deskRouter);
-  app.use('/api/institutional', apiKeyAuth, institutionalRouter);
-  app.use('/api/terminal', apiKeyAuth, terminalRouter);
+  if (enableLegacyRoutes) {
+    // --- Public Read-Only Routes (no auth required) ---
+    app.use('/api/candles', candlesRouter);
+    app.use('/api/mtf', mtfRouter);
+    app.use('/api/scan', scanRouter);
+    app.use('/api/sky', skyRouter);
+    app.use('/api/tickers', tickersRouter);
+
+    // --- Sensitive Routes (auth required when API_KEY is set) ---
+    app.use('/api/paper', apiKeyAuth, paperRouter);
+    app.use('/api/desk', apiKeyAuth, deskRouter);
+    app.use('/api/institutional', apiKeyAuth, institutionalRouter);
+    app.use('/api/terminal', apiKeyAuth, terminalRouter);
+  }
 
   // Payload too large error handler (HTTP 413)
   app.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {

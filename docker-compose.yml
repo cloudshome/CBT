@@ -84,6 +84,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
+      - ENABLE_LEGACY_EXPRESS_ROUTES=false
       - DATABASE_URL=file:/app/data/dev.db
       # Behind the Caddy proxy → allow trusted X-Forwarded-For for rate limiting
       - TRUST_PROXY_XFF=true

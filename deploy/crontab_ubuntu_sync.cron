@@ -29,3 +29,6 @@ SSH_AUTH_SOCK=/run/user/1000/gcr/ssh
 
 # 11:55 PM (23:55)
 55 23 * * * /home/cloudslover/CBT/scripts/ubuntu_git_sync.sh >> /home/cloudslover/CBT/data/logs/git_sync.log 2>&1
+
+# Daily Database Maintenance & WAL Truncation (03:00 UTC / 09:00 AM Dhaka)
+0 9 * * * /home/cloudslover/CBT/.venv/bin/python /home/cloudslover/CBT/deploy/db_maintenance.py >> /home/cloudslover/CBT/data/logs/cron_db_maintenance.log 2>&1

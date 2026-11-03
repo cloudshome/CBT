@@ -4,6 +4,11 @@ import { createApp } from '../src/server';
 describe('CORS configuration (fail-closed in production)', () => {
   const originalEnv = process.env.NODE_ENV;
   const originalCors = process.env.CORS_ORIGIN;
+  const originalApiKey = process.env.API_KEY;
+
+  beforeEach(() => {
+    process.env.API_KEY = 'test-long-valid-api-key-12345';
+  });
 
   afterEach(() => {
     process.env.NODE_ENV = originalEnv;
@@ -11,6 +16,11 @@ describe('CORS configuration (fail-closed in production)', () => {
       delete process.env.CORS_ORIGIN;
     } else {
       process.env.CORS_ORIGIN = originalCors;
+    }
+    if (originalApiKey === undefined) {
+      delete process.env.API_KEY;
+    } else {
+      process.env.API_KEY = originalApiKey;
     }
   });
 
