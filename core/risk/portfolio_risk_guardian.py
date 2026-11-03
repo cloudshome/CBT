@@ -44,10 +44,20 @@ from core.risk.asset_eligibility_gate import (
     AssetLiquidityMetrics,
     DeterministicAssetEligibilityGate,
 )
+from core.risk.execution_isolation import (
+    ConstitutionalViolationError,
+    assert_execution_airgap,
+)
+from core.risk.guardian_supervisor import GuardianSupervisor
 from core.risk.immutable_risk_accounting import (
     ImmutableRiskBudget,
     RiskAccountingStatus,
 )
+from core.risk.order_authorization import (
+    DurableOrderAuthorizationStore,
+    compute_portfolio_version,
+)
+from core.risk.strategy_lineage_registry import StrategyLineageRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +95,7 @@ class PortfolioRiskLimits:
     fail_closed_on_missing_data: bool = True
     require_active_daemon: bool = False
     heartbeat_watchdog_timeout_seconds: float = 5.0
+    authorization_ttl_seconds: float = 5.0
 
     @property
     def max_position_risk_usd(self) -> float:
@@ -130,6 +141,9 @@ class ProposedOrder:
     desk: str = "MAIN_SOVEREIGN"
     ai_opportunity_score: float | None = None
     exchange: str = "PAPER_BINANCE"
+    portfolio_book: str | None = None
+    strategy_genome_content: str | None = None
+    strategy_parameters: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -146,6 +160,9 @@ class RiskDecision:
     rationale: str = ""
     evaluated_metrics: dict[str, Any] = field(default_factory=dict)
     evaluated_at_utc: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+    authorization_id: str = ""
+    authorization_token: str = ""
+    portfolio_state_version: str = ""
 
 
 class PortfolioRiskGuardian:
@@ -186,6 +203,11 @@ class PortfolioRiskGuardian:
         self.last_heartbeat_utc = datetime.now(UTC).isoformat()
         self.loop_execution_count = 0
         self._order_fingerprints: set[str] = set()
+
+        # M33.1 Hardened Subsystems: Durable Authorizations, Lineage Registry, and Independent Supervisor
+        self.auth_store = DurableOrderAuthorizationStore()
+        self.lineage_registry = StrategyLineageRegistry()
+        self.supervisor = GuardianSupervisor(self, supervisor_poll_interval=0.25)
 
         self._initialize_and_load_state()
 
@@ -510,16 +532,11 @@ class PortfolioRiskGuardian:
         Must be invoked and return approved=True before ANY order can reach an executor.
         """
         with self._lock:
-            # 0. Constitutional Real Capital Lockout
-            if order.exchange.upper() in (
-                "LIVE",
-                "REAL",
-                "PRODUCTION",
-                "REAL_CAPITAL",
-                "MAINNET",
-                "BINANCE_REAL",
-                "BYBIT_REAL",
-            ) or order.desk.upper() in ("LIVE", "REAL", "REAL_CAPITAL"):
+            # 0. Constitutional Real Capital Lockout & Execution Airgap
+            effective_desk = order.desk or order.portfolio_book or "MAIN_SOVEREIGN"
+            try:
+                assert_execution_airgap(exchange=order.exchange, desk=effective_desk)
+            except (ConstitutionalViolationError, PermissionError) as cve:
                 return RiskDecision(
                     approved=False,
                     circuit_breaker_state=self.state,
@@ -528,7 +545,7 @@ class PortfolioRiskGuardian:
                     allocated_size=0.0,
                     allocated_risk_usd=0.0,
                     rejection_code="REAL_CAPITAL_EXECUTION_FORBIDDEN",
-                    rationale="Constitutional Invariant: REAL_CAPITAL_ENABLED is permanently False. Live capital execution forbidden.",
+                    rationale=str(cve),
                 )
 
             # 0b. Monitoring Daemon Watchdog Check
@@ -545,7 +562,27 @@ class PortfolioRiskGuardian:
                         rationale="Risk monitoring daemon heartbeat is stalled or loop is inactive. Failing closed.",
                     )
 
-            # 0c. Order Replay / Context Protection
+            # 0c. Strategy Lineage & Quarantine Inheritance Gate
+            lineage_allowed, lineage_code, lineage_reason = (
+                self.lineage_registry.check_quarantine_inheritance(
+                    strategy_id=order.strategy_id,
+                    genome_content=order.strategy_genome_content,
+                    parameters=order.strategy_parameters,
+                )
+            )
+            if not lineage_allowed:
+                return RiskDecision(
+                    approved=False,
+                    circuit_breaker_state=self.state,
+                    symbol=order.symbol,
+                    direction=order.direction,
+                    allocated_size=0.0,
+                    allocated_risk_usd=0.0,
+                    rejection_code=lineage_code,
+                    rationale=lineage_reason,
+                )
+
+            # 0d. Order Replay / Context Protection
             order_fingerprint = (
                 f"{order.symbol}:{order.direction}:{float(order.entry_price):.6f}:"
                 f"{float(order.size):.6f}:{order.market_data_timestamp_ms}:{order.strategy_id}"
@@ -810,6 +847,30 @@ class PortfolioRiskGuardian:
 
             # All 12 deterministic gates passed green!
             self._order_fingerprints.add(order_fingerprint)
+
+            # Issue durable single-use authorization token bound to current portfolio state version
+            portfolio_ver = compute_portfolio_version(
+                circuit_breaker_state=self.state.value,
+                mtm_equity_usd=portfolio_metrics["mtm_equity_usd"],
+                open_positions_count=portfolio_metrics["open_positions_count"],
+                drawdown_pct=portfolio_metrics["drawdown_pct"],
+            )
+            auth = self.auth_store.issue_authorization(
+                symbol=order.symbol,
+                direction=order.direction,
+                size=allocated_size,
+                entry_price=order.entry_price,
+                stop_loss=order.stop_loss,
+                allocated_risk_usd=allocated_risk_usd,
+                portfolio_state_version=portfolio_ver,
+                ttl_seconds=self.limits.authorization_ttl_seconds,
+                contract_multiplier=order.contract_multiplier,
+                exchange=order.exchange,
+                desk=effective_desk,
+                strategy_id=order.strategy_id,
+                environment="PAPER",
+            )
+
             return RiskDecision(
                 approved=True,
                 circuit_breaker_state=self.state,
@@ -819,6 +880,9 @@ class PortfolioRiskGuardian:
                 allocated_risk_usd=allocated_risk_usd,
                 rejection_code="",
                 rationale="Deterministic risk clearance granted across all 12 portfolio guardian gates.",
+                authorization_id=auth.authorization_id,
+                authorization_token=auth.authorization_token,
+                portfolio_state_version=portfolio_ver,
                 evaluated_metrics={
                     "allocated_risk_usd": round(allocated_risk_usd, 2),
                     "proposed_notional_usd": round(proposed_notional_usd, 2),
@@ -827,4 +891,43 @@ class PortfolioRiskGuardian:
                     "mtm_equity_usd": portfolio_metrics["mtm_equity_usd"],
                     "drawdown_pct": portfolio_metrics["drawdown_pct"],
                 },
+            )
+
+    def consume_order_authorization(
+        self,
+        authorization_id: str,
+        order: ProposedOrder,
+    ) -> tuple[bool, str]:
+        """
+        Atomically consumes an approved authorization token against the current portfolio state.
+        Ensures:
+        1. Single-use consumption (CAS).
+        2. Exact order parameter match (detects mutation).
+        3. Portfolio state version consistency (detects stale approval).
+        4. Monotonic TTL expiry.
+        """
+        with self._lock:
+            if not authorization_id:
+                return False, "AUTHORIZATION_ID_MISSING"
+
+            metrics = self.monitor_portfolio_state()
+            current_ver = compute_portfolio_version(
+                circuit_breaker_state=self.state.value,
+                mtm_equity_usd=metrics["mtm_equity_usd"],
+                open_positions_count=metrics["open_positions_count"],
+                drawdown_pct=metrics["drawdown_pct"],
+            )
+            effective_desk = order.desk or order.portfolio_book or "MAIN_SOVEREIGN"
+            return self.auth_store.consume_authorization(
+                authorization_id=authorization_id,
+                symbol=order.symbol,
+                direction=order.direction,
+                size=order.size,
+                entry_price=order.entry_price,
+                stop_loss=order.stop_loss,
+                current_portfolio_version=current_ver,
+                contract_multiplier=order.contract_multiplier,
+                exchange=order.exchange,
+                desk=effective_desk,
+                strategy_id=order.strategy_id,
             )

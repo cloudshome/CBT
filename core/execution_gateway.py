@@ -14,6 +14,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from core.database import db_manager
+from core.risk.execution_isolation import assert_execution_airgap
 
 logger = logging.getLogger("ai_quant_sentinel.execution_gateway")
 
@@ -55,8 +56,9 @@ class ExecutionGateway:
         self,
         max_latency_ms: float = 1500.0,
         max_slippage_bps: float = 12.0,
-        mode: str = "PAPER_TRADING",  # "PAPER_TRADING" or "LIVE_BROKER"
+        mode: str = "PAPER_TRADING",
     ):
+        assert_execution_airgap(mode=mode)
         self.max_latency_ms = max_latency_ms
         self.max_slippage_bps = max_slippage_bps
         self.mode = mode
@@ -121,7 +123,7 @@ class ExecutionGateway:
                     now_ms,
                     order_id,
                     symbol,
-                    "SMART_ROUTER" if self.mode == "LIVE_BROKER" else "PAPER_SIMULATOR",
+                    "PAPER_SIMULATOR",
                     order_type,
                     target_price,
                     executed_price if status == "FILLED" else target_price,

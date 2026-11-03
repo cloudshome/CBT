@@ -367,6 +367,7 @@ class PortfolioShadowManager:
                         size=sz,
                         strategy_id=style_tag or "SHADOW_DESK",
                         portfolio_book=book_id,
+                        desk=book_id,
                     )
                     decision = guardian.evaluate_proposed_order(proposed)
                     if not decision.approved:
@@ -374,6 +375,12 @@ class PortfolioShadowManager:
                         raise ValueError(
                             f"Portfolio Risk Guardian Rejection [{decision.rejection_code}]: {decision.rationale}"
                         )
+                    consumed, consume_msg = guardian.consume_order_authorization(
+                        decision.authorization_id, proposed
+                    )
+                    if not consumed:
+                        conn.rollback()
+                        raise ValueError(f"Order Authorization Consumption Failed [{consume_msg}]")
 
                 if max_risk_usd is not None:
                     trade_risk = float(size) * abs(float(entry_price) - float(stop_loss))
@@ -1169,6 +1176,12 @@ class PortfolioShadowManager:
                     raise ValueError(
                         f"Portfolio Risk Guardian Rejection [{decision.rejection_code}]: {decision.rationale}"
                     )
+                consumed, consume_msg = guardian.consume_order_authorization(
+                    decision.authorization_id, proposed
+                )
+                if not consumed:
+                    conn.rollback()
+                    raise ValueError(f"Order Authorization Consumption Failed [{consume_msg}]")
 
             # 3. Insert new position
             conn.execute(
