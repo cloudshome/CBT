@@ -1,0 +1,88 @@
+{
+  "test_run_timestamp_utc": "2026-11-03T11:06:00Z",
+  "python_version": "Python 3.13.3",
+  "pytest_version": "pytest-9.1.1",
+  "platform": "win32",
+  "suites": {
+    "m33_failure_injection": {
+      "path": "tests/test_milestone33_failure_injection.py",
+      "test_count": 15,
+      "passed": 15,
+      "failed": 0,
+      "skipped": 0,
+      "duration_seconds": 17.83,
+      "exit_code": 0,
+      "tests": [
+        "test_m33_continuous_daemon_heartbeat_and_mtm_monitoring",
+        "test_m33_stalled_daemon_watchdog_failure_injection",
+        "test_m33_reallocate_replace_position_bypass_sealed",
+        "test_m33_real_capital_execution_lockout_invariant",
+        "test_m33_order_context_replay_protection",
+        "test_m33_numerical_single_position_dollar_cap_enforcement",
+        "test_m33_database_write_failure_and_lock_fail_closed",
+        "test_m33_market_gap_through_protective_stop",
+        "test_m33_stale_market_data_failure_injection",
+        "test_m33_clock_drift_failure_injection",
+        "test_m33_circuit_breaker_complete_7_state_lifecycle",
+        "test_m33_utc_midnight_rollover_preserves_freeze",
+        "test_m33_corrupted_state_recovery_fails_closed",
+        "test_m33_pending_order_risk_reservation",
+        "test_m33_partial_exit_proportional_risk_deallocation"
+      ]
+    },
+    "m32_portfolio_risk_guardian": {
+      "path": "tests/test_milestone32_risk_guardian.py",
+      "test_count": 15,
+      "passed": 15,
+      "failed": 0,
+      "skipped": 0,
+      "duration_seconds": 6.47,
+      "exit_code": 0
+    },
+    "m31_quantitative_integrity": {
+      "path": "tests/test_milestone31_quantitative_integrity.py",
+      "test_count": 11,
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0,
+      "duration_seconds": 3.82,
+      "exit_code": 0
+    },
+    "gate5_adversarial_forensics": {
+      "path": "tests/test_gate5_adversarial_forensics.py",
+      "test_count": 14,
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0,
+      "duration_seconds": 4.15,
+      "exit_code": 0
+    },
+    "gate5_quantitative_validation": {
+      "path": "tests/test_gate5_quantitative_validation.py",
+      "test_count": 9,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 0,
+      "duration_seconds": 3.12,
+      "exit_code": 0
+    },
+    "milestone18_sor_and_certification": {
+      "path": "scripts/verify_m18_certification.py",
+      "test_count": 149,
+      "passed": 149,
+      "failed": 0,
+      "skipped": 0,
+      "duration_seconds": 190.71,
+      "exit_code": 0,
+      "test_identity_sha256": "2acbff25f391249cb1881bd40a4440384cecdd7682c6f83b91487d8744d0b57b"
+    }
+  },
+  "aggregate_metrics": {
+    "total_tests_executed": 213,
+    "total_passed": 213,
+    "total_failed": 0,
+    "pass_rate_pct": 100.0,
+    "verdict": "VERIFIED"
+  }
+}
+

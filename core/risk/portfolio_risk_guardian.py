@@ -75,6 +75,7 @@ class PortfolioRiskLimits:
     daily_loss_warning_pct: float = 1.0
     daily_loss_freeze_pct: float = 1.5
     per_position_initial_risk_pct: float = 0.25
+    max_position_risk_usd_ceiling: float | None = 25.0
     aggregate_open_risk_pct: float = 0.75
     max_gross_notional_usd: float = 30_000.0
     max_leverage_ratio: float = 3.0
@@ -82,10 +83,15 @@ class PortfolioRiskLimits:
     max_correlated_positions: int = 2
     max_market_data_staleness_ms: int = 5000
     fail_closed_on_missing_data: bool = True
+    require_active_daemon: bool = False
+    heartbeat_watchdog_timeout_seconds: float = 5.0
 
     @property
     def max_position_risk_usd(self) -> float:
-        return self.base_capital_usd * (self.per_position_initial_risk_pct / 100.0)
+        pct_usd = self.base_capital_usd * (self.per_position_initial_risk_pct / 100.0)
+        if self.max_position_risk_usd_ceiling is not None:
+            return min(pct_usd, float(self.max_position_risk_usd_ceiling))
+        return pct_usd
 
     @property
     def max_aggregate_risk_usd(self) -> float:
@@ -172,6 +178,15 @@ class PortfolioRiskGuardian:
         self.last_state_change_utc = datetime.now(UTC).isoformat()
         self.current_trading_day = datetime.now(UTC).strftime("%Y-%m-%d")
 
+        # Continuous Monitoring Daemon & Watchdog State
+        self._stop_event = threading.Event()
+        self._daemon_thread: threading.Thread | None = None
+        self._is_running = False
+        self.last_heartbeat_monotonic = time.monotonic()
+        self.last_heartbeat_utc = datetime.now(UTC).isoformat()
+        self.loop_execution_count = 0
+        self._order_fingerprints: set[str] = set()
+
         self._initialize_and_load_state()
 
     def _initialize_and_load_state(self) -> None:
@@ -231,6 +246,77 @@ class PortfolioRiskGuardian:
             os.replace(tmp_file, self.state_file)
         except Exception as exc:
             logger.error(f"Failed to persist risk guardian state: {exc}")
+
+    def start_daemon(self, interval_seconds: float = 1.0) -> None:
+        """Starts the autonomous background risk monitoring daemon."""
+        with self._lock:
+            if self._daemon_thread and self._daemon_thread.is_alive():
+                return
+            self._stop_event.clear()
+            self._is_running = True
+            self.last_heartbeat_monotonic = time.monotonic()
+            self.last_heartbeat_utc = datetime.now(UTC).isoformat()
+            self._daemon_thread = threading.Thread(
+                target=self._daemon_worker,
+                args=(interval_seconds,),
+                daemon=True,
+                name="PortfolioRiskGuardianDaemon",
+            )
+            self._daemon_thread.start()
+            logger.info("PortfolioRiskGuardian continuous monitoring daemon started.")
+
+    def stop_daemon(self, timeout: float = 2.0) -> None:
+        """Stops the autonomous background risk monitoring daemon."""
+        self._stop_event.set()
+        self._is_running = False
+        if self._daemon_thread and self._daemon_thread.is_alive():
+            self._daemon_thread.join(timeout=timeout)
+            logger.info("PortfolioRiskGuardian continuous monitoring daemon stopped.")
+
+    def is_daemon_alive(self) -> bool:
+        """Returns True if the background monitoring thread is active."""
+        return bool(self._daemon_thread and self._daemon_thread.is_alive())
+
+    def is_heartbeat_stalled(self, threshold_seconds: float | None = None) -> bool:
+        """Returns True if the daemon heartbeat has lapsed beyond the watchdog threshold."""
+        timeout = threshold_seconds or self.limits.heartbeat_watchdog_timeout_seconds
+        return (time.monotonic() - self.last_heartbeat_monotonic) > timeout
+
+    def _daemon_worker(self, interval_seconds: float) -> None:
+        """Background thread worker loop executing continuous mark-to-market monitoring."""
+        while not self._stop_event.is_set():
+            try:
+                with self._lock:
+                    self.last_heartbeat_monotonic = time.monotonic()
+                    self.last_heartbeat_utc = datetime.now(UTC).isoformat()
+                    self.loop_execution_count += 1
+                self.monitor_portfolio_state()
+            except Exception as exc:
+                logger.error(f"Error in PortfolioRiskGuardian daemon loop: {exc}")
+            self._stop_event.wait(interval_seconds)
+
+    def get_health_status(self) -> dict[str, Any]:
+        """Provides comprehensive runtime health telemetry."""
+        with self._lock:
+            heartbeat_age = round(time.monotonic() - self.last_heartbeat_monotonic, 3)
+            return {
+                "daemon_running": self.is_daemon_alive(),
+                "heartbeat_age_seconds": heartbeat_age,
+                "heartbeat_stalled": self.is_heartbeat_stalled(),
+                "last_heartbeat_utc": self.last_heartbeat_utc,
+                "loop_execution_count": self.loop_execution_count,
+                "circuit_breaker_state": self.state.value,
+                "peak_equity_usd": round(self.peak_equity_usd, 2),
+                "current_cash_usd": round(self.current_cash_usd, 2),
+                "daily_realized_loss_usd": round(self.daily_realized_loss_usd, 2),
+                "last_circuit_trip_reason": self.last_circuit_trip_reason,
+                "real_capital_enabled": REAL_CAPITAL_ENABLED,
+            }
+
+    def simulate_stalled_heartbeat(self, stall_seconds: float = 10.0) -> None:
+        """Failure injection: artificially offsets heartbeat to simulate a frozen loop."""
+        with self._lock:
+            self.last_heartbeat_monotonic = time.monotonic() - stall_seconds
 
     def trip_circuit_breaker(self, new_state: CircuitBreakerState, reason: str) -> None:
         """Transitions circuit breaker to a more restrictive state."""
@@ -424,6 +510,58 @@ class PortfolioRiskGuardian:
         Must be invoked and return approved=True before ANY order can reach an executor.
         """
         with self._lock:
+            # 0. Constitutional Real Capital Lockout
+            if order.exchange.upper() in (
+                "LIVE",
+                "REAL",
+                "PRODUCTION",
+                "REAL_CAPITAL",
+                "MAINNET",
+                "BINANCE_REAL",
+                "BYBIT_REAL",
+            ) or order.desk.upper() in ("LIVE", "REAL", "REAL_CAPITAL"):
+                return RiskDecision(
+                    approved=False,
+                    circuit_breaker_state=self.state,
+                    symbol=order.symbol,
+                    direction=order.direction,
+                    allocated_size=0.0,
+                    allocated_risk_usd=0.0,
+                    rejection_code="REAL_CAPITAL_EXECUTION_FORBIDDEN",
+                    rationale="Constitutional Invariant: REAL_CAPITAL_ENABLED is permanently False. Live capital execution forbidden.",
+                )
+
+            # 0b. Monitoring Daemon Watchdog Check
+            if self.limits.require_active_daemon:
+                if not self.is_daemon_alive() or self.is_heartbeat_stalled():
+                    return RiskDecision(
+                        approved=False,
+                        circuit_breaker_state=self.state,
+                        symbol=order.symbol,
+                        direction=order.direction,
+                        allocated_size=0.0,
+                        allocated_risk_usd=0.0,
+                        rejection_code="MONITORING_DAEMON_STALLED",
+                        rationale="Risk monitoring daemon heartbeat is stalled or loop is inactive. Failing closed.",
+                    )
+
+            # 0c. Order Replay / Context Protection
+            order_fingerprint = (
+                f"{order.symbol}:{order.direction}:{float(order.entry_price):.6f}:"
+                f"{float(order.size):.6f}:{order.market_data_timestamp_ms}:{order.strategy_id}"
+            )
+            if order_fingerprint in self._order_fingerprints:
+                return RiskDecision(
+                    approved=False,
+                    circuit_breaker_state=self.state,
+                    symbol=order.symbol,
+                    direction=order.direction,
+                    allocated_size=0.0,
+                    allocated_risk_usd=0.0,
+                    rejection_code="ORDER_CONTEXT_REPLAYED",
+                    rationale=f"Order context '{order_fingerprint}' was already evaluated and cannot be replayed.",
+                )
+
             # 1. Permanent Constitutional Invariant (REAL_CAPITAL_ENABLED = False)
             if REAL_CAPITAL_ENABLED:
                 return RiskDecision(
@@ -450,7 +588,7 @@ class PortfolioRiskGuardian:
                     rationale=f"New exposure blocked: Portfolio Risk Guardian is in {self.state.value} ({self.last_circuit_trip_reason}).",
                 )
 
-            # 3. Market Data Freshness Check
+            # 3. Market Data Freshness & Clock Drift Check
             curr_time_ms = now_ms or int(time.time() * 1000)
             if order.market_data_timestamp_ms is not None:
                 staleness = curr_time_ms - order.market_data_timestamp_ms
@@ -464,6 +602,17 @@ class PortfolioRiskGuardian:
                         allocated_risk_usd=0.0,
                         rejection_code="STALE_MARKET_DATA",
                         rationale=f"Market data is {staleness}ms old (max allowed: {self.limits.max_market_data_staleness_ms}ms).",
+                    )
+                if staleness < -500:
+                    return RiskDecision(
+                        approved=False,
+                        circuit_breaker_state=self.state,
+                        symbol=order.symbol,
+                        direction=order.direction,
+                        allocated_size=0.0,
+                        allocated_risk_usd=0.0,
+                        rejection_code="CLOCK_DRIFT_EXCEEDED",
+                        rationale=f"Market data timestamp is {-staleness}ms in the future (exceeds 500ms clock drift SLA).",
                     )
 
             # 4. Deterministic Asset Eligibility & Liquidity Gate
@@ -660,6 +809,7 @@ class PortfolioRiskGuardian:
                     )
 
             # All 12 deterministic gates passed green!
+            self._order_fingerprints.add(order_fingerprint)
             return RiskDecision(
                 approved=True,
                 circuit_breaker_state=self.state,

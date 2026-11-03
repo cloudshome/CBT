@@ -1,0 +1,90 @@
+{
+  "manifest_version": "1.0.0",
+  "milestone": "M33",
+  "audit_timestamp_utc": "2026-11-03T11:05:00Z",
+  "governance_constitution": {
+    "REAL_CAPITAL_ENABLED": false,
+    "real_capital_lock_enforcement": "PERMANENT_FAIL_CLOSED",
+    "override_authority": "NONE (AI agents, human operators, and multi-sig cannot enable real capital)",
+    "permitted_execution_environments": [
+      "PAPER",
+      "TESTNET",
+      "SHADOW",
+      "SIMULATION",
+      "REPLAY"
+    ],
+    "prohibited_execution_environments": [
+      "LIVE",
+      "PRODUCTION",
+      "REAL_CAPITAL",
+      "MAINNET"
+    ]
+  },
+  "risk_limits_policy": {
+    "base_capital_usd": 10000.0,
+    "max_drawdown_ceiling_pct": 2.0,
+    "daily_loss_warning_pct": 1.0,
+    "daily_loss_freeze_pct": 1.5,
+    "per_position_initial_risk_pct": 0.25,
+    "max_position_risk_usd_ceiling": 25.0,
+    "aggregate_open_risk_pct": 0.75,
+    "max_aggregate_open_risk_usd": 75.0,
+    "max_gross_notional_usd": 30000.0,
+    "max_leverage_ratio": 3.0,
+    "max_concurrent_positions": 3,
+    "max_correlated_positions": 2,
+    "max_market_data_staleness_ms": 5000,
+    "max_clock_drift_ms": 500,
+    "heartbeat_watchdog_timeout_seconds": 5.0,
+    "fail_closed_on_missing_data": true
+  },
+  "asset_eligibility_matrix": {
+    "tier1_whitelist": [
+      "BTC/USDT",
+      "ETH/USDT",
+      "SOL/USDT",
+      "PAXG/USDT",
+      "XAU/USDT"
+    ],
+    "prohibited_microcaps": [
+      "KORU",
+      "AKE",
+      "DOOD",
+      "BMT",
+      "MAGMA"
+    ],
+    "ai_override_prohibited": true
+  },
+  "circuit_breaker_lifecycle": {
+    "states": [
+      "NORMAL",
+      "WARNING",
+      "REDUCED_EXPOSURE",
+      "HARD_FREEZE",
+      "INVESTIGATION",
+      "PAPER_RECOVERY",
+      "REQUALIFICATION"
+    ],
+    "calendar_rollover_resets_freeze": false,
+    "human_authorization_required_for_investigation": true,
+    "paper_recovery_sizing_haircut": 0.50
+  },
+  "historical_accounting_ground_truth": {
+    "sample_trades_count": 52,
+    "realized_nominal_pnl_usd": -1142.07,
+    "modeled_slippage_usd": -390.44,
+    "slippage_adjusted_pnl_usd": -1532.51,
+    "ending_nominal_cash_usd": 8857.93,
+    "historical_peak_equity_usd": 10000.0,
+    "historical_trough_equity_usd": 8643.46,
+    "max_historical_drawdown_pct": 13.565
+  },
+  "m18_certified_invariants": {
+    "certified_commit": "c9cc1cad780453b81032f6b1b1b81117d41c060f",
+    "certified_gates_count": 14,
+    "certified_tests_count": 149,
+    "test_identity_sha256": "2acbff25f391249cb1881bd40a4440384cecdd7682c6f83b91487d8744d0b57b",
+    "status": "PRODUCTION_PASS_VERIFIED"
+  }
+}
+

@@ -1144,6 +1144,32 @@ class PortfolioShadowManager:
                             f"Risk Gate Rejection: trade risk ${trade_risk:.2f} exceeds allowable ${max_risk_usd:.2f}."
                         )
 
+            # Portfolio Risk Guardian Pre-Trade Evaluation Guard (Milestone 32 & 33)
+            if (
+                os.getenv("ENABLE_PORTFOLIO_RISK_GUARDIAN", "1") == "1" and not is_test_env
+            ) or os.getenv("FORCE_PORTFOLIO_RISK_GUARDIAN") == "1":
+                from core.risk.portfolio_risk_guardian import (
+                    PortfolioRiskGuardian,
+                    ProposedOrder,
+                )
+
+                guardian = PortfolioRiskGuardian()
+                proposed = ProposedOrder(
+                    symbol=symbol,
+                    direction=direction,
+                    entry_price=ep,
+                    stop_loss=sl,
+                    size=float(size),
+                    strategy_id=style_tag or "REPLACE_ORDER",
+                    desk=book_id,
+                )
+                decision = guardian.evaluate_proposed_order(proposed)
+                if not decision.approved:
+                    conn.rollback()
+                    raise ValueError(
+                        f"Portfolio Risk Guardian Rejection [{decision.rejection_code}]: {decision.rationale}"
+                    )
+
             # 3. Insert new position
             conn.execute(
                 """
