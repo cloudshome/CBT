@@ -349,6 +349,32 @@ class PortfolioShadowManager:
                     conn.rollback()
                     raise ValueError(f"Risk Gate Rejection: {cooldown_reason}")
 
+                # Portfolio Risk Guardian Pre-Trade Evaluation Guard (Milestone 32)
+                if (
+                    os.getenv("ENABLE_PORTFOLIO_RISK_GUARDIAN", "1") == "1" and not is_test_env
+                ) or os.getenv("FORCE_PORTFOLIO_RISK_GUARDIAN") == "1":
+                    from core.risk.portfolio_risk_guardian import (
+                        PortfolioRiskGuardian,
+                        ProposedOrder,
+                    )
+
+                    guardian = PortfolioRiskGuardian()
+                    proposed = ProposedOrder(
+                        symbol=symbol,
+                        direction=direction,
+                        entry_price=ep,
+                        stop_loss=sl,
+                        size=sz,
+                        strategy_id=style_tag or "SHADOW_DESK",
+                        portfolio_book=book_id,
+                    )
+                    decision = guardian.evaluate_proposed_order(proposed)
+                    if not decision.approved:
+                        conn.rollback()
+                        raise ValueError(
+                            f"Portfolio Risk Guardian Rejection [{decision.rejection_code}]: {decision.rationale}"
+                        )
+
                 if max_risk_usd is not None:
                     trade_risk = float(size) * abs(float(entry_price) - float(stop_loss))
                     if trade_risk > (max_risk_usd + 1e-4):
