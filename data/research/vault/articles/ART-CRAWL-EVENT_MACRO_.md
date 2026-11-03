@@ -3,7 +3,7 @@
 **Source Family:** `MACRO`  
 **Issuer / Authority:** `FEDERAL_RESERVE`  
 **Event Type:** `MACRO_RATE_DECISION`  
-**Observed At:** `2026-10-14T12:51:14.895544+00:00`  
+**Observed At:** `2026-10-14T09:01:11.786968+00:00`  
 **Affected Entities:** `BTC, ETH, SOL`  
 **Jurisdiction:** `US`  
 **Causal Firewall Status:** `PASSED`
