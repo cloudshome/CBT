@@ -39,6 +39,9 @@ class Gate5State(StrEnum):
     QUANTITATIVE_VALIDATION = "QUANTITATIVE_VALIDATION"
     QUALIFIED_FOR_SHADOW_CONTINUATION = "QUALIFIED_FOR_SHADOW_CONTINUATION"
     QUARANTINED = "QUARANTINED"
+    INVESTIGATION = "INVESTIGATION"
+    PAPER_RECOVERY = "PAPER_RECOVERY"
+    REQUALIFICATION = "REQUALIFICATION"
     REJECTED = "REJECTED"
 
 
@@ -341,5 +344,189 @@ def evaluate_gate5_lifecycle(
         cost_stress=cost_stress,
         regime_attribution=regime_attr,
         failures=failures,
+        recommendations=recommendations,
+    )
+
+
+def transition_to_investigation(
+    current_result: Gate5EvaluationResult,
+    investigation_rationale: str,
+) -> Gate5EvaluationResult:
+    """
+    Transitions a strategy from QUARANTINED to INVESTIGATION.
+    Does NOT reset or erase historical trades or failures.
+    """
+    if current_result.state != Gate5State.QUARANTINED:
+        raise ValueError(
+            f"Cannot transition to INVESTIGATION from state '{current_result.state}'. "
+            f"Only QUARANTINED strategies can enter INVESTIGATION."
+        )
+
+    recommendations = list(current_result.recommendations)
+    recommendations.append(f"Investigation commenced: {investigation_rationale}")
+
+    return Gate5EvaluationResult(
+        state=Gate5State.INVESTIGATION,
+        real_capital_enabled=False,
+        days_observed=current_result.days_observed,
+        total_trades=current_result.total_trades,
+        effective_sample_size=current_result.effective_sample_size,
+        net_expectancy_r=current_result.net_expectancy_r,
+        expectancy_ci_lower=current_result.expectancy_ci_lower,
+        expectancy_ci_upper=current_result.expectancy_ci_upper,
+        win_rate_pct=current_result.win_rate_pct,
+        win_rate_ci_lower=current_result.win_rate_ci_lower,
+        win_rate_ci_upper=current_result.win_rate_ci_upper,
+        profit_factor=current_result.profit_factor,
+        max_drawdown_pct=current_result.max_drawdown_pct,
+        ulcer_index=current_result.ulcer_index,
+        deflated_sharpe_ratio=current_result.deflated_sharpe_ratio,
+        sharpe_ratio=current_result.sharpe_ratio,
+        cost_stress=current_result.cost_stress,
+        regime_attribution=current_result.regime_attribution,
+        failures=list(current_result.failures),
+        recommendations=recommendations,
+    )
+
+
+def transition_to_paper_recovery(
+    current_result: Gate5EvaluationResult,
+    recovery_plan: str,
+) -> Gate5EvaluationResult:
+    """
+    Transitions a strategy from INVESTIGATION to PAPER_RECOVERY.
+    Strategy is permitted to execute in isolated forward paper burn-in.
+    """
+    if current_result.state != Gate5State.INVESTIGATION:
+        raise ValueError(
+            f"Cannot transition to PAPER_RECOVERY from state '{current_result.state}'. "
+            f"Strategy must be in INVESTIGATION state."
+        )
+
+    recommendations = list(current_result.recommendations)
+    recommendations.append(f"Paper recovery burn-in initialized: {recovery_plan}")
+
+    return Gate5EvaluationResult(
+        state=Gate5State.PAPER_RECOVERY,
+        real_capital_enabled=False,
+        days_observed=current_result.days_observed,
+        total_trades=current_result.total_trades,
+        effective_sample_size=current_result.effective_sample_size,
+        net_expectancy_r=current_result.net_expectancy_r,
+        expectancy_ci_lower=current_result.expectancy_ci_lower,
+        expectancy_ci_upper=current_result.expectancy_ci_upper,
+        win_rate_pct=current_result.win_rate_pct,
+        win_rate_ci_lower=current_result.win_rate_ci_lower,
+        win_rate_ci_upper=current_result.win_rate_ci_upper,
+        profit_factor=current_result.profit_factor,
+        max_drawdown_pct=current_result.max_drawdown_pct,
+        ulcer_index=current_result.ulcer_index,
+        deflated_sharpe_ratio=current_result.deflated_sharpe_ratio,
+        sharpe_ratio=current_result.sharpe_ratio,
+        cost_stress=current_result.cost_stress,
+        regime_attribution=current_result.regime_attribution,
+        failures=list(current_result.failures),
+        recommendations=recommendations,
+    )
+
+
+def evaluate_paper_recovery(
+    prior_historical_trades: list[TradeReturn],
+    recovery_trades: list[TradeReturn],
+    min_recovery_trades: int = 30,
+    max_recovery_drawdown: float = 2.0,
+) -> Gate5EvaluationResult:
+    """
+    Evaluates out-of-sample forward performance during PAPER_RECOVERY.
+    Constitutional rule: Past failures are preserved in the total audit trail,
+    while recovery is judged strictly on the newly observed post-incident trades.
+    """
+    if len(recovery_trades) < min_recovery_trades:
+        rec_profile = calculate_full_statistical_profile(recovery_trades) if recovery_trades else {}
+        return Gate5EvaluationResult(
+            state=Gate5State.PAPER_RECOVERY,
+            real_capital_enabled=False,
+            total_trades=len(prior_historical_trades) + len(recovery_trades),
+            net_expectancy_r=rec_profile.get("net_expectancy_r", 0.0),
+            max_drawdown_pct=rec_profile.get("max_drawdown_pct", 0.0),
+            failures=[
+                f"Insufficient paper recovery sample: {len(recovery_trades)} / {min_recovery_trades} required."
+            ],
+            recommendations=["Continue paper recovery forward testing."],
+        )
+
+    rec_profile = calculate_full_statistical_profile(recovery_trades)
+    cost_stress = evaluate_cost_stress_decay(recovery_trades)
+    regime_attr = decompose_regime_performance(recovery_trades)
+    rec_losses = count_max_consecutive_losses(recovery_trades)
+
+    failures: list[str] = []
+    recommendations: list[str] = []
+
+    if rec_losses >= 8:
+        failures.append(f"Adverse streak during recovery: {rec_losses} consecutive losses.")
+        return Gate5EvaluationResult(
+            state=Gate5State.QUARANTINED,
+            real_capital_enabled=False,
+            total_trades=len(prior_historical_trades) + len(recovery_trades),
+            net_expectancy_r=rec_profile["net_expectancy_r"],
+            max_drawdown_pct=rec_profile["max_drawdown_pct"],
+            failures=failures,
+            recommendations=["Re-quarantine: strategy failed paper recovery."],
+        )
+
+    if rec_profile["max_drawdown_pct"] > max_recovery_drawdown:
+        failures.append(
+            f"Recovery drawdown breach: {rec_profile['max_drawdown_pct']:.2f}% exceeds {max_recovery_drawdown:.2f}% ceiling."
+        )
+        return Gate5EvaluationResult(
+            state=Gate5State.QUARANTINED,
+            real_capital_enabled=False,
+            total_trades=len(prior_historical_trades) + len(recovery_trades),
+            net_expectancy_r=rec_profile["net_expectancy_r"],
+            max_drawdown_pct=rec_profile["max_drawdown_pct"],
+            failures=failures,
+            recommendations=["Re-quarantine: recovery drawdown ceiling breached."],
+        )
+
+    if rec_profile["net_expectancy_r"] <= 0.0:
+        failures.append(
+            f"Negative recovery expectancy: E[R] = {rec_profile['net_expectancy_r']:+.4f}R."
+        )
+        return Gate5EvaluationResult(
+            state=Gate5State.REJECTED,
+            real_capital_enabled=False,
+            total_trades=len(prior_historical_trades) + len(recovery_trades),
+            net_expectancy_r=rec_profile["net_expectancy_r"],
+            max_drawdown_pct=rec_profile["max_drawdown_pct"],
+            failures=failures,
+            recommendations=["Reject strategy: recovery evidence confirmed lack of edge."],
+        )
+
+    # Recovery successfully completed!
+    recommendations.append(
+        "Paper recovery criteria satisfied. Transitioning to REQUALIFICATION state for sustained shadow monitoring."
+    )
+    combined_total = len(prior_historical_trades) + len(recovery_trades)
+
+    return Gate5EvaluationResult(
+        state=Gate5State.REQUALIFICATION,
+        real_capital_enabled=False,
+        total_trades=combined_total,
+        effective_sample_size=rec_profile["effective_sample_size"],
+        net_expectancy_r=rec_profile["net_expectancy_r"],
+        expectancy_ci_lower=rec_profile["expectancy_95_ci"]["ci_lower"],
+        expectancy_ci_upper=rec_profile["expectancy_95_ci"]["ci_upper"],
+        win_rate_pct=rec_profile["win_rate_pct"],
+        win_rate_ci_lower=rec_profile["win_rate_wilson_ci"]["ci_lower"],
+        win_rate_ci_upper=rec_profile["win_rate_wilson_ci"]["ci_upper"],
+        profit_factor=rec_profile["profit_factor"],
+        max_drawdown_pct=rec_profile["max_drawdown_pct"],
+        ulcer_index=rec_profile["ulcer_index"],
+        deflated_sharpe_ratio=rec_profile["deflated_sharpe_ratio"],
+        sharpe_ratio=rec_profile["sharpe_ratio"],
+        cost_stress=cost_stress,
+        regime_attribution=regime_attr,
+        failures=[],
         recommendations=recommendations,
     )

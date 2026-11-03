@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -100,19 +101,23 @@ class QuantitativeGate5Auditor:
                     entry_p = float(r["entry_price"] or 1.0)
                     sl_p = float(r["stop_loss"] or (entry_p * 0.98))
                     sz = float(r["size"] or 1.0)
+                    notional_usd = entry_p * sz
+                    stop_dist = abs(entry_p - sl_p)
 
-                    # Nominal risk per unit = |entry - stop_loss|
-                    risk_per_unit = max(entry_p * 0.005, abs(entry_p - sl_p))
-                    total_risk_usd = risk_per_unit * sz
-                    if total_risk_usd <= 0.0:
-                        total_risk_usd = 50.0  # Default nominal risk anchor ($50 = 0.5% of $10k)
+                    # Robust institutional risk denominator:
+                    # Trailed breakeven stops (stop_dist ~ 0) must not divide PnL by micro-cents.
+                    # Bounded by allocated initial risk: min 1.5% of notional and min $25.0 (0.25% of $10k base).
+                    if stop_dist < (entry_p * 0.005) or (stop_dist * sz) < 10.0:
+                        total_risk_usd = max(25.0, notional_usd * 0.015)
+                    else:
+                        total_risk_usd = max(25.0, stop_dist * sz)
 
                     # Compute return in R
                     gross_pnl_usd = pnl_usd + fee_usd
                     gross_r = gross_pnl_usd / total_risk_usd
                     fee_r = fee_usd / total_risk_usd
                     # Slippage model (estimated 5 bps of entry notional)
-                    slippage_usd = (entry_p * sz) * 0.0005
+                    slippage_usd = notional_usd * 0.0005
                     slippage_r = slippage_usd / total_risk_usd
 
                     trade = TradeReturn(
@@ -148,6 +153,77 @@ class QuantitativeGate5Auditor:
         )
 
 
+def get_git_commit_sha() -> str:
+    """Retrieves the current git commit SHA if git repository is available."""
+    try:
+        res = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=ROOT_DIR,
+        )
+        if res.returncode == 0 and res.stdout.strip():
+            return res.stdout.strip()
+    except Exception:
+        pass
+    return "UNKNOWN_COMMIT"
+
+
+def compute_evidence_digest(db_path: Path | str) -> str:
+    """
+    Computes a deterministic, cryptographic SHA-256 digest across all
+    input trade records and reconciliation states in the SQLite database.
+    Any insertion, deletion, or alteration of historical trades alters this hash.
+    """
+    target = Path(db_path)
+    if not target.exists():
+        return "DATABASE_NOT_FOUND"
+
+    conn = sqlite3.connect(target)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    tables = {r[0] for r in cur.fetchall()}
+
+    records: list[str] = []
+
+    if "shadow_positions" in tables:
+        cur.execute("PRAGMA table_info(shadow_positions);")
+        pos_cols = {col[1] for col in cur.fetchall()}
+        id_col = "position_id" if "position_id" in pos_cols else "id"
+        cur.execute(
+            f"SELECT {id_col} AS trade_id, symbol, direction, entry_price, size, "
+            f"stop_loss, realized_pnl, opened_at, closed_at, status "
+            f"FROM shadow_positions ORDER BY {id_col} ASC;"
+        )
+        for r in cur.fetchall():
+            row_token = (
+                f"{r['trade_id']}|{r['symbol']}|{r['direction']}|{r['entry_price']}|"
+                f"{r['size']}|{r['stop_loss']}|{r['realized_pnl']}|{r['opened_at']}|"
+                f"{r['closed_at']}|{r['status']}"
+            )
+            records.append(row_token)
+
+    if "execution_reconciliation_records" in tables:
+        cur.execute(
+            "SELECT reconciliation_id, reconciliation_status, executed_qty, fee_paid_usd "
+            "FROM execution_reconciliation_records ORDER BY reconciliation_id ASC;"
+        )
+        for r in cur.fetchall():
+            rec_token = f"REC:{r['reconciliation_id']}|{r['reconciliation_status']}|{r['executed_qty']}|{r['fee_paid_usd']}"
+            records.append(rec_token)
+
+    conn.close()
+
+    if not records:
+        return "EMPTY_LEDGER"
+
+    canonical_data = "\n".join(records)
+    return hashlib.sha256(canonical_data.encode("utf-8")).hexdigest()
+
+
 def generate_audit_manifest(
     result: Gate5EvaluationResult,
     db_path: Path | str | None = None,
@@ -155,13 +231,35 @@ def generate_audit_manifest(
 ) -> dict[str, Any]:
     """
     Generates a cryptographic, machine-readable audit manifest.
-    Computes a SHA-256 fingerprint of the evaluation parameters and metrics.
+    Computes a SHA-256 fingerprint binding:
+    - Input trade evidence digest
+    - Database path
+    - Code Git commit SHA
+    - Configuration and statistical methodology
+    - Random seed
+    - Evaluation metrics and lifecycle state
     """
+    db_target = Path(db_path) if db_path else (ROOT_DIR / "data" / "trading_logs.db")
+    evidence_digest = compute_evidence_digest(db_target)
+    git_sha = get_git_commit_sha()
     now_utc = datetime.now(UTC).isoformat()
-    manifest_payload = {
-        "manifest_version": "2.0.0",
+
+    manifest_payload: dict[str, Any] = {
+        "manifest_version": "2.1.0",
         "timestamp_utc": now_utc,
-        "database_inspected": str(db_path or "data/trading_logs.db"),
+        "git_commit_sha": git_sha,
+        "database_inspected": str(db_target),
+        "evidence_digest_sha256": evidence_digest,
+        "methodology": {
+            "bootstrap_samples": 2000,
+            "bootstrap_seed": 42,
+            "confidence_level": 0.95,
+            "autocorrelation_kernel": "Bartlett",
+            "deflated_sharpe_trials": 10,
+            "cost_stress_tiers": ["1.0x (base)", "1.5x (conservative)", "2.5x (severe)"],
+            "max_allowed_drawdown_pct": 2.0,
+            "consecutive_loss_circuit_breaker": 8,
+        },
         "state": result.state.value,
         "real_capital_enabled": result.real_capital_enabled,
         "days_observed": result.days_observed,
@@ -175,6 +273,7 @@ def generate_audit_manifest(
         "max_drawdown_pct": result.max_drawdown_pct,
         "ulcer_index": result.ulcer_index,
         "deflated_sharpe_ratio": result.deflated_sharpe_ratio,
+        "sharpe_ratio": result.sharpe_ratio,
         "cost_stress": result.cost_stress,
         "regime_attribution": result.regime_attribution,
         "failures": result.failures,
@@ -192,3 +291,45 @@ def generate_audit_manifest(
             json.dump(manifest_payload, f, indent=2)
 
     return manifest_payload
+
+
+def verify_audit_manifest(
+    manifest: dict[str, Any],
+    db_path: Path | str | None = None,
+) -> tuple[bool, str]:
+    """
+    Cryptographically verifies an audit manifest against current database state.
+    Returns: (is_valid, reason)
+    """
+    if "audit_signature_sha256" not in manifest:
+        return False, "SIGNATURE_MISSING: Manifest has no audit_signature_sha256"
+
+    # 1. Verify self-consistency of manifest payload signature
+    manifest_copy = dict(manifest)
+    expected_sig = manifest_copy.pop("audit_signature_sha256")
+    serialized = json.dumps(manifest_copy, sort_keys=True)
+    computed_sig = hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+    if computed_sig != expected_sig:
+        return False, f"TAMPERED_MANIFEST: Expected sig {expected_sig}, got {computed_sig}"
+
+    # 2. Verify evidence digest against underlying database
+    target_db = (
+        Path(db_path)
+        if db_path
+        else Path(manifest.get("database_inspected", "data/trading_logs.db"))
+    )
+    if not target_db.exists():
+        return False, f"DATABASE_NOT_FOUND: {target_db} does not exist"
+
+    current_evidence_digest = compute_evidence_digest(target_db)
+    recorded_digest = manifest.get("evidence_digest_sha256")
+
+    if current_evidence_digest != recorded_digest:
+        return (
+            False,
+            f"TAMPERED_EVIDENCE: Database digest {current_evidence_digest} "
+            f"does not match recorded digest {recorded_digest}",
+        )
+
+    return True, "VERIFIED_AUTHENTIC"
