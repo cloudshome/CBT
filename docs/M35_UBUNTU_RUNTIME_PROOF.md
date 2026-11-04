@@ -70,3 +70,4 @@ head -n 5 ~/CBT/research/live_paper_practice_manifest.jsonl
 - Zero unhandled exceptions or restart loops.
 
 Until this telemetry is verified and attached, the operational status remains **`RUNTIME_VERIFICATION_PENDING`**.
+

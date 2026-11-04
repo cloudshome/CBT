@@ -39,3 +39,4 @@ To verify that Ubuntu has byte-for-byte identical historical market data to Wind
 - **Single-Writer Flow:**
   - Ubuntu operates as the **Exclusive Event Writer** to [`research/live_paper_practice_manifest.jsonl`](file:///c:/Users/azims/CBT/research/live_paper_practice_manifest.jsonl).
   - Windows accesses this ledger purely via Git pull as a **Read-Only Auditor**.
+

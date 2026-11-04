@@ -65,3 +65,4 @@ To achieve statistical significance ($DSR > 0.95$) against 500 trials with $N = 
 
 **Governance Directive:** We will NEVER cite DSR as a standalone pass condition for low-frequency macro setups. We classify these results as:
 $$\mathbf{OBSERVED\ SAMPLE\ EDGE:\ POSITIVE} \quad \Big| \quad \mathbf{ASYMPTOTIC\ STATISTICAL\ PROOF:\ INSUFFICIENT\ SAMPLE}$$
+

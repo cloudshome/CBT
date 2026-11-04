@@ -76,3 +76,4 @@ Every single setup is traceable to an immutable entry timestamp and exit outcome
 1. **Exact Count Parity:** $17 + 11 + 6 + 1 = 35$ total setups evaluated across all canonical datasets.
 2. **Setup Universe Integrity:** Baseline, fusion, and control modes evaluated the **exact identical setup timestamps**.
 3. **Denominator Consistency:** When excluding `ETHUSDT 4h` due to statistically negligible sample ($N=1$), the 3 core candidate configurations total **exactly 34 setups**.
+

@@ -1,0 +1,1322 @@
+{
+  "FAMILY_1_BTCUSDT_1h_DEV_2022_2023": {
+    "family_id": "FAMILY_1",
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "split": "DEV_2022_2023",
+    "strict_mixed_metrics": {
+      "total_trades": 444,
+      "win_rate_pct": 24.5,
+      "mean_net_r": -0.247,
+      "profit_factor": 0.7,
+      "max_drawdown_r": 118.22,
+      "sharpe_per_trade": -0.164
+    },
+    "taker_metrics": {
+      "total_trades": 444,
+      "win_rate_pct": 24.5,
+      "mean_net_r": -0.339,
+      "profit_factor": 0.62,
+      "max_drawdown_r": 158.66,
+      "sharpe_per_trade": -0.225
+    }
+  },
+  "FAMILY_1_BTCUSDT_1h_VAL_2024": {
+    "family_id": "FAMILY_1",
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "split": "VAL_2024",
+    "strict_mixed_metrics": {
+      "total_trades": 219,
+      "win_rate_pct": 27.9,
+      "mean_net_r": -0.092,
+      "profit_factor": 0.88,
+      "max_drawdown_r": 38.02,
+      "sharpe_per_trade": -0.059
+    },
+    "taker_metrics": {
+      "total_trades": 219,
+      "win_rate_pct": 27.9,
+      "mean_net_r": -0.168,
+      "profit_factor": 0.79,
+      "max_drawdown_r": 50.22,
+      "sharpe_per_trade": -0.108
+    }
+  },
+  "FAMILY_1_BTCUSDT_1h_SEALED_OOS_2025": {
+    "family_id": "FAMILY_1",
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "split": "SEALED_OOS_2025",
+    "strict_mixed_metrics": {
+      "total_trades": 205,
+      "win_rate_pct": 27.8,
+      "mean_net_r": -0.141,
+      "profit_factor": 0.82,
+      "max_drawdown_r": 29.19,
+      "sharpe_per_trade": -0.091
+    },
+    "taker_metrics": {
+      "total_trades": 205,
+      "win_rate_pct": 27.8,
+      "mean_net_r": -0.234,
+      "profit_factor": 0.73,
+      "max_drawdown_r": 47.6,
+      "sharpe_per_trade": -0.15
+    }
+  },
+  "FAMILY_1_BTCUSDT_1h_FORWARD_2026": {
+    "family_id": "FAMILY_1",
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "split": "FORWARD_2026",
+    "strict_mixed_metrics": {
+      "total_trades": 172,
+      "win_rate_pct": 27.9,
+      "mean_net_r": -0.137,
+      "profit_factor": 0.83,
+      "max_drawdown_r": 38.28,
+      "sharpe_per_trade": -0.088
+    },
+    "taker_metrics": {
+      "total_trades": 172,
+      "win_rate_pct": 27.9,
+      "mean_net_r": -0.238,
+      "profit_factor": 0.72,
+      "max_drawdown_r": 52.12,
+      "sharpe_per_trade": -0.152
+    }
+  },
+  "FAMILY_1_BTCUSDT_1h_FULL_SERIES": {
+    "family_id": "FAMILY_1",
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "split": "FULL_SERIES",
+    "strict_mixed_metrics": {
+      "total_trades": 1040,
+      "win_rate_pct": 26.4,
+      "mean_net_r": -0.175,
+      "profit_factor": 0.78,
+      "max_drawdown_r": 190.57,
+      "sharpe_per_trade": -0.114
+    },
+    "taker_metrics": {
+      "total_trades": 1040,
+      "win_rate_pct": 26.4,
+      "mean_net_r": -0.266,
+      "profit_factor": 0.69,
+      "max_drawdown_r": 282.8,
+      "sharpe_per_trade": -0.173
+    }
+  },
+  "FAMILY_2_BTCUSDT_1h_DEV_2022_2023": {
+    "family_id": "FAMILY_2",
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "split": "DEV_2022_2023",
+    "strict_mixed_metrics": {
+      "total_trades": 313,
+      "win_rate_pct": 23.0,
+      "mean_net_r": -0.142,
+      "profit_factor": 0.79,
+      "max_drawdown_r": 61.49,
+      "sharpe_per_trade": -0.099
+    },
+    "taker_metrics": {
+      "total_trades": 313,
+      "win_rate_pct": 23.0,
+      "mean_net_r": -0.203,
+      "profit_factor": 0.72,
+      "max_drawdown_r": 77.5,
+      "sharpe_per_trade": -0.142
+    }
+  },
+  "FAMILY_2_BTCUSDT_1h_VAL_2024": {
+    "family_id": "FAMILY_2",
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "split": "VAL_2024",
+    "strict_mixed_metrics": {
+      "total_trades": 116,
+      "win_rate_pct": 23.3,
+      "mean_net_r": -0.059,
+      "profit_factor": 0.91,
+      "max_drawdown_r": 19.81,
+      "sharpe_per_trade": -0.041
+    },
+    "taker_metrics": {
+      "total_trades": 116,
+      "win_rate_pct": 23.3,
+      "mean_net_r": -0.109,
+      "profit_factor": 0.83,
+      "max_drawdown_r": 21.59,
+      "sharpe_per_trade": -0.076
+    }
+  },
+  "FAMILY_2_BTCUSDT_1h_SEALED_OOS_2025": {
+    "family_id": "FAMILY_2",
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "split": "SEALED_OOS_2025",
+    "strict_mixed_metrics": {
+      "total_trades": 96,
+      "win_rate_pct": 30.2,
+      "mean_net_r": 0.081,
+      "profit_factor": 1.13,
+      "max_drawdown_r": 21.84,
+      "sharpe_per_trade": 0.052
+    },
+    "taker_metrics": {
+      "total_trades": 96,
+      "win_rate_pct": 30.2,
+      "mean_net_r": 0.011,
+      "profit_factor": 1.02,
+      "max_drawdown_r": 24.54,
+      "sharpe_per_trade": 0.007
+    }
+  },
+  "FAMILY_2_BTCUSDT_1h_FORWARD_2026": {
+    "family_id": "FAMILY_2",
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "split": "FORWARD_2026",
+    "strict_mixed_metrics": {
+      "total_trades": 81,
+      "win_rate_pct": 21.0,
+      "mean_net_r": -0.139,
+      "profit_factor": 0.78,
+      "max_drawdown_r": 16.96,
+      "sharpe_per_trade": -0.101
+    },
+    "taker_metrics": {
+      "total_trades": 81,
+      "win_rate_pct": 21.0,
+      "mean_net_r": -0.199,
+      "profit_factor": 0.71,
+      "max_drawdown_r": 19.27,
+      "sharpe_per_trade": -0.145
+    }
+  },
+  "FAMILY_2_BTCUSDT_1h_FULL_SERIES": {
+    "family_id": "FAMILY_2",
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "split": "FULL_SERIES",
+    "strict_mixed_metrics": {
+      "total_trades": 606,
+      "win_rate_pct": 23.9,
+      "mean_net_r": -0.09,
+      "profit_factor": 0.86,
+      "max_drawdown_r": 62.07,
+      "sharpe_per_trade": -0.063
+    },
+    "taker_metrics": {
+      "total_trades": 606,
+      "win_rate_pct": 23.9,
+      "mean_net_r": -0.151,
+      "profit_factor": 0.79,
+      "max_drawdown_r": 91.56,
+      "sharpe_per_trade": -0.104
+    }
+  },
+  "FAMILY_3_BTCUSDT_1h_DEV_2022_2023": {
+    "family_id": "FAMILY_3",
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "split": "DEV_2022_2023",
+    "strict_mixed_metrics": {
+      "total_trades": 401,
+      "win_rate_pct": 29.4,
+      "mean_net_r": -0.023,
+      "profit_factor": 0.97,
+      "max_drawdown_r": 40.69,
+      "sharpe_per_trade": -0.015
+    },
+    "taker_metrics": {
+      "total_trades": 401,
+      "win_rate_pct": 29.4,
+      "mean_net_r": -0.111,
+      "profit_factor": 0.86,
+      "max_drawdown_r": 60.33,
+      "sharpe_per_trade": -0.071
+    }
+  },
+  "FAMILY_3_BTCUSDT_1h_VAL_2024": {
+    "family_id": "FAMILY_3",
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "split": "VAL_2024",
+    "strict_mixed_metrics": {
+      "total_trades": 187,
+      "win_rate_pct": 24.1,
+      "mean_net_r": -0.219,
+      "profit_factor": 0.72,
+      "max_drawdown_r": 42.59,
+      "sharpe_per_trade": -0.149
+    },
+    "taker_metrics": {
+      "total_trades": 187,
+      "win_rate_pct": 24.1,
+      "mean_net_r": -0.298,
+      "profit_factor": 0.65,
+      "max_drawdown_r": 56.66,
+      "sharpe_per_trade": -0.203
+    }
+  },
+  "FAMILY_3_BTCUSDT_1h_SEALED_OOS_2025": {
+    "family_id": "FAMILY_3",
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "split": "SEALED_OOS_2025",
+    "strict_mixed_metrics": {
+      "total_trades": 166,
+      "win_rate_pct": 30.1,
+      "mean_net_r": -0.06,
+      "profit_factor": 0.92,
+      "max_drawdown_r": 19.48,
+      "sharpe_per_trade": -0.038
+    },
+    "taker_metrics": {
+      "total_trades": 166,
+      "win_rate_pct": 30.1,
+      "mean_net_r": -0.161,
+      "profit_factor": 0.81,
+      "max_drawdown_r": 33.25,
+      "sharpe_per_trade": -0.102
+    }
+  },
+  "FAMILY_3_BTCUSDT_1h_FORWARD_2026": {
+    "family_id": "FAMILY_3",
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "split": "FORWARD_2026",
+    "strict_mixed_metrics": {
+      "total_trades": 154,
+      "win_rate_pct": 25.3,
+      "mean_net_r": -0.223,
+      "profit_factor": 0.73,
+      "max_drawdown_r": 42.57,
+      "sharpe_per_trade": -0.147
+    },
+    "taker_metrics": {
+      "total_trades": 154,
+      "win_rate_pct": 25.3,
+      "mean_net_r": -0.332,
+      "profit_factor": 0.63,
+      "max_drawdown_r": 53.69,
+      "sharpe_per_trade": -0.216
+    }
+  },
+  "FAMILY_3_BTCUSDT_1h_FULL_SERIES": {
+    "family_id": "FAMILY_3",
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "split": "FULL_SERIES",
+    "strict_mixed_metrics": {
+      "total_trades": 908,
+      "win_rate_pct": 27.8,
+      "mean_net_r": -0.104,
+      "profit_factor": 0.86,
+      "max_drawdown_r": 125.6,
+      "sharpe_per_trade": -0.068
+    },
+    "taker_metrics": {
+      "total_trades": 908,
+      "win_rate_pct": 27.8,
+      "mean_net_r": -0.196,
+      "profit_factor": 0.76,
+      "max_drawdown_r": 197.77,
+      "sharpe_per_trade": -0.127
+    }
+  },
+  "FAMILY_1_BTCUSDT_4h_DEV_2022_2023": {
+    "family_id": "FAMILY_1",
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "split": "DEV_2022_2023",
+    "strict_mixed_metrics": {
+      "total_trades": 96,
+      "win_rate_pct": 15.6,
+      "mean_net_r": -0.474,
+      "profit_factor": 0.45,
+      "max_drawdown_r": 47.61,
+      "sharpe_per_trade": -0.373
+    },
+    "taker_metrics": {
+      "total_trades": 96,
+      "win_rate_pct": 15.6,
+      "mean_net_r": -0.513,
+      "profit_factor": 0.42,
+      "max_drawdown_r": 51.1,
+      "sharpe_per_trade": -0.403
+    }
+  },
+  "FAMILY_1_BTCUSDT_4h_VAL_2024": {
+    "family_id": "FAMILY_1",
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "split": "VAL_2024",
+    "strict_mixed_metrics": {
+      "total_trades": 52,
+      "win_rate_pct": 26.9,
+      "mean_net_r": -0.031,
+      "profit_factor": 0.95,
+      "max_drawdown_r": 11.75,
+      "sharpe_per_trade": -0.02
+    },
+    "taker_metrics": {
+      "total_trades": 52,
+      "win_rate_pct": 26.9,
+      "mean_net_r": -0.063,
+      "profit_factor": 0.91,
+      "max_drawdown_r": 12.85,
+      "sharpe_per_trade": -0.041
+    }
+  },
+  "FAMILY_1_BTCUSDT_4h_SEALED_OOS_2025": {
+    "family_id": "FAMILY_1",
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "split": "SEALED_OOS_2025",
+    "strict_mixed_metrics": {
+      "total_trades": 43,
+      "win_rate_pct": 30.2,
+      "mean_net_r": -0.007,
+      "profit_factor": 0.99,
+      "max_drawdown_r": 10.59,
+      "sharpe_per_trade": -0.004
+    },
+    "taker_metrics": {
+      "total_trades": 43,
+      "win_rate_pct": 30.2,
+      "mean_net_r": -0.048,
+      "profit_factor": 0.94,
+      "max_drawdown_r": 11.59,
+      "sharpe_per_trade": -0.03
+    }
+  },
+  "FAMILY_1_BTCUSDT_4h_FORWARD_2026": {
+    "family_id": "FAMILY_1",
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "split": "FORWARD_2026",
+    "strict_mixed_metrics": {
+      "total_trades": 34,
+      "win_rate_pct": 23.5,
+      "mean_net_r": -0.18,
+      "profit_factor": 0.76,
+      "max_drawdown_r": 10.6,
+      "sharpe_per_trade": -0.122
+    },
+    "taker_metrics": {
+      "total_trades": 34,
+      "win_rate_pct": 23.5,
+      "mean_net_r": -0.219,
+      "profit_factor": 0.72,
+      "max_drawdown_r": 11.6,
+      "sharpe_per_trade": -0.149
+    }
+  },
+  "FAMILY_1_BTCUSDT_4h_FULL_SERIES": {
+    "family_id": "FAMILY_1",
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "split": "FULL_SERIES",
+    "strict_mixed_metrics": {
+      "total_trades": 225,
+      "win_rate_pct": 22.2,
+      "mean_net_r": -0.238,
+      "profit_factor": 0.69,
+      "max_drawdown_r": 53.86,
+      "sharpe_per_trade": -0.164
+    },
+    "taker_metrics": {
+      "total_trades": 225,
+      "win_rate_pct": 22.2,
+      "mean_net_r": -0.276,
+      "profit_factor": 0.66,
+      "max_drawdown_r": 62.21,
+      "sharpe_per_trade": -0.19
+    }
+  },
+  "FAMILY_2_BTCUSDT_4h_DEV_2022_2023": {
+    "family_id": "FAMILY_2",
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "split": "DEV_2022_2023",
+    "strict_mixed_metrics": {
+      "total_trades": 67,
+      "win_rate_pct": 16.4,
+      "mean_net_r": -0.275,
+      "profit_factor": 0.59,
+      "max_drawdown_r": 19.19,
+      "sharpe_per_trade": -0.217
+    },
+    "taker_metrics": {
+      "total_trades": 67,
+      "win_rate_pct": 16.4,
+      "mean_net_r": -0.302,
+      "profit_factor": 0.57,
+      "max_drawdown_r": 20.87,
+      "sharpe_per_trade": -0.239
+    }
+  },
+  "FAMILY_2_BTCUSDT_4h_VAL_2024": {
+    "family_id": "FAMILY_2",
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "split": "VAL_2024",
+    "strict_mixed_metrics": {
+      "total_trades": 21,
+      "win_rate_pct": 28.6,
+      "mean_net_r": 0.112,
+      "profit_factor": 1.19,
+      "max_drawdown_r": 5.17,
+      "sharpe_per_trade": 0.074
+    },
+    "taker_metrics": {
+      "total_trades": 21,
+      "win_rate_pct": 28.6,
+      "mean_net_r": 0.093,
+      "profit_factor": 1.15,
+      "max_drawdown_r": 5.27,
+      "sharpe_per_trade": 0.061
+    }
+  },
+  "FAMILY_2_BTCUSDT_4h_SEALED_OOS_2025": {
+    "family_id": "FAMILY_2",
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "split": "SEALED_OOS_2025",
+    "strict_mixed_metrics": {
+      "total_trades": 21,
+      "win_rate_pct": 23.8,
+      "mean_net_r": -0.118,
+      "profit_factor": 0.83,
+      "max_drawdown_r": 6.39,
+      "sharpe_per_trade": -0.081
+    },
+    "taker_metrics": {
+      "total_trades": 21,
+      "win_rate_pct": 23.8,
+      "mean_net_r": -0.147,
+      "profit_factor": 0.8,
+      "max_drawdown_r": 6.63,
+      "sharpe_per_trade": -0.1
+    }
+  },
+  "FAMILY_2_BTCUSDT_4h_FORWARD_2026": {
+    "family_id": "FAMILY_2",
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "split": "FORWARD_2026",
+    "strict_mixed_metrics": {
+      "total_trades": 19,
+      "win_rate_pct": 5.3,
+      "mean_net_r": -0.753,
+      "profit_factor": 0.14,
+      "max_drawdown_r": 15.66,
+      "sharpe_per_trade": -0.931
+    },
+    "taker_metrics": {
+      "total_trades": 19,
+      "win_rate_pct": 5.3,
+      "mean_net_r": -0.78,
+      "profit_factor": 0.14,
+      "max_drawdown_r": 16.07,
+      "sharpe_per_trade": -0.969
+    }
+  },
+  "FAMILY_2_BTCUSDT_4h_FULL_SERIES": {
+    "family_id": "FAMILY_2",
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "split": "FULL_SERIES",
+    "strict_mixed_metrics": {
+      "total_trades": 128,
+      "win_rate_pct": 18.0,
+      "mean_net_r": -0.257,
+      "profit_factor": 0.63,
+      "max_drawdown_r": 33.26,
+      "sharpe_per_trade": -0.195
+    },
+    "taker_metrics": {
+      "total_trades": 128,
+      "win_rate_pct": 18.0,
+      "mean_net_r": -0.283,
+      "profit_factor": 0.61,
+      "max_drawdown_r": 36.53,
+      "sharpe_per_trade": -0.215
+    }
+  },
+  "FAMILY_3_BTCUSDT_4h_DEV_2022_2023": {
+    "family_id": "FAMILY_3",
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "split": "DEV_2022_2023",
+    "strict_mixed_metrics": {
+      "total_trades": 91,
+      "win_rate_pct": 29.7,
+      "mean_net_r": 0.044,
+      "profit_factor": 1.06,
+      "max_drawdown_r": 17.62,
+      "sharpe_per_trade": 0.028
+    },
+    "taker_metrics": {
+      "total_trades": 91,
+      "win_rate_pct": 29.7,
+      "mean_net_r": 0.006,
+      "profit_factor": 1.01,
+      "max_drawdown_r": 18.64,
+      "sharpe_per_trade": 0.004
+    }
+  },
+  "FAMILY_3_BTCUSDT_4h_VAL_2024": {
+    "family_id": "FAMILY_3",
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "split": "VAL_2024",
+    "strict_mixed_metrics": {
+      "total_trades": 53,
+      "win_rate_pct": 15.1,
+      "mean_net_r": -0.477,
+      "profit_factor": 0.43,
+      "max_drawdown_r": 25.6,
+      "sharpe_per_trade": -0.382
+    },
+    "taker_metrics": {
+      "total_trades": 53,
+      "win_rate_pct": 15.1,
+      "mean_net_r": -0.516,
+      "profit_factor": 0.41,
+      "max_drawdown_r": 27.55,
+      "sharpe_per_trade": -0.413
+    }
+  },
+  "FAMILY_3_BTCUSDT_4h_SEALED_OOS_2025": {
+    "family_id": "FAMILY_3",
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "split": "SEALED_OOS_2025",
+    "strict_mixed_metrics": {
+      "total_trades": 35,
+      "win_rate_pct": 20.0,
+      "mean_net_r": -0.377,
+      "profit_factor": 0.56,
+      "max_drawdown_r": 24.33,
+      "sharpe_per_trade": -0.267
+    },
+    "taker_metrics": {
+      "total_trades": 35,
+      "win_rate_pct": 20.0,
+      "mean_net_r": -0.424,
+      "profit_factor": 0.53,
+      "max_drawdown_r": 25.79,
+      "sharpe_per_trade": -0.3
+    }
+  },
+  "FAMILY_3_BTCUSDT_4h_FORWARD_2026": {
+    "family_id": "FAMILY_3",
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "split": "FORWARD_2026",
+    "strict_mixed_metrics": {
+      "total_trades": 30,
+      "win_rate_pct": 16.7,
+      "mean_net_r": -0.483,
+      "profit_factor": 0.46,
+      "max_drawdown_r": 16.07,
+      "sharpe_per_trade": -0.372
+    },
+    "taker_metrics": {
+      "total_trades": 30,
+      "win_rate_pct": 16.7,
+      "mean_net_r": -0.524,
+      "profit_factor": 0.43,
+      "max_drawdown_r": 17.05,
+      "sharpe_per_trade": -0.405
+    }
+  },
+  "FAMILY_3_BTCUSDT_4h_FULL_SERIES": {
+    "family_id": "FAMILY_3",
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "split": "FULL_SERIES",
+    "strict_mixed_metrics": {
+      "total_trades": 209,
+      "win_rate_pct": 22.5,
+      "mean_net_r": -0.234,
+      "profit_factor": 0.7,
+      "max_drawdown_r": 66.73,
+      "sharpe_per_trade": -0.161
+    },
+    "taker_metrics": {
+      "total_trades": 209,
+      "win_rate_pct": 22.5,
+      "mean_net_r": -0.275,
+      "profit_factor": 0.66,
+      "max_drawdown_r": 72.82,
+      "sharpe_per_trade": -0.189
+    }
+  },
+  "FAMILY_1_ETHUSDT_1h_DEV_2022_2023": {
+    "family_id": "FAMILY_1",
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "split": "DEV_2022_2023",
+    "strict_mixed_metrics": {
+      "total_trades": 439,
+      "win_rate_pct": 25.7,
+      "mean_net_r": -0.193,
+      "profit_factor": 0.76,
+      "max_drawdown_r": 96.36,
+      "sharpe_per_trade": -0.127
+    },
+    "taker_metrics": {
+      "total_trades": 439,
+      "win_rate_pct": 25.7,
+      "mean_net_r": -0.27,
+      "profit_factor": 0.69,
+      "max_drawdown_r": 128.51,
+      "sharpe_per_trade": -0.177
+    }
+  },
+  "FAMILY_1_ETHUSDT_1h_VAL_2024": {
+    "family_id": "FAMILY_1",
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "split": "VAL_2024",
+    "strict_mixed_metrics": {
+      "total_trades": 197,
+      "win_rate_pct": 28.9,
+      "mean_net_r": -0.06,
+      "profit_factor": 0.92,
+      "max_drawdown_r": 27.22,
+      "sharpe_per_trade": -0.038
+    },
+    "taker_metrics": {
+      "total_trades": 197,
+      "win_rate_pct": 28.9,
+      "mean_net_r": -0.124,
+      "profit_factor": 0.85,
+      "max_drawdown_r": 36.58,
+      "sharpe_per_trade": -0.078
+    }
+  },
+  "FAMILY_1_ETHUSDT_1h_SEALED_OOS_2025": {
+    "family_id": "FAMILY_1",
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "split": "SEALED_OOS_2025",
+    "strict_mixed_metrics": {
+      "total_trades": 207,
+      "win_rate_pct": 22.7,
+      "mean_net_r": -0.271,
+      "profit_factor": 0.67,
+      "max_drawdown_r": 64.79,
+      "sharpe_per_trade": -0.186
+    },
+    "taker_metrics": {
+      "total_trades": 207,
+      "win_rate_pct": 22.7,
+      "mean_net_r": -0.33,
+      "profit_factor": 0.62,
+      "max_drawdown_r": 76.53,
+      "sharpe_per_trade": -0.227
+    }
+  },
+  "FAMILY_1_ETHUSDT_1h_FORWARD_2026": {
+    "family_id": "FAMILY_1",
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "split": "FORWARD_2026",
+    "strict_mixed_metrics": {
+      "total_trades": 145,
+      "win_rate_pct": 29.0,
+      "mean_net_r": -0.072,
+      "profit_factor": 0.9,
+      "max_drawdown_r": 26.41,
+      "sharpe_per_trade": -0.046
+    },
+    "taker_metrics": {
+      "total_trades": 145,
+      "win_rate_pct": 29.0,
+      "mean_net_r": -0.148,
+      "profit_factor": 0.82,
+      "max_drawdown_r": 34.78,
+      "sharpe_per_trade": -0.094
+    }
+  },
+  "FAMILY_1_ETHUSDT_1h_FULL_SERIES": {
+    "family_id": "FAMILY_1",
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "split": "FULL_SERIES",
+    "strict_mixed_metrics": {
+      "total_trades": 988,
+      "win_rate_pct": 26.2,
+      "mean_net_r": -0.165,
+      "profit_factor": 0.79,
+      "max_drawdown_r": 174.73,
+      "sharpe_per_trade": -0.108
+    },
+    "taker_metrics": {
+      "total_trades": 988,
+      "win_rate_pct": 26.2,
+      "mean_net_r": -0.236,
+      "profit_factor": 0.72,
+      "max_drawdown_r": 242.72,
+      "sharpe_per_trade": -0.154
+    }
+  },
+  "FAMILY_2_ETHUSDT_1h_DEV_2022_2023": {
+    "family_id": "FAMILY_2",
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "split": "DEV_2022_2023",
+    "strict_mixed_metrics": {
+      "total_trades": 280,
+      "win_rate_pct": 22.9,
+      "mean_net_r": -0.104,
+      "profit_factor": 0.84,
+      "max_drawdown_r": 42.47,
+      "sharpe_per_trade": -0.073
+    },
+    "taker_metrics": {
+      "total_trades": 280,
+      "win_rate_pct": 22.9,
+      "mean_net_r": -0.149,
+      "profit_factor": 0.78,
+      "max_drawdown_r": 50.67,
+      "sharpe_per_trade": -0.105
+    }
+  },
+  "FAMILY_2_ETHUSDT_1h_VAL_2024": {
+    "family_id": "FAMILY_2",
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "split": "VAL_2024",
+    "strict_mixed_metrics": {
+      "total_trades": 120,
+      "win_rate_pct": 16.7,
+      "mean_net_r": -0.271,
+      "profit_factor": 0.6,
+      "max_drawdown_r": 37.33,
+      "sharpe_per_trade": -0.212
+    },
+    "taker_metrics": {
+      "total_trades": 120,
+      "win_rate_pct": 16.7,
+      "mean_net_r": -0.309,
+      "profit_factor": 0.56,
+      "max_drawdown_r": 41.9,
+      "sharpe_per_trade": -0.241
+    }
+  },
+  "FAMILY_2_ETHUSDT_1h_SEALED_OOS_2025": {
+    "family_id": "FAMILY_2",
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "split": "SEALED_OOS_2025",
+    "strict_mixed_metrics": {
+      "total_trades": 110,
+      "win_rate_pct": 19.1,
+      "mean_net_r": -0.124,
+      "profit_factor": 0.79,
+      "max_drawdown_r": 16.69,
+      "sharpe_per_trade": -0.094
+    },
+    "taker_metrics": {
+      "total_trades": 110,
+      "win_rate_pct": 19.1,
+      "mean_net_r": -0.158,
+      "profit_factor": 0.74,
+      "max_drawdown_r": 20.12,
+      "sharpe_per_trade": -0.12
+    }
+  },
+  "FAMILY_2_ETHUSDT_1h_FORWARD_2026": {
+    "family_id": "FAMILY_2",
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "split": "FORWARD_2026",
+    "strict_mixed_metrics": {
+      "total_trades": 101,
+      "win_rate_pct": 29.7,
+      "mean_net_r": 0.137,
+      "profit_factor": 1.24,
+      "max_drawdown_r": 12.89,
+      "sharpe_per_trade": 0.09
+    },
+    "taker_metrics": {
+      "total_trades": 101,
+      "win_rate_pct": 29.7,
+      "mean_net_r": 0.093,
+      "profit_factor": 1.15,
+      "max_drawdown_r": 14.7,
+      "sharpe_per_trade": 0.061
+    }
+  },
+  "FAMILY_2_ETHUSDT_1h_FULL_SERIES": {
+    "family_id": "FAMILY_2",
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "split": "FULL_SERIES",
+    "strict_mixed_metrics": {
+      "total_trades": 611,
+      "win_rate_pct": 22.1,
+      "mean_net_r": -0.1,
+      "profit_factor": 0.84,
+      "max_drawdown_r": 85.1,
+      "sharpe_per_trade": -0.072
+    },
+    "taker_metrics": {
+      "total_trades": 611,
+      "win_rate_pct": 22.1,
+      "mean_net_r": -0.142,
+      "profit_factor": 0.79,
+      "max_drawdown_r": 102.66,
+      "sharpe_per_trade": -0.101
+    }
+  },
+  "FAMILY_3_ETHUSDT_1h_DEV_2022_2023": {
+    "family_id": "FAMILY_3",
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "split": "DEV_2022_2023",
+    "strict_mixed_metrics": {
+      "total_trades": 365,
+      "win_rate_pct": 31.0,
+      "mean_net_r": 0.033,
+      "profit_factor": 1.05,
+      "max_drawdown_r": 34.56,
+      "sharpe_per_trade": 0.021
+    },
+    "taker_metrics": {
+      "total_trades": 365,
+      "win_rate_pct": 31.0,
+      "mean_net_r": -0.036,
+      "profit_factor": 0.95,
+      "max_drawdown_r": 55.59,
+      "sharpe_per_trade": -0.022
+    }
+  },
+  "FAMILY_3_ETHUSDT_1h_VAL_2024": {
+    "family_id": "FAMILY_3",
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "split": "VAL_2024",
+    "strict_mixed_metrics": {
+      "total_trades": 188,
+      "win_rate_pct": 25.5,
+      "mean_net_r": -0.185,
+      "profit_factor": 0.77,
+      "max_drawdown_r": 42.18,
+      "sharpe_per_trade": -0.121
+    },
+    "taker_metrics": {
+      "total_trades": 188,
+      "win_rate_pct": 25.5,
+      "mean_net_r": -0.254,
+      "profit_factor": 0.7,
+      "max_drawdown_r": 54.79,
+      "sharpe_per_trade": -0.166
+    }
+  },
+  "FAMILY_3_ETHUSDT_1h_SEALED_OOS_2025": {
+    "family_id": "FAMILY_3",
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "split": "SEALED_OOS_2025",
+    "strict_mixed_metrics": {
+      "total_trades": 163,
+      "win_rate_pct": 24.5,
+      "mean_net_r": -0.189,
+      "profit_factor": 0.76,
+      "max_drawdown_r": 50.9,
+      "sharpe_per_trade": -0.126
+    },
+    "taker_metrics": {
+      "total_trades": 163,
+      "win_rate_pct": 24.5,
+      "mean_net_r": -0.242,
+      "profit_factor": 0.7,
+      "max_drawdown_r": 56.17,
+      "sharpe_per_trade": -0.162
+    }
+  },
+  "FAMILY_3_ETHUSDT_1h_FORWARD_2026": {
+    "family_id": "FAMILY_3",
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "split": "FORWARD_2026",
+    "strict_mixed_metrics": {
+      "total_trades": 163,
+      "win_rate_pct": 22.1,
+      "mean_net_r": -0.275,
+      "profit_factor": 0.66,
+      "max_drawdown_r": 49.67,
+      "sharpe_per_trade": -0.19
+    },
+    "taker_metrics": {
+      "total_trades": 163,
+      "win_rate_pct": 22.1,
+      "mean_net_r": -0.347,
+      "profit_factor": 0.6,
+      "max_drawdown_r": 57.71,
+      "sharpe_per_trade": -0.24
+    }
+  },
+  "FAMILY_3_ETHUSDT_1h_FULL_SERIES": {
+    "family_id": "FAMILY_3",
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "split": "FULL_SERIES",
+    "strict_mixed_metrics": {
+      "total_trades": 879,
+      "win_rate_pct": 27.0,
+      "mean_net_r": -0.112,
+      "profit_factor": 0.85,
+      "max_drawdown_r": 119.09,
+      "sharpe_per_trade": -0.073
+    },
+    "taker_metrics": {
+      "total_trades": 879,
+      "win_rate_pct": 27.0,
+      "mean_net_r": -0.179,
+      "profit_factor": 0.78,
+      "max_drawdown_r": 172.42,
+      "sharpe_per_trade": -0.116
+    }
+  },
+  "FAMILY_1_ETHUSDT_4h_DEV_2022_2023": {
+    "family_id": "FAMILY_1",
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "split": "DEV_2022_2023",
+    "strict_mixed_metrics": {
+      "total_trades": 100,
+      "win_rate_pct": 20.0,
+      "mean_net_r": -0.29,
+      "profit_factor": 0.63,
+      "max_drawdown_r": 27.96,
+      "sharpe_per_trade": -0.209
+    },
+    "taker_metrics": {
+      "total_trades": 100,
+      "win_rate_pct": 20.0,
+      "mean_net_r": -0.321,
+      "profit_factor": 0.6,
+      "max_drawdown_r": 31.06,
+      "sharpe_per_trade": -0.232
+    }
+  },
+  "FAMILY_1_ETHUSDT_4h_VAL_2024": {
+    "family_id": "FAMILY_1",
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "split": "VAL_2024",
+    "strict_mixed_metrics": {
+      "total_trades": 52,
+      "win_rate_pct": 15.4,
+      "mean_net_r": -0.429,
+      "profit_factor": 0.47,
+      "max_drawdown_r": 28.06,
+      "sharpe_per_trade": -0.341
+    },
+    "taker_metrics": {
+      "total_trades": 52,
+      "win_rate_pct": 15.4,
+      "mean_net_r": -0.457,
+      "profit_factor": 0.45,
+      "max_drawdown_r": 29.35,
+      "sharpe_per_trade": -0.363
+    }
+  },
+  "FAMILY_1_ETHUSDT_4h_SEALED_OOS_2025": {
+    "family_id": "FAMILY_1",
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "split": "SEALED_OOS_2025",
+    "strict_mixed_metrics": {
+      "total_trades": 42,
+      "win_rate_pct": 23.8,
+      "mean_net_r": -0.209,
+      "profit_factor": 0.74,
+      "max_drawdown_r": 11.62,
+      "sharpe_per_trade": -0.14
+    },
+    "taker_metrics": {
+      "total_trades": 42,
+      "win_rate_pct": 23.8,
+      "mean_net_r": -0.235,
+      "profit_factor": 0.71,
+      "max_drawdown_r": 12.32,
+      "sharpe_per_trade": -0.158
+    }
+  },
+  "FAMILY_1_ETHUSDT_4h_FORWARD_2026": {
+    "family_id": "FAMILY_1",
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "split": "FORWARD_2026",
+    "strict_mixed_metrics": {
+      "total_trades": 34,
+      "win_rate_pct": 23.5,
+      "mean_net_r": -0.172,
+      "profit_factor": 0.77,
+      "max_drawdown_r": 7.49,
+      "sharpe_per_trade": -0.118
+    },
+    "taker_metrics": {
+      "total_trades": 34,
+      "win_rate_pct": 23.5,
+      "mean_net_r": -0.206,
+      "profit_factor": 0.73,
+      "max_drawdown_r": 8.42,
+      "sharpe_per_trade": -0.142
+    }
+  },
+  "FAMILY_1_ETHUSDT_4h_FULL_SERIES": {
+    "family_id": "FAMILY_1",
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "split": "FULL_SERIES",
+    "strict_mixed_metrics": {
+      "total_trades": 228,
+      "win_rate_pct": 20.2,
+      "mean_net_r": -0.289,
+      "profit_factor": 0.63,
+      "max_drawdown_r": 67.26,
+      "sharpe_per_trade": -0.208
+    },
+    "taker_metrics": {
+      "total_trades": 228,
+      "win_rate_pct": 20.2,
+      "mean_net_r": -0.319,
+      "profit_factor": 0.6,
+      "max_drawdown_r": 73.98,
+      "sharpe_per_trade": -0.23
+    }
+  },
+  "FAMILY_2_ETHUSDT_4h_DEV_2022_2023": {
+    "family_id": "FAMILY_2",
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "split": "DEV_2022_2023",
+    "strict_mixed_metrics": {
+      "total_trades": 59,
+      "win_rate_pct": 20.3,
+      "mean_net_r": -0.188,
+      "profit_factor": 0.73,
+      "max_drawdown_r": 22.85,
+      "sharpe_per_trade": -0.136
+    },
+    "taker_metrics": {
+      "total_trades": 59,
+      "win_rate_pct": 20.3,
+      "mean_net_r": -0.21,
+      "profit_factor": 0.7,
+      "max_drawdown_r": 24.01,
+      "sharpe_per_trade": -0.152
+    }
+  },
+  "FAMILY_2_ETHUSDT_4h_VAL_2024": {
+    "family_id": "FAMILY_2",
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "split": "VAL_2024",
+    "strict_mixed_metrics": {
+      "total_trades": 23,
+      "win_rate_pct": 26.1,
+      "mean_net_r": -0.071,
+      "profit_factor": 0.9,
+      "max_drawdown_r": 6.15,
+      "sharpe_per_trade": -0.047
+    },
+    "taker_metrics": {
+      "total_trades": 23,
+      "win_rate_pct": 26.1,
+      "mean_net_r": -0.089,
+      "profit_factor": 0.88,
+      "max_drawdown_r": 6.25,
+      "sharpe_per_trade": -0.058
+    }
+  },
+  "FAMILY_2_ETHUSDT_4h_SEALED_OOS_2025": {
+    "family_id": "FAMILY_2",
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "split": "SEALED_OOS_2025",
+    "strict_mixed_metrics": {
+      "total_trades": 24,
+      "win_rate_pct": 4.2,
+      "mean_net_r": -0.67,
+      "profit_factor": 0.13,
+      "max_drawdown_r": 15.06,
+      "sharpe_per_trade": -0.864
+    },
+    "taker_metrics": {
+      "total_trades": 24,
+      "win_rate_pct": 4.2,
+      "mean_net_r": -0.685,
+      "profit_factor": 0.13,
+      "max_drawdown_r": 15.41,
+      "sharpe_per_trade": -0.881
+    }
+  },
+  "FAMILY_2_ETHUSDT_4h_FORWARD_2026": {
+    "family_id": "FAMILY_2",
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "split": "FORWARD_2026",
+    "strict_mixed_metrics": {
+      "total_trades": 25,
+      "win_rate_pct": 20.0,
+      "mean_net_r": -0.251,
+      "profit_factor": 0.66,
+      "max_drawdown_r": 7.96,
+      "sharpe_per_trade": -0.181
+    },
+    "taker_metrics": {
+      "total_trades": 25,
+      "win_rate_pct": 20.0,
+      "mean_net_r": -0.27,
+      "profit_factor": 0.64,
+      "max_drawdown_r": 8.25,
+      "sharpe_per_trade": -0.195
+    }
+  },
+  "FAMILY_2_ETHUSDT_4h_FULL_SERIES": {
+    "family_id": "FAMILY_2",
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "split": "FULL_SERIES",
+    "strict_mixed_metrics": {
+      "total_trades": 131,
+      "win_rate_pct": 18.3,
+      "mean_net_r": -0.268,
+      "profit_factor": 0.63,
+      "max_drawdown_r": 47.89,
+      "sharpe_per_trade": -0.2
+    },
+    "taker_metrics": {
+      "total_trades": 131,
+      "win_rate_pct": 18.3,
+      "mean_net_r": -0.287,
+      "profit_factor": 0.61,
+      "max_drawdown_r": 50.32,
+      "sharpe_per_trade": -0.215
+    }
+  },
+  "FAMILY_3_ETHUSDT_4h_DEV_2022_2023": {
+    "family_id": "FAMILY_3",
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "split": "DEV_2022_2023",
+    "strict_mixed_metrics": {
+      "total_trades": 78,
+      "win_rate_pct": 29.5,
+      "mean_net_r": 0.085,
+      "profit_factor": 1.13,
+      "max_drawdown_r": 9.44,
+      "sharpe_per_trade": 0.054
+    },
+    "taker_metrics": {
+      "total_trades": 78,
+      "win_rate_pct": 29.5,
+      "mean_net_r": 0.053,
+      "profit_factor": 1.08,
+      "max_drawdown_r": 9.72,
+      "sharpe_per_trade": 0.034
+    }
+  },
+  "FAMILY_3_ETHUSDT_4h_VAL_2024": {
+    "family_id": "FAMILY_3",
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "split": "VAL_2024",
+    "strict_mixed_metrics": {
+      "total_trades": 40,
+      "win_rate_pct": 25.0,
+      "mean_net_r": -0.138,
+      "profit_factor": 0.81,
+      "max_drawdown_r": 12.54,
+      "sharpe_per_trade": -0.092
+    },
+    "taker_metrics": {
+      "total_trades": 40,
+      "win_rate_pct": 25.0,
+      "mean_net_r": -0.178,
+      "profit_factor": 0.77,
+      "max_drawdown_r": 13.18,
+      "sharpe_per_trade": -0.119
+    }
+  },
+  "FAMILY_3_ETHUSDT_4h_SEALED_OOS_2025": {
+    "family_id": "FAMILY_3",
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "split": "SEALED_OOS_2025",
+    "strict_mixed_metrics": {
+      "total_trades": 51,
+      "win_rate_pct": 27.5,
+      "mean_net_r": -0.025,
+      "profit_factor": 0.96,
+      "max_drawdown_r": 15.9,
+      "sharpe_per_trade": -0.016
+    },
+    "taker_metrics": {
+      "total_trades": 51,
+      "win_rate_pct": 27.5,
+      "mean_net_r": -0.054,
+      "profit_factor": 0.93,
+      "max_drawdown_r": 16.47,
+      "sharpe_per_trade": -0.035
+    }
+  },
+  "FAMILY_3_ETHUSDT_4h_FORWARD_2026": {
+    "family_id": "FAMILY_3",
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "split": "FORWARD_2026",
+    "strict_mixed_metrics": {
+      "total_trades": 36,
+      "win_rate_pct": 27.8,
+      "mean_net_r": -0.036,
+      "profit_factor": 0.95,
+      "max_drawdown_r": 14.81,
+      "sharpe_per_trade": -0.023
+    },
+    "taker_metrics": {
+      "total_trades": 36,
+      "win_rate_pct": 27.8,
+      "mean_net_r": -0.076,
+      "profit_factor": 0.9,
+      "max_drawdown_r": 15.54,
+      "sharpe_per_trade": -0.049
+    }
+  },
+  "FAMILY_3_ETHUSDT_4h_FULL_SERIES": {
+    "family_id": "FAMILY_3",
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "split": "FULL_SERIES",
+    "strict_mixed_metrics": {
+      "total_trades": 205,
+      "win_rate_pct": 27.8,
+      "mean_net_r": -0.007,
+      "profit_factor": 0.99,
+      "max_drawdown_r": 24.31,
+      "sharpe_per_trade": -0.005
+    },
+    "taker_metrics": {
+      "total_trades": 205,
+      "win_rate_pct": 27.8,
+      "mean_net_r": -0.041,
+      "profit_factor": 0.94,
+      "max_drawdown_r": 28.79,
+      "sharpe_per_trade": -0.027
+    }
+  }
+}

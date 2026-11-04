@@ -58,3 +58,4 @@ To answer whether the improvement from $+0.322R$ (50 baseline setups) to $+1.213
    forecast_only_cannot_execute = True
    ```
    Kronos remains purely an exogenous filter. It cannot route orders, authorize risk, or enable live capital.
+

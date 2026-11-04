@@ -112,3 +112,4 @@ We will build no more governance layers or redundant dashboards. Research will e
 5. **Funding + open-interest dislocation**
 6. **Cross-asset relative strength**
 7. **Event-driven opportunities**
+

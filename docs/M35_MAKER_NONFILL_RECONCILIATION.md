@@ -81,3 +81,4 @@ Why did the Order Block Retest achieve a $91.43\%$ fill rate (32 of 35) while ea
 3. **Conservative Net Opportunity Cost:**
    $$\text{Total Gross Profit Missed} = 3 \text{ trades} \times +2.5R = \mathbf{+7.50R}.$$
    Even after completely forfeiting this $+7.50R$, **all three candidate configurations retain $> +0.83R$ net expectancy under strict zero-fallback mixed execution**.
+
