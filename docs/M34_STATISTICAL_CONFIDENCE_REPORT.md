@@ -73,3 +73,4 @@ When evaluating 80 distinct experiment combinations, selection bias is inevitabl
 2. **Actionable Mandate:**
    - Candidate is authorized for prospective paper-shadow monitoring with local simulated execution.
    - Real-capital promotion is strictly prohibited.
+

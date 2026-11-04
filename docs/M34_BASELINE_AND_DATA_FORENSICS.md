@@ -66,3 +66,4 @@ Full forensic evaluation of all stored Parquet candles:
 
 3. **Data Parity Guarantee:**
    - Partition-level SHA-256 digests in `research/manifests/*.json` enable instant validation on the Ubuntu worker to verify zero bit rot or schema drift across systems.
+

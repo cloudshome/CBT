@@ -70,3 +70,4 @@ In `signal_engine.py` and `scripts/research/run_historical_edge_discovery.py`:
 - If `kronos_uncertainty > 0.55` $\implies$ Discarded.
 - If Kronos model inference throws timeout or NaN $\implies$ Fail Closed (`NO_TRADE`).
 - Strategy baseline logic is preserved separately in research logs without bypass authority.
+

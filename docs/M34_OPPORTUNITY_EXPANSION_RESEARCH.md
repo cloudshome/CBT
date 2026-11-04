@@ -84,3 +84,4 @@ We investigated whether relaxing Kronos thresholds can prudently increase trade 
 | `BTCUSDT 1h LIQUIDITY_SWEEP` | Full Series | 34 | +0.105R | 1.15 | **NEEDS_MORE_DATA** |
 | `BTCUSDT 1h FVG_RETEST` | Full Series | 29 | +0.065R | 1.08 | **VERIFIED_FAIL** |
 | `BTCUSDT 1h TREND_PULLBACK` | Full Series | 48 | -0.045R | 0.94 | **VERIFIED_FAIL** |
+

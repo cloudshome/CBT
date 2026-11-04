@@ -66,3 +66,4 @@ To eliminate overlapping position bias and double-counting:
 | ATR uses past closed bars ($i-1$) | **VERIFIED** | Lines 125–130 |
 | Same-candle stop/target ambiguity resolves stop-first | **VERIFIED** | Lines 422–442 |
 | Zero future price data accessible at bar $i$ | **VERIFIED** | Replay walk-forward loop |
+

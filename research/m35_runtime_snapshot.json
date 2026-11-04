@@ -1,0 +1,20 @@
+{
+  "inspection_timestamp_utc": "2026-11-04T08:12:13.224413+00:00",
+  "local_host_node": "WINDOWS_WORKSTATION_AUDITOR",
+  "remote_worker_node": "UBUNTU_24_7_SERVER",
+  "deployment_status": "RUNTIME_VERIFICATION_PENDING",
+  "process_evidence": {
+    "local_daemon_active": false,
+    "ubuntu_ssh_reachable": false,
+    "ubuntu_service_name": "sky-paper.service (specified in docs/UBUNTU_PC_ROLE.md)",
+    "verified_pid": null,
+    "verified_uptime": null,
+    "verified_websocket_heartbeat": null,
+    "reason": "Windows workstation sandbox has no direct SSH / systemctl bridge to inspect the live Ubuntu host process table. Local genesis block in live_paper_practice_manifest.jsonl was created, but live ongoing daemon execution on Ubuntu remains UNVERIFIED from Windows."
+  },
+  "latest_ledger_event": {
+    "file": "research/live_paper_practice_manifest.jsonl",
+    "event_type": "GENESIS_PAPER_SHADOW_LEDGER",
+    "status": "INITIALIZED_PENDING_PROSPECTIVE_SIGNALS"
+  }
+}

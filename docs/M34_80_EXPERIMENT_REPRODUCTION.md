@@ -99,3 +99,4 @@ The previous 3 months of false "NO EDGE" declarations and negative expectancy we
 - **`TREND_PULLBACK`:** Prone to deep drawdowns during regime shifts ($PF < 1.15$).
 
 **Reproduction Conclusion:** `HTF_ORDER_BLOCK_KRONOS_CONFLUENCE` demonstrates clear, consistent positive edge across all 4 chronological splits, but its sparse trade sample requires strict statistical qualification before any operational promotion.
+

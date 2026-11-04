@@ -85,3 +85,4 @@ We subjected the primary candidate (`BTCUSDT 1h ORDER_BLOCK_RETEST`) to friction
 | **Extreme 5.0x Frictions** | 65.0 bps | +0.804R | 2.95 | PASS |
 
 **Finding:** Because Higher-Timeframe (1H/4H) trade risk envelopes average $200\text{ to }400\text{ bps}$, the edge is highly robust against transaction friction spikes, maintaining $> +1.0R$ net expectancy even under $2.5\times$ stressed fees.
+

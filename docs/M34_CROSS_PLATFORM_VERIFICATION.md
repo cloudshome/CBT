@@ -48,3 +48,4 @@ This report establishes the distributed operational division and data parity bet
 
 - Both nodes must sync via NTP (Network Time Protocol) to within $\pm 100\text{ ms}$ of standard UTC.
 - All ledger timestamps, trade outcomes, and candle finality marks are serialized in ISO 8601 UTC format.
+

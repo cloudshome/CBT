@@ -115,3 +115,4 @@ If any abnormal behavior or anomaly is detected:
 python -c "from core.execution.risk_guardian import trigger_emergency_kill_switch; trigger_emergency_kill_switch('OPERATOR_MANUAL_HALT')"
 ```
 This forces all paper activity into `HARD_FREEZE`. No simulated orders can be submitted until cleared by explicit operator reset.
+
