@@ -1,0 +1,503 @@
+{
+  "dataset_id": "binance_perp_ETHUSDT_4h",
+  "exchange": "binance",
+  "market_type": "perp",
+  "symbol": "ETHUSDT",
+  "timeframe": "4h",
+  "timezone": "UTC",
+  "total_files": 58,
+  "total_size_bytes": 765059,
+  "total_rows": 10519,
+  "start_timestamp_ms": 1640995200000,
+  "end_timestamp_ms": 1792454400000,
+  "start_datetime_utc": "2022-01-01T00:00:00+00:00",
+  "end_datetime_utc": "2026-10-20T00:00:00+00:00",
+  "expected_step_ms": 14400000,
+  "total_gaps_found": 0,
+  "gaps_sample": [],
+  "schema_dtypes": {
+    "ts": "int64",
+    "exchange": "object",
+    "market": "object",
+    "symbol": "object",
+    "timeframe": "object",
+    "open": "float64",
+    "high": "float64",
+    "low": "float64",
+    "close": "float64",
+    "volume": "float64",
+    "quote_volume": "float64",
+    "trades": "int64",
+    "closed": "bool",
+    "source": "object",
+    "price_type": "object",
+    "ingested_at": "int64"
+  },
+  "dataset_sha256": "fae85cb0d7cb121729f143bacd5c5ecc95e94b8ade8daf64e758256f93dfa45e",
+  "partition_files": [
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2022/month=01/part-000.parquet",
+      "size_bytes": 13625,
+      "sha256": "558c5ec3dcd1536e224113f06ccd46bd51ee20ccca7a6969e2fdbe751d094f95",
+      "rows": 186,
+      "min_ts": 1640995200000,
+      "max_ts": 1643659200000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2022/month=02/part-000.parquet",
+      "size_bytes": 12632,
+      "sha256": "987179cf9145cd4749abb767154de026180bb09b000339912acc626ff07eb9ef",
+      "rows": 168,
+      "min_ts": 1643673600000,
+      "max_ts": 1646078400000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2022/month=03/part-000.parquet",
+      "size_bytes": 13552,
+      "sha256": "4cd0f22f3f1676094e83f03e1a1f723e39e7b990e9c5fbf1e41328bfc109f074",
+      "rows": 186,
+      "min_ts": 1646092800000,
+      "max_ts": 1648756800000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2022/month=04/part-000.parquet",
+      "size_bytes": 13172,
+      "sha256": "6172d758fb3836ed69826e4321502ccf74592cf05e92a0419048907a1ae64a3a",
+      "rows": 180,
+      "min_ts": 1648771200000,
+      "max_ts": 1651348800000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2022/month=05/part-000.parquet",
+      "size_bytes": 13537,
+      "sha256": "659c26ed2ee3a3d3bc50c21826d84d4a29964758679b4d854ae4e180df406a1d",
+      "rows": 186,
+      "min_ts": 1651363200000,
+      "max_ts": 1654027200000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2022/month=06/part-000.parquet",
+      "size_bytes": 13076,
+      "sha256": "742515be9fb6f741e54f335683d20f1816980e6394431e6cb3b7a25f8e85c9ee",
+      "rows": 180,
+      "min_ts": 1654041600000,
+      "max_ts": 1656619200000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2022/month=07/part-000.parquet",
+      "size_bytes": 13335,
+      "sha256": "451c27d58f4e69e770011404d31f0d0aad81d2fd6e71afbbc4db32a08e99d5e4",
+      "rows": 186,
+      "min_ts": 1656633600000,
+      "max_ts": 1659297600000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2022/month=08/part-000.parquet",
+      "size_bytes": 13301,
+      "sha256": "bebd47eed3ed8696784140afbea1b8dffc5b2d0928e575a6cee652bcd3c56ca3",
+      "rows": 186,
+      "min_ts": 1659312000000,
+      "max_ts": 1661976000000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2022/month=09/part-000.parquet",
+      "size_bytes": 13011,
+      "sha256": "b0c5de6a2803bcdf146ff115c058f0d13e06041e078d6b323f8cd644de86203d",
+      "rows": 180,
+      "min_ts": 1661990400000,
+      "max_ts": 1664568000000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2022/month=10/part-000.parquet",
+      "size_bytes": 13160,
+      "sha256": "64dfa793e42b627dbf5e88d8bceb5bb51c7f04747734fe76b320b6f02b3eee52",
+      "rows": 186,
+      "min_ts": 1664582400000,
+      "max_ts": 1667246400000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2022/month=11/part-000.parquet",
+      "size_bytes": 12958,
+      "sha256": "c788537149f7ec33cd0bf864d9fdc775d5af5e49ac0566b75cfcc4447628f5e3",
+      "rows": 180,
+      "min_ts": 1667260800000,
+      "max_ts": 1669838400000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2022/month=12/part-000.parquet",
+      "size_bytes": 13095,
+      "sha256": "2b7751eb745adb96d4c8ab7a08dce4b30ca8194d5a70732214099cfe189123bd",
+      "rows": 186,
+      "min_ts": 1669852800000,
+      "max_ts": 1672516800000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2023/month=01/part-000.parquet",
+      "size_bytes": 13289,
+      "sha256": "c3e6ae943d521fb3509286454b686d2fb92881a512cc17c737dd60c3b44b73fc",
+      "rows": 186,
+      "min_ts": 1672531200000,
+      "max_ts": 1675195200000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2023/month=02/part-000.parquet",
+      "size_bytes": 12283,
+      "sha256": "6ee7dd383739f5a7c01814a76f8431d15fa238464b5555ee9da0dbd475ed65ac",
+      "rows": 168,
+      "min_ts": 1675209600000,
+      "max_ts": 1677614400000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2023/month=03/part-000.parquet",
+      "size_bytes": 13278,
+      "sha256": "d426edfebcb00051a872e356668e44ef2ec7237f75661699c9f40d6b1c6dfe77",
+      "rows": 186,
+      "min_ts": 1677628800000,
+      "max_ts": 1680292800000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2023/month=04/part-000.parquet",
+      "size_bytes": 12906,
+      "sha256": "d0ca9ace3468a922e9d78037e1887483ca46caa5ddd7a8e1ed7f4985316a132e",
+      "rows": 180,
+      "min_ts": 1680307200000,
+      "max_ts": 1682884800000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2023/month=05/part-000.parquet",
+      "size_bytes": 13036,
+      "sha256": "ca7e04daaea1b17768a5ab8fda417418a976e98884f22ba4e513e557945451f1",
+      "rows": 186,
+      "min_ts": 1682899200000,
+      "max_ts": 1685563200000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2023/month=06/part-000.parquet",
+      "size_bytes": 12930,
+      "sha256": "fa3e06f5007491979d3eeb34d1a2eac22b8ab06d149b98e8955d614cbcced39a",
+      "rows": 180,
+      "min_ts": 1685577600000,
+      "max_ts": 1688155200000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2023/month=07/part-000.parquet",
+      "size_bytes": 13076,
+      "sha256": "7e8c0cb1698d668768ce7f9d94848b72970557f1ab987ed878555b470f4b4b74",
+      "rows": 186,
+      "min_ts": 1688169600000,
+      "max_ts": 1690833600000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2023/month=08/part-000.parquet",
+      "size_bytes": 13109,
+      "sha256": "c3c80815390731261d99bf938c99390f88c2888a6681a5e018aae7ca047568a0",
+      "rows": 186,
+      "min_ts": 1690848000000,
+      "max_ts": 1693512000000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2023/month=09/part-000.parquet",
+      "size_bytes": 12733,
+      "sha256": "a030b07d77bf4010996a292a6a757ff27026e1cf948cf559f0add9f2cc4ba368",
+      "rows": 180,
+      "min_ts": 1693526400000,
+      "max_ts": 1696104000000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2023/month=10/part-000.parquet",
+      "size_bytes": 13182,
+      "sha256": "5f9deab77fa9520726e7bf413d8f0403d4d0c0fee78de94e2f1ea235a404e633",
+      "rows": 186,
+      "min_ts": 1696118400000,
+      "max_ts": 1698782400000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2023/month=11/part-000.parquet",
+      "size_bytes": 12978,
+      "sha256": "c065551d5d8036b31a8e725c4521ca08cde36a7a77a027122c83c0cd8da46563",
+      "rows": 180,
+      "min_ts": 1698796800000,
+      "max_ts": 1701374400000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2023/month=12/part-000.parquet",
+      "size_bytes": 13412,
+      "sha256": "df1ab577d8a5aa1ed0ce228040bc191f196ede14f25edc1858152c39d0d521b9",
+      "rows": 186,
+      "min_ts": 1701388800000,
+      "max_ts": 1704052800000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2024/month=01/part-000.parquet",
+      "size_bytes": 13486,
+      "sha256": "1f852666477386441efa6052655ee003c55027e834ff56d3c42d81c6e62f74fa",
+      "rows": 186,
+      "min_ts": 1704067200000,
+      "max_ts": 1706731200000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2024/month=02/part-000.parquet",
+      "size_bytes": 13079,
+      "sha256": "32868ca445df7e839bc47ee0bcb514d4c68c3dd3143f96184ba7981f05a2ffa3",
+      "rows": 174,
+      "min_ts": 1706745600000,
+      "max_ts": 1709236800000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2024/month=03/part-000.parquet",
+      "size_bytes": 13670,
+      "sha256": "8f251ee654533183419c7f9a9bee0f0dc2196359624892efb016e112914dc56a",
+      "rows": 186,
+      "min_ts": 1709251200000,
+      "max_ts": 1711915200000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2024/month=04/part-000.parquet",
+      "size_bytes": 13278,
+      "sha256": "663e70f9f011f1fbadc936e131cb12ea716d038f4f5f708ff694eecb703ab6ad",
+      "rows": 180,
+      "min_ts": 1711929600000,
+      "max_ts": 1714507200000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2024/month=05/part-000.parquet",
+      "size_bytes": 13466,
+      "sha256": "ed1234173a5234dc64e491d33bc9e63c6c9f8827d03f5f76b18e749a4ab0caf1",
+      "rows": 186,
+      "min_ts": 1714521600000,
+      "max_ts": 1717185600000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2024/month=06/part-000.parquet",
+      "size_bytes": 13208,
+      "sha256": "de0b3c2316222fbce8b17dd7f39e879bf08798ad7ff8baace07c4ce1518b2439",
+      "rows": 180,
+      "min_ts": 1717200000000,
+      "max_ts": 1719777600000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2024/month=07/part-000.parquet",
+      "size_bytes": 13537,
+      "sha256": "f648329b1528c622fe003af0bc22e65c866bb930dc05c2f7e996a8a1da5509b4",
+      "rows": 186,
+      "min_ts": 1719792000000,
+      "max_ts": 1722456000000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2024/month=08/part-000.parquet",
+      "size_bytes": 13548,
+      "sha256": "cdb00cef753aab57ecced34bfa8a70444d3a8909fcd081089c83eac65cc80df7",
+      "rows": 186,
+      "min_ts": 1722470400000,
+      "max_ts": 1725134400000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2024/month=09/part-000.parquet",
+      "size_bytes": 13182,
+      "sha256": "36f37777784abaa63478451e4733c69d8ad3c170cb380fb40c9cdef12687cd1b",
+      "rows": 180,
+      "min_ts": 1725148800000,
+      "max_ts": 1727726400000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2024/month=10/part-000.parquet",
+      "size_bytes": 13493,
+      "sha256": "bda9c82f427dd04216d7db6557f77cd802b37f41f925efbf5f1c9fe188185cb3",
+      "rows": 186,
+      "min_ts": 1727740800000,
+      "max_ts": 1730404800000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2024/month=11/part-000.parquet",
+      "size_bytes": 13317,
+      "sha256": "a34e1133270c8e16387e432d4069315ec8bb97e7dd781b94f86b6659b5b0e521",
+      "rows": 180,
+      "min_ts": 1730419200000,
+      "max_ts": 1732996800000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2024/month=12/part-000.parquet",
+      "size_bytes": 13539,
+      "sha256": "f6001da7c7d77792a99f9379677d70f9c087b10bf4ced68c5c0bcd253973a5c3",
+      "rows": 186,
+      "min_ts": 1733011200000,
+      "max_ts": 1735675200000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2025/month=01/part-000.parquet",
+      "size_bytes": 13451,
+      "sha256": "63d0ae3b36c081b6316c93da2ea2da4e6f43d7d902923c7cf7bac21ad61b3f2d",
+      "rows": 186,
+      "min_ts": 1735689600000,
+      "max_ts": 1738353600000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2025/month=02/part-000.parquet",
+      "size_bytes": 12660,
+      "sha256": "aea2647a683201dc5c284327bf8bcde73762363c1dd77ecbefbdf6ac0e9a04ee",
+      "rows": 168,
+      "min_ts": 1738368000000,
+      "max_ts": 1740772800000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2025/month=03/part-000.parquet",
+      "size_bytes": 13419,
+      "sha256": "17b62518e3e692725f7ad089a62b643915492b672779dc8e0c81c42f3553a638",
+      "rows": 186,
+      "min_ts": 1740787200000,
+      "max_ts": 1743451200000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2025/month=04/part-000.parquet",
+      "size_bytes": 12987,
+      "sha256": "32a818439f1deff8866da5112a25917478ab787ef307131d5d564eb9ddc8ae6d",
+      "rows": 180,
+      "min_ts": 1743465600000,
+      "max_ts": 1746043200000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2025/month=05/part-000.parquet",
+      "size_bytes": 13498,
+      "sha256": "8e9fd48c8115b72766f0c9376b3924b23d09cecc1aab0a3574ffbc7beb4e375b",
+      "rows": 186,
+      "min_ts": 1746057600000,
+      "max_ts": 1748721600000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2025/month=06/part-000.parquet",
+      "size_bytes": 13222,
+      "sha256": "23ec4f297b2b1bf4427b780270732dbcb10b57957fd8a6c69ac9fbde1a084eee",
+      "rows": 180,
+      "min_ts": 1748736000000,
+      "max_ts": 1751313600000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2025/month=07/part-000.parquet",
+      "size_bytes": 13714,
+      "sha256": "955b608eb4e589abf7d3e96d815102b97449c5e2f08c066e1b097ee4def008c6",
+      "rows": 186,
+      "min_ts": 1751328000000,
+      "max_ts": 1753992000000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2025/month=08/part-000.parquet",
+      "size_bytes": 13731,
+      "sha256": "b04d3a1d2764e5a9a702c6160653b0570d59633fa2f030c298870e1634883c3a",
+      "rows": 186,
+      "min_ts": 1754006400000,
+      "max_ts": 1756670400000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2025/month=09/part-000.parquet",
+      "size_bytes": 13302,
+      "sha256": "56b8811d50ca62589c4151404e1f8b33ae3c69606a7c6c5d6a6f81f7176fed98",
+      "rows": 180,
+      "min_ts": 1756684800000,
+      "max_ts": 1759262400000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2025/month=10/part-000.parquet",
+      "size_bytes": 13601,
+      "sha256": "5d41527518d2c51393db2f6a3db8ae3c4689e5f1c099574e2288053b10a00764",
+      "rows": 186,
+      "min_ts": 1759276800000,
+      "max_ts": 1761940800000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2025/month=11/part-000.parquet",
+      "size_bytes": 13370,
+      "sha256": "fe587aec459726eb9c36a3b8f4f23067c8c594c28ec9b1e7a9facc4b9429d57b",
+      "rows": 180,
+      "min_ts": 1761955200000,
+      "max_ts": 1764532800000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2025/month=12/part-000.parquet",
+      "size_bytes": 13483,
+      "sha256": "e8b32e9d7793ab22ba0f24e37158d35891ccf9e5f0d116a62cd5d4867e4d6798",
+      "rows": 186,
+      "min_ts": 1764547200000,
+      "max_ts": 1767211200000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2026/month=01/part-000.parquet",
+      "size_bytes": 13598,
+      "sha256": "9448163f0b87564f1750954111d85d7f26bca74eb3b3db2f6746ee7d4ef50a9d",
+      "rows": 186,
+      "min_ts": 1767225600000,
+      "max_ts": 1769889600000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2026/month=02/part-000.parquet",
+      "size_bytes": 12583,
+      "sha256": "d743db2158607aeacaa42f227df814c37c19e6822e879d9f3dccc43d542644d4",
+      "rows": 168,
+      "min_ts": 1769904000000,
+      "max_ts": 1772308800000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2026/month=03/part-000.parquet",
+      "size_bytes": 13426,
+      "sha256": "9774328debb08105af91e835003c62a2ad4256226c722e1230eec6fa5bfb51bf",
+      "rows": 186,
+      "min_ts": 1772323200000,
+      "max_ts": 1774987200000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2026/month=04/part-000.parquet",
+      "size_bytes": 13203,
+      "sha256": "96be269c62aa2374f98aecf7fe5e241ce0a78111d9b583e0a1d2fb4aba3f93e9",
+      "rows": 180,
+      "min_ts": 1775001600000,
+      "max_ts": 1777579200000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2026/month=05/part-000.parquet",
+      "size_bytes": 13503,
+      "sha256": "52615a7ce35204cbf3c4572e2d9ff2c189e0d38f4df00c47dbb02dfb91c9a3a0",
+      "rows": 186,
+      "min_ts": 1777593600000,
+      "max_ts": 1780257600000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2026/month=06/part-000.parquet",
+      "size_bytes": 13066,
+      "sha256": "123e087334bb6cd8d94a0ddaa17b37c98474331f6158233191b75b8d696a28f7",
+      "rows": 180,
+      "min_ts": 1780272000000,
+      "max_ts": 1782849600000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2026/month=07/part-000.parquet",
+      "size_bytes": 13179,
+      "sha256": "cfc5e195d131eec1f051270bef8a1c606a61830432c429424e2879ee6ee91c90",
+      "rows": 186,
+      "min_ts": 1782864000000,
+      "max_ts": 1785528000000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2026/month=08/part-000.parquet",
+      "size_bytes": 13308,
+      "sha256": "978f138e56b4dd3c2658bcebe51804e00b028a913bc0f9d8de0e298c8cbd747c",
+      "rows": 186,
+      "min_ts": 1785542400000,
+      "max_ts": 1788206400000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2026/month=09/part-000.parquet",
+      "size_bytes": 13172,
+      "sha256": "197aeef1753e1c0f41c7aed18f508a9902eee4bab454c536f93b221800883767",
+      "rows": 180,
+      "min_ts": 1788220800000,
+      "max_ts": 1790798400000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=ETHUSDT/timeframe=4h/year=2026/month=10/part-000.parquet",
+      "size_bytes": 10114,
+      "sha256": "3d1607d5c2222153af2ccb9ed121b448634e5a2941311dc590de6446fadc8847",
+      "rows": 115,
+      "min_ts": 1790812800000,
+      "max_ts": 1792454400000
+    }
+  ]
+}

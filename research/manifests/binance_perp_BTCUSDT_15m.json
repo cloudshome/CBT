@@ -1,0 +1,55 @@
+{
+  "dataset_id": "binance_perp_BTCUSDT_15m",
+  "exchange": "binance",
+  "market_type": "perp",
+  "symbol": "BTCUSDT",
+  "timeframe": "15m",
+  "timezone": "UTC",
+  "total_files": 2,
+  "total_size_bytes": 139650,
+  "total_rows": 2879,
+  "start_timestamp_ms": 1789885800000,
+  "end_timestamp_ms": 1792476000000,
+  "start_datetime_utc": "2026-09-20T06:30:00+00:00",
+  "end_datetime_utc": "2026-10-20T06:00:00+00:00",
+  "expected_step_ms": 900000,
+  "total_gaps_found": 0,
+  "gaps_sample": [],
+  "schema_dtypes": {
+    "ts": "int64",
+    "exchange": "object",
+    "market": "object",
+    "symbol": "object",
+    "timeframe": "object",
+    "open": "float64",
+    "high": "float64",
+    "low": "float64",
+    "close": "float64",
+    "volume": "float64",
+    "quote_volume": "float64",
+    "trades": "int64",
+    "closed": "bool",
+    "source": "object",
+    "price_type": "object",
+    "ingested_at": "int64"
+  },
+  "dataset_sha256": "2b270a490d9c9ae428e9bbef83e43e6c4446144953cb191593f71822eadaaff5",
+  "partition_files": [
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=15m/year=2026/month=09/part-000.parquet",
+      "size_bytes": 51373,
+      "sha256": "7d45ff9aef10369fb5cd0b85a2c77f07749efc3cca372035b8ee310caf2519f7",
+      "rows": 1030,
+      "min_ts": 1789885800000,
+      "max_ts": 1790811900000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=15m/year=2026/month=10/part-000.parquet",
+      "size_bytes": 88277,
+      "sha256": "e882d8abdf13725e1ab85541e5e387e30a5df5931af398b7d1dcac27f2dcc81e",
+      "rows": 1849,
+      "min_ts": 1790812800000,
+      "max_ts": 1792476000000
+    }
+  ]
+}

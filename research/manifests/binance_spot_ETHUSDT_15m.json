@@ -1,0 +1,55 @@
+{
+  "dataset_id": "binance_spot_ETHUSDT_15m",
+  "exchange": "binance",
+  "market_type": "spot",
+  "symbol": "ETHUSDT",
+  "timeframe": "15m",
+  "timezone": "UTC",
+  "total_files": 2,
+  "total_size_bytes": 143754,
+  "total_rows": 2879,
+  "start_timestamp_ms": 1789885800000,
+  "end_timestamp_ms": 1792476000000,
+  "start_datetime_utc": "2026-09-20T06:30:00+00:00",
+  "end_datetime_utc": "2026-10-20T06:00:00+00:00",
+  "expected_step_ms": 900000,
+  "total_gaps_found": 0,
+  "gaps_sample": [],
+  "schema_dtypes": {
+    "ts": "int64",
+    "exchange": "object",
+    "market": "object",
+    "symbol": "object",
+    "timeframe": "object",
+    "open": "float64",
+    "high": "float64",
+    "low": "float64",
+    "close": "float64",
+    "volume": "float64",
+    "quote_volume": "float64",
+    "trades": "int64",
+    "closed": "bool",
+    "source": "object",
+    "price_type": "object",
+    "ingested_at": "int64"
+  },
+  "dataset_sha256": "15024dc183d849288c952cdafee0f821b52dd071ad93e0061abf7c34b68e11c1",
+  "partition_files": [
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=spot/symbol=ETHUSDT/timeframe=15m/year=2026/month=09/part-000.parquet",
+      "size_bytes": 52483,
+      "sha256": "3651a40dc0149f8afcba613fc950f7dd21b7af3feb964ee8f20ee122e2b2b609",
+      "rows": 1030,
+      "min_ts": 1789885800000,
+      "max_ts": 1790811900000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=spot/symbol=ETHUSDT/timeframe=15m/year=2026/month=10/part-000.parquet",
+      "size_bytes": 91271,
+      "sha256": "f2ade9ace8d7e2bcf761ad3d9ca4b25941694628f49bd74fd18596b343071943",
+      "rows": 1849,
+      "min_ts": 1790812800000,
+      "max_ts": 1792476000000
+    }
+  ]
+}

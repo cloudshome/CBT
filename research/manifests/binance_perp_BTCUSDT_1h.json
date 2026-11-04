@@ -1,0 +1,503 @@
+{
+  "dataset_id": "binance_perp_BTCUSDT_1h",
+  "exchange": "binance",
+  "market_type": "perp",
+  "symbol": "BTCUSDT",
+  "timeframe": "1h",
+  "timezone": "UTC",
+  "total_files": 58,
+  "total_size_bytes": 2239292,
+  "total_rows": 42078,
+  "start_timestamp_ms": 1640995200000,
+  "end_timestamp_ms": 1792472400000,
+  "start_datetime_utc": "2022-01-01T00:00:00+00:00",
+  "end_datetime_utc": "2026-10-20T05:00:00+00:00",
+  "expected_step_ms": 3600000,
+  "total_gaps_found": 0,
+  "gaps_sample": [],
+  "schema_dtypes": {
+    "ts": "int64",
+    "exchange": "object",
+    "market": "object",
+    "symbol": "object",
+    "timeframe": "object",
+    "open": "float64",
+    "high": "float64",
+    "low": "float64",
+    "close": "float64",
+    "volume": "float64",
+    "quote_volume": "float64",
+    "trades": "int64",
+    "closed": "bool",
+    "source": "object",
+    "price_type": "object",
+    "ingested_at": "int64"
+  },
+  "dataset_sha256": "a892145be694199b30c6a9397eb2d4b0daf45365c150411170fc62a7dac5ee45",
+  "partition_files": [
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2022/month=01/part-000.parquet",
+      "size_bytes": 40532,
+      "sha256": "0d2a3c6a9892c0375999a2a79f6ac6e060eac8050ba176e7f6c0f4e295449eb9",
+      "rows": 744,
+      "min_ts": 1640995200000,
+      "max_ts": 1643670000000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2022/month=02/part-000.parquet",
+      "size_bytes": 36997,
+      "sha256": "fdbc6088f0e2d59a87cda2b9d616a7326b3565f54cd3150be69aeb270fc6d8e2",
+      "rows": 672,
+      "min_ts": 1643673600000,
+      "max_ts": 1646089200000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2022/month=03/part-000.parquet",
+      "size_bytes": 39485,
+      "sha256": "ab677038c2c86aa8dbb22bda4655a7bc855719fcfe1e310de9a0699c10e2f849",
+      "rows": 744,
+      "min_ts": 1646092800000,
+      "max_ts": 1648767600000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2022/month=04/part-000.parquet",
+      "size_bytes": 38629,
+      "sha256": "d1c34cb3bc8393968300b305dbd5be8c7f46c81c15439cbc5ed03db8f3272c1e",
+      "rows": 720,
+      "min_ts": 1648771200000,
+      "max_ts": 1651359600000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2022/month=05/part-000.parquet",
+      "size_bytes": 39510,
+      "sha256": "22d2395d14746388ceac4f33b68ff4295bc6db237e4cbefb9de606b3bef5f3ee",
+      "rows": 744,
+      "min_ts": 1651363200000,
+      "max_ts": 1654038000000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2022/month=06/part-000.parquet",
+      "size_bytes": 38495,
+      "sha256": "8a8af134ddf8c46fa92cec10ccb220c65e74d48c805b2d44e7ee6e7d7da495ec",
+      "rows": 720,
+      "min_ts": 1654041600000,
+      "max_ts": 1656630000000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2022/month=07/part-000.parquet",
+      "size_bytes": 39387,
+      "sha256": "27b839aa4147750489f559349e2a3ce3e5e5c0b0cca35db5cc0b2e7f5be2f87d",
+      "rows": 744,
+      "min_ts": 1656633600000,
+      "max_ts": 1659308400000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2022/month=08/part-000.parquet",
+      "size_bytes": 39287,
+      "sha256": "e86c2aea725f6c60d2acfe4ebb114aeba508f3c8336bd52b3b17790057a9750c",
+      "rows": 744,
+      "min_ts": 1659312000000,
+      "max_ts": 1661986800000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2022/month=09/part-000.parquet",
+      "size_bytes": 38082,
+      "sha256": "24c3f4c31f525753c7d6d7031e7536f3bfce8e8c23365722f10d356b33b0be38",
+      "rows": 720,
+      "min_ts": 1661990400000,
+      "max_ts": 1664578800000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2022/month=10/part-000.parquet",
+      "size_bytes": 39154,
+      "sha256": "ec42642ea9382399345bccf88db317228bb2c3c8c3ecf94a14d695d089aa94a8",
+      "rows": 744,
+      "min_ts": 1664582400000,
+      "max_ts": 1667257200000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2022/month=11/part-000.parquet",
+      "size_bytes": 38035,
+      "sha256": "a2e4a5f4f2b263b323a65909a33f1d3db4423d790adc25d4ac2dbe42ce765b50",
+      "rows": 720,
+      "min_ts": 1667260800000,
+      "max_ts": 1669849200000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2022/month=12/part-000.parquet",
+      "size_bytes": 38328,
+      "sha256": "15b997d6807d4e94e16c0381ea26ba1ca1eaefefc894a22fdef430601f17015f",
+      "rows": 744,
+      "min_ts": 1669852800000,
+      "max_ts": 1672527600000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2023/month=01/part-000.parquet",
+      "size_bytes": 39136,
+      "sha256": "1bafa81153e424bf1265e20b14ce292e5f5b80dd1452dc2ba25326e19690d311",
+      "rows": 744,
+      "min_ts": 1672531200000,
+      "max_ts": 1675206000000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2023/month=02/part-000.parquet",
+      "size_bytes": 36101,
+      "sha256": "38d85b755a63bdae7e665f2aa2d52b1b061123d99fb7ce70e7f61379dc92ef3d",
+      "rows": 672,
+      "min_ts": 1675209600000,
+      "max_ts": 1677625200000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2023/month=03/part-000.parquet",
+      "size_bytes": 39527,
+      "sha256": "9440ca3966fa453b81e51ad42f578fe4991b4d8c947e622b36b86239d60ae91a",
+      "rows": 744,
+      "min_ts": 1677628800000,
+      "max_ts": 1680303600000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2023/month=04/part-000.parquet",
+      "size_bytes": 38050,
+      "sha256": "9aeee2a64dde73048588060df70eedcc7c62ad9575c1ec793604acc965107082",
+      "rows": 720,
+      "min_ts": 1680307200000,
+      "max_ts": 1682895600000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2023/month=05/part-000.parquet",
+      "size_bytes": 39217,
+      "sha256": "a2e87d960d66d4de69f0833424acb6ddf00a40f1e45eae58fb590fa246e1eaa8",
+      "rows": 744,
+      "min_ts": 1682899200000,
+      "max_ts": 1685574000000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2023/month=06/part-000.parquet",
+      "size_bytes": 38470,
+      "sha256": "121bd47a80d433cc6152b9deaf01ec4a81da36e5c9b5c6bfeb6eaf805131749a",
+      "rows": 720,
+      "min_ts": 1685577600000,
+      "max_ts": 1688166000000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2023/month=07/part-000.parquet",
+      "size_bytes": 38784,
+      "sha256": "c47ace12d249f2b138a08379a5d4fbbf4dc10859ae6fdf1705e59c5a20e063f3",
+      "rows": 744,
+      "min_ts": 1688169600000,
+      "max_ts": 1690844400000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2023/month=08/part-000.parquet",
+      "size_bytes": 38725,
+      "sha256": "2dc4c4a8d3875a4c292cc7581a71d4c7701cb8a73ebc4e921c57dc5037ba4236",
+      "rows": 744,
+      "min_ts": 1690848000000,
+      "max_ts": 1693522800000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2023/month=09/part-000.parquet",
+      "size_bytes": 37775,
+      "sha256": "957bc5261cae8b73e4f2eb68241b76216c7f3ba3f3a95dc40e654994b660ae14",
+      "rows": 720,
+      "min_ts": 1693526400000,
+      "max_ts": 1696114800000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2023/month=10/part-000.parquet",
+      "size_bytes": 39238,
+      "sha256": "99fc2b0fcc6424f6c90eadffd820a062b32adc5a83b5c417cb93492309ed1689",
+      "rows": 744,
+      "min_ts": 1696118400000,
+      "max_ts": 1698793200000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2023/month=11/part-000.parquet",
+      "size_bytes": 38249,
+      "sha256": "47dd3acccfa059cd3cd01bc87a002dfeee20d2f23c4f60af38ea9af98863f588",
+      "rows": 720,
+      "min_ts": 1698796800000,
+      "max_ts": 1701385200000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2023/month=12/part-000.parquet",
+      "size_bytes": 39397,
+      "sha256": "640752b435814e6e8a1c073eb029b169301bb439ebea3e5079d3ab368d6b1caf",
+      "rows": 744,
+      "min_ts": 1701388800000,
+      "max_ts": 1704063600000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2024/month=01/part-000.parquet",
+      "size_bytes": 39513,
+      "sha256": "9f98116d1fde7153d051fe4bbdfed72a726ed599507736c13ae80b33ed369a17",
+      "rows": 744,
+      "min_ts": 1704067200000,
+      "max_ts": 1706742000000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2024/month=02/part-000.parquet",
+      "size_bytes": 37365,
+      "sha256": "95679736d9f9559b4a1a30efa0b173bb0d956fa43b7f0c059bd734b8400dff08",
+      "rows": 696,
+      "min_ts": 1706745600000,
+      "max_ts": 1709247600000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2024/month=03/part-000.parquet",
+      "size_bytes": 40192,
+      "sha256": "2327b2072880bfc929fafd0187893ea9a06a95a87af03b02baf2a9d3ed355173",
+      "rows": 744,
+      "min_ts": 1709251200000,
+      "max_ts": 1711926000000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2024/month=04/part-000.parquet",
+      "size_bytes": 38576,
+      "sha256": "ceddf127820dcc23ae498e9e90dec5f89c26a4a12e8c0e2d5630f383464611ae",
+      "rows": 720,
+      "min_ts": 1711929600000,
+      "max_ts": 1714518000000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2024/month=05/part-000.parquet",
+      "size_bytes": 39608,
+      "sha256": "a845724c0e217f15d48ce12ed859a2f9a0e5bf0c98ab6eafff5a59af6f2653b2",
+      "rows": 744,
+      "min_ts": 1714521600000,
+      "max_ts": 1717196400000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2024/month=06/part-000.parquet",
+      "size_bytes": 38156,
+      "sha256": "2ec2fc504721dbac284032732d342745ff985cbc3e72572980552c423aeccc13",
+      "rows": 720,
+      "min_ts": 1717200000000,
+      "max_ts": 1719788400000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2024/month=07/part-000.parquet",
+      "size_bytes": 39668,
+      "sha256": "5fbed5131c866aae166a8a48b70ce28c36b0ca7155d9d01f43d4223728a61e28",
+      "rows": 744,
+      "min_ts": 1719792000000,
+      "max_ts": 1722466800000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2024/month=08/part-000.parquet",
+      "size_bytes": 39578,
+      "sha256": "39ff019424dc9d541e4dd4042426031561e023ceaaa26eb08284c362f6b08999",
+      "rows": 744,
+      "min_ts": 1722470400000,
+      "max_ts": 1725145200000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2024/month=09/part-000.parquet",
+      "size_bytes": 38619,
+      "sha256": "989b369015498dd121767cabeae6c909fe1cba41ad68badd4b8b2a76fc307648",
+      "rows": 720,
+      "min_ts": 1725148800000,
+      "max_ts": 1727737200000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2024/month=10/part-000.parquet",
+      "size_bytes": 39415,
+      "sha256": "5afddc4d26f5d1ff3b95a0ceacdaf9b12cc72adafc7f485a979c1b5dfe7d7b66",
+      "rows": 744,
+      "min_ts": 1727740800000,
+      "max_ts": 1730415600000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2024/month=11/part-000.parquet",
+      "size_bytes": 38639,
+      "sha256": "288abbf816579b29d7f289469470cf3bd69084aba03643309a96fba1bdeeead2",
+      "rows": 720,
+      "min_ts": 1730419200000,
+      "max_ts": 1733007600000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2024/month=12/part-000.parquet",
+      "size_bytes": 39606,
+      "sha256": "36a9971e881c1631ad1383ea85f4748b3ec4c442a152466d0ab77da948b028bb",
+      "rows": 744,
+      "min_ts": 1733011200000,
+      "max_ts": 1735686000000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2025/month=01/part-000.parquet",
+      "size_bytes": 39599,
+      "sha256": "13151f76299a311e056768c33f89c785e8787189450df6689755a89ffe2ae437",
+      "rows": 744,
+      "min_ts": 1735689600000,
+      "max_ts": 1738364400000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2025/month=02/part-000.parquet",
+      "size_bytes": 36091,
+      "sha256": "c2cb088dfae51dda409e03bf3f5b195e86ace191fb94c97a3945e31d8e12971f",
+      "rows": 672,
+      "min_ts": 1738368000000,
+      "max_ts": 1740783600000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2025/month=03/part-000.parquet",
+      "size_bytes": 39672,
+      "sha256": "6964ffe35f67c926d5a9ae2efc66b118c37276473005217d5dbd0b5ad1401c35",
+      "rows": 744,
+      "min_ts": 1740787200000,
+      "max_ts": 1743462000000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2025/month=04/part-000.parquet",
+      "size_bytes": 38465,
+      "sha256": "eef594da65f5e8fd39bc89bbb45e20cc3710b7b0260b898ce4597cf5ca834468",
+      "rows": 720,
+      "min_ts": 1743465600000,
+      "max_ts": 1746054000000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2025/month=05/part-000.parquet",
+      "size_bytes": 39539,
+      "sha256": "7503080b43fdeba0882dbf8dbd65ddcacc1acd37e8435bce4ba08e00e20b7e35",
+      "rows": 744,
+      "min_ts": 1746057600000,
+      "max_ts": 1748732400000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2025/month=06/part-000.parquet",
+      "size_bytes": 38256,
+      "sha256": "1afc8021886a503f01b407038c780182e20e3db7f5fee3c790c556229ffe8624",
+      "rows": 720,
+      "min_ts": 1748736000000,
+      "max_ts": 1751324400000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2025/month=07/part-000.parquet",
+      "size_bytes": 39283,
+      "sha256": "70e40afd37a7115c7d606c65b5c54844a3ab80ae1301b726c04748fe8077b6b2",
+      "rows": 744,
+      "min_ts": 1751328000000,
+      "max_ts": 1754002800000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2025/month=08/part-000.parquet",
+      "size_bytes": 39556,
+      "sha256": "941eaa7b00d72cf12ffc72a20e846ccddaf4331311af0de275b9d1c240f27f5a",
+      "rows": 744,
+      "min_ts": 1754006400000,
+      "max_ts": 1756681200000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2025/month=09/part-000.parquet",
+      "size_bytes": 38340,
+      "sha256": "a43af38e6860ef3e0b93c2376bbe5b852ea2d41e5270cc61d4dc7603e97d7b9f",
+      "rows": 720,
+      "min_ts": 1756684800000,
+      "max_ts": 1759273200000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2025/month=10/part-000.parquet",
+      "size_bytes": 39657,
+      "sha256": "8a91ea936e4ea74e13cea90067db8c1813f6c2ff84ecc57dfc5f859e5ada3665",
+      "rows": 744,
+      "min_ts": 1759276800000,
+      "max_ts": 1761951600000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2025/month=11/part-000.parquet",
+      "size_bytes": 38676,
+      "sha256": "a81f1b4be5c9b03bf8ef80a6479548062679c686f66cf5f02ee6974f8022b393",
+      "rows": 720,
+      "min_ts": 1761955200000,
+      "max_ts": 1764543600000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2025/month=12/part-000.parquet",
+      "size_bytes": 39330,
+      "sha256": "f27cd81fbbf7f59bb44777de85b081e911e2455581539adf7f4752d3eb087ad7",
+      "rows": 744,
+      "min_ts": 1764547200000,
+      "max_ts": 1767222000000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2026/month=01/part-000.parquet",
+      "size_bytes": 39517,
+      "sha256": "f02f7214103334a7e5ddd32efe419534961a252deffecf359da0a69bab036554",
+      "rows": 744,
+      "min_ts": 1767225600000,
+      "max_ts": 1769900400000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2026/month=02/part-000.parquet",
+      "size_bytes": 36370,
+      "sha256": "f6dc626af6413d199af586648c1109005e9eb34d594c9ea1bb075f2d96649925",
+      "rows": 672,
+      "min_ts": 1769904000000,
+      "max_ts": 1772319600000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2026/month=03/part-000.parquet",
+      "size_bytes": 39493,
+      "sha256": "50f8d5693322d4c3e30af84f924defda6dab585ba446be86443b6004c5e28566",
+      "rows": 744,
+      "min_ts": 1772323200000,
+      "max_ts": 1774998000000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2026/month=04/part-000.parquet",
+      "size_bytes": 38657,
+      "sha256": "1f7f7cefae8878685821dd01218d4be8242b4a7b775be9f73f253b326a356c54",
+      "rows": 720,
+      "min_ts": 1775001600000,
+      "max_ts": 1777590000000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2026/month=05/part-000.parquet",
+      "size_bytes": 39287,
+      "sha256": "fe0846cd86ebb5469444a63d4b452e6cb486c98713db4404f22c657335515994",
+      "rows": 744,
+      "min_ts": 1777593600000,
+      "max_ts": 1780268400000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2026/month=06/part-000.parquet",
+      "size_bytes": 38596,
+      "sha256": "bd710b53636d2509be6f1d7818f3c0b90d2e1d77e45ded7368c04e81dfd1330c",
+      "rows": 720,
+      "min_ts": 1780272000000,
+      "max_ts": 1782860400000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2026/month=07/part-000.parquet",
+      "size_bytes": 39472,
+      "sha256": "3e29277d45783a91541a7ca9d7595e8405eeb180e49107a066b810e0b25dbec3",
+      "rows": 744,
+      "min_ts": 1782864000000,
+      "max_ts": 1785538800000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2026/month=08/part-000.parquet",
+      "size_bytes": 39411,
+      "sha256": "068ad9356b9a01a75351710175b34cde3f0db4a651ae2a426f59281ec2698033",
+      "rows": 744,
+      "min_ts": 1785542400000,
+      "max_ts": 1788217200000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2026/month=09/part-000.parquet",
+      "size_bytes": 38237,
+      "sha256": "2f8b4b05e08492ed308b9d6bcfc817bfd661e3bcf64f4519abee34504a8cca6b",
+      "rows": 720,
+      "min_ts": 1788220800000,
+      "max_ts": 1790809200000
+    },
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=perp/symbol=BTCUSDT/timeframe=1h/year=2026/month=10/part-000.parquet",
+      "size_bytes": 26263,
+      "sha256": "6f55d56b32f2f21a1d5543ed1ee9841aad7837d7f107423617ca333b5b237792",
+      "rows": 462,
+      "min_ts": 1790812800000,
+      "max_ts": 1792472400000
+    }
+  ]
+}

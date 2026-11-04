@@ -1,0 +1,47 @@
+{
+  "dataset_id": "binance_spot_BTCUSDT_1m",
+  "exchange": "binance",
+  "market_type": "spot",
+  "symbol": "BTCUSDT",
+  "timeframe": "1m",
+  "timezone": "UTC",
+  "total_files": 1,
+  "total_size_bytes": 50132,
+  "total_rows": 999,
+  "start_timestamp_ms": 1793116560000,
+  "end_timestamp_ms": 1793176440000,
+  "start_datetime_utc": "2026-10-27T15:56:00+00:00",
+  "end_datetime_utc": "2026-10-28T08:34:00+00:00",
+  "expected_step_ms": 60000,
+  "total_gaps_found": 0,
+  "gaps_sample": [],
+  "schema_dtypes": {
+    "ts": "int64",
+    "exchange": "object",
+    "market": "object",
+    "symbol": "object",
+    "timeframe": "object",
+    "open": "float64",
+    "high": "float64",
+    "low": "float64",
+    "close": "float64",
+    "volume": "float64",
+    "quote_volume": "float64",
+    "trades": "int64",
+    "closed": "bool",
+    "source": "object",
+    "price_type": "object",
+    "ingested_at": "int64"
+  },
+  "dataset_sha256": "fd173336b660584aa8f28f71e404bde435f1b1700465c6d058c6192bc23ad375",
+  "partition_files": [
+    {
+      "relative_path": "data/store/parquet/candles/exchange=binance/market=spot/symbol=BTCUSDT/timeframe=1m/year=2026/month=10/part-000.parquet",
+      "size_bytes": 50132,
+      "sha256": "81473eb823fdaa5f8ff1fa46f029a503bd9974054fa0b5eb7bdd9261be3fceab",
+      "rows": 999,
+      "min_ts": 1793116560000,
+      "max_ts": 1793176440000
+    }
+  ]
+}

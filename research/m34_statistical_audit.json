@@ -1,0 +1,1602 @@
+{
+  "BTCUSDT_4h_LIQUIDITY_SWEEP_DEV_2022_2023": {
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "strategy": "LIQUIDITY_SWEEP",
+    "split": "DEV_2022_2023",
+    "trade_count": 6,
+    "effective_sample_size": 2.9,
+    "lag1_autocorrelation": -0.341,
+    "bootstrap_95_ci_mean_r": [
+      -0.868,
+      1.469
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -0.138,
+      "pf_drop_best": 0.78,
+      "best_trade_r": 2.472
+    },
+    "deflated_sharpe_ratio": 0.4274,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "BTCUSDT_4h_LIQUIDITY_SWEEP_VAL_2024": {
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "strategy": "LIQUIDITY_SWEEP",
+    "split": "VAL_2024",
+    "trade_count": 2,
+    "effective_sample_size": 2.0,
+    "lag1_autocorrelation": 0.0,
+    "bootstrap_95_ci_mean_r": [
+      -1.135,
+      -1.018
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -1.135,
+      "pf_drop_best": 0.0,
+      "best_trade_r": -1.018
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "BTCUSDT_4h_LIQUIDITY_SWEEP_SEALED_OOS_2025": {
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "strategy": "LIQUIDITY_SWEEP",
+    "split": "SEALED_OOS_2025",
+    "trade_count": 1,
+    "effective_sample_size": 1.0,
+    "lag1_autocorrelation": 0.0,
+    "bootstrap_95_ci_mean_r": [
+      -1.024,
+      -1.024
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 0.0,
+      "pf_drop_best": 0.0,
+      "best_trade_r": -1.024
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "BTCUSDT_4h_LIQUIDITY_SWEEP_FORWARD_2026": {
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "strategy": "LIQUIDITY_SWEEP",
+    "split": "FORWARD_2026",
+    "trade_count": 0,
+    "effective_sample_size": 0.0,
+    "lag1_autocorrelation": 0.0,
+    "bootstrap_95_ci_mean_r": [
+      0.0,
+      0.0
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 0.0,
+      "pf_drop_best": 0.0,
+      "best_trade_r": 0.0
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NO_EDGE"
+  },
+  "BTCUSDT_4h_LIQUIDITY_SWEEP_FULL_SERIES": {
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "strategy": "LIQUIDITY_SWEEP",
+    "split": "FULL_SERIES",
+    "trade_count": 9,
+    "effective_sample_size": 5.5,
+    "lag1_autocorrelation": -0.242,
+    "bootstrap_95_ci_mean_r": [
+      -0.955,
+      0.902
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -0.483,
+      "pf_drop_best": 0.39,
+      "best_trade_r": 2.472
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "BTCUSDT_4h_ORDER_BLOCK_RETEST_DEV_2022_2023": {
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "strategy": "ORDER_BLOCK_RETEST",
+    "split": "DEV_2022_2023",
+    "trade_count": 1,
+    "effective_sample_size": 1.0,
+    "lag1_autocorrelation": 0.0,
+    "bootstrap_95_ci_mean_r": [
+      -1.03,
+      -1.03
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 0.0,
+      "pf_drop_best": 0.0,
+      "best_trade_r": -1.03
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "BTCUSDT_4h_ORDER_BLOCK_RETEST_VAL_2024": {
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "strategy": "ORDER_BLOCK_RETEST",
+    "split": "VAL_2024",
+    "trade_count": 2,
+    "effective_sample_size": 2.0,
+    "lag1_autocorrelation": 0.0,
+    "bootstrap_95_ci_mean_r": [
+      -1.076,
+      1.952
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -1.076,
+      "pf_drop_best": 0.0,
+      "best_trade_r": 1.952
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "BTCUSDT_4h_ORDER_BLOCK_RETEST_SEALED_OOS_2025": {
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "strategy": "ORDER_BLOCK_RETEST",
+    "split": "SEALED_OOS_2025",
+    "trade_count": 2,
+    "effective_sample_size": 2.0,
+    "lag1_autocorrelation": 0.0,
+    "bootstrap_95_ci_mean_r": [
+      2.306,
+      2.374
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 2.306,
+      "pf_drop_best": 99.0,
+      "best_trade_r": 2.374
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "BTCUSDT_4h_ORDER_BLOCK_RETEST_FORWARD_2026": {
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "strategy": "ORDER_BLOCK_RETEST",
+    "split": "FORWARD_2026",
+    "trade_count": 1,
+    "effective_sample_size": 1.0,
+    "lag1_autocorrelation": 0.0,
+    "bootstrap_95_ci_mean_r": [
+      2.436,
+      2.436
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 0.0,
+      "pf_drop_best": 0.0,
+      "best_trade_r": 2.436
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "BTCUSDT_4h_ORDER_BLOCK_RETEST_FULL_SERIES": {
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "strategy": "ORDER_BLOCK_RETEST",
+    "split": "FULL_SERIES",
+    "trade_count": 6,
+    "effective_sample_size": 3.5,
+    "lag1_autocorrelation": -0.26,
+    "bootstrap_95_ci_mean_r": [
+      -0.052,
+      2.313
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 0.905,
+      "pf_drop_best": 3.15,
+      "best_trade_r": 2.436
+    },
+    "deflated_sharpe_ratio": 0.9897,
+    "status": "CANDIDATE"
+  },
+  "BTCUSDT_4h_FVG_RETEST_DEV_2022_2023": {
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "strategy": "FVG_RETEST",
+    "split": "DEV_2022_2023",
+    "trade_count": 291,
+    "effective_sample_size": 285.0,
+    "lag1_autocorrelation": 0.01,
+    "bootstrap_95_ci_mean_r": [
+      1.478,
+      1.804
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 1.636,
+      "pf_drop_best": 8.27,
+      "best_trade_r": 2.459
+    },
+    "deflated_sharpe_ratio": 1.0,
+    "status": "CANDIDATE"
+  },
+  "BTCUSDT_4h_FVG_RETEST_VAL_2024": {
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "strategy": "FVG_RETEST",
+    "split": "VAL_2024",
+    "trade_count": 156,
+    "effective_sample_size": 129.0,
+    "lag1_autocorrelation": -0.095,
+    "bootstrap_95_ci_mean_r": [
+      1.46,
+      1.888
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 1.673,
+      "pf_drop_best": 8.81,
+      "best_trade_r": 2.462
+    },
+    "deflated_sharpe_ratio": 1.0,
+    "status": "CANDIDATE"
+  },
+  "BTCUSDT_4h_FVG_RETEST_SEALED_OOS_2025": {
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "strategy": "FVG_RETEST",
+    "split": "SEALED_OOS_2025",
+    "trade_count": 176,
+    "effective_sample_size": 172.3,
+    "lag1_autocorrelation": -0.011,
+    "bootstrap_95_ci_mean_r": [
+      1.081,
+      1.542
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 1.314,
+      "pf_drop_best": 5.01,
+      "best_trade_r": 2.45
+    },
+    "deflated_sharpe_ratio": 1.0,
+    "status": "CANDIDATE"
+  },
+  "BTCUSDT_4h_FVG_RETEST_FORWARD_2026": {
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "strategy": "FVG_RETEST",
+    "split": "FORWARD_2026",
+    "trade_count": 127,
+    "effective_sample_size": 106.5,
+    "lag1_autocorrelation": -0.088,
+    "bootstrap_95_ci_mean_r": [
+      1.188,
+      1.688
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 1.45,
+      "pf_drop_best": 5.97,
+      "best_trade_r": 2.429
+    },
+    "deflated_sharpe_ratio": 1.0,
+    "status": "CANDIDATE"
+  },
+  "BTCUSDT_4h_FVG_RETEST_FULL_SERIES": {
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "strategy": "FVG_RETEST",
+    "split": "FULL_SERIES",
+    "trade_count": 750,
+    "effective_sample_size": 718.4,
+    "lag1_autocorrelation": -0.021,
+    "bootstrap_95_ci_mean_r": [
+      1.433,
+      1.642
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 1.54,
+      "pf_drop_best": 6.99,
+      "best_trade_r": 2.462
+    },
+    "deflated_sharpe_ratio": 1.0,
+    "status": "CANDIDATE"
+  },
+  "BTCUSDT_4h_TREND_PULLBACK_DEV_2022_2023": {
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "strategy": "TREND_PULLBACK",
+    "split": "DEV_2022_2023",
+    "trade_count": 62,
+    "effective_sample_size": 38.1,
+    "lag1_autocorrelation": -0.239,
+    "bootstrap_95_ci_mean_r": [
+      -0.668,
+      -0.04
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -0.422,
+      "pf_drop_best": 0.46,
+      "best_trade_r": 2.49
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "BTCUSDT_4h_TREND_PULLBACK_VAL_2024": {
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "strategy": "TREND_PULLBACK",
+    "split": "VAL_2024",
+    "trade_count": 32,
+    "effective_sample_size": 23.1,
+    "lag1_autocorrelation": -0.162,
+    "bootstrap_95_ci_mean_r": [
+      -0.032,
+      1.017
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 0.403,
+      "pf_drop_best": 1.86,
+      "best_trade_r": 2.49
+    },
+    "deflated_sharpe_ratio": 0.9946,
+    "status": "CANDIDATE"
+  },
+  "BTCUSDT_4h_TREND_PULLBACK_SEALED_OOS_2025": {
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "strategy": "TREND_PULLBACK",
+    "split": "SEALED_OOS_2025",
+    "trade_count": 37,
+    "effective_sample_size": 22.2,
+    "lag1_autocorrelation": 0.25,
+    "bootstrap_95_ci_mean_r": [
+      -0.43,
+      0.527
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -0.056,
+      "pf_drop_best": 0.92,
+      "best_trade_r": 2.475
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "BTCUSDT_4h_TREND_PULLBACK_FORWARD_2026": {
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "strategy": "TREND_PULLBACK",
+    "split": "FORWARD_2026",
+    "trade_count": 28,
+    "effective_sample_size": 26.9,
+    "lag1_autocorrelation": 0.02,
+    "bootstrap_95_ci_mean_r": [
+      -0.692,
+      0.247
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -0.336,
+      "pf_drop_best": 0.52,
+      "best_trade_r": 2.466
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "BTCUSDT_4h_TREND_PULLBACK_FULL_SERIES": {
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "strategy": "TREND_PULLBACK",
+    "split": "FULL_SERIES",
+    "trade_count": 159,
+    "effective_sample_size": 157.6,
+    "lag1_autocorrelation": 0.004,
+    "bootstrap_95_ci_mean_r": [
+      -0.309,
+      0.142
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -0.107,
+      "pf_drop_best": 0.84,
+      "best_trade_r": 2.49
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "BTCUSDT_1h_LIQUIDITY_SWEEP_DEV_2022_2023": {
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "strategy": "LIQUIDITY_SWEEP",
+    "split": "DEV_2022_2023",
+    "trade_count": 19,
+    "effective_sample_size": 8.9,
+    "lag1_autocorrelation": -0.361,
+    "bootstrap_95_ci_mean_r": [
+      -0.755,
+      0.344
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -0.364,
+      "pf_drop_best": 0.42,
+      "best_trade_r": 2.424
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "BTCUSDT_1h_LIQUIDITY_SWEEP_VAL_2024": {
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "strategy": "LIQUIDITY_SWEEP",
+    "split": "VAL_2024",
+    "trade_count": 11,
+    "effective_sample_size": 4.4,
+    "lag1_autocorrelation": -0.427,
+    "bootstrap_95_ci_mean_r": [
+      -1.09,
+      0.785
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -0.416,
+      "pf_drop_best": 0.53,
+      "best_trade_r": 2.38
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "BTCUSDT_1h_LIQUIDITY_SWEEP_SEALED_OOS_2025": {
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "strategy": "LIQUIDITY_SWEEP",
+    "split": "SEALED_OOS_2025",
+    "trade_count": 14,
+    "effective_sample_size": 10.7,
+    "lag1_autocorrelation": 0.132,
+    "bootstrap_95_ci_mean_r": [
+      -0.551,
+      1.13
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 0.075,
+      "pf_drop_best": 1.12,
+      "best_trade_r": 2.439
+    },
+    "deflated_sharpe_ratio": 0.0001,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "BTCUSDT_1h_LIQUIDITY_SWEEP_FORWARD_2026": {
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "strategy": "LIQUIDITY_SWEEP",
+    "split": "FORWARD_2026",
+    "trade_count": 12,
+    "effective_sample_size": 8.8,
+    "lag1_autocorrelation": -0.152,
+    "bootstrap_95_ci_mean_r": [
+      -0.759,
+      1.069
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -0.108,
+      "pf_drop_best": 0.85,
+      "best_trade_r": 2.442
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "BTCUSDT_1h_LIQUIDITY_SWEEP_FULL_SERIES": {
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "strategy": "LIQUIDITY_SWEEP",
+    "split": "FULL_SERIES",
+    "trade_count": 56,
+    "effective_sample_size": 40.5,
+    "lag1_autocorrelation": -0.161,
+    "bootstrap_95_ci_mean_r": [
+      -0.395,
+      0.389
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -0.067,
+      "pf_drop_best": 0.9,
+      "best_trade_r": 2.442
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "BTCUSDT_1h_ORDER_BLOCK_RETEST_DEV_2022_2023": {
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "strategy": "ORDER_BLOCK_RETEST",
+    "split": "DEV_2022_2023",
+    "trade_count": 7,
+    "effective_sample_size": 3.5,
+    "lag1_autocorrelation": -0.33,
+    "bootstrap_95_ci_mean_r": [
+      0.113,
+      2.377
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 1.119,
+      "pf_drop_best": 3.51,
+      "best_trade_r": 2.441
+    },
+    "deflated_sharpe_ratio": 0.9938,
+    "status": "CANDIDATE"
+  },
+  "BTCUSDT_1h_ORDER_BLOCK_RETEST_VAL_2024": {
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "strategy": "ORDER_BLOCK_RETEST",
+    "split": "VAL_2024",
+    "trade_count": 6,
+    "effective_sample_size": 5.8,
+    "lag1_autocorrelation": 0.019,
+    "bootstrap_95_ci_mean_r": [
+      0.624,
+      2.392
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 1.648,
+      "pf_drop_best": 8.5,
+      "best_trade_r": 2.45
+    },
+    "deflated_sharpe_ratio": 0.9966,
+    "status": "CANDIDATE"
+  },
+  "BTCUSDT_1h_ORDER_BLOCK_RETEST_SEALED_OOS_2025": {
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "strategy": "ORDER_BLOCK_RETEST",
+    "split": "SEALED_OOS_2025",
+    "trade_count": 3,
+    "effective_sample_size": 3.0,
+    "lag1_autocorrelation": 0.0,
+    "bootstrap_95_ci_mean_r": [
+      -1.158,
+      2.395
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -1.147,
+      "pf_drop_best": 0.0,
+      "best_trade_r": 2.395
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "BTCUSDT_1h_ORDER_BLOCK_RETEST_FORWARD_2026": {
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "strategy": "ORDER_BLOCK_RETEST",
+    "split": "FORWARD_2026",
+    "trade_count": 1,
+    "effective_sample_size": 1.0,
+    "lag1_autocorrelation": 0.0,
+    "bootstrap_95_ci_mean_r": [
+      2.29,
+      2.29
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 0.0,
+      "pf_drop_best": 0.0,
+      "best_trade_r": 2.29
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "BTCUSDT_1h_ORDER_BLOCK_RETEST_FULL_SERIES": {
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "strategy": "ORDER_BLOCK_RETEST",
+    "split": "FULL_SERIES",
+    "trade_count": 17,
+    "effective_sample_size": 13.8,
+    "lag1_autocorrelation": 0.103,
+    "bootstrap_95_ci_mean_r": [
+      0.47,
+      1.974
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 1.237,
+      "pf_drop_best": 4.26,
+      "best_trade_r": 2.45
+    },
+    "deflated_sharpe_ratio": 1.0,
+    "status": "CANDIDATE"
+  },
+  "BTCUSDT_1h_FVG_RETEST_DEV_2022_2023": {
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "strategy": "FVG_RETEST",
+    "split": "DEV_2022_2023",
+    "trade_count": 956,
+    "effective_sample_size": 896.8,
+    "lag1_autocorrelation": 0.032,
+    "bootstrap_95_ci_mean_r": [
+      1.219,
+      1.407
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 1.315,
+      "pf_drop_best": 5.47,
+      "best_trade_r": 2.442
+    },
+    "deflated_sharpe_ratio": 1.0,
+    "status": "CANDIDATE"
+  },
+  "BTCUSDT_1h_FVG_RETEST_VAL_2024": {
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "strategy": "FVG_RETEST",
+    "split": "VAL_2024",
+    "trade_count": 530,
+    "effective_sample_size": 496.4,
+    "lag1_autocorrelation": -0.033,
+    "bootstrap_95_ci_mean_r": [
+      1.387,
+      1.605
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 1.495,
+      "pf_drop_best": 7.54,
+      "best_trade_r": 2.42
+    },
+    "deflated_sharpe_ratio": 1.0,
+    "status": "CANDIDATE"
+  },
+  "BTCUSDT_1h_FVG_RETEST_SEALED_OOS_2025": {
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "strategy": "FVG_RETEST",
+    "split": "SEALED_OOS_2025",
+    "trade_count": 547,
+    "effective_sample_size": 513.9,
+    "lag1_autocorrelation": 0.031,
+    "bootstrap_95_ci_mean_r": [
+      1.27,
+      1.477
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 1.373,
+      "pf_drop_best": 7.25,
+      "best_trade_r": 2.408
+    },
+    "deflated_sharpe_ratio": 1.0,
+    "status": "CANDIDATE"
+  },
+  "BTCUSDT_1h_FVG_RETEST_FORWARD_2026": {
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "strategy": "FVG_RETEST",
+    "split": "FORWARD_2026",
+    "trade_count": 452,
+    "effective_sample_size": 430.9,
+    "lag1_autocorrelation": 0.024,
+    "bootstrap_95_ci_mean_r": [
+      1.087,
+      1.334
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 1.216,
+      "pf_drop_best": 5.21,
+      "best_trade_r": 2.398
+    },
+    "deflated_sharpe_ratio": 1.0,
+    "status": "CANDIDATE"
+  },
+  "BTCUSDT_1h_FVG_RETEST_FULL_SERIES": {
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "strategy": "FVG_RETEST",
+    "split": "FULL_SERIES",
+    "trade_count": 2485,
+    "effective_sample_size": 2379.2,
+    "lag1_autocorrelation": 0.022,
+    "bootstrap_95_ci_mean_r": [
+      1.296,
+      1.402
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 1.349,
+      "pf_drop_best": 6.14,
+      "best_trade_r": 2.442
+    },
+    "deflated_sharpe_ratio": 1.0,
+    "status": "CANDIDATE"
+  },
+  "BTCUSDT_1h_TREND_PULLBACK_DEV_2022_2023": {
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "strategy": "TREND_PULLBACK",
+    "split": "DEV_2022_2023",
+    "trade_count": 219,
+    "effective_sample_size": 185.2,
+    "lag1_autocorrelation": -0.084,
+    "bootstrap_95_ci_mean_r": [
+      -0.306,
+      0.08
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -0.118,
+      "pf_drop_best": 0.83,
+      "best_trade_r": 2.471
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "BTCUSDT_1h_TREND_PULLBACK_VAL_2024": {
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "strategy": "TREND_PULLBACK",
+    "split": "VAL_2024",
+    "trade_count": 131,
+    "effective_sample_size": 115.0,
+    "lag1_autocorrelation": -0.065,
+    "bootstrap_95_ci_mean_r": [
+      -0.297,
+      0.211
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -0.074,
+      "pf_drop_best": 0.89,
+      "best_trade_r": 2.477
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "BTCUSDT_1h_TREND_PULLBACK_SEALED_OOS_2025": {
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "strategy": "TREND_PULLBACK",
+    "split": "SEALED_OOS_2025",
+    "trade_count": 121,
+    "effective_sample_size": 95.7,
+    "lag1_autocorrelation": 0.117,
+    "bootstrap_95_ci_mean_r": [
+      -0.429,
+      0.076
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -0.209,
+      "pf_drop_best": 0.72,
+      "best_trade_r": 2.468
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "BTCUSDT_1h_TREND_PULLBACK_FORWARD_2026": {
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "strategy": "TREND_PULLBACK",
+    "split": "FORWARD_2026",
+    "trade_count": 85,
+    "effective_sample_size": 51.7,
+    "lag1_autocorrelation": -0.244,
+    "bootstrap_95_ci_mean_r": [
+      -0.311,
+      0.304
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -0.043,
+      "pf_drop_best": 0.93,
+      "best_trade_r": 2.47
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "BTCUSDT_1h_TREND_PULLBACK_FULL_SERIES": {
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "strategy": "TREND_PULLBACK",
+    "split": "FULL_SERIES",
+    "trade_count": 556,
+    "effective_sample_size": 492.5,
+    "lag1_autocorrelation": -0.061,
+    "bootstrap_95_ci_mean_r": [
+      -0.223,
+      0.023
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -0.102,
+      "pf_drop_best": 0.85,
+      "best_trade_r": 2.477
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "ETHUSDT_4h_LIQUIDITY_SWEEP_DEV_2022_2023": {
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "strategy": "LIQUIDITY_SWEEP",
+    "split": "DEV_2022_2023",
+    "trade_count": 3,
+    "effective_sample_size": 3.0,
+    "lag1_autocorrelation": 0.0,
+    "bootstrap_95_ci_mean_r": [
+      -1.099,
+      -1.029
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -1.087,
+      "pf_drop_best": 0.0,
+      "best_trade_r": -1.029
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "ETHUSDT_4h_LIQUIDITY_SWEEP_VAL_2024": {
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "strategy": "LIQUIDITY_SWEEP",
+    "split": "VAL_2024",
+    "trade_count": 1,
+    "effective_sample_size": 1.0,
+    "lag1_autocorrelation": 0.0,
+    "bootstrap_95_ci_mean_r": [
+      -0.017,
+      -0.017
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 0.0,
+      "pf_drop_best": 0.0,
+      "best_trade_r": -0.017
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "ETHUSDT_4h_LIQUIDITY_SWEEP_SEALED_OOS_2025": {
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "strategy": "LIQUIDITY_SWEEP",
+    "split": "SEALED_OOS_2025",
+    "trade_count": 1,
+    "effective_sample_size": 1.0,
+    "lag1_autocorrelation": 0.0,
+    "bootstrap_95_ci_mean_r": [
+      -1.077,
+      -1.077
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 0.0,
+      "pf_drop_best": 0.0,
+      "best_trade_r": -1.077
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "ETHUSDT_4h_LIQUIDITY_SWEEP_FORWARD_2026": {
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "strategy": "LIQUIDITY_SWEEP",
+    "split": "FORWARD_2026",
+    "trade_count": 1,
+    "effective_sample_size": 1.0,
+    "lag1_autocorrelation": 0.0,
+    "bootstrap_95_ci_mean_r": [
+      -1.02,
+      -1.02
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 0.0,
+      "pf_drop_best": 0.0,
+      "best_trade_r": -1.02
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "ETHUSDT_4h_LIQUIDITY_SWEEP_FULL_SERIES": {
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "strategy": "LIQUIDITY_SWEEP",
+    "split": "FULL_SERIES",
+    "trade_count": 6,
+    "effective_sample_size": 3.7,
+    "lag1_autocorrelation": -0.232,
+    "bootstrap_95_ci_mean_r": [
+      -1.078,
+      -0.533
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -1.06,
+      "pf_drop_best": 0.0,
+      "best_trade_r": -0.017
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "ETHUSDT_4h_ORDER_BLOCK_RETEST_DEV_2022_2023": {
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "strategy": "ORDER_BLOCK_RETEST",
+    "split": "DEV_2022_2023",
+    "trade_count": 1,
+    "effective_sample_size": 1.0,
+    "lag1_autocorrelation": 0.0,
+    "bootstrap_95_ci_mean_r": [
+      -1.022,
+      -1.022
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 0.0,
+      "pf_drop_best": 0.0,
+      "best_trade_r": -1.022
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "ETHUSDT_4h_ORDER_BLOCK_RETEST_VAL_2024": {
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "strategy": "ORDER_BLOCK_RETEST",
+    "split": "VAL_2024",
+    "trade_count": 0,
+    "effective_sample_size": 0.0,
+    "lag1_autocorrelation": 0.0,
+    "bootstrap_95_ci_mean_r": [
+      0.0,
+      0.0
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 0.0,
+      "pf_drop_best": 0.0,
+      "best_trade_r": 0.0
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NO_EDGE"
+  },
+  "ETHUSDT_4h_ORDER_BLOCK_RETEST_SEALED_OOS_2025": {
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "strategy": "ORDER_BLOCK_RETEST",
+    "split": "SEALED_OOS_2025",
+    "trade_count": 0,
+    "effective_sample_size": 0.0,
+    "lag1_autocorrelation": 0.0,
+    "bootstrap_95_ci_mean_r": [
+      0.0,
+      0.0
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 0.0,
+      "pf_drop_best": 0.0,
+      "best_trade_r": 0.0
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NO_EDGE"
+  },
+  "ETHUSDT_4h_ORDER_BLOCK_RETEST_FORWARD_2026": {
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "strategy": "ORDER_BLOCK_RETEST",
+    "split": "FORWARD_2026",
+    "trade_count": 0,
+    "effective_sample_size": 0.0,
+    "lag1_autocorrelation": 0.0,
+    "bootstrap_95_ci_mean_r": [
+      0.0,
+      0.0
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 0.0,
+      "pf_drop_best": 0.0,
+      "best_trade_r": 0.0
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NO_EDGE"
+  },
+  "ETHUSDT_4h_ORDER_BLOCK_RETEST_FULL_SERIES": {
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "strategy": "ORDER_BLOCK_RETEST",
+    "split": "FULL_SERIES",
+    "trade_count": 1,
+    "effective_sample_size": 1.0,
+    "lag1_autocorrelation": 0.0,
+    "bootstrap_95_ci_mean_r": [
+      -1.022,
+      -1.022
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 0.0,
+      "pf_drop_best": 0.0,
+      "best_trade_r": -1.022
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "ETHUSDT_4h_FVG_RETEST_DEV_2022_2023": {
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "strategy": "FVG_RETEST",
+    "split": "DEV_2022_2023",
+    "trade_count": 317,
+    "effective_sample_size": 285.6,
+    "lag1_autocorrelation": -0.052,
+    "bootstrap_95_ci_mean_r": [
+      1.402,
+      1.724
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 1.561,
+      "pf_drop_best": 7.06,
+      "best_trade_r": 2.46
+    },
+    "deflated_sharpe_ratio": 1.0,
+    "status": "CANDIDATE"
+  },
+  "ETHUSDT_4h_FVG_RETEST_VAL_2024": {
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "strategy": "FVG_RETEST",
+    "split": "VAL_2024",
+    "trade_count": 145,
+    "effective_sample_size": 104.2,
+    "lag1_autocorrelation": -0.164,
+    "bootstrap_95_ci_mean_r": [
+      1.571,
+      1.988
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 1.783,
+      "pf_drop_best": 10.93,
+      "best_trade_r": 2.457
+    },
+    "deflated_sharpe_ratio": 1.0,
+    "status": "CANDIDATE"
+  },
+  "ETHUSDT_4h_FVG_RETEST_SEALED_OOS_2025": {
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "strategy": "FVG_RETEST",
+    "split": "SEALED_OOS_2025",
+    "trade_count": 175,
+    "effective_sample_size": 173.5,
+    "lag1_autocorrelation": -0.004,
+    "bootstrap_95_ci_mean_r": [
+      1.441,
+      1.859
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 1.656,
+      "pf_drop_best": 8.23,
+      "best_trade_r": 2.461
+    },
+    "deflated_sharpe_ratio": 1.0,
+    "status": "CANDIDATE"
+  },
+  "ETHUSDT_4h_FVG_RETEST_FORWARD_2026": {
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "strategy": "FVG_RETEST",
+    "split": "FORWARD_2026",
+    "trade_count": 119,
+    "effective_sample_size": 82.3,
+    "lag1_autocorrelation": 0.182,
+    "bootstrap_95_ci_mean_r": [
+      1.244,
+      1.784
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 1.511,
+      "pf_drop_best": 6.53,
+      "best_trade_r": 2.453
+    },
+    "deflated_sharpe_ratio": 1.0,
+    "status": "CANDIDATE"
+  },
+  "ETHUSDT_4h_FVG_RETEST_FULL_SERIES": {
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "strategy": "FVG_RETEST",
+    "split": "FULL_SERIES",
+    "trade_count": 756,
+    "effective_sample_size": 737.0,
+    "lag1_autocorrelation": -0.013,
+    "bootstrap_95_ci_mean_r": [
+      1.519,
+      1.717
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 1.621,
+      "pf_drop_best": 7.82,
+      "best_trade_r": 2.461
+    },
+    "deflated_sharpe_ratio": 1.0,
+    "status": "CANDIDATE"
+  },
+  "ETHUSDT_4h_TREND_PULLBACK_DEV_2022_2023": {
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "strategy": "TREND_PULLBACK",
+    "split": "DEV_2022_2023",
+    "trade_count": 62,
+    "effective_sample_size": 50.7,
+    "lag1_autocorrelation": -0.1,
+    "bootstrap_95_ci_mean_r": [
+      -0.425,
+      0.307
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -0.096,
+      "pf_drop_best": 0.86,
+      "best_trade_r": 2.489
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "ETHUSDT_4h_TREND_PULLBACK_VAL_2024": {
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "strategy": "TREND_PULLBACK",
+    "split": "VAL_2024",
+    "trade_count": 36,
+    "effective_sample_size": 19.7,
+    "lag1_autocorrelation": -0.292,
+    "bootstrap_95_ci_mean_r": [
+      -0.452,
+      0.619
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -0.033,
+      "pf_drop_best": 0.96,
+      "best_trade_r": 2.482
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "ETHUSDT_4h_TREND_PULLBACK_SEALED_OOS_2025": {
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "strategy": "TREND_PULLBACK",
+    "split": "SEALED_OOS_2025",
+    "trade_count": 34,
+    "effective_sample_size": 33.0,
+    "lag1_autocorrelation": 0.015,
+    "bootstrap_95_ci_mean_r": [
+      -0.479,
+      0.493
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -0.098,
+      "pf_drop_best": 0.84,
+      "best_trade_r": 2.487
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "ETHUSDT_4h_TREND_PULLBACK_FORWARD_2026": {
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "strategy": "TREND_PULLBACK",
+    "split": "FORWARD_2026",
+    "trade_count": 25,
+    "effective_sample_size": 15.3,
+    "lag1_autocorrelation": -0.241,
+    "bootstrap_95_ci_mean_r": [
+      -0.678,
+      0.38
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -0.289,
+      "pf_drop_best": 0.59,
+      "best_trade_r": 2.474
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "ETHUSDT_4h_TREND_PULLBACK_FULL_SERIES": {
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "strategy": "TREND_PULLBACK",
+    "split": "FULL_SERIES",
+    "trade_count": 157,
+    "effective_sample_size": 114.8,
+    "lag1_autocorrelation": -0.155,
+    "bootstrap_95_ci_mean_r": [
+      -0.273,
+      0.19
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -0.062,
+      "pf_drop_best": 0.91,
+      "best_trade_r": 2.489
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "ETHUSDT_1h_LIQUIDITY_SWEEP_DEV_2022_2023": {
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "strategy": "LIQUIDITY_SWEEP",
+    "split": "DEV_2022_2023",
+    "trade_count": 15,
+    "effective_sample_size": 12.9,
+    "lag1_autocorrelation": 0.076,
+    "bootstrap_95_ci_mean_r": [
+      -0.149,
+      1.494
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 0.496,
+      "pf_drop_best": 1.93,
+      "best_trade_r": 2.469
+    },
+    "deflated_sharpe_ratio": 0.9908,
+    "status": "CANDIDATE"
+  },
+  "ETHUSDT_1h_LIQUIDITY_SWEEP_VAL_2024": {
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "strategy": "LIQUIDITY_SWEEP",
+    "split": "VAL_2024",
+    "trade_count": 13,
+    "effective_sample_size": 7.8,
+    "lag1_autocorrelation": 0.249,
+    "bootstrap_95_ci_mean_r": [
+      -1.066,
+      0.552
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -0.491,
+      "pf_drop_best": 0.45,
+      "best_trade_r": 2.459
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "ETHUSDT_1h_LIQUIDITY_SWEEP_SEALED_OOS_2025": {
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "strategy": "LIQUIDITY_SWEEP",
+    "split": "SEALED_OOS_2025",
+    "trade_count": 8,
+    "effective_sample_size": 3.4,
+    "lag1_autocorrelation": -0.403,
+    "bootstrap_95_ci_mean_r": [
+      -1.113,
+      1.071
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -0.604,
+      "pf_drop_best": 0.36,
+      "best_trade_r": 2.388
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "ETHUSDT_1h_LIQUIDITY_SWEEP_FORWARD_2026": {
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "strategy": "LIQUIDITY_SWEEP",
+    "split": "FORWARD_2026",
+    "trade_count": 7,
+    "effective_sample_size": 6.2,
+    "lag1_autocorrelation": 0.06,
+    "bootstrap_95_ci_mean_r": [
+      -0.656,
+      1.794
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 0.179,
+      "pf_drop_best": 1.3,
+      "best_trade_r": 2.445
+    },
+    "deflated_sharpe_ratio": 0.7967,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "ETHUSDT_1h_LIQUIDITY_SWEEP_FULL_SERIES": {
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "strategy": "LIQUIDITY_SWEEP",
+    "split": "FULL_SERIES",
+    "trade_count": 43,
+    "effective_sample_size": 40.1,
+    "lag1_autocorrelation": 0.035,
+    "bootstrap_95_ci_mean_r": [
+      -0.307,
+      0.697
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 0.124,
+      "pf_drop_best": 1.18,
+      "best_trade_r": 2.469
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "ETHUSDT_1h_ORDER_BLOCK_RETEST_DEV_2022_2023": {
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "strategy": "ORDER_BLOCK_RETEST",
+    "split": "DEV_2022_2023",
+    "trade_count": 6,
+    "effective_sample_size": 3.0,
+    "lag1_autocorrelation": -0.328,
+    "bootstrap_95_ci_mean_r": [
+      0.585,
+      2.369
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 1.56,
+      "pf_drop_best": 8.37,
+      "best_trade_r": 2.468
+    },
+    "deflated_sharpe_ratio": 0.9966,
+    "status": "CANDIDATE"
+  },
+  "ETHUSDT_1h_ORDER_BLOCK_RETEST_VAL_2024": {
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "strategy": "ORDER_BLOCK_RETEST",
+    "split": "VAL_2024",
+    "trade_count": 1,
+    "effective_sample_size": 1.0,
+    "lag1_autocorrelation": 0.0,
+    "bootstrap_95_ci_mean_r": [
+      -1.083,
+      -1.083
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 0.0,
+      "pf_drop_best": 0.0,
+      "best_trade_r": -1.083
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "ETHUSDT_1h_ORDER_BLOCK_RETEST_SEALED_OOS_2025": {
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "strategy": "ORDER_BLOCK_RETEST",
+    "split": "SEALED_OOS_2025",
+    "trade_count": 3,
+    "effective_sample_size": 3.0,
+    "lag1_autocorrelation": 0.0,
+    "bootstrap_95_ci_mean_r": [
+      -1.061,
+      2.42
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -1.056,
+      "pf_drop_best": 0.0,
+      "best_trade_r": 2.42
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "ETHUSDT_1h_ORDER_BLOCK_RETEST_FORWARD_2026": {
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "strategy": "ORDER_BLOCK_RETEST",
+    "split": "FORWARD_2026",
+    "trade_count": 1,
+    "effective_sample_size": 1.0,
+    "lag1_autocorrelation": 0.0,
+    "bootstrap_95_ci_mean_r": [
+      2.027,
+      2.027
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 0.0,
+      "pf_drop_best": 0.0,
+      "best_trade_r": 2.027
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "ETHUSDT_1h_ORDER_BLOCK_RETEST_FULL_SERIES": {
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "strategy": "ORDER_BLOCK_RETEST",
+    "split": "FULL_SERIES",
+    "trade_count": 11,
+    "effective_sample_size": 6.2,
+    "lag1_autocorrelation": -0.281,
+    "bootstrap_95_ci_mean_r": [
+      0.105,
+      1.956
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 0.905,
+      "pf_drop_best": 3.13,
+      "best_trade_r": 2.468
+    },
+    "deflated_sharpe_ratio": 0.9989,
+    "status": "CANDIDATE"
+  },
+  "ETHUSDT_1h_FVG_RETEST_DEV_2022_2023": {
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "strategy": "FVG_RETEST",
+    "split": "DEV_2022_2023",
+    "trade_count": 1088,
+    "effective_sample_size": 979.7,
+    "lag1_autocorrelation": 0.052,
+    "bootstrap_95_ci_mean_r": [
+      1.337,
+      1.501
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 1.418,
+      "pf_drop_best": 6.15,
+      "best_trade_r": 2.456
+    },
+    "deflated_sharpe_ratio": 1.0,
+    "status": "CANDIDATE"
+  },
+  "ETHUSDT_1h_FVG_RETEST_VAL_2024": {
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "strategy": "FVG_RETEST",
+    "split": "VAL_2024",
+    "trade_count": 537,
+    "effective_sample_size": 522.4,
+    "lag1_autocorrelation": -0.014,
+    "bootstrap_95_ci_mean_r": [
+      1.382,
+      1.616
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 1.498,
+      "pf_drop_best": 7.08,
+      "best_trade_r": 2.44
+    },
+    "deflated_sharpe_ratio": 1.0,
+    "status": "CANDIDATE"
+  },
+  "ETHUSDT_1h_FVG_RETEST_SEALED_OOS_2025": {
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "strategy": "FVG_RETEST",
+    "split": "SEALED_OOS_2025",
+    "trade_count": 547,
+    "effective_sample_size": 443.1,
+    "lag1_autocorrelation": 0.105,
+    "bootstrap_95_ci_mean_r": [
+      1.403,
+      1.633
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 1.515,
+      "pf_drop_best": 7.16,
+      "best_trade_r": 2.462
+    },
+    "deflated_sharpe_ratio": 1.0,
+    "status": "CANDIDATE"
+  },
+  "ETHUSDT_1h_FVG_RETEST_FORWARD_2026": {
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "strategy": "FVG_RETEST",
+    "split": "FORWARD_2026",
+    "trade_count": 420,
+    "effective_sample_size": 415.6,
+    "lag1_autocorrelation": 0.005,
+    "bootstrap_95_ci_mean_r": [
+      1.202,
+      1.47
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 1.331,
+      "pf_drop_best": 5.67,
+      "best_trade_r": 2.426
+    },
+    "deflated_sharpe_ratio": 1.0,
+    "status": "CANDIDATE"
+  },
+  "ETHUSDT_1h_FVG_RETEST_FULL_SERIES": {
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "strategy": "FVG_RETEST",
+    "split": "FULL_SERIES",
+    "trade_count": 2592,
+    "effective_sample_size": 2371.7,
+    "lag1_autocorrelation": 0.044,
+    "bootstrap_95_ci_mean_r": [
+      1.389,
+      1.497
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 1.442,
+      "pf_drop_best": 6.45,
+      "best_trade_r": 2.462
+    },
+    "deflated_sharpe_ratio": 1.0,
+    "status": "CANDIDATE"
+  },
+  "ETHUSDT_1h_TREND_PULLBACK_DEV_2022_2023": {
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "strategy": "TREND_PULLBACK",
+    "split": "DEV_2022_2023",
+    "trade_count": 254,
+    "effective_sample_size": 210.7,
+    "lag1_autocorrelation": -0.093,
+    "bootstrap_95_ci_mean_r": [
+      -0.305,
+      0.05
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -0.142,
+      "pf_drop_best": 0.8,
+      "best_trade_r": 2.484
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "ETHUSDT_1h_TREND_PULLBACK_VAL_2024": {
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "strategy": "TREND_PULLBACK",
+    "split": "VAL_2024",
+    "trade_count": 118,
+    "effective_sample_size": 111.0,
+    "lag1_autocorrelation": 0.031,
+    "bootstrap_95_ci_mean_r": [
+      -0.261,
+      0.266
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -0.029,
+      "pf_drop_best": 0.96,
+      "best_trade_r": 2.476
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "ETHUSDT_1h_TREND_PULLBACK_SEALED_OOS_2025": {
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "strategy": "TREND_PULLBACK",
+    "split": "SEALED_OOS_2025",
+    "trade_count": 103,
+    "effective_sample_size": 92.6,
+    "lag1_autocorrelation": -0.053,
+    "bootstrap_95_ci_mean_r": [
+      -0.402,
+      0.159
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -0.144,
+      "pf_drop_best": 0.79,
+      "best_trade_r": 2.483
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "ETHUSDT_1h_TREND_PULLBACK_FORWARD_2026": {
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "strategy": "TREND_PULLBACK",
+    "split": "FORWARD_2026",
+    "trade_count": 90,
+    "effective_sample_size": 77.3,
+    "lag1_autocorrelation": 0.076,
+    "bootstrap_95_ci_mean_r": [
+      -0.263,
+      0.405
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": 0.04,
+      "pf_drop_best": 1.06,
+      "best_trade_r": 2.472
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  },
+  "ETHUSDT_1h_TREND_PULLBACK_FULL_SERIES": {
+    "symbol": "ETHUSDT",
+    "timeframe": "1h",
+    "strategy": "TREND_PULLBACK",
+    "split": "FULL_SERIES",
+    "trade_count": 565,
+    "effective_sample_size": 532.6,
+    "lag1_autocorrelation": -0.03,
+    "bootstrap_95_ci_mean_r": [
+      -0.19,
+      0.055
+    ],
+    "outlier_sensitivity": {
+      "net_expectancy_drop_best": -0.076,
+      "pf_drop_best": 0.89,
+      "best_trade_r": 2.484
+    },
+    "deflated_sharpe_ratio": 0.0,
+    "status": "NEEDS_MORE_DATA"
+  }
+}
