@@ -178,7 +178,8 @@ class PortfolioRiskGuardian:
         db_path: Path | str | None = None,
     ) -> None:
         self.limits = limits or PortfolioRiskLimits()
-        self.state_file = Path(state_file) if state_file else DEFAULT_STATE_FILE
+        env_state = os.environ.get("PORTFOLIO_RISK_GUARDIAN_STATE_FILE")
+        self.state_file = Path(state_file) if state_file else (Path(env_state) if env_state else DEFAULT_STATE_FILE)
         env_db = os.environ.get("TRADING_LOGS_DB_PATH")
         default_db = Path(env_db) if env_db else (ROOT_DIR / "data" / "trading_logs.db")
         self.db_path = Path(db_path) if db_path else default_db
