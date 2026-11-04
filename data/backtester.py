@@ -565,8 +565,11 @@ def run_backtest_on_store(
             "report": {},
             "graded": [],
         }
-    # Respect the `bars` cap for quick backtests (same contract as REST).
-    df = df.tail(bars).reset_index(drop=True)
+    # Respect the `bars` cap for quick backtests; if None or <=0, use full historical dataset.
+    if bars is not None and bars > 0:
+        df = df.tail(bars).reset_index(drop=True)
+    else:
+        df = df.reset_index(drop=True)
     result = run_backtest(
         df,
         symbol=symbol,
