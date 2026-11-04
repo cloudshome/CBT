@@ -407,8 +407,8 @@ def test_adv13_daily_reset_attempting_to_clear_hard_freeze(tmp_path):
     guardian.daily_realized_loss_usd = 200.0
 
     # Advance calendar day
-    tomorrow_str = "2026-11-04"
-    guardian.reset_daily_metrics(current_day_utc=tomorrow_str)
+    guardian.current_trading_day = "2020-01-01"
+    guardian.reset_daily_metrics(current_day_utc="2020-01-02")
 
     # Invariant: daily loss reset, but state remains HARD_FREEZE!
     assert guardian.daily_realized_loss_usd == 0.0
