@@ -68,3 +68,4 @@ While naive 1H liquidity sweeps suffer slight negative expectancy ($-0.10R$), **
 $$\mathbf{DECISION:\ NEEDS\_MORE\_DATA\ /\ VALUABLE\_PORTFOLIO\_DIVERSIFIER}$$
 
 Family 3 will NOT be deployed in standalone paper-shadow mode yet. However, due to its **verified negative correlation with the benchmark**, it is prioritized for Phase 2 HTF range-bound conditioning research.
+

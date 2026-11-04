@@ -62,3 +62,4 @@ The hypothesis is falsified and **REJECTED** if:
 $$\mathbf{DECISION:\ REJECTED}$$
 
 Naive trend pullback continuation is empirically falsified on crypto perpetuals across 2022–2026. It will **NOT** be promoted to paper-shadow mode.
+

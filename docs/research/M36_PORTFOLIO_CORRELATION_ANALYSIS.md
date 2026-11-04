@@ -58,3 +58,4 @@ In strict accordance with the Post-M35 Research Directive:
 Proceed to **Phase 2 Data Ingestion**:
 1. Ingest Binance funding rates and Open Interest for **Family 5 (Funding/OI Dislocation)**.
 2. Ingest `SOLUSDT` and `BNBUSDT` for **Family 6 (Cross-Asset Relative Strength)**.
+

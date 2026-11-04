@@ -21,3 +21,4 @@ for fam, title in [
             m_oos = res[k_oos]['strict_mixed_metrics']
             m_fwd = res[k_fwd]['strict_mixed_metrics']
             print(f"    --> 2025 OOS: N={m_oos['total_trades']:2d}, NetR={m_oos['mean_net_r']:+5.2f}R, PF={m_oos['profit_factor']:4.2f} | 2026 Replay: N={m_fwd['total_trades']:2d}, NetR={m_fwd['mean_net_r']:+5.2f}R, PF={m_fwd['profit_factor']:4.2f}")
+

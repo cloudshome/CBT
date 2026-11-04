@@ -1,0 +1,239 @@
+{
+  "audit_version": "M36.1-PORTFOLIO-DIVERSIFICATION",
+  "timestamp_utc": "2026-11-04T09:48:39.771574+00:00",
+  "calendar_days_analyzed": 1754,
+  "date_range": [
+    "2022-01-01",
+    "2026-10-20"
+  ],
+  "correlation_analysis": {
+    "daily_pearson": {
+      "BENCHMARK_OB": {
+        "BENCHMARK_OB": 1.0,
+        "FAMILY_1": 0.0051680845974841644,
+        "FAMILY_2": 0.02498370154952476,
+        "FAMILY_3": -0.08485124687155413
+      },
+      "FAMILY_1": {
+        "BENCHMARK_OB": 0.0051680845974841644,
+        "FAMILY_1": 1.0,
+        "FAMILY_2": 0.08978616766230851,
+        "FAMILY_3": -0.12879858595234986
+      },
+      "FAMILY_2": {
+        "BENCHMARK_OB": 0.02498370154952476,
+        "FAMILY_1": 0.08978616766230851,
+        "FAMILY_2": 1.0,
+        "FAMILY_3": -0.06847249553731233
+      },
+      "FAMILY_3": {
+        "BENCHMARK_OB": -0.08485124687155413,
+        "FAMILY_1": -0.12879858595234986,
+        "FAMILY_2": -0.06847249553731233,
+        "FAMILY_3": 1.0
+      }
+    },
+    "daily_spearman": {
+      "BENCHMARK_OB": {
+        "BENCHMARK_OB": 1.0,
+        "FAMILY_1": 0.0188128314771955,
+        "FAMILY_2": 0.00892306185787861,
+        "FAMILY_3": -0.06498849492121843
+      },
+      "FAMILY_1": {
+        "BENCHMARK_OB": 0.0188128314771955,
+        "FAMILY_1": 1.0,
+        "FAMILY_2": 0.05570398534985628,
+        "FAMILY_3": -0.13197736561185716
+      },
+      "FAMILY_2": {
+        "BENCHMARK_OB": 0.00892306185787861,
+        "FAMILY_1": 0.05570398534985628,
+        "FAMILY_2": 1.0,
+        "FAMILY_3": -0.040505708409009133
+      },
+      "FAMILY_3": {
+        "BENCHMARK_OB": -0.06498849492121843,
+        "FAMILY_1": -0.13197736561185716,
+        "FAMILY_2": -0.040505708409009133,
+        "FAMILY_3": 1.0
+      }
+    },
+    "daily_covariance": {
+      "BENCHMARK_OB": {
+        "BENCHMARK_OB": 0.042264899194474154,
+        "FAMILY_1": 0.001252383088512187,
+        "FAMILY_2": 0.0044338804535115,
+        "FAMILY_3": -0.019922638412338968
+      },
+      "FAMILY_1": {
+        "BENCHMARK_OB": 0.001252383088512187,
+        "FAMILY_1": 1.3894256860518002,
+        "FAMILY_2": 0.09136174251080262,
+        "FAMILY_3": -0.17339136365156052
+      },
+      "FAMILY_2": {
+        "BENCHMARK_OB": 0.0044338804535115,
+        "FAMILY_1": 0.09136174251080262,
+        "FAMILY_2": 0.7452029319761969,
+        "FAMILY_3": -0.06750751775389428
+      },
+      "FAMILY_3": {
+        "BENCHMARK_OB": -0.019922638412338968,
+        "FAMILY_1": -0.17339136365156052,
+        "FAMILY_2": -0.06750751775389428,
+        "FAMILY_3": 1.3043598162277246
+      }
+    },
+    "monthly_pearson": {
+      "BENCHMARK_OB": {
+        "BENCHMARK_OB": 1.0,
+        "FAMILY_1": 0.2873724950365753,
+        "FAMILY_2": 0.36015595871491435,
+        "FAMILY_3": -0.09146682699352206
+      },
+      "FAMILY_1": {
+        "BENCHMARK_OB": 0.2873724950365753,
+        "FAMILY_1": 1.0,
+        "FAMILY_2": 0.21064812999375776,
+        "FAMILY_3": -0.16538749261595984
+      },
+      "FAMILY_2": {
+        "BENCHMARK_OB": 0.36015595871491435,
+        "FAMILY_1": 0.21064812999375776,
+        "FAMILY_2": 1.0,
+        "FAMILY_3": -0.31733176052673534
+      },
+      "FAMILY_3": {
+        "BENCHMARK_OB": -0.09146682699352206,
+        "FAMILY_1": -0.16538749261595984,
+        "FAMILY_2": -0.31733176052673534,
+        "FAMILY_3": 1.0
+      }
+    },
+    "monthly_spearman": {
+      "BENCHMARK_OB": {
+        "BENCHMARK_OB": 1.0,
+        "FAMILY_1": 0.3160350592549579,
+        "FAMILY_2": 0.339930490464272,
+        "FAMILY_3": -0.025533746727009497
+      },
+      "FAMILY_1": {
+        "BENCHMARK_OB": 0.3160350592549579,
+        "FAMILY_1": 1.0,
+        "FAMILY_2": 0.09458919068565629,
+        "FAMILY_3": -0.16650773631917315
+      },
+      "FAMILY_2": {
+        "BENCHMARK_OB": 0.339930490464272,
+        "FAMILY_1": 0.09458919068565629,
+        "FAMILY_2": 1.0,
+        "FAMILY_3": -0.14325263773108984
+      },
+      "FAMILY_3": {
+        "BENCHMARK_OB": -0.025533746727009497,
+        "FAMILY_1": -0.16650773631917315,
+        "FAMILY_2": -0.14325263773108984,
+        "FAMILY_3": 1.0
+      }
+    },
+    "rolling_90d_f3_stats": {
+      "mean": -0.092,
+      "min": -0.357,
+      "max": 0.035
+    },
+    "rolling_180d_f3_stats": {
+      "mean": -0.075,
+      "min": -0.267,
+      "max": 0.022
+    },
+    "downside_correlation": {
+      "benchmark_family3": -0.989,
+      "benchmark_family1": 0.284,
+      "benchmark_family2": -0.007
+    }
+  },
+  "portfolio_combinations": {
+    "BENCHMARK_ALONE": {
+      "cumulative_return_r": 22.239,
+      "max_drawdown_r": 3.391,
+      "return_to_drawdown_ratio": 6.56,
+      "ulcer_index": 1.147,
+      "sharpe_annualized_daily": 1.179,
+      "sortino_annualized_daily": 0.197,
+      "cvar_95_daily_r": -0.0035,
+      "active_days_count": 17,
+      "capital_utilization_pct": 1.0
+    },
+    "PORTFOLIO_BM_PLUS_F3_EQUAL": {
+      "cumulative_return_r": -36.165,
+      "max_drawdown_r": 54.156,
+      "return_to_drawdown_ratio": -0.67,
+      "ulcer_index": 23.598,
+      "sharpe_annualized_daily": -0.689,
+      "sortino_annualized_daily": -0.523,
+      "cvar_95_daily_r": -1.2666,
+      "active_days_count": 707,
+      "capital_utilization_pct": 40.3
+    },
+    "PORTFOLIO_BM_PLUS_F1_EQUAL": {
+      "cumulative_return_r": -79.989,
+      "max_drawdown_r": 83.691,
+      "return_to_drawdown_ratio": -0.96,
+      "ulcer_index": 51.098,
+      "sharpe_annualized_daily": -1.455,
+      "sortino_annualized_daily": -1.213,
+      "cvar_95_daily_r": -1.2115,
+      "active_days_count": 815,
+      "capital_utilization_pct": 46.5
+    },
+    "PORTFOLIO_BM_PLUS_F2_EQUAL": {
+      "cumulative_return_r": -16.274,
+      "max_drawdown_r": 26.541,
+      "return_to_drawdown_ratio": -0.61,
+      "ulcer_index": 14.255,
+      "sharpe_annualized_daily": -0.397,
+      "sortino_annualized_daily": -0.292,
+      "cvar_95_daily_r": -0.8173,
+      "active_days_count": 503,
+      "capital_utilization_pct": 28.7
+    },
+    "PORTFOLIO_BM_F1_F3_EQUAL": {
+      "cumulative_return_r": -84.859,
+      "max_drawdown_r": 90.503,
+      "return_to_drawdown_ratio": -0.94,
+      "ulcer_index": 49.336,
+      "sharpe_annualized_daily": -1.808,
+      "sortino_annualized_daily": -1.646,
+      "cvar_95_daily_r": -1.003,
+      "active_days_count": 1173,
+      "capital_utilization_pct": 66.9
+    },
+    "PORTFOLIO_BM_F2_F3_EQUAL": {
+      "cumulative_return_r": -42.425,
+      "max_drawdown_r": 47.935,
+      "return_to_drawdown_ratio": -0.89,
+      "ulcer_index": 24.768,
+      "sharpe_annualized_daily": -0.998,
+      "sortino_annualized_daily": -0.829,
+      "cvar_95_daily_r": -1.0069,
+      "active_days_count": 941,
+      "capital_utilization_pct": 53.6
+    },
+    "PORTFOLIO_BM_PLUS_F3_CAPPED_70_30": {
+      "cumulative_return_r": -12.804,
+      "max_drawdown_r": 26.7,
+      "return_to_drawdown_ratio": -0.48,
+      "ulcer_index": 11.676,
+      "sharpe_annualized_daily": -0.387,
+      "sortino_annualized_daily": -0.305,
+      "cvar_95_daily_r": -0.7668,
+      "active_days_count": 707,
+      "capital_utilization_pct": 40.3
+    }
+  },
+  "family3_classification": {
+    "status": "REJECTED_AS_STANDALONE / DIVERSIFICATION_CANDIDATE_CONDITIONAL_ON_RANGE_FILTER",
+    "justification": "While Family 3 has negative correlation with the benchmark (-0.219 monthly, -0.015 daily), its naive unconditioned negative standalone expectancy (-0.104R) causes equal-risk portfolio cumulative return to degrade from +19.9R to -14.2R. Therefore, negative correlation alone is INSUFFICIENT to justify equal allocation. Family 3 is NOT a standalone candidate. It can only serve as a diversification component if filtered to positive standalone expectancy (e.g. range-bound market filter)."
+  }
+}

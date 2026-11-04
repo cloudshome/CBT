@@ -63,3 +63,4 @@ The hypothesis is falsified and **REJECTED** if:
 $$\mathbf{DECISION:\ NEEDS\_MORE\_DATA\ /\ REJECTED\_AS\_STANDALONE}$$
 
 Volatility Squeeze Breakout cannot stand alone without an explicit regime filter that silences breakout signals during range-bound chop. It is archived for potential multi-regime conditional ensemble use.
+

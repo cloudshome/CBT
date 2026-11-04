@@ -37,3 +37,4 @@ We enforce the foundational rule: **No hypothesis is backtested until its requir
    - Backfill Binance historical funding rates and open interest into `data/store/parquet/derivatives/`.
    - Ingest 2022–2026 1H/4H candles for `SOLUSDT` and `BNBUSDT`.
    - Compile point-in-time timestamped economic calendar.
+

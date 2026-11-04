@@ -419,10 +419,10 @@ class BinanceClient:
         df = pd.DataFrame(data)
         if df.empty:
             return df
-        df = df.rename(columns={"fundingTime": "ts", "fundingRate": "funding_rate"})
+        df = df.rename(columns={"fundingTime": "ts", "fundingRate": "funding_rate", "markPrice": "mark_price"})
         df["ts"] = df["ts"].astype("int64")
-        df["funding_rate"] = df["funding_rate"].astype(float)
-        df["mark_price"] = df["mark_price"].astype(float)
+        df["funding_rate"] = pd.to_numeric(df["funding_rate"], errors="coerce").fillna(0.0)
+        df["mark_price"] = pd.to_numeric(df.get("mark_price", 0.0), errors="coerce").fillna(0.0)
         return (
             df[["ts", "funding_rate", "mark_price"]]
             .sort_values("ts")
