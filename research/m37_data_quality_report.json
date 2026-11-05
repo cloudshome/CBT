@@ -1,0 +1,102 @@
+{
+  "audit_version": "M37-DERIVATIVES-COVERAGE-AUDIT",
+  "generated_at_utc": "2026-11-05T05:16:39.608576+00:00",
+  "datasets": {
+    "BTCUSDT": {
+      "funding_rate": {
+        "partition_count": 59,
+        "total_rows": 5308,
+        "total_size_bytes": 199964,
+        "earliest_timestamp_utc": "2022-01-01 00:00:00.006000+00:00",
+        "latest_timestamp_utc": "2026-11-05 00:00:00+00:00",
+        "duplicate_count": 0,
+        "missing_intervals_count": 0,
+        "status": "PASS_FULL_COVERAGE"
+      },
+      "open_interest": {
+        "partition_count": 59,
+        "total_rows": 42168,
+        "total_size_bytes": 747650,
+        "earliest_timestamp_utc": "2022-01-01 00:00:00+00:00",
+        "latest_timestamp_utc": "2026-11-04 09:00:00+00:00",
+        "duplicate_count": 0,
+        "missing_intervals_count": 0,
+        "status": "PASS_FULL_COVERAGE"
+      },
+      "open_interest_value": {
+        "partition_count": 59,
+        "total_rows": 42168,
+        "total_size_bytes": 836270,
+        "earliest_timestamp_utc": "2022-01-01 00:00:00+00:00",
+        "latest_timestamp_utc": "2026-11-04 09:00:00+00:00",
+        "duplicate_count": 0,
+        "missing_intervals_count": 0,
+        "status": "PASS_FULL_COVERAGE"
+      },
+      "spot_1h_candle": {
+        "partition_count": 58,
+        "total_rows": 42301,
+        "total_size_bytes": 1732713,
+        "earliest_timestamp_utc": "2022-01-01 01:00:00+00:00",
+        "latest_timestamp_utc": "2026-10-01 01:00:00+00:00",
+        "status": "PASS_FULL_COVERAGE"
+      },
+      "perp_1h_candle": {
+        "partition_count": 58,
+        "total_rows": 42078,
+        "total_size_bytes": 2239292,
+        "earliest_timestamp_utc": "2022-01-01 00:00:00+00:00",
+        "latest_timestamp_utc": "2026-10-20 05:00:00+00:00",
+        "status": "PASS_FULL_COVERAGE"
+      }
+    },
+    "ETHUSDT": {
+      "funding_rate": {
+        "partition_count": 59,
+        "total_rows": 5308,
+        "total_size_bytes": 200811,
+        "earliest_timestamp_utc": "2022-01-01 00:00:00.006000+00:00",
+        "latest_timestamp_utc": "2026-11-05 00:00:00+00:00",
+        "duplicate_count": 0,
+        "missing_intervals_count": 0,
+        "status": "PASS_FULL_COVERAGE"
+      },
+      "open_interest": {
+        "partition_count": 59,
+        "total_rows": 42168,
+        "total_size_bytes": 782019,
+        "earliest_timestamp_utc": "2022-01-01 00:00:00+00:00",
+        "latest_timestamp_utc": "2026-11-04 09:00:00+00:00",
+        "duplicate_count": 0,
+        "missing_intervals_count": 0,
+        "status": "PASS_FULL_COVERAGE"
+      },
+      "open_interest_value": {
+        "partition_count": 59,
+        "total_rows": 42168,
+        "total_size_bytes": 836399,
+        "earliest_timestamp_utc": "2022-01-01 00:00:00+00:00",
+        "latest_timestamp_utc": "2026-11-04 09:00:00+00:00",
+        "duplicate_count": 0,
+        "missing_intervals_count": 0,
+        "status": "PASS_FULL_COVERAGE"
+      },
+      "spot_1h_candle": {
+        "partition_count": 58,
+        "total_rows": 42301,
+        "total_size_bytes": 1628983,
+        "earliest_timestamp_utc": "2022-01-01 01:00:00+00:00",
+        "latest_timestamp_utc": "2026-10-01 01:00:00+00:00",
+        "status": "PASS_FULL_COVERAGE"
+      },
+      "perp_1h_candle": {
+        "partition_count": 58,
+        "total_rows": 42078,
+        "total_size_bytes": 2214497,
+        "earliest_timestamp_utc": "2022-01-01 00:00:00+00:00",
+        "latest_timestamp_utc": "2026-10-20 05:00:00+00:00",
+        "status": "PASS_FULL_COVERAGE"
+      }
+    }
+  }
+}
