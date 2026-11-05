@@ -1,0 +1,107 @@
+{
+  "metadata": {
+    "milestone": "M38-INDEPENDENT-ALPHA-VERIFICATION",
+    "timestamp_utc": "2026-11-05T05:49:13.832692+00:00",
+    "data_audit": {
+      "btc_merged_rows": 42009,
+      "eth_merged_rows": 42009,
+      "discrepancy_investigation_2450": {
+        "root_cause_1_trade_ledger": "Family 1 in independent_edges_trade_ledger.jsonl contains exactly 2,481 total simulated trades across 4 asset/timeframe slices (BTC 1h: 1029, BTC 4h: 240, ETH 1h: 997, ETH 4h: 215). Informal rounding in executive communication cited '~2,450 records'.",
+        "root_cause_2_calendar_horizon": "The difference between 42,078 recorded perpetual hourly bars (ending 2026-10-20 05:00 UTC) and the theoretical 5.0 full calendar years (44,528 hours through 2027-01-31) is exactly 2,450 hours (102.08 calendar days).",
+        "audit_verdict": "RECONCILED. No missing data inside the active 2022-01-01 to 2026-10-20 research window. Inner-merged stream is 100% synchronized across 42,009 hourly observations with 0 gaps."
+      }
+    }
+  },
+  "H3_BTC_OI_FLUSH": {
+    "baseline_metrics": {
+      "trade_count": 50,
+      "win_rate_pct": 56.0,
+      "net_cumulative_r": 15.695,
+      "expectancy_r": 0.3139,
+      "profit_factor": 1.77,
+      "max_drawdown_r": 4.279,
+      "sharpe_trade": 1.759,
+      "t_stat": 1.759,
+      "p_value": 0.0848,
+      "ci_95_low": -0.0358,
+      "ci_95_high": 0.6636,
+      "skewness": 0.149,
+      "kurtosis": -1.585
+    },
+    "statistical_certification": {
+      "strategy": "H3_BTC",
+      "total_trades": 50,
+      "effective_sample_size": 40.0,
+      "autocorrelation_lag1": 0.111,
+      "clustered_block_bootstrap_95_ci": [
+        -0.0654,
+        0.7076
+      ],
+      "deflated_sharpe_ratio": 0.0,
+      "raw_p_value": 0.0848,
+      "fdr_adjusted_p_value": 1.0,
+      "train_expectancy_r": 0.3124,
+      "val_expectancy_r": 0.3032,
+      "oos_expectancy_r": 0.3865,
+      "oos_trade_count": 2,
+      "ulcer_index": 2.007,
+      "cvar_95_r": -1.1241
+    },
+    "adversarial_stress_testing": {
+      "base_expectancy_r": 0.3139,
+      "cost_1_5x_expectancy_r": 0.2729,
+      "cost_2_5x_expectancy_r": 0.1909,
+      "delayed_entry_expectancy_r": 0.1789,
+      "sl_gap_expectancy_r": 0.2419,
+      "funding_shock_expectancy_r": 0.3061,
+      "breakeven_cost_multiplier": 175.39
+    },
+    "governance_classification": "RESEARCH_CANDIDATE / NEEDS_MORE_OOS_DATA"
+  },
+  "H5_ETH_OI_COMPRESSION": {
+    "baseline_metrics": {
+      "trade_count": 48,
+      "win_rate_pct": 45.83,
+      "net_cumulative_r": 21.881,
+      "expectancy_r": 0.4559,
+      "profit_factor": 1.75,
+      "max_drawdown_r": 10.77,
+      "sharpe_trade": 1.811,
+      "t_stat": 1.811,
+      "p_value": 0.0766,
+      "ci_95_low": -0.0376,
+      "ci_95_high": 0.9493,
+      "skewness": 0.179,
+      "kurtosis": -1.953
+    },
+    "statistical_certification": {
+      "strategy": "H5_ETH",
+      "total_trades": 48,
+      "effective_sample_size": 35.7,
+      "autocorrelation_lag1": 0.147,
+      "clustered_block_bootstrap_95_ci": [
+        -0.1058,
+        1.0279
+      ],
+      "deflated_sharpe_ratio": 0.0,
+      "raw_p_value": 0.0766,
+      "fdr_adjusted_p_value": 1.0,
+      "train_expectancy_r": 0.279,
+      "val_expectancy_r": 0.1979,
+      "oos_expectancy_r": 1.8021,
+      "oos_trade_count": 6,
+      "ulcer_index": 4.894,
+      "cvar_95_r": -1.2304
+    },
+    "adversarial_stress_testing": {
+      "base_expectancy_r": 0.4559,
+      "cost_1_5x_expectancy_r": 0.389,
+      "cost_2_5x_expectancy_r": 0.2552,
+      "delayed_entry_expectancy_r": 0.4776,
+      "sl_gap_expectancy_r": 0.3475,
+      "funding_shock_expectancy_r": 0.4589,
+      "breakeven_cost_multiplier": 254.28
+    },
+    "governance_classification": "RESEARCH_CANDIDATE / NEEDS_MORE_OOS_DATA"
+  }
+}

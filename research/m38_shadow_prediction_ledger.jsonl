@@ -1,0 +1,1 @@
+{"timestamp_utc": "2026-11-05T05:49:13.831334+00:00", "strategy_id": "H3_BTC_OI_FLUSH", "symbol": "BTCUSDT", "action": "OBSERVE_ONLY_NO_ORDER", "current_oi": 94882.52, "current_price": 81682.1, "signal_state": false, "execution_permission": "DENIED_RESEARCH_ONLY", "notes": "Prospective shadow logging active; zero execution bypass."}
