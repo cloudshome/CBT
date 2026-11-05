@@ -1,0 +1,85 @@
+{
+  "audit_version": "M38C-STATISTICAL-REPRODUCTION",
+  "auditor": "Independent Institutional Quantitative Auditor",
+  "timestamp_utc": "2026-11-05T07:15:00Z",
+  "commit_reviewed": "4a639ab",
+  "candidates": {
+    "H3_BTC": {
+      "strategy_id": "H3_OI_FLUSH_CAPITULATION_LONG_BTC",
+      "asset": "BTCUSDT",
+      "timeframe": "1h",
+      "direction": "LONG",
+      "reproduced_metrics": {
+        "sample_size_n": 50,
+        "win_rate_pct": 56.0,
+        "mean_r": 0.3139,
+        "std_r": 1.2617,
+        "t_stat": 1.7593,
+        "p_value_raw": 0.0848,
+        "autocorrelation_lag1": 0.111,
+        "effective_sample_size_n_eff": 40.0,
+        "clustered_block_bootstrap_95_ci": [0.0067, 0.6582],
+        "skewness": 0.1492,
+        "excess_kurtosis": -1.5849,
+        "per_trade_sharpe": 0.2488,
+        "deflated_sharpe_ratio_k10": 0.0,
+        "fdr_adjusted_p_value_bh": 0.8477,
+        "partition_breakdown": {
+          "train_expectancy_r": 0.3124,
+          "train_n": 40,
+          "val_expectancy_r": 0.3032,
+          "val_n": 8,
+          "oos_expectancy_r": 0.3865,
+          "oos_n": 2
+        }
+      },
+      "friction_stress_and_breakeven_audit": {
+        "reported_breakeven_multiplier": 175.39,
+        "reported_metric_flaw": "DIMENSIONAL_ERROR: In run_m38_independent_alpha_verification.py, line 506 divided expectancy in R-units (0.3139) by raw price percentage friction (0.0018), producing an erroneous and inflated 175.39x.",
+        "reproduced_correct_breakeven_multiplier": 4.83,
+        "reproduced_correct_methodology": "Simulated friction stress tests demonstrate: Base friction consumes ~0.082R per 1.0x cost. Stressed at 1.5x, expectancy is +0.2729R; at 2.5x, expectancy is +0.1909R. Linear breakeven threshold is 1.0 + (0.3139 / 0.0820) = 4.83x base frictions.",
+        "robustness_verdict": "ADEQUATE_FOR_CRYPTO_FEES_BUT_INFLATED_IN_M38_REPORT"
+      },
+      "statistical_significance_verdict": "NOT_SIGNIFICANT (p = 0.0848 > 0.05, FDR p = 0.848, DSR = 0.000, N_oos = 2)"
+    },
+    "H5_ETH": {
+      "strategy_id": "H5_OI_COMPRESSION_BREAKDOWN_SHORT_ETH",
+      "asset": "ETHUSDT",
+      "timeframe": "1h",
+      "direction": "SHORT",
+      "reproduced_metrics": {
+        "sample_size_n": 48,
+        "win_rate_pct": 45.83,
+        "mean_r": 0.4559,
+        "std_r": 1.7443,
+        "t_stat": 1.8106,
+        "p_value_raw": 0.0766,
+        "autocorrelation_lag1": 0.1468,
+        "effective_sample_size_n_eff": 35.7,
+        "clustered_block_bootstrap_95_ci": [-0.0853, 1.106],
+        "skewness": 0.1793,
+        "excess_kurtosis": -1.9532,
+        "per_trade_sharpe": 0.2613,
+        "deflated_sharpe_ratio_k10": 0.0,
+        "fdr_adjusted_p_value_bh": 0.766,
+        "partition_breakdown": {
+          "train_expectancy_r": 0.279,
+          "train_n": 34,
+          "val_expectancy_r": 0.1979,
+          "val_n": 8,
+          "oos_expectancy_r": 1.8021,
+          "oos_n": 6
+        }
+      },
+      "friction_stress_and_breakeven_audit": {
+        "reported_breakeven_multiplier": 254.28,
+        "reported_metric_flaw": "DIMENSIONAL_ERROR: In run_m38_independent_alpha_verification.py, line 506 divided expectancy in R-units (0.4559) by raw price percentage friction (0.0018), producing an erroneous and inflated 254.28x.",
+        "reproduced_correct_breakeven_multiplier": 4.41,
+        "reproduced_correct_methodology": "Simulated friction stress tests demonstrate: Base friction consumes ~0.1338R per 1.0x cost. Stressed at 1.5x, expectancy is +0.3890R; at 2.5x, expectancy is +0.2552R. Linear breakeven threshold is 1.0 + (0.4559 / 0.1338) = 4.41x base frictions.",
+        "robustness_verdict": "ADEQUATE_FOR_CRYPTO_FEES_BUT_INFLATED_IN_M38_REPORT"
+      },
+      "statistical_significance_verdict": "NOT_SIGNIFICANT (p = 0.0766 > 0.05, FDR p = 0.766, DSR = 0.000, 95% CI straddles zero, N_oos = 6)"
+    }
+  },
+  "overall_governance_verdict": "VERIFIED_STATISTICS_REPRODUCED_BUT_FAILED_PRODUCTION_GATES"
+}

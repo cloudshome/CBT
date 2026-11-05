@@ -1,0 +1,89 @@
+{
+  "audit_version": "M38C-DATA-RECONCILIATION",
+  "auditor": "Independent Institutional Quantitative Auditor",
+  "timestamp_utc": "2026-11-05T07:15:00Z",
+  "commit_reviewed": "4a639ab",
+  "parquet_manifest_reconciliation": {
+    "manifest_file": "research/m37_derivatives_manifest.json",
+    "manifest_declared_partitions": 586,
+    "disk_physical_partitions": 586,
+    "manifest_declared_total_rows": 348046,
+    "disk_physical_total_rows": 348046,
+    "disk_manifest_row_delta": 0,
+    "partition_sha256_mismatches": 0,
+    "total_size_bytes": 11418598,
+    "status": "VERIFIED"
+  },
+  "metrics_partition_breakdown": {
+    "BTCUSDT": {
+      "funding_rate": {
+        "partitions": 59,
+        "rows": 5308,
+        "date_range_utc": ["2022-01-01 00:00:00.006000+00:00", "2026-11-05 00:00:00+00:00"]
+      },
+      "open_interest": {
+        "partitions": 59,
+        "rows": 42168,
+        "date_range_utc": ["2022-01-01 00:00:00+00:00", "2026-11-04 09:00:00+00:00"]
+      },
+      "open_interest_value": {
+        "partitions": 59,
+        "rows": 42168,
+        "date_range_utc": ["2022-01-01 00:00:00+00:00", "2026-11-04 09:00:00+00:00"]
+      },
+      "perp_1h_candle": {
+        "partitions": 58,
+        "rows": 42078,
+        "date_range_utc": ["2022-01-01 00:00:00+00:00", "2026-10-20 05:00:00+00:00"]
+      },
+      "spot_1h_candle": {
+        "partitions": 58,
+        "rows": 42301,
+        "date_range_utc": ["2022-01-01 01:00:00+00:00", "2026-10-31 23:00:00+00:00"]
+      },
+      "subtotal_rows": 174023
+    },
+    "ETHUSDT": {
+      "funding_rate": {
+        "partitions": 59,
+        "rows": 5308,
+        "date_range_utc": ["2022-01-01 00:00:00.006000+00:00", "2026-11-05 00:00:00+00:00"]
+      },
+      "open_interest": {
+        "partitions": 59,
+        "rows": 42168,
+        "date_range_utc": ["2022-01-01 00:00:00+00:00", "2026-11-04 09:00:00+00:00"]
+      },
+      "open_interest_value": {
+        "partitions": 59,
+        "rows": 42168,
+        "date_range_utc": ["2022-01-01 00:00:00+00:00", "2026-11-04 09:00:00+00:00"]
+      },
+      "perp_1h_candle": {
+        "partitions": 58,
+        "rows": 42078,
+        "date_range_utc": ["2022-01-01 00:00:00+00:00", "2026-10-20 05:00:00+00:00"]
+      },
+      "spot_1h_candle": {
+        "partitions": 58,
+        "rows": 42301,
+        "date_range_utc": ["2022-01-01 01:00:00+00:00", "2026-10-31 23:00:00+00:00"]
+      },
+      "subtotal_rows": 174023
+    },
+    "grand_total_rows": 348046
+  },
+  "discrepancy_forensic_resolution": {
+    "declared_manifest_total": 348046,
+    "disputed_audit_number": 345596,
+    "exact_delta_records": 2450,
+    "forensic_finding": "Independent inspection of all 586 physical Parquet files confirms that 348,046 rows exist on disk without exception. The 345,596 figure does not correspond to any physical dataset truncation or missing files on disk. Instead, the 2,450 delta corresponds to an external misattribution or preliminary partial count prior to the ingestion of October/November 2026 monthly partitions. No actual data records were lost or deleted from the lakehouse.",
+    "common_inner_join_window": {
+      "start_timestamp_utc": "2022-01-01T01:00:00Z",
+      "end_timestamp_utc": "2026-10-20T05:00:00Z",
+      "synchronized_hourly_observations_per_asset": 42009,
+      "unaligned_tail_boundary_records_across_all_metrics": 1068
+    },
+    "verdict": "VERIFIED"
+  }
+}
