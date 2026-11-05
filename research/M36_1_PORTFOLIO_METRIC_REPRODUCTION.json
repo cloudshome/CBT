@@ -1,0 +1,142 @@
+{
+  "audit_metadata": {
+    "gate": "M36.1 Reconciliation Gate",
+    "timestamp_utc": "2026-11-05T04:47:00Z",
+    "total_calendar_days": 1754,
+    "date_range": [
+      "2022-01-01",
+      "2026-10-20"
+    ],
+    "accounting_model": "Additive R-units, normalized per-trade 1.0R risk, strict mixed fees (Taker 0.04%, Maker 0.02%, Slip 0.01%, Spread 0.01%)",
+    "total_discrepancies_found": 0
+  },
+  "portfolio_reproductions": {
+    "BENCHMARK_ALONE": {
+      "weights": {
+        "BENCHMARK_OB": 1.0
+      },
+      "reproduced_metrics": {
+        "cumulative_return_r": 22.239,
+        "max_drawdown_r": 3.391,
+        "return_to_drawdown_ratio": 6.56,
+        "ulcer_index": 1.147,
+        "sharpe_annualized_daily": 1.179,
+        "sortino_annualized_daily": 0.197,
+        "cvar_95_daily_r": -0.0035,
+        "active_days_count": 17,
+        "capital_utilization_pct": 1.0
+      },
+      "discrepancy_vs_reported": {}
+    },
+    "PORTFOLIO_BM_PLUS_F3_EQUAL": {
+      "weights": {
+        "BENCHMARK_OB": 0.5,
+        "FAMILY_3": 0.5
+      },
+      "reproduced_metrics": {
+        "cumulative_return_r": -36.165,
+        "max_drawdown_r": 54.156,
+        "return_to_drawdown_ratio": -0.67,
+        "ulcer_index": 23.598,
+        "sharpe_annualized_daily": -0.689,
+        "sortino_annualized_daily": -0.523,
+        "cvar_95_daily_r": -1.2666,
+        "active_days_count": 707,
+        "capital_utilization_pct": 40.3
+      },
+      "discrepancy_vs_reported": {}
+    },
+    "PORTFOLIO_BM_PLUS_F1_EQUAL": {
+      "weights": {
+        "BENCHMARK_OB": 0.5,
+        "FAMILY_1": 0.5
+      },
+      "reproduced_metrics": {
+        "cumulative_return_r": -79.989,
+        "max_drawdown_r": 83.691,
+        "return_to_drawdown_ratio": -0.96,
+        "ulcer_index": 51.098,
+        "sharpe_annualized_daily": -1.455,
+        "sortino_annualized_daily": -1.213,
+        "cvar_95_daily_r": -1.2115,
+        "active_days_count": 815,
+        "capital_utilization_pct": 46.5
+      },
+      "discrepancy_vs_reported": {}
+    },
+    "PORTFOLIO_BM_PLUS_F2_EQUAL": {
+      "weights": {
+        "BENCHMARK_OB": 0.5,
+        "FAMILY_2": 0.5
+      },
+      "reproduced_metrics": {
+        "cumulative_return_r": -16.274,
+        "max_drawdown_r": 26.541,
+        "return_to_drawdown_ratio": -0.61,
+        "ulcer_index": 14.255,
+        "sharpe_annualized_daily": -0.397,
+        "sortino_annualized_daily": -0.292,
+        "cvar_95_daily_r": -0.8173,
+        "active_days_count": 503,
+        "capital_utilization_pct": 28.7
+      },
+      "discrepancy_vs_reported": {}
+    },
+    "PORTFOLIO_BM_F1_F3_EQUAL": {
+      "weights": {
+        "BENCHMARK_OB": 0.333,
+        "FAMILY_1": 0.333,
+        "FAMILY_3": 0.334
+      },
+      "reproduced_metrics": {
+        "cumulative_return_r": -84.859,
+        "max_drawdown_r": 90.503,
+        "return_to_drawdown_ratio": -0.94,
+        "ulcer_index": 49.336,
+        "sharpe_annualized_daily": -1.808,
+        "sortino_annualized_daily": -1.646,
+        "cvar_95_daily_r": -1.003,
+        "active_days_count": 1173,
+        "capital_utilization_pct": 66.9
+      },
+      "discrepancy_vs_reported": {}
+    },
+    "PORTFOLIO_BM_F2_F3_EQUAL": {
+      "weights": {
+        "BENCHMARK_OB": 0.333,
+        "FAMILY_2": 0.333,
+        "FAMILY_3": 0.334
+      },
+      "reproduced_metrics": {
+        "cumulative_return_r": -42.425,
+        "max_drawdown_r": 47.935,
+        "return_to_drawdown_ratio": -0.89,
+        "ulcer_index": 24.768,
+        "sharpe_annualized_daily": -0.998,
+        "sortino_annualized_daily": -0.829,
+        "cvar_95_daily_r": -1.0069,
+        "active_days_count": 941,
+        "capital_utilization_pct": 53.6
+      },
+      "discrepancy_vs_reported": {}
+    },
+    "PORTFOLIO_BM_PLUS_F3_CAPPED_70_30": {
+      "weights": {
+        "BENCHMARK_OB": 0.7,
+        "FAMILY_3": 0.3
+      },
+      "reproduced_metrics": {
+        "cumulative_return_r": -12.804,
+        "max_drawdown_r": 26.7,
+        "return_to_drawdown_ratio": -0.48,
+        "ulcer_index": 11.676,
+        "sharpe_annualized_daily": -0.387,
+        "sortino_annualized_daily": -0.305,
+        "cvar_95_daily_r": -0.7668,
+        "active_days_count": 707,
+        "capital_utilization_pct": 40.3
+      },
+      "discrepancy_vs_reported": {}
+    }
+  }
+}

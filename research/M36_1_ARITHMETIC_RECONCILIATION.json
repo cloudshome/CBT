@@ -1,0 +1,83 @@
+{
+  "audit_metadata": {
+    "gate": "M36.1 Reconciliation Gate",
+    "timestamp_utc": "2026-11-05T04:46:00Z",
+    "auditor": "Independent Quantitative Research Auditor",
+    "target_family": "FAMILY_3 (Liquidity Sweep & Failed Breakout)"
+  },
+  "contradiction_resolution": {
+    "issue_description": "Apparent discrepancy in M36.1 between reported expectancy (-0.104R/trade), trade count ('98' vs '908'), and total loss (-47.28R).",
+    "root_cause_analysis": {
+      "trade_count_anomaly": "Typographical transcription omission in Bengali summary prose ('\u09ef\u09ee\u099f\u09bf \u099f\u09cd\u09b0\u09c7\u09a1\u09c7' instead of '\u09ef\u09e6\u09ee\u099f\u09bf \u099f\u09cd\u09b0\u09c7\u09a1\u09c7'). The raw trade ledger strictly contains 908 BTCUSDT 1h trades.",
+      "total_loss_anomaly": "Dual accounting interpretation. -94.5700R is the RAW strategy-level net loss (-0.10415R * 908). -47.285R is the ALLOCATED PORTFOLIO CONTRIBUTION in a 50/50 equal-risk portfolio (0.5 * -94.5700R = -47.285R).",
+      "mathematical_reconciliation": "-0.1041515 R/trade * 908 trades = -94.5700 R (Raw Strategy Loss). In 50/50 portfolio: 0.5 * (-94.5700 R) = -47.285 R (Allocated Portfolio Impact)."
+    },
+    "exact_reconciled_values": {
+      "raw_trade_count_btc_1h": 908,
+      "raw_trade_count_all_f3_slices": 2201,
+      "raw_gross_return_r": 39.0,
+      "raw_net_return_strict_mixed_r": -94.57,
+      "raw_net_return_pure_taker_r": -178.019,
+      "raw_expectancy_net_strict_r": -0.1042,
+      "portfolio_allocation_weight": 0.5,
+      "allocated_portfolio_loss_contribution_r": -47.285
+    }
+  },
+  "cost_breakdown_btc_1h": {
+    "total_gross_pnl_r": 39.0,
+    "total_net_pnl_strict_r": -94.57,
+    "total_execution_friction_deducted_r": 133.57,
+    "average_friction_per_trade_r": 0.1471,
+    "friction_model": "3-Tier (Taker 0.04%, Maker 0.02%, Adverse Slippage 0.01%, Spread 0.01%)"
+  },
+  "slices_breakdown": {
+    "BTCUSDT_1h": {
+      "symbol": "BTCUSDT",
+      "timeframe": "1h",
+      "trade_count": 908,
+      "gross_pnl_r": 39.0,
+      "net_pnl_r_strict": -94.57,
+      "mean_net_pnl_r_strict": -0.1042,
+      "mean_gross_pnl_r": 0.043,
+      "long_trades": 434,
+      "short_trades": 474,
+      "win_rate_pct": 27.75
+    },
+    "BTCUSDT_4h": {
+      "symbol": "BTCUSDT",
+      "timeframe": "4h",
+      "trade_count": 209,
+      "gross_pnl_r": -35.5,
+      "net_pnl_r_strict": -48.961,
+      "mean_net_pnl_r_strict": -0.2343,
+      "mean_gross_pnl_r": -0.1699,
+      "long_trades": 98,
+      "short_trades": 111,
+      "win_rate_pct": 22.49
+    },
+    "ETHUSDT_1h": {
+      "symbol": "ETHUSDT",
+      "timeframe": "1h",
+      "trade_count": 879,
+      "gross_pnl_r": -4.5,
+      "net_pnl_r_strict": -98.276,
+      "mean_net_pnl_r_strict": -0.1118,
+      "mean_gross_pnl_r": -0.0051,
+      "long_trades": 455,
+      "short_trades": 424,
+      "win_rate_pct": 26.96
+    },
+    "ETHUSDT_4h": {
+      "symbol": "ETHUSDT",
+      "timeframe": "4h",
+      "trade_count": 205,
+      "gross_pnl_r": 9.5,
+      "net_pnl_r_strict": -1.527,
+      "mean_net_pnl_r_strict": -0.0074,
+      "mean_gross_pnl_r": 0.0463,
+      "long_trades": 104,
+      "short_trades": 101,
+      "win_rate_pct": 27.8
+    }
+  }
+}
