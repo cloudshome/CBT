@@ -375,4 +375,3 @@ def test_is_passive_limit_auto_resolution():
     )
     assert cost_auto_passive.fee_r == cost_passive.fee_r
     assert cost_auto_taker.fee_r == cost_taker.fee_r
-

@@ -615,9 +615,9 @@ class MastermindArbiterCouncil:
                     rejection_reason = "Invalid stop loss or take profit level."
                 elif proposal.take_profit <= 0.01:
                     rejection_reason = f"Irrational Take-Profit: Target ${proposal.take_profit} is too close to zero."
-                elif sl_dist_pct > 3.5:
+                elif round(sl_dist_pct, 2) > 3.50:
                     rejection_reason = (
-                        f"Irrational Stop-Loss Geometry: Stop distance {sl_dist_pct:.1f}% exceeds 3.5% institutional ceiling. "
+                        f"Irrational Stop-Loss Geometry: Stop distance {sl_dist_pct:.2f}% exceeds 3.5% institutional ceiling. "
                         f"Catastrophic stop losses are strictly prohibited."
                     )
                 elif sl_dist_pct < 0.4:

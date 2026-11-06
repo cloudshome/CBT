@@ -5,7 +5,7 @@ import numpy as np
 from datetime import datetime, timezone, timedelta
 import math
 
-ROOT = Path("c:/Users/azims/CBT")
+ROOT = Path(__file__).resolve().parent.parent.parent
 
 # Load M35 Frozen Benchmark Trades (BTC 1h)
 bm_file = ROOT / "research" / "m34_trade_level_ledger.jsonl"

@@ -87,4 +87,3 @@ def test_prune_old_uploads_respects_ttl(tmp_path):
     assert stats["reclaimed_kb"] > 0
     assert not old_file.exists()
     assert recent_file.exists()
-

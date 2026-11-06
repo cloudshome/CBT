@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
-ROOT = Path("c:/Users/azims/CBT")
+ROOT = Path(__file__).resolve().parent.parent.parent
 url = "https://fapi.binance.com/fapi/v1/fundingRate"
 
 start_ts = 1640995200000  # 2022-01-01 00:00:00 UTC

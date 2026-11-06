@@ -3,7 +3,7 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
-ROOT = Path("c:/Users/azims/CBT")
+ROOT = Path(__file__).resolve().parent.parent.parent
 
 # 1. Inspect independent_edges_trade_ledger.jsonl
 fam_file = ROOT / "research" / "independent_edges_trade_ledger.jsonl"

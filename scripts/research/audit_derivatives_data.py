@@ -4,7 +4,7 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
-ROOT = Path("c:/Users/azims/CBT")
+ROOT = Path(__file__).resolve().parent.parent.parent
 manifest_path = ROOT / "research" / "m36_1_derivatives_data_manifest.json"
 
 with open(manifest_path, "r", encoding="utf-8") as f:

@@ -11,44 +11,48 @@ Permanent Governance Invariant:
 
 from __future__ import annotations
 
-from .auditor import (
-    QuantitativeGate5Auditor,
-    generate_audit_manifest,
-)
-from .cost_stress import (
-    FrictionTier,
-    apply_friction_stress,
-    evaluate_cost_stress_decay,
-)
-from .metrics import (
-    TradeReturn,
-    calculate_block_bootstrap_ci,
-    calculate_deflated_sharpe_ratio,
-    calculate_drawdown_series,
-    calculate_effective_sample_size,
-    calculate_full_statistical_profile,
-    calculate_net_expectancy,
-    calculate_profit_factor,
-    calculate_ulcer_index,
-    calculate_wilson_win_rate_ci,
-)
-from .regime_attribution import (
-    MarketRegime,
-    classify_market_regime,
-    decompose_regime_performance,
-)
-from .state_machine import (
-    Gate5EvaluationResult,
-    Gate5State,
-    evaluate_gate5_lifecycle,
-)
-from .trade_quality import (
-    NoTradeDecision,
-    TradeQualityAssessment,
-    evaluate_trade_quality,
-)
-
 REAL_CAPITAL_ENABLED: bool = False
+
+try:
+    from .auditor import (
+        QuantitativeGate5Auditor,
+        generate_audit_manifest,
+    )
+    from .cost_stress import (
+        FrictionTier,
+        apply_friction_stress,
+        evaluate_cost_stress_decay,
+    )
+    from .metrics import (
+        TradeReturn,
+        calculate_block_bootstrap_ci,
+        calculate_deflated_sharpe_ratio,
+        calculate_drawdown_series,
+        calculate_effective_sample_size,
+        calculate_full_statistical_profile,
+        calculate_net_expectancy,
+        calculate_profit_factor,
+        calculate_ulcer_index,
+        calculate_wilson_win_rate_ci,
+    )
+    from .regime_attribution import (
+        MarketRegime,
+        classify_market_regime,
+        decompose_regime_performance,
+    )
+    from .state_machine import (
+        Gate5EvaluationResult,
+        Gate5State,
+        evaluate_gate5_lifecycle,
+    )
+    from .trade_quality import (
+        NoTradeDecision,
+        TradeQualityAssessment,
+        evaluate_trade_quality,
+    )
+except ImportError:
+    # Optional quantitative dependencies in minimal runtime environments
+    pass
 
 __all__ = [
     "REAL_CAPITAL_ENABLED",

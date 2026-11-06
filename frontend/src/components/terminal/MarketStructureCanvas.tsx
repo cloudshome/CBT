@@ -12,6 +12,9 @@ import {
   X,
   PanelRightClose,
   PanelRightOpen,
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
 } from 'lucide-react';
 import { TradingViewChart } from '../../core/engine/TradingViewChart';
 import {
@@ -76,17 +79,74 @@ export const MarketStructureCanvas: React.FC<MarketStructureCanvasProps> = ({
   const effectiveSide = selectedSignalPlan ? (selectedSignalPlan.tp1 >= entryMid ? 'LONG' : 'SHORT') : 'NEUTRAL';
   const isPlanLong = effectiveSide === 'LONG';
 
+  // Derive Live Execution State & Distances relative to Live Market Price
+  const eLow = selectedSignalPlan ? Math.min(selectedSignalPlan.entryZone[0], selectedSignalPlan.entryZone[1]) : 0;
+  const eHigh = selectedSignalPlan ? Math.max(selectedSignalPlan.entryZone[0], selectedSignalPlan.entryZone[1]) : 0;
+
+  let liveExecutionState: 'IN_ZONE' | 'WAITING_PULLBACK' | 'AWAITING_RECLAIM' | 'INVALIDATED' =
+    selectedSignalPlan?.executionState || 'IN_ZONE';
+
+  if (selectedSignalPlan) {
+    if (isPlanLong) {
+      if (currentPrice <= selectedSignalPlan.stopLoss || currentPrice <= selectedSignalPlan.invalidationPrice) {
+        liveExecutionState = 'INVALIDATED';
+      } else if (currentPrice < eLow) {
+        liveExecutionState = 'AWAITING_RECLAIM';
+      } else if (currentPrice > eHigh) {
+        liveExecutionState = 'WAITING_PULLBACK';
+      } else {
+        liveExecutionState = 'IN_ZONE';
+      }
+    } else {
+      if (currentPrice >= selectedSignalPlan.stopLoss || currentPrice >= selectedSignalPlan.invalidationPrice) {
+        liveExecutionState = 'INVALIDATED';
+      } else if (currentPrice > eHigh) {
+        liveExecutionState = 'AWAITING_RECLAIM';
+      } else if (currentPrice < eLow) {
+        liveExecutionState = 'WAITING_PULLBACK';
+      } else {
+        liveExecutionState = 'IN_ZONE';
+      }
+    }
+  }
+
   // Shared Execution Ladder Component (used in both floating HUD and docked sidebar)
   const renderLadderContent = (docked: boolean) => {
     if (!selectedSignalPlan) return null;
+
+    const diffFromEntryLow = Number((eLow - currentPrice).toFixed(2));
+    const diffFromEntryHigh = Number((currentPrice - eHigh).toFixed(2));
+
     return (
       <div className={`text-xs font-mono select-none ${docked ? 'p-2 border-b border-[#1e293b] bg-[#090e1c]/70' : ''}`}>
         <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-indigo-500/30">
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <Target size={12} className={isPlanLong ? 'text-emerald-400' : 'text-rose-400'} />
             <span className={`font-bold text-[10px] tracking-wider ${isPlanLong ? 'text-emerald-400' : 'text-rose-400'}`}>
               {selectedSignalPlan.style} {effectiveSide}
             </span>
+
+            {/* Execution State Badge */}
+            {liveExecutionState === 'IN_ZONE' && (
+              <span className="px-1.5 py-0.2 rounded text-[8px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/50 flex items-center gap-0.5">
+                <CheckCircle2 size={8} /> IN ZONE
+              </span>
+            )}
+            {liveExecutionState === 'AWAITING_RECLAIM' && (
+              <span className="px-1.5 py-0.2 rounded text-[8px] font-bold bg-amber-950/90 text-amber-300 border border-amber-500/60 animate-pulse flex items-center gap-0.5">
+                <AlertTriangle size={8} /> BELOW ENTRY
+              </span>
+            )}
+            {liveExecutionState === 'WAITING_PULLBACK' && (
+              <span className="px-1.5 py-0.2 rounded text-[8px] font-bold bg-cyan-950/80 text-cyan-300 border border-cyan-500/40 flex items-center gap-0.5">
+                <Clock size={8} /> PULLBACK PENDING
+              </span>
+            )}
+            {liveExecutionState === 'INVALIDATED' && (
+              <span className="px-1.5 py-0.2 rounded text-[8px] font-bold bg-rose-950 text-rose-300 border border-rose-500/60 flex items-center gap-0.5">
+                ⛔ STOPPED OUT
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-1">
             <span className="text-emerald-400 font-bold text-[10px] mr-1">
@@ -118,10 +178,11 @@ export const MarketStructureCanvas: React.FC<MarketStructureCanvasProps> = ({
           </div>
         </div>
 
-        {/* Vertical Execution Ladder (Price-ordered top-to-bottom) */}
+        {/* Vertical Execution Ladder (Price-ordered top-to-bottom with live market position) */}
         <div className="space-y-1 text-[10px]">
           {isPlanLong ? (
             <>
+              {/* Take Profits */}
               <div className="flex justify-between items-center text-emerald-400">
                 <span>TP3 (+6.2R):</span>
                 <span className="font-bold">${selectedSignalPlan.tp3.toLocaleString()}</span>
@@ -135,15 +196,77 @@ export const MarketStructureCanvas: React.FC<MarketStructureCanvasProps> = ({
                 <span className="font-bold">${selectedSignalPlan.tp1.toLocaleString()}</span>
               </div>
 
-              <div className="my-1 py-0.5 px-1.5 bg-indigo-950/80 border border-indigo-500/50 rounded flex justify-between items-center text-white font-bold">
-                <span>ENTRY:</span>
-                <span className="text-[9px]">${selectedSignalPlan.entryZone[0].toLocaleString()} – ${selectedSignalPlan.entryZone[1].toLocaleString()}</span>
+              {/* Live Market Price if Above Entry Zone (Waiting for Pullback) */}
+              {liveExecutionState === 'WAITING_PULLBACK' && (
+                <div className="my-0.5 py-0.5 px-1.5 bg-cyan-950/60 border border-cyan-500/40 rounded flex justify-between items-center text-cyan-300 font-bold text-[9px]">
+                  <span className="flex items-center gap-1">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                    LIVE MARKET:
+                  </span>
+                  <span>${currentPrice.toLocaleString()} (+${diffFromEntryHigh.toLocaleString()} above entry)</span>
+                </div>
+              )}
+
+              {/* Entry Zone */}
+              <div className={`my-1 py-1 px-1.5 rounded flex flex-col gap-0.5 ${
+                liveExecutionState === 'IN_ZONE'
+                  ? 'bg-emerald-950/70 border border-emerald-500/70 shadow-sm shadow-emerald-500/20 text-white font-bold'
+                  : 'bg-indigo-950/80 border border-indigo-500/50 text-white font-bold'
+              }`}>
+                <div className="flex justify-between items-center">
+                  <span className="flex items-center gap-1">
+                    <Target size={11} className={liveExecutionState === 'IN_ZONE' ? 'text-emerald-400' : 'text-cyan-400'} />
+                    ENTRY:
+                  </span>
+                  <span className="text-[9px] text-cyan-300">
+                    ${selectedSignalPlan.entryZone[0].toLocaleString()} – ${selectedSignalPlan.entryZone[1].toLocaleString()}
+                  </span>
+                </div>
+                {liveExecutionState === 'IN_ZONE' && (
+                  <div className="flex justify-between items-center text-[8px] text-emerald-300 font-normal pt-0.5 border-t border-emerald-500/30">
+                    <span className="flex items-center gap-0.5">
+                      <span className="inline-block w-1 h-1 rounded-full bg-emerald-400 animate-ping"></span>
+                      LIVE TICK IN ZONE:
+                    </span>
+                    <span className="font-bold text-white">${currentPrice.toLocaleString()}</span>
+                  </div>
+                )}
               </div>
 
+              {/* Live Market Price if Below Entry Zone (Awaiting Reclaim Warning) */}
+              {liveExecutionState === 'AWAITING_RECLAIM' && (
+                <div className="my-1 p-1.5 bg-amber-950/60 border border-amber-500/60 rounded text-[9px] text-amber-300 shadow-md">
+                  <div className="flex justify-between items-center font-bold">
+                    <span className="flex items-center gap-1 text-white">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                      LIVE MARKET:
+                    </span>
+                    <span className="text-white font-extrabold text-[10px]">${currentPrice.toLocaleString()}</span>
+                    <span className="text-amber-400 font-mono">
+                      (-${diffFromEntryLow.toLocaleString()} below entry)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 text-[8px] text-amber-200 mt-1 pt-1 border-t border-amber-500/30 font-sans">
+                    <AlertTriangle size={10} className="text-amber-400 shrink-0" />
+                    <span>Price below entry zone. Awaiting candle close above ${eLow.toLocaleString()} before entry.</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Stop Loss & Invalidation */}
               <div className="flex justify-between items-center text-rose-400">
                 <span>STOP LOSS:</span>
                 <span className="font-bold">${selectedSignalPlan.stopLoss.toLocaleString()}</span>
               </div>
+
+              {/* Live Market Price if Stop Breached */}
+              {liveExecutionState === 'INVALIDATED' && (
+                <div className="my-0.5 py-0.5 px-1 bg-rose-950/80 border border-rose-500 rounded text-[9px] text-rose-300 font-bold flex justify-between items-center">
+                  <span>⛔ LIVE MARKET: ${currentPrice.toLocaleString()}</span>
+                  <span>STOP BREACHED</span>
+                </div>
+              )}
+
               <div className="flex justify-between items-center text-rose-500 text-[9px]">
                 <span>INVALIDATION:</span>
                 <span className="font-bold">${selectedSignalPlan.invalidationPrice.toLocaleString()}</span>
@@ -151,20 +274,82 @@ export const MarketStructureCanvas: React.FC<MarketStructureCanvasProps> = ({
             </>
           ) : (
             <>
+              {/* Short Setup Ladder */}
               <div className="flex justify-between items-center text-rose-500 text-[9px]">
                 <span>INVALIDATION:</span>
                 <span className="font-bold">${selectedSignalPlan.invalidationPrice.toLocaleString()}</span>
               </div>
+
+              {liveExecutionState === 'INVALIDATED' && (
+                <div className="my-0.5 py-0.5 px-1 bg-rose-950/80 border border-rose-500 rounded text-[9px] text-rose-300 font-bold flex justify-between items-center">
+                  <span>⛔ LIVE MARKET: ${currentPrice.toLocaleString()}</span>
+                  <span>STOP BREACHED</span>
+                </div>
+              )}
+
               <div className="flex justify-between items-center text-rose-400">
                 <span>STOP LOSS:</span>
                 <span className="font-bold">${selectedSignalPlan.stopLoss.toLocaleString()}</span>
               </div>
 
-              <div className="my-1 py-0.5 px-1.5 bg-indigo-950/80 border border-indigo-500/50 rounded flex justify-between items-center text-white font-bold">
-                <span>ENTRY:</span>
-                <span className="text-[9px]">${selectedSignalPlan.entryZone[0].toLocaleString()} – ${selectedSignalPlan.entryZone[1].toLocaleString()}</span>
+              {/* Live Market Price if Above Entry Zone (Short Awaiting Rejection) */}
+              {liveExecutionState === 'AWAITING_RECLAIM' && (
+                <div className="my-1 p-1.5 bg-amber-950/60 border border-amber-500/60 rounded text-[9px] text-amber-300 shadow-md">
+                  <div className="flex justify-between items-center font-bold">
+                    <span className="flex items-center gap-1 text-white">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                      LIVE MARKET:
+                    </span>
+                    <span className="text-white font-extrabold text-[10px]">${currentPrice.toLocaleString()}</span>
+                    <span className="text-amber-400 font-mono">
+                      (+${diffFromEntryHigh.toLocaleString()} above entry)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 text-[8px] text-amber-200 mt-1 pt-1 border-t border-amber-500/30 font-sans">
+                    <AlertTriangle size={10} className="text-amber-400 shrink-0" />
+                    <span>Price above short entry. Awaiting rejection below ${eHigh.toLocaleString()} before entry.</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Entry Zone */}
+              <div className={`my-1 py-1 px-1.5 rounded flex flex-col gap-0.5 ${
+                liveExecutionState === 'IN_ZONE'
+                  ? 'bg-emerald-950/70 border border-emerald-500/70 shadow-sm shadow-emerald-500/20 text-white font-bold'
+                  : 'bg-indigo-950/80 border border-indigo-500/50 text-white font-bold'
+              }`}>
+                <div className="flex justify-between items-center">
+                  <span className="flex items-center gap-1">
+                    <Target size={11} className={liveExecutionState === 'IN_ZONE' ? 'text-emerald-400' : 'text-cyan-400'} />
+                    ENTRY:
+                  </span>
+                  <span className="text-[9px] text-cyan-300">
+                    ${selectedSignalPlan.entryZone[0].toLocaleString()} – ${selectedSignalPlan.entryZone[1].toLocaleString()}
+                  </span>
+                </div>
+                {liveExecutionState === 'IN_ZONE' && (
+                  <div className="flex justify-between items-center text-[8px] text-emerald-300 font-normal pt-0.5 border-t border-emerald-500/30">
+                    <span className="flex items-center gap-0.5">
+                      <span className="inline-block w-1 h-1 rounded-full bg-emerald-400 animate-ping"></span>
+                      LIVE TICK IN ZONE:
+                    </span>
+                    <span className="font-bold text-white">${currentPrice.toLocaleString()}</span>
+                  </div>
+                )}
               </div>
 
+              {/* Live Market Price if Below Entry Zone (Short Waiting for Pullback Up) */}
+              {liveExecutionState === 'WAITING_PULLBACK' && (
+                <div className="my-0.5 py-0.5 px-1.5 bg-cyan-950/60 border border-cyan-500/40 rounded flex justify-between items-center text-cyan-300 font-bold text-[9px]">
+                  <span className="flex items-center gap-1">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                    LIVE MARKET:
+                  </span>
+                  <span>${currentPrice.toLocaleString()} (-${diffFromEntryLow.toLocaleString()} below entry)</span>
+                </div>
+              )}
+
+              {/* Take Profits */}
               <div className="flex justify-between items-center text-emerald-300">
                 <span>TP1 (+1.5R):</span>
                 <span className="font-bold">${selectedSignalPlan.tp1.toLocaleString()}</span>
@@ -329,6 +514,16 @@ export const MarketStructureCanvas: React.FC<MarketStructureCanvasProps> = ({
                 <span className={`font-bold text-[10px] ${isPlanLong ? 'text-emerald-400' : 'text-rose-400'}`}>
                   {selectedSignalPlan.style} {effectiveSide}
                 </span>
+                {liveExecutionState === 'AWAITING_RECLAIM' && (
+                  <span className="text-amber-400 font-bold text-[9px] bg-amber-950/80 px-1 py-0.2 rounded border border-amber-500/40 animate-pulse">
+                    BELOW ENTRY
+                  </span>
+                )}
+                {liveExecutionState === 'IN_ZONE' && (
+                  <span className="text-emerald-400 font-bold text-[9px] bg-emerald-950/80 px-1 py-0.2 rounded border border-emerald-500/40">
+                    IN ZONE
+                  </span>
+                )}
                 <span className="text-emerald-400 font-bold text-[10px]">
                   R:R {selectedSignalPlan.riskRewardRatio}:1
                 </span>

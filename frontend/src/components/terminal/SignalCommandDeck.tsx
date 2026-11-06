@@ -5,12 +5,16 @@ import {
   Send,
   Target,
   Sliders,
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
 } from 'lucide-react';
 import { StyleSignalPlan } from '../../types';
 
 interface SignalCommandDeckProps {
   signals: StyleSignalPlan[];
   selectedStyle: StyleSignalPlan['style'];
+  currentPrice?: number;
   onSelectStyle: (style: StyleSignalPlan['style']) => void;
   onSubmitToApproval: (signal: StyleSignalPlan) => void;
 }
@@ -18,6 +22,7 @@ interface SignalCommandDeckProps {
 export const SignalCommandDeck: React.FC<SignalCommandDeckProps> = ({
   signals,
   selectedStyle,
+  currentPrice,
   onSelectStyle,
   onSubmitToApproval,
 }) => {
@@ -28,6 +33,42 @@ export const SignalCommandDeck: React.FC<SignalCommandDeckProps> = ({
     const s = secs % 60;
     return `${mins}m ${s}s`;
   };
+
+  // Derive execution state relative to currentPrice if provided
+  const curP = currentPrice ?? (currentSignal ? (currentSignal.entryZone[0] + currentSignal.entryZone[1]) / 2 : 0);
+  const isSignalLong = currentSignal?.side === 'LONG';
+  const eLow = currentSignal ? Math.min(currentSignal.entryZone[0], currentSignal.entryZone[1]) : 0;
+  const eHigh = currentSignal ? Math.max(currentSignal.entryZone[0], currentSignal.entryZone[1]) : 0;
+
+  let liveState: 'IN_ZONE' | 'WAITING_PULLBACK' | 'AWAITING_RECLAIM' | 'INVALIDATED' =
+    currentSignal?.executionState || 'IN_ZONE';
+
+  if (currentSignal && currentPrice !== undefined) {
+    if (isSignalLong) {
+      if (curP <= currentSignal.stopLoss || curP <= currentSignal.invalidationPrice) {
+        liveState = 'INVALIDATED';
+      } else if (curP < eLow) {
+        liveState = 'AWAITING_RECLAIM';
+      } else if (curP > eHigh) {
+        liveState = 'WAITING_PULLBACK';
+      } else {
+        liveState = 'IN_ZONE';
+      }
+    } else {
+      if (curP >= currentSignal.stopLoss || curP >= currentSignal.invalidationPrice) {
+        liveState = 'INVALIDATED';
+      } else if (curP > eHigh) {
+        liveState = 'AWAITING_RECLAIM';
+      } else if (curP < eLow) {
+        liveState = 'WAITING_PULLBACK';
+      } else {
+        liveState = 'IN_ZONE';
+      }
+    }
+  }
+
+  const diffFromEntryLow = Number((eLow - curP).toFixed(2));
+  const diffFromEntryHigh = Number((curP - eHigh).toFixed(2));
 
   return (
     <div className="w-full bg-[#080c16] border border-[#1e293b] rounded-lg p-3 text-xs font-mono text-slate-300 select-none">
@@ -79,6 +120,26 @@ export const SignalCommandDeck: React.FC<SignalCommandDeckProps> = ({
                   }`}>
                     {currentSignal.style} {currentSignal.side}
                   </span>
+                  {liveState === 'AWAITING_RECLAIM' && (
+                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-950 text-amber-300 border border-amber-500/50 flex items-center gap-1 animate-pulse">
+                      <AlertTriangle size={9} /> BELOW ENTRY
+                    </span>
+                  )}
+                  {liveState === 'IN_ZONE' && (
+                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/50 flex items-center gap-1">
+                      <CheckCircle2 size={9} /> IN ZONE
+                    </span>
+                  )}
+                  {liveState === 'WAITING_PULLBACK' && (
+                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-cyan-950 text-cyan-300 border border-cyan-500/50 flex items-center gap-1">
+                      <Clock size={9} /> PULLBACK PENDING
+                    </span>
+                  )}
+                  {liveState === 'INVALIDATED' && (
+                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-950 text-rose-300 border border-rose-500/50">
+                      ⛔ INVALIDATED
+                    </span>
+                  )}
                   <span className="text-[10px] text-slate-400 font-mono">
                     Timeframe: {currentSignal.timeframe}
                   </span>
@@ -119,16 +180,61 @@ export const SignalCommandDeck: React.FC<SignalCommandDeckProps> = ({
                   <span className="text-emerald-400 font-mono">+1.5R</span>
                 </div>
 
-                {/* Entry Zone */}
-                <div className="flex justify-between items-center p-2 rounded bg-indigo-950/40 border border-indigo-500/50 text-white font-bold my-1">
-                  <div className="flex items-center gap-1.5">
-                    <Target size={13} className="text-cyan-400" />
-                    <span>OPTIMAL ENTRY ZONE:</span>
+                {/* Live Market Price if Above Entry Zone (Waiting for Pullback) */}
+                {liveState === 'WAITING_PULLBACK' && currentPrice !== undefined && (
+                  <div className="p-1.5 rounded bg-cyan-950/40 border border-cyan-500/50 flex justify-between items-center text-cyan-300 font-bold text-[9px]">
+                    <span className="flex items-center gap-1">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                      LIVE MARKET PRICE:
+                    </span>
+                    <span>${curP.toLocaleString()} (+${diffFromEntryHigh.toLocaleString()} above entry zone)</span>
                   </div>
-                  <span className="text-cyan-300 font-mono">
-                    ${currentSignal.entryZone[0].toLocaleString()} – ${currentSignal.entryZone[1].toLocaleString()}
-                  </span>
+                )}
+
+                {/* Entry Zone */}
+                <div className={`p-2 rounded border text-white font-bold my-1 ${
+                  liveState === 'IN_ZONE'
+                    ? 'bg-emerald-950/70 border-emerald-500 shadow-sm shadow-emerald-500/30'
+                    : 'bg-indigo-950/40 border-indigo-500/50'
+                }`}>
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-1.5">
+                      <Target size={13} className={liveState === 'IN_ZONE' ? 'text-emerald-400' : 'text-cyan-400'} />
+                      <span>OPTIMAL ENTRY ZONE:</span>
+                    </div>
+                    <span className="text-cyan-300 font-mono">
+                      ${currentSignal.entryZone[0].toLocaleString()} – ${currentSignal.entryZone[1].toLocaleString()}
+                    </span>
+                  </div>
+                  {liveState === 'IN_ZONE' && currentPrice !== undefined && (
+                    <div className="text-[9px] text-emerald-300 font-normal pt-1 mt-1 border-t border-emerald-500/30 flex justify-between items-center">
+                      <span>● LIVE TICK IN ZONE:</span>
+                      <span className="font-bold text-white">${curP.toLocaleString()}</span>
+                    </div>
+                  )}
                 </div>
+
+                {/* Live Market Price if Below Entry Zone (Awaiting Reclaim Warning) */}
+                {liveState === 'AWAITING_RECLAIM' && currentPrice !== undefined && (
+                  <div className="p-2 rounded bg-amber-950/70 border border-amber-500/70 text-amber-300 shadow-md">
+                    <div className="flex justify-between items-center font-bold">
+                      <span className="flex items-center gap-1 text-white">
+                        <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                        LIVE MARKET PRICE:
+                      </span>
+                      <span className="text-white font-extrabold text-[11px]">${curP.toLocaleString()}</span>
+                      <span className="text-amber-400 font-mono">
+                        (-${diffFromEntryLow.toLocaleString()} below entry)
+                      </span>
+                    </div>
+                    <div className="text-[9px] text-amber-200 mt-1.5 pt-1.5 border-t border-amber-500/30 flex items-center gap-1.5">
+                      <AlertTriangle size={12} className="text-amber-400 shrink-0" />
+                      <span>
+                        Market price has broken below optimal entry. Do NOT market buy into drawdown. Awaiting candle close above ${eLow.toLocaleString()} to confirm reclaim.
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Stop Loss & Invalidation */}
                 <div className="flex justify-between items-center p-1.5 rounded bg-rose-950/20 border border-rose-500/30 text-rose-300">
@@ -201,12 +307,37 @@ export const SignalCommandDeck: React.FC<SignalCommandDeckProps> = ({
             </div>
 
             {/* Submit to Approval Blotter Action Button */}
+            {liveState === 'AWAITING_RECLAIM' && (
+              <div className="mb-2 p-1.5 rounded bg-amber-950/60 border border-amber-500/50 text-[10px] text-amber-300 flex items-center gap-1.5">
+                <AlertTriangle size={12} className="text-amber-400 shrink-0" />
+                <span>Queueing this trade will require structural reclaim confirmation before order dispatch.</span>
+              </div>
+            )}
+            {liveState === 'INVALIDATED' && (
+              <div className="mb-2 p-1.5 rounded bg-rose-950/60 border border-rose-500/50 text-[10px] text-rose-300 flex items-center gap-1.5">
+                <AlertTriangle size={12} className="text-rose-400 shrink-0" />
+                <span>Setup breached stop loss / invalidation. Submission blocked by risk gate.</span>
+              </div>
+            )}
             <button
               onClick={() => onSubmitToApproval(currentSignal)}
-              className="w-full py-2 px-3 rounded font-bold text-xs flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-slate-950 shadow-md shadow-cyan-500/20 transition-all active:scale-[0.99]"
+              disabled={liveState === 'INVALIDATED'}
+              className={`w-full py-2 px-3 rounded font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.99] ${
+                liveState === 'INVALIDATED'
+                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                  : liveState === 'AWAITING_RECLAIM'
+                  ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-amber-500/20'
+                  : 'bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-slate-950 shadow-cyan-500/20'
+              }`}
             >
               <Send size={13} />
-              <span>SUBMIT TO HUMAN APPROVAL BLOTTER</span>
+              <span>
+                {liveState === 'INVALIDATED'
+                  ? 'SETUP INVALIDATED (STOP BREACHED)'
+                  : liveState === 'AWAITING_RECLAIM'
+                  ? 'SUBMIT CONDITIONAL RECLAIM TO BLOTTER'
+                  : 'SUBMIT TO HUMAN APPROVAL BLOTTER'}
+              </span>
             </button>
           </div>
         </div>

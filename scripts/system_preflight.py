@@ -33,6 +33,20 @@ def get_python_executable() -> str:
     return sys.executable
 
 
+def get_ruff_executable() -> list[str]:
+    """Finds ruff standalone binary or module invocation."""
+    if os.name == "nt":
+        venv_ruff = PROJECT_ROOT / ".venv" / "Scripts" / "ruff.exe"
+    else:
+        venv_ruff = PROJECT_ROOT / ".venv" / "bin" / "ruff"
+    if venv_ruff.exists():
+        return [str(venv_ruff)]
+    which_ruff = shutil.which("ruff")
+    if which_ruff:
+        return [which_ruff]
+    return [get_python_executable(), "-m", "ruff"]
+
+
 def run_check(name, fn):
     print(f"[*] Running: {name}...", end=" ", flush=True)
     try:
@@ -151,9 +165,10 @@ def check_m18_certification():
 
 
 def check_ruff():
+    ruff_cmd = get_ruff_executable()
     # 1. Ruff lint check on core/ and tests/ matching CI
     res_lint = subprocess.run(
-        [get_python_executable(), "-m", "ruff", "check", "core/", "tests/"],
+        [*ruff_cmd, "check", "core/", "tests/"],
         cwd=PROJECT_ROOT,
         capture_output=True,
         text=True,
@@ -166,7 +181,7 @@ def check_ruff():
 
     # 2. Ruff formatting check on core/ and tests/ matching CI
     res_fmt = subprocess.run(
-        [get_python_executable(), "-m", "ruff", "format", "--check", "core/", "tests/"],
+        [*ruff_cmd, "format", "--check", "core/", "tests/"],
         cwd=PROJECT_ROOT,
         capture_output=True,
         text=True,

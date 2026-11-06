@@ -444,13 +444,13 @@ class DynamicOpportunitySpecialist(BaseSpecialistAgent):
         if self.recommended_direction == "SHORT":
             direction = DecisionAction.SHORT
             # Exhaustion / Breakdown SHORT
-            # Bound SL distance to institutional boundary (max 3.5%)
+            # Bound SL distance to institutional boundary (3.0% default, max 3.5%)
             raw_sl = (
                 self.invalidation_level
                 if (self.invalidation_level and self.invalidation_level > cur_price)
-                else round(cur_price * 1.035, 6)
+                else round(cur_price * 1.030, 6)
             )
-            max_sl = round(cur_price * 1.035, 6)
+            max_sl = round(cur_price * 1.030, 6)
             sl = min(raw_sl, max_sl)
             risk = max(abs(sl - cur_price), cur_price * 0.01)
             # TP must be structural, strictly positive, and provide at least 2.2R
@@ -467,9 +467,9 @@ class DynamicOpportunitySpecialist(BaseSpecialistAgent):
             raw_sl = (
                 self.invalidation_level
                 if (self.invalidation_level and 0 < self.invalidation_level < cur_price)
-                else round(cur_price * 0.965, 6)
+                else round(cur_price * 0.970, 6)
             )
-            min_sl = round(cur_price * 0.965, 6)
+            min_sl = round(cur_price * 0.970, 6)
             sl = max(raw_sl, min_sl)
             risk = max(abs(cur_price - sl), cur_price * 0.01)
             tp = round(cur_price + (risk * 2.2), 6)

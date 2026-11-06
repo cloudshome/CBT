@@ -5,7 +5,7 @@ import numpy as np
 from datetime import datetime, timezone, timedelta
 from scipy import stats
 
-ROOT = Path("c:/Users/azims/CBT")
+ROOT = Path(__file__).resolve().parent.parent.parent
 
 # Load Benchmark
 bm_file = ROOT / "research" / "m34_trade_level_ledger.jsonl"

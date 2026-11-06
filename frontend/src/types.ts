@@ -1624,6 +1624,12 @@ export interface InstitutionalConfluenceData {
   qualityScoreHistory: number[];
 }
 
+export type SignalExecutionState =
+  | 'IN_ZONE'
+  | 'WAITING_PULLBACK'
+  | 'AWAITING_RECLAIM'
+  | 'INVALIDATED';
+
 export interface StyleSignalPlan {
   style: 'SCALP' | 'DAY' | 'SWING' | 'MOMENTUM' | 'POSITION';
   side: 'LONG' | 'SHORT';
@@ -1644,6 +1650,9 @@ export interface StyleSignalPlan {
   reaffirmsCount: number;
   cooldownRemainingSecs: number;
   thesis: string;
+  executionState?: SignalExecutionState;
+  executionStateNote?: string;
+  distanceToEntryPct?: number;
 }
 
 export interface SignalBlotterRecord {

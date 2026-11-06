@@ -11,7 +11,9 @@ CTB Phase 3 Rigorous Verification Battery:
 """
 
 import pandas as pd
+import pytest
 
+import data.backtester as bt
 from core.central_mind import CentralTradingMind, TradeProposal
 from core.data_streamer import data_streamer
 from core.half_kelly_sizer import HalfKellyPositionSizer
@@ -19,6 +21,13 @@ from core.risk_manager import risk_manager
 from data.backtester import _evaluate
 from engine.indicators import add_all_indicators
 from engine.signal_engine import analyze_frame_at
+
+
+@pytest.fixture(autouse=True)
+def _default_execution_model(monkeypatch):
+    """Backtester math unit tests test raw grader invariants without slippage."""
+    monkeypatch.setattr(bt, "EXECUTION_MODEL", "none")
+
 
 # ==============================================================================
 # 1. CAUSALITY & FUTURE DATA MUTATION INVARIANCE

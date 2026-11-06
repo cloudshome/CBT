@@ -1138,7 +1138,57 @@ async def get_master_terminal_telemetry(
     pos_sl = round(low_50 * 0.965, 2)
     pos_inv = round(pos_sl * 0.998, 2)
 
-    style_signals = [
+    def _eval_signal_state(
+        s_side: str, s_entry: list[float], s_sl_p: float, s_inv_p: float
+    ) -> dict[str, Any]:
+        e_l = min(s_entry[0], s_entry[1])
+        e_h = max(s_entry[0], s_entry[1])
+        is_l = s_side.upper() == "LONG"
+        if is_l:
+            if cur_p <= s_sl_p or cur_p <= s_inv_p:
+                st = "INVALIDATED"
+                nt = f"Price breached stop loss (${s_sl_p:,.2f}). Setup invalidated."
+                dst = round(((cur_p - e_l) / cur_p) * 100, 2)
+            elif cur_p < e_l:
+                st = "AWAITING_RECLAIM"
+                diff = e_l - cur_p
+                diff_pct = (diff / cur_p) * 100
+                nt = f"Market is ${diff:,.2f} (-{diff_pct:.1f}%) below entry. Do NOT market-buy. Awaiting candle close above ${e_l:,.2f}."
+                dst = -round(diff_pct, 2)
+            elif cur_p > e_h:
+                st = "WAITING_PULLBACK"
+                diff = cur_p - e_h
+                diff_pct = (diff / cur_p) * 100
+                nt = f"Market is ${diff:,.2f} (+{diff_pct:.1f}%) above entry. Awaiting pullback into discount demand zone."
+                dst = round(diff_pct, 2)
+            else:
+                st = "IN_ZONE"
+                nt = f"Price is inside optimal entry zone (${e_l:,.2f} – ${e_h:,.2f}). Ready for execution."
+                dst = 0.0
+        else:
+            if cur_p >= s_sl_p or cur_p >= s_inv_p:
+                st = "INVALIDATED"
+                nt = f"Price breached stop loss (${s_sl_p:,.2f}). Setup invalidated."
+                dst = round(((cur_p - e_h) / cur_p) * 100, 2)
+            elif cur_p > e_h:
+                st = "AWAITING_RECLAIM"
+                diff = cur_p - e_h
+                diff_pct = (diff / cur_p) * 100
+                nt = f"Market is ${diff:,.2f} (+{diff_pct:.1f}%) above entry. Do NOT market-sell. Awaiting rejection below ${e_h:,.2f}."
+                dst = round(diff_pct, 2)
+            elif cur_p < e_l:
+                st = "WAITING_PULLBACK"
+                diff = e_l - cur_p
+                diff_pct = (diff / cur_p) * 100
+                nt = f"Market is ${diff:,.2f} (-{diff_pct:.1f}%) below entry. Awaiting pullback into premium supply zone."
+                dst = -round(diff_pct, 2)
+            else:
+                st = "IN_ZONE"
+                nt = f"Price is inside optimal entry zone (${e_l:,.2f} – ${e_h:,.2f}). Ready for execution."
+                dst = 0.0
+        return {"executionState": st, "executionStateNote": nt, "distanceToEntryPct": dst}
+
+    raw_style_signals = [
         {
             "style": "SCALP",
             "side": "LONG" if is_bull else "SHORT",
@@ -1244,6 +1294,16 @@ async def get_master_terminal_telemetry(
             "cooldownRemainingSecs": 0,
             "thesis": "Macro post-halving parabolic expansion supported by ETF inflows.",
         },
+    ]
+
+    style_signals = [
+        {
+            **sig,
+            **_eval_signal_state(
+                sig["side"], sig["entryZone"], sig["stopLoss"], sig["invalidationPrice"]
+            ),
+        }
+        for sig in raw_style_signals
     ]
 
     # 6. Level 5: Authoritative Execution Blotter, Real Portfolio & Performance

@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 import pandas as pd
 
-ROOT = Path("c:/Users/azims/CBT")
+ROOT = Path(__file__).resolve().parent.parent.parent
 
 print("--- Manifest Record Counts ---")
 m37_q = json.load(open(ROOT / "research/m37_data_quality_report.json"))

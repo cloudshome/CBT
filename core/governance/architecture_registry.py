@@ -123,6 +123,7 @@ MODULE_LAYER_RULES: Final[list[tuple[str, ArchitectureLayer]]] = [
     ("core.arbitrage", ArchitectureLayer.LAYER_2_QUANT_SIMULATION),
     # Layer 3: Application APIs & Gateways & Alert Bots
     ("app", ArchitectureLayer.LAYER_3_GATEWAY_API),
+    ("core.worker", ArchitectureLayer.LAYER_3_GATEWAY_API),
     ("cbt_backend", ArchitectureLayer.LAYER_3_GATEWAY_API),
     ("src", ArchitectureLayer.LAYER_3_GATEWAY_API),
     ("core.terminal_routes", ArchitectureLayer.LAYER_3_GATEWAY_API),

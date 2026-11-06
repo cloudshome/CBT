@@ -123,7 +123,18 @@ class BaseSpecialistAgent(ABC):
         if not candles_15m or len(candles_15m) < 5:
             return disconfirming
 
-        latest = candles_15m[-1]
+        # Evaluate the last fully closed candle (candles_15m[-2]) rather than the open forming candle
+        # to prevent false-positive volume dry-up and phantom wick rejections on in-progress bars.
+        if len(candles_15m) >= 12:
+            latest = candles_15m[-2]
+            recent_vols = [float(b.get("volume", 0.0)) for b in candles_15m[-12:-2]]
+        elif len(candles_15m) >= 3:
+            latest = candles_15m[-2]
+            recent_vols = [float(b.get("volume", 0.0)) for b in candles_15m[:-2]]
+        else:
+            latest = candles_15m[-1]
+            recent_vols = [float(b.get("volume", 0.0)) for b in candles_15m[:-1]]
+
         c = float(latest.get("close", 0.0))
         h = float(latest.get("high", 0.0))
         l = float(latest.get("low", 0.0))
@@ -147,7 +158,6 @@ class BaseSpecialistAgent(ABC):
                     )
 
         # 2. Volume Divergence Check
-        recent_vols = [float(b.get("volume", 0.0)) for b in candles_15m[-10:-1]]
         avg_vol = sum(recent_vols) / max(1, len(recent_vols))
         if (
             avg_vol > 0

@@ -528,8 +528,83 @@ terminalRouter.get('/telemetry', async (req: Request, res: Response): Promise<vo
       84, 82, 81, 80, 82, 84, 86, 85, 84, 86,
     ];
 
+    // Helper to evaluate signal execution state relative to current price
+    const calculateSignalExecutionState = (
+      side: 'LONG' | 'SHORT',
+      entryZone: [number, number],
+      stopLoss: number,
+      invalidationPrice: number
+    ) => {
+      const eLow = Math.min(entryZone[0], entryZone[1]);
+      const eHigh = Math.max(entryZone[0], entryZone[1]);
+
+      if (side === 'LONG') {
+        if (curP <= stopLoss || curP <= invalidationPrice) {
+          return {
+            executionState: 'INVALIDATED' as const,
+            executionStateNote: `Price breached stop loss ($${stopLoss.toLocaleString()}). Setup invalidated.`,
+            distanceToEntryPct: Number((((curP - eLow) / curP) * 100).toFixed(2)),
+          };
+        }
+        if (curP < eLow) {
+          const diff = eLow - curP;
+          const diffPct = Number(((diff / curP) * 100).toFixed(2));
+          return {
+            executionState: 'AWAITING_RECLAIM' as const,
+            executionStateNote: `Market is $${diff.toFixed(2)} (-${diffPct}%) below entry. Do not market-buy. Awaiting candle close above $${eLow.toLocaleString()}.`,
+            distanceToEntryPct: -diffPct,
+          };
+        }
+        if (curP > eHigh) {
+          const diff = curP - eHigh;
+          const diffPct = Number(((diff / curP) * 100).toFixed(2));
+          return {
+            executionState: 'WAITING_PULLBACK' as const,
+            executionStateNote: `Market is $${diff.toFixed(2)} (+${diffPct}%) above entry. Awaiting pullback to entry zone.`,
+            distanceToEntryPct: diffPct,
+          };
+        }
+        return {
+          executionState: 'IN_ZONE' as const,
+          executionStateNote: `Market is inside optimal entry zone ($${eLow.toLocaleString()} – $${eHigh.toLocaleString()}). Ready for execution.`,
+          distanceToEntryPct: 0,
+        };
+      } else {
+        if (curP >= stopLoss || curP >= invalidationPrice) {
+          return {
+            executionState: 'INVALIDATED' as const,
+            executionStateNote: `Price breached stop loss ($${stopLoss.toLocaleString()}). Setup invalidated.`,
+            distanceToEntryPct: Number((((curP - eHigh) / curP) * 100).toFixed(2)),
+          };
+        }
+        if (curP > eHigh) {
+          const diff = curP - eHigh;
+          const diffPct = Number(((diff / curP) * 100).toFixed(2));
+          return {
+            executionState: 'AWAITING_RECLAIM' as const,
+            executionStateNote: `Market is $${diff.toFixed(2)} (+${diffPct}%) above entry. Do not market-sell. Awaiting rejection below $${eHigh.toLocaleString()}.`,
+            distanceToEntryPct: diffPct,
+          };
+        }
+        if (curP < eLow) {
+          const diff = eLow - curP;
+          const diffPct = Number(((diff / curP) * 100).toFixed(2));
+          return {
+            executionState: 'WAITING_PULLBACK' as const,
+            executionStateNote: `Market is $${diff.toFixed(2)} (-${diffPct}%) below entry. Awaiting pullback to entry zone.`,
+            distanceToEntryPct: -diffPct,
+          };
+        }
+        return {
+          executionState: 'IN_ZONE' as const,
+          executionStateNote: `Market is inside optimal entry zone ($${eLow.toLocaleString()} – $${eHigh.toLocaleString()}). Ready for execution.`,
+          distanceToEntryPct: 0,
+        };
+      }
+    };
+
     // 5. Level 4: 5-Style Signal Plans
-    const styleSignals = [
+    const rawStyleSignals = [
       {
         style: 'SCALP' as const,
         side: 'LONG' as const,
@@ -636,6 +711,11 @@ terminalRouter.get('/telemetry', async (req: Request, res: Response): Promise<vo
         thesis: 'Macro post-halving parabolic expansion supported by ETF inflows.',
       },
     ];
+
+    const styleSignals = rawStyleSignals.map((sig) => ({
+      ...sig,
+      ...calculateSignalExecutionState(sig.side, sig.entryZone, sig.stopLoss, sig.invalidationPrice),
+    }));
 
     // 6. Level 5: Human Approval Queue, Paper Portfolio & Calibration
     const paperPortfolio = {

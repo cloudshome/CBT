@@ -218,6 +218,7 @@ export const InstitutionalMasterTerminal: React.FC<InstitutionalMasterTerminalPr
                 <SignalCommandDeck
                   signals={telemetry.styleSignals}
                   selectedStyle={selectedStyle}
+                  currentPrice={telemetry.currentPrice}
                   onSelectStyle={setSelectedStyle}
                   onSubmitToApproval={handleSubmitToApproval}
                 />

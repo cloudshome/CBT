@@ -111,13 +111,17 @@ def test_validate_production_security_config_missing_or_short_key(monkeypatch):
     # Empty key
     monkeypatch.setattr(auth_mod, "API_KEY", "")
     monkeypatch.delenv("API_KEY", raising=False)
-    with pytest.raises(RuntimeError, match="API_KEY must be configured with at least 16 characters"):
+    with pytest.raises(
+        RuntimeError, match="API_KEY must be configured with at least 16 characters"
+    ):
         auth_mod.validate_production_security_config()
 
     # Short key (<16 chars)
     monkeypatch.setattr(auth_mod, "API_KEY", "short-key-123")
     monkeypatch.setenv("API_KEY", "short-key-123")
-    with pytest.raises(RuntimeError, match="API_KEY must be configured with at least 16 characters"):
+    with pytest.raises(
+        RuntimeError, match="API_KEY must be configured with at least 16 characters"
+    ):
         auth_mod.validate_production_security_config()
 
 
@@ -147,4 +151,3 @@ def test_validate_production_security_config_valid(monkeypatch):
 
     # Should not raise
     auth_mod.validate_production_security_config()
-

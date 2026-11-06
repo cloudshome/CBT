@@ -38,7 +38,6 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from core.quantitative_validation import REAL_CAPITAL_ENABLED
 from core.risk.asset_eligibility_gate import (
     AssetEligibilityDecision,
     AssetLiquidityMetrics,
@@ -58,6 +57,8 @@ from core.risk.order_authorization import (
     compute_portfolio_version,
 )
 from core.risk.strategy_lineage_registry import StrategyLineageRegistry
+
+REAL_CAPITAL_ENABLED: bool = False
 
 logger = logging.getLogger(__name__)
 
@@ -163,6 +164,8 @@ class RiskDecision:
     authorization_id: str = ""
     authorization_token: str = ""
     portfolio_state_version: str = ""
+    displacement_candidate_id: str | None = None
+    displacement_action: str | None = None
 
 
 class PortfolioRiskGuardian:
@@ -179,7 +182,11 @@ class PortfolioRiskGuardian:
     ) -> None:
         self.limits = limits or PortfolioRiskLimits()
         env_state = os.environ.get("PORTFOLIO_RISK_GUARDIAN_STATE_FILE")
-        self.state_file = Path(state_file) if state_file else (Path(env_state) if env_state else DEFAULT_STATE_FILE)
+        self.state_file = (
+            Path(state_file)
+            if state_file
+            else (Path(env_state) if env_state else DEFAULT_STATE_FILE)
+        )
         env_db = os.environ.get("TRADING_LOGS_DB_PATH")
         default_db = Path(env_db) if env_db else (ROOT_DIR / "data" / "trading_logs.db")
         self.db_path = Path(db_path) if db_path else default_db
@@ -310,8 +317,9 @@ class PortfolioRiskGuardian:
         while not self._stop_event.is_set():
             try:
                 with self._lock:
-                    self.last_heartbeat_monotonic = time.monotonic()
-                    self.last_heartbeat_utc = datetime.now(UTC).isoformat()
+                    if not getattr(self, "_simulate_stall", False):
+                        self.last_heartbeat_monotonic = time.monotonic()
+                        self.last_heartbeat_utc = datetime.now(UTC).isoformat()
                     self.loop_execution_count += 1
                 self.monitor_portfolio_state()
             except Exception as exc:
@@ -339,6 +347,7 @@ class PortfolioRiskGuardian:
     def simulate_stalled_heartbeat(self, stall_seconds: float = 10.0) -> None:
         """Failure injection: artificially offsets heartbeat to simulate a frozen loop."""
         with self._lock:
+            self._simulate_stall = True
             self.last_heartbeat_monotonic = time.monotonic() - stall_seconds
 
     def trip_circuit_breaker(self, new_state: CircuitBreakerState, reason: str) -> None:
@@ -520,7 +529,85 @@ class PortfolioRiskGuardian:
                 "net_notional_usd": round(net_notional_usd, 2),
                 "leverage_ratio": round(leverage, 2),
                 "active_symbols": active_symbols,
+                "open_positions": open_positions,
             }
+
+    def _evaluate_opportunity_displacement(
+        self,
+        order: ProposedOrder,
+        open_positions: list[dict[str, Any]],
+        allocated_risk_usd: float,
+        mtm_equity_usd: float,
+    ) -> tuple[bool, str | None, str]:
+        """
+        Intelligent Opportunity Displacement Arbiter.
+        When open positions meet capacity, evaluates if incoming trade T_new possesses
+        superior marginal utility over the weakest active position P_i.
+
+        Returns:
+            (can_displace, candidate_position_id, rationale)
+        """
+        if not open_positions:
+            return False, None, "No active positions available for displacement."
+
+        # 1. Compute Marginal Utility of Proposed Order U(T_new)
+        if order.ai_opportunity_score is not None:
+            new_utility = float(order.ai_opportunity_score)
+        else:
+            risk_dist = abs(order.entry_price - order.stop_loss)
+            tp_dist = abs((order.take_profit or (order.entry_price * 1.05)) - order.entry_price)
+            rr = tp_dist / max(risk_dist, 1e-4)
+            new_utility = 50.0 + min(35.0, rr * 7.0)
+
+        # 2. Score Utility of Each Active Position U(P_i)
+        scored_positions: list[tuple[float, str, str, float]] = []
+
+        for p in open_positions:
+            pid = str(p.get("position_id", ""))
+            psym = str(p.get("symbol", ""))
+            ep = float(p.get("entry_price") or 1.0)
+            sl = float(p.get("stop_loss") or ep)
+            sz = float(p.get("size") or 0.0)
+            upnl = float(p.get("unrealized_pnl") or 0.0)
+
+            initial_risk = max(1.0, abs(ep - sl) * sz)
+            r_achieved = upnl / initial_risk
+
+            if r_achieved >= 1.5:
+                pos_utility = 45.0  # Matured runner, ideal candidate to bank and displace
+            elif r_achieved <= -0.7:
+                pos_utility = 40.0  # Stalled/bleeding trade near stop
+            elif r_achieved < 0:
+                pos_utility = 55.0 + (r_achieved * 15.0)  # Moderate drawdown: 45 - 55
+            else:
+                pos_utility = 65.0 + min(20.0, r_achieved * 15.0)  # Developing trade: 65 - 85
+
+            if (
+                psym.replace("/", "").replace("_", "").upper()
+                == order.symbol.replace("/", "").replace("_", "").upper()
+            ):
+                pos_utility += 30.0
+
+            scored_positions.append((pos_utility, pid, psym, r_achieved))
+
+        scored_positions.sort(key=lambda x: x[0])
+        weakest_utility, weakest_id, weakest_sym, weakest_r = scored_positions[0]
+
+        # 3. Displacement Hurdle: Proposed order must exceed weakest by at least delta_hurdle (10.0 points)
+        delta_hurdle = 10.0
+        if new_utility > (weakest_utility + delta_hurdle):
+            rationale = (
+                f"Opportunity displacement approved: Proposed {order.symbol} (Utility {new_utility:.1f}) "
+                f"displaces inferior holding {weakest_id} ({weakest_sym}, Utility {weakest_utility:.1f}, Achieved {weakest_r:+.2f}R)."
+            )
+            return True, weakest_id, rationale
+        else:
+            rationale = (
+                f"Open positions ({len(open_positions)}) meets or exceeds allowed capacity. "
+                f"Proposed {order.symbol} (Utility {new_utility:.1f}) does not exceed displacement hurdle "
+                f"over lowest active position {weakest_sym} (Utility {weakest_utility:.1f} + {delta_hurdle:.1f} hurdle)."
+            )
+            return False, None, rationale
 
     def evaluate_proposed_order(
         self,
@@ -766,31 +853,66 @@ class PortfolioRiskGuardian:
                     ),
                 )
 
-            # Check Max Concurrent Positions
+            # Calculate Initial Projected Gross Notional & Leverage
+            projected_notional = portfolio_metrics["gross_notional_usd"] + proposed_notional_usd
+            projected_leverage = projected_notional / portfolio_metrics["mtm_equity_usd"]
+
+            # Check Max Concurrent Positions & Opportunity Displacement
             effective_max_positions = (
                 1
                 if self.state == CircuitBreakerState.REDUCED_EXPOSURE
                 else self.limits.max_concurrent_positions
             )
+            displacement_candidate_id: str | None = None
+            displacement_action: str | None = None
+
             if portfolio_metrics["open_positions_count"] >= effective_max_positions:
-                return RiskDecision(
-                    approved=False,
-                    circuit_breaker_state=self.state,
-                    symbol=order.symbol,
-                    direction=order.direction,
-                    allocated_size=allocated_size,
-                    allocated_risk_usd=allocated_risk_usd,
-                    rejection_code="MAX_CONCURRENT_POSITIONS_REACHED",
-                    rationale=(
-                        f"Open positions ({portfolio_metrics['open_positions_count']}) "
-                        f"meets or exceeds allowed capacity ({effective_max_positions})."
-                    ),
+                open_pos_list = portfolio_metrics.get("open_positions", [])
+                can_displace, candidate_id, disp_rationale = (
+                    self._evaluate_opportunity_displacement(
+                        order,
+                        open_pos_list,
+                        allocated_risk_usd,
+                        portfolio_metrics["mtm_equity_usd"],
+                    )
                 )
+                if can_displace and candidate_id:
+                    displacement_candidate_id = candidate_id
+                    displacement_action = "REPLACE_POSITION"
+                    # Relieve candidate's risk & notional from projections
+                    cand_pos = next(
+                        (p for p in open_pos_list if p.get("position_id") == candidate_id), None
+                    )
+                    if cand_pos:
+                        cand_notional = float(
+                            cand_pos.get("current_price", cand_pos.get("entry_price", 1.0))
+                        ) * float(cand_pos.get("size", 0.0))
+                        cand_risk = max(
+                            25.0,
+                            abs(
+                                float(cand_pos.get("entry_price", 1.0))
+                                - float(cand_pos.get("stop_loss", 1.0))
+                            )
+                            * float(cand_pos.get("size", 0.0)),
+                        )
+                        projected_aggregate_risk = max(0.0, projected_aggregate_risk - cand_risk)
+                        projected_notional = max(0.0, projected_notional - cand_notional)
+                        projected_leverage = (
+                            projected_notional / portfolio_metrics["mtm_equity_usd"]
+                        )
+                else:
+                    return RiskDecision(
+                        approved=False,
+                        circuit_breaker_state=self.state,
+                        symbol=order.symbol,
+                        direction=order.direction,
+                        allocated_size=allocated_size,
+                        allocated_risk_usd=allocated_risk_usd,
+                        rejection_code="MAX_CONCURRENT_POSITIONS_REACHED",
+                        rationale=disp_rationale,
+                    )
 
             # Check Gross Notional & Leverage Cap
-            projected_notional = portfolio_metrics["gross_notional_usd"] + proposed_notional_usd
-            projected_leverage = projected_notional / portfolio_metrics["mtm_equity_usd"]
-
             if projected_notional > self.limits.max_gross_notional_usd:
                 return RiskDecision(
                     approved=False,
@@ -880,10 +1002,14 @@ class PortfolioRiskGuardian:
                 allocated_size=allocated_size,
                 allocated_risk_usd=allocated_risk_usd,
                 rejection_code="",
-                rationale="Deterministic risk clearance granted across all 12 portfolio guardian gates.",
+                rationale="Deterministic risk clearance granted across all 12 portfolio guardian gates."
+                if not displacement_action
+                else f"Opportunity displacement clearance granted: Replaces {displacement_candidate_id}.",
                 authorization_id=auth.authorization_id,
                 authorization_token=auth.authorization_token,
                 portfolio_state_version=portfolio_ver,
+                displacement_candidate_id=displacement_candidate_id,
+                displacement_action=displacement_action,
                 evaluated_metrics={
                     "allocated_risk_usd": round(allocated_risk_usd, 2),
                     "proposed_notional_usd": round(proposed_notional_usd, 2),

@@ -44,5 +44,3 @@ async def test_lifespan_spawns_lightweight_tasks_only_when_decoupled(monkeypatch
         async with app_mod.lifespan_ctx(app_mod.app):
             # Exactly 4 lightweight web-process tasks spawned
             assert len(created_tasks) == 4
-
-

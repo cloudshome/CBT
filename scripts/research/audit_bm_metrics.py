@@ -3,7 +3,7 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
-ROOT = Path("c:/Users/azims/CBT")
+ROOT = Path(__file__).resolve().parent.parent.parent
 bm_file = ROOT / "research" / "m34_trade_level_ledger.jsonl"
 bm_trades = []
 if bm_file.exists():
