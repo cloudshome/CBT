@@ -44,7 +44,11 @@ class SKYIntelligenceOrchestrator:
         self._last_signal_bar: dict[tuple[str, str], int] = {}
 
     def get_bayesian_setup_stats(
-        self, symbol: str, setup_type_str: str, epoch_ms: int = 1793469018542
+        self,
+        symbol: str,
+        setup_type_str: str,
+        epoch_ms: int = 1793469018542,
+        now_sec: float | None = None,
     ) -> tuple[float, float, int]:
         """
         Computes dynamic Bayesian posterior win rate (p_hat) and empirical win expectancy (R_win_hat).
@@ -53,10 +57,10 @@ class SKYIntelligenceOrchestrator:
             (p_win_hat, r_win_hat, sample_size)
         """
         cache_key = f"{symbol}_{setup_type_str}"
-        now_sec = time.time()
+        current_sec = now_sec if now_sec is not None else time.time()
         if cache_key in self._bayesian_cache:
             p_hat, r_hat, n_samples, exp_time = self._bayesian_cache[cache_key]
-            if now_sec < exp_time:
+            if current_sec < exp_time:
                 return p_hat, r_hat, n_samples
 
         # Conservative prior: alpha_0 = 6.0, beta_0 = 6.0 (p_0 = 0.50), prior average win = 1.45R
@@ -68,6 +72,7 @@ class SKYIntelligenceOrchestrator:
         n_total = 0
         sum_win_r = 0.0
 
+        now_ms_limit = current_sec * 1000.0
         try:
             from core.database import db_manager
 
@@ -78,9 +83,10 @@ class SKYIntelligenceOrchestrator:
                     FROM shadow_positions
                     WHERE status = 'CLOSED'
                       AND opened_at >= ?
-                      AND (entry_reason LIKE ? OR symbol = ?);
+                      AND closed_at <= ?
+                      AND entry_reason LIKE ?;
                     """,
-                    (epoch_ms, f"%{setup_type_str}%", symbol),
+                    (epoch_ms, now_ms_limit, f"%{setup_type_str}%"),
                 ).fetchall()
 
                 for r in rows:
@@ -99,7 +105,7 @@ class SKYIntelligenceOrchestrator:
         p_win_hat = (alpha_0 + n_wins) / (alpha_0 + beta_0 + n_total)
         r_win_hat = (alpha_0 * r_win_0 + sum_win_r) / (alpha_0 + n_wins)
 
-        self._bayesian_cache[cache_key] = (p_win_hat, r_win_hat, n_total, now_sec + 60.0)
+        self._bayesian_cache[cache_key] = (p_win_hat, r_win_hat, n_total, current_sec + 60.0)
         return p_win_hat, r_win_hat, n_total
 
     def analyze_market(
@@ -115,11 +121,12 @@ class SKYIntelligenceOrchestrator:
         prev_open_interest: float = 49200.0,
         funding_rate: float = 0.0001,
         account_equity_usd: float = 100_000.0,
+        simulated_now_ms: float | None = None,
     ) -> DecisionOutput:
         """
         Runs the full 12-stage sequential quantitative evaluation.
         """
-        now_ms = time.time() * 1000
+        now_ms = simulated_now_ms if simulated_now_ms is not None else (time.time() * 1000)
         tick_time = latest_tick_time_ms or now_ms
 
         if not candles:
@@ -310,6 +317,7 @@ class SKYIntelligenceOrchestrator:
         p_win_hat, r_win_hat, sample_size = self.get_bayesian_setup_stats(
             symbol=symbol,
             setup_type_str=best_setup.setup_type.value,
+            now_sec=now_ms / 1000.0,
         )
 
         # Nudge win probability slightly by confluence score deviation from 75.0 baseline

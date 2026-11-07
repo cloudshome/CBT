@@ -3,6 +3,11 @@ SKY — Professional Market Intelligence Engine.
 Modular, reproducible, non-repainting quantitative intelligence layer for SMC, Market Structure,
 Liquidity, Volume, Volatility, Derivatives, Regimes, Setups, and Empirical Expectancy.
 """
+# ruff: noqa: E402
+
+from core.sky_intelligence._numpy_compat import register_numpy_compat
+
+register_numpy_compat()
 
 from core.sky_intelligence.ablation_framework import (
     FeatureAblationFramework,

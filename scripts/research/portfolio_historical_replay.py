@@ -159,10 +159,83 @@ def load_aligned_candles(symbols: list[str], limit_per_asset: int = 2500) -> lis
     return all_candles
 
 
-def extract_signal_stream(candles: list[Candle]) -> dict[int, list[TradeCandidate]]:
+def compute_adx(
+    highs: list[float], lows: list[float], closes: list[float], period: int = 14
+) -> list[float]:
+    """Computes standard Welles Wilder Average Directional Index (ADX)."""
+    n = len(closes)
+    if n < period * 2:
+        return [0.0] * n
+    tr = [0.0] * n
+    plus_dm = [0.0] * n
+    minus_dm = [0.0] * n
+    for i in range(1, n):
+        h_diff = highs[i] - highs[i - 1]
+        l_diff = lows[i - 1] - lows[i]
+        plus_dm[i] = h_diff if (h_diff > l_diff and h_diff > 0) else 0.0
+        minus_dm[i] = l_diff if (l_diff > h_diff and l_diff > 0) else 0.0
+        tr[i] = max(
+            highs[i] - lows[i],
+            abs(highs[i] - closes[i - 1]),
+            abs(lows[i] - closes[i - 1]),
+        )
+    smooth_tr = [0.0] * n
+    smooth_pdm = [0.0] * n
+    smooth_mdm = [0.0] * n
+    smooth_tr[period] = sum(tr[1 : period + 1])
+    smooth_pdm[period] = sum(plus_dm[1 : period + 1])
+    smooth_mdm[period] = sum(minus_dm[1 : period + 1])
+    for i in range(period + 1, n):
+        smooth_tr[i] = smooth_tr[i - 1] - (smooth_tr[i - 1] / period) + tr[i]
+        smooth_pdm[i] = smooth_pdm[i - 1] - (smooth_pdm[i - 1] / period) + plus_dm[i]
+        smooth_mdm[i] = smooth_mdm[i - 1] - (smooth_mdm[i - 1] / period) + minus_dm[i]
+    dx = [0.0] * n
+    for i in range(period, n):
+        p_di = 100.0 * (smooth_pdm[i] / smooth_tr[i]) if smooth_tr[i] > 1e-9 else 0.0
+        m_di = 100.0 * (smooth_mdm[i] / smooth_tr[i]) if smooth_tr[i] > 1e-9 else 0.0
+        di_sum = p_di + m_di
+        dx[i] = 100.0 * abs(p_di - m_di) / di_sum if di_sum > 1e-9 else 0.0
+    adx = [0.0] * n
+    start_adx = period * 2 - 1
+    if start_adx < n:
+        adx[start_adx] = sum(dx[period : start_adx + 1]) / period
+        for i in range(start_adx + 1, n):
+            adx[i] = (adx[i - 1] * (period - 1) + dx[i]) / period
+    return adx
+
+
+def compute_atr(
+    highs: list[float], lows: list[float], closes: list[float], period: int = 14
+) -> list[float]:
+    """Computes smoothed Average True Range (ATR)."""
+    n = len(closes)
+    atr = [0.0] * n
+    if n < period + 1:
+        return atr
+    tr = [0.0] * n
+    for i in range(1, n):
+        tr[i] = max(
+            highs[i] - lows[i],
+            abs(highs[i] - closes[i - 1]),
+            abs(lows[i] - closes[i - 1]),
+        )
+    atr[period] = sum(tr[1 : period + 1]) / period
+    for i in range(period + 1, n):
+        atr[i] = (atr[i - 1] * (period - 1) + tr[i]) / period
+    return atr
+
+
+def extract_signal_stream(
+    candles: list[Candle],
+    adx_threshold: float = 14.0,
+    require_htf_alignment: bool = True,
+) -> dict[int, list[TradeCandidate]]:
     """
-    Generates causal trade candidates from multi-asset price action.
-    Uses rolling exponential structural moving averages (fast 9 vs slow 21) and ATR breakouts.
+    Generates causal trade candidates using a market-regime-aware quantitative architecture:
+    1. Trend strength filter: ADX >= adx_threshold (filters out choppy range-bound whip)
+    2. Higher-timeframe trend alignment: EMA 50 trend confirmation
+    3. Structural pullback execution: enters on limit pullback towards EMA 9
+    4. Volatility-scaled risk targets: 1.5x ATR stop loss, 3.0x ATR take profit
     """
     by_asset: dict[str, list[Candle]] = {}
     for c in candles:
@@ -171,41 +244,55 @@ def extract_signal_stream(candles: list[Candle]) -> dict[int, list[TradeCandidat
     candidates_by_time: dict[int, list[TradeCandidate]] = {}
 
     for sym, c_list in by_asset.items():
-        if len(c_list) < 30:
+        if len(c_list) < 60:
             continue
         closes = [c.close for c in c_list]
         highs = [c.high for c in c_list]
         lows = [c.low for c in c_list]
 
-        # Calculate fast (9) and slow (21) EMA
-        ema9 = [closes[0]]
-        ema21 = [closes[0]]
+        # Calculate fast (9), slow (21), and macro anchor (50) EMAs
         k9 = 2.0 / 10.0
         k21 = 2.0 / 22.0
+        k50 = 2.0 / 51.0
+
+        ema9 = [closes[0]]
+        ema21 = [closes[0]]
+        ema50 = [closes[0]]
 
         for idx in range(1, len(closes)):
             ema9.append(closes[idx] * k9 + ema9[-1] * (1.0 - k9))
             ema21.append(closes[idx] * k21 + ema21[-1] * (1.0 - k21))
+            ema50.append(closes[idx] * k50 + ema50[-1] * (1.0 - k50))
+
+        adx_series = compute_adx(highs, lows, closes, period=14)
+        atr_series = compute_atr(highs, lows, closes, period=14)
 
         # Scan for structural setups
-        for i in range(25, len(c_list)):
+        for i in range(50, len(c_list)):
             c = c_list[i]
-            c_list[i - 1]
+            adx_val = adx_series[i]
+            atr = atr_series[i] if atr_series[i] > 1e-4 else max(c.close * 0.005, 1.0)
 
-            # Approximate ATR
-            tr_sum = sum(
-                max(highs[j] - lows[j], abs(highs[j] - closes[j - 1])) for j in range(i - 14, i)
-            )
-            atr = max(c.close * 0.005, tr_sum / 14.0)
+            # Regime Gate: Suppress breakout entries when market is in sideways chop
+            if adx_val < adx_threshold:
+                continue
 
-            # Bullish EMA Cross & Expansion
-            if ema9[i - 1] <= ema21[i - 1] and ema9[i] > ema21[i] and c.close > ema9[i]:
-                entry = c.close
+            # Bullish: EMA 9 crosses above EMA 21 with HTF trend alignment
+            bullish = ema9[i - 1] <= ema21[i - 1] and ema9[i] > ema21[i]
+            if require_htf_alignment:
+                bullish = bullish and (c.close > ema50[i])
+
+            if bullish:
+                # Institutional limit pullback entry
+                entry = min(c.close, ema9[i])
                 sl = entry - (atr * 1.5)
-                tp = entry + (atr * 3.5)
+                tp = entry + (atr * 3.0)
                 rr = (tp - entry) / max(1e-4, entry - sl)
                 utility = (
-                    55.0 + min(35.0, rr * 6.0) + (10.0 if "BTC" in sym or "PAXG" in sym else 5.0)
+                    65.0
+                    + min(20.0, rr * 5.0)
+                    + (10.0 if "BTC" in sym or "PAXG" in sym else 5.0)
+                    + min(15.0, max(0.0, adx_val - adx_threshold) * 1.2)
                 )
 
                 cand = TradeCandidate(
@@ -216,18 +303,26 @@ def extract_signal_stream(candles: list[Candle]) -> dict[int, list[TradeCandidat
                     stop_loss=sl,
                     take_profit=tp,
                     utility_score=utility,
-                    rationale=f"Bullish EMA crossover expansion on {sym}",
+                    rationale=f"Trend-confirmed Bullish EMA cross on {sym} (ADX={adx_val:.1f})",
                 )
                 candidates_by_time.setdefault(c.timestamp, []).append(cand)
 
-            # Bearish EMA Cross & Rejection
-            elif ema9[i - 1] >= ema21[i - 1] and ema9[i] < ema21[i] and c.close < ema9[i]:
-                entry = c.close
+            # Bearish: EMA 9 crosses below EMA 21 with HTF trend alignment
+            bearish = ema9[i - 1] >= ema21[i - 1] and ema9[i] < ema21[i]
+            if require_htf_alignment:
+                bearish = bearish and (c.close < ema50[i])
+
+            if bearish:
+                # Institutional limit pullback entry
+                entry = max(c.close, ema9[i])
                 sl = entry + (atr * 1.5)
-                tp = entry - (atr * 3.5)
+                tp = entry - (atr * 3.0)
                 rr = (entry - tp) / max(1e-4, sl - entry)
                 utility = (
-                    50.0 + min(35.0, rr * 6.0) + (10.0 if "BTC" in sym or "PAXG" in sym else 5.0)
+                    60.0
+                    + min(20.0, rr * 5.0)
+                    + (10.0 if "BTC" in sym or "PAXG" in sym else 5.0)
+                    + min(15.0, max(0.0, adx_val - adx_threshold) * 1.2)
                 )
 
                 cand = TradeCandidate(
@@ -238,7 +333,7 @@ def extract_signal_stream(candles: list[Candle]) -> dict[int, list[TradeCandidat
                     stop_loss=sl,
                     take_profit=tp,
                     utility_score=utility,
-                    rationale=f"Bearish EMA crossover rejection on {sym}",
+                    rationale=f"Trend-confirmed Bearish EMA cross on {sym} (ADX={adx_val:.1f})",
                 )
                 candidates_by_time.setdefault(c.timestamp, []).append(cand)
 
