@@ -762,40 +762,40 @@ class MastermindArbiterCouncil:
                             calib_weight,
                         )
 
-                    # Dispatch immediate notification to Telegram
-                    try:
-                        import asyncio
+                        # Dispatch immediate notification to Telegram ONLY when trade is approved & executed
+                        try:
+                            import asyncio
 
-                        from core.telegram_bot import telegram_bot
+                            from core.telegram_bot import telegram_bot
 
-                        emoji_dir = "🟢 LONG" if direction_str == "LONG" else "🔴 SHORT"
-                        thesis_clean = (proposal.thesis or "")[:160].replace("_", " ").replace("[", "(").replace("]", ")")
-                        telegram_msg = (
-                            f"⚡ *MASTERMIND SPECIALIST TRADE DEPLOYED*\n"
-                            f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                            f"🤖 *Specialist:* `{spec.specialist_id}`\n"
-                            f"🪙 *Symbol:* `{sym}`\n"
-                            f"🧭 *Direction:* {emoji_dir}\n"
-                            f"💵 *Entry Price:* `${cur_price:,.2f}`\n"
-                            f"🛡️ *Stop-Loss:* `${proposal.stop_loss:,.2f}`\n"
-                            f"🎯 *Take-Profit:* `${proposal.take_profit:,.2f}`\n"
-                            f"📐 *Risk-Reward:* `{proposal.risk_reward_ratio:.2f}R`\n"
-                            f"📊 *Net EV:* `+{proposal.expected_value_r:.2f}R` | *Conf:* `{effective_confidence * 100:.0f}%`\n"
-                            f"💼 *Approved Sizing:* `${approved_notional:,.2f}` ({units:.4f} units)\n"
-                            f"🔍 *Overlap Discount:* `{overlap_discount:.2f}x` | *Calib:* `{calib_weight:.2f}x`\n"
-                            f"📝 *Thesis:* {thesis_clean}\n"
-                            f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                            f"Darwinian Mastermind Council • Virtual Paper Execution"
-                        )
-                        t_task = asyncio.create_task(
-                            telegram_bot.send_message(telegram_msg, parse_mode="Markdown")
-                        )
-                        self._bg_tasks.add(t_task)
-                        t_task.add_done_callback(self._bg_tasks.discard)
-                    except Exception as t_err:
-                        logger.warning(
-                            "Failed to dispatch Mastermind trade alert to Telegram: %s", t_err
-                        )
+                            emoji_dir = "🟢 LONG" if direction_str == "LONG" else "🔴 SHORT"
+                            thesis_clean = (proposal.thesis or "")[:160].replace("_", " ").replace("[", "(").replace("]", ")")
+                            telegram_msg = (
+                                f"⚡ *MASTERMIND SPECIALIST TRADE DEPLOYED*\n"
+                                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                                f"🤖 *Specialist:* `{spec.specialist_id}`\n"
+                                f"🪙 *Symbol:* `{sym}`\n"
+                                f"🧭 *Direction:* {emoji_dir}\n"
+                                f"💵 *Entry Price:* `${cur_price:,.2f}`\n"
+                                f"🛡️ *Stop-Loss:* `${proposal.stop_loss:,.2f}`\n"
+                                f"🎯 *Take-Profit:* `${proposal.take_profit:,.2f}`\n"
+                                f"📐 *Risk-Reward:* `{proposal.risk_reward_ratio:.2f}R`\n"
+                                f"📊 *Net EV:* `+{proposal.expected_value_r:.2f}R` | *Conf:* `{effective_confidence * 100:.0f}%`\n"
+                                f"💼 *Approved Sizing:* `${approved_notional:,.2f}` ({units:.4f} units)\n"
+                                f"🔍 *Overlap Discount:* `{overlap_discount:.2f}x` | *Calib:* `{calib_weight:.2f}x`\n"
+                                f"📝 *Thesis:* {thesis_clean}\n"
+                                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                                f"Darwinian Mastermind Council • Virtual Paper Execution"
+                            )
+                            t_task = asyncio.create_task(
+                                telegram_bot.send_message(telegram_msg, parse_mode="Markdown")
+                            )
+                            self._bg_tasks.add(t_task)
+                            t_task.add_done_callback(self._bg_tasks.discard)
+                        except Exception as t_err:
+                            logger.warning(
+                                "Failed to dispatch Mastermind trade alert to Telegram: %s", t_err
+                            )
                 except Exception as ex:
                     is_approved = False
                     rejection_reason = f"Shadow execution rejected: {ex}"
