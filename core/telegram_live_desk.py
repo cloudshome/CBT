@@ -58,8 +58,34 @@ class HmacActionToken:
 class TelegramLiveTradingDesk:
     """Master Telegram live trading commander and scheduled reporting coordinator."""
 
-    def __init__(self) -> None:
-        self._secret = os.getenv("JWT_SECRET", "sky_tele_live_secret_key_2026").encode("utf-8")
+    def __init__(self, secret: str | bytes | None = None) -> None:
+        if secret is not None:
+            if isinstance(secret, str):
+                secret_str = secret.strip()
+                if not secret_str:
+                    raise RuntimeError("JWT_SECRET provided as empty or whitespace string.")
+                self._secret = secret_str.encode("utf-8")
+            elif isinstance(secret, bytes):
+                if not secret.strip():
+                    raise RuntimeError("JWT_SECRET provided as empty bytes.")
+                self._secret = secret
+            else:
+                raise RuntimeError("JWT_SECRET must be str or bytes.")
+        else:
+            raw_secret = os.getenv("JWT_SECRET")
+            if raw_secret is None:
+                raise RuntimeError(
+                    "JWT_SECRET environment variable is missing. Fail-closed: "
+                    "refusing startup without explicit JWT_SECRET."
+                )
+            clean_secret = raw_secret.strip()
+            if not clean_secret:
+                raise RuntimeError(
+                    "JWT_SECRET environment variable is empty or whitespace. Fail-closed: "
+                    "refusing startup without explicit, non-empty JWT_SECRET."
+                )
+            self._secret = clean_secret.encode("utf-8")
+
         self._active_tokens: dict[str, HmacActionToken] = {}
 
     def generate_action_token(
@@ -236,5 +262,26 @@ class TelegramLiveTradingDesk:
         return macro_event_reporter.format_event_flash_report()
 
 
-# Global singleton
-telegram_live_desk = TelegramLiveTradingDesk()
+# Global singleton accessor / lazy instance
+_telegram_live_desk_instance: TelegramLiveTradingDesk | None = None
+
+
+def get_telegram_live_desk() -> TelegramLiveTradingDesk:
+    """Returns the singleton instance, instantiating it with fail-closed validation if needed."""
+    global _telegram_live_desk_instance
+    if _telegram_live_desk_instance is None:
+        _telegram_live_desk_instance = TelegramLiveTradingDesk()
+    return _telegram_live_desk_instance
+
+
+class _TelegramLiveDeskProxy:
+    """Transparent proxy preserving the `telegram_live_desk` module-level singleton interface."""
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(get_telegram_live_desk(), name)
+
+    def __repr__(self) -> str:
+        return f"<TelegramLiveDeskProxy instance={_telegram_live_desk_instance is not None}>"
+
+
+telegram_live_desk: TelegramLiveTradingDesk = _TelegramLiveDeskProxy()  # type: ignore[assignment]
