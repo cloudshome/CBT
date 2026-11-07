@@ -17,6 +17,8 @@ bin/
 /data/research/vault/documents/
 /data/research/vault/articles/
 .venv/
+.python313/
+.venv-m18-verify/
 .vscode/
 .env
 .DS_Store

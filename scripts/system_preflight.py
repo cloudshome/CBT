@@ -24,6 +24,15 @@ if sys.stdout and hasattr(sys.stdout, "reconfigure"):
 
 def get_python_executable() -> str:
     """Finds active or local virtualenv python executable on Windows or Linux."""
+    if os.getenv("PYTHON_EXECUTABLE"):
+        return os.environ["PYTHON_EXECUTABLE"]
+    if os.getenv("VIRTUAL_ENV"):
+        venv_dir = Path(os.environ["VIRTUAL_ENV"])
+        candidate = venv_dir / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+        if candidate.exists():
+            return str(candidate)
+    if sys.prefix != sys.base_prefix:
+        return sys.executable
     if os.name == "nt":
         venv_py = PROJECT_ROOT / ".venv" / "Scripts" / "python.exe"
     else:
