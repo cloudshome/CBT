@@ -896,6 +896,66 @@ class TelegramBotDispatcher:
 
         return chunks if chunks else [text[:max_chars]]
 
+    @staticmethod
+    def sanitize_telegram_markdown(text: str) -> str:
+        """
+        Sanitizes text for Telegram Markdown (v1) parsing.
+        Preserves deliberate *bold*, _italic_, `code`, ```blocks```, and [links](url).
+        Escapes rogue underscores inside identifiers (e.g. BTC_USDT, pos_id),
+        unbalanced single asterisks, and standalone brackets that trigger Telegram entity errors.
+        """
+        if not text:
+            return text
+
+        # Split text into code blocks/spans (which must not be escaped) and regular text
+        token_pattern = re.compile(r"(```[\s\S]*?```|`[^`\n]*`)")
+        parts = token_pattern.split(text)
+
+        link_pattern = re.compile(r"\[([^[\]\n]+)\]\((https?://[^\s)]+)\)")
+
+        sanitized_parts: list[str] = []
+        for i, part in enumerate(parts):
+            # Odd indices are inline code or code blocks; leave them untouched
+            if i % 2 == 1:
+                sanitized_parts.append(part)
+                continue
+
+            # In non-code text:
+            # 1. Temporarily protect valid [label](url) links
+            links: list[str] = []
+
+            def _save_link(match: re.Match, link_store: list[str] = links) -> str:
+                placeholder = f"\x00LINK_{len(link_store)}\x00"
+                link_store.append(match.group(0))
+                return placeholder
+
+            protected = link_pattern.sub(_save_link, part)
+
+            # 2. Escape standalone brackets that are not part of links
+            protected = protected.replace("[", "\\[").replace("]", "\\]")
+
+            # 3. Restore valid links
+            for idx, link_str in enumerate(links):
+                placeholder = f"\x00LINK_{idx}\x00"
+                protected = protected.replace(placeholder, link_str)
+
+            # 4. Escape underscores adjacent to word characters (e.g. BTC_USDT, pos_id)
+            protected = re.sub(r"(?<=\w)_(?=\w)", r"\\_", protected)
+
+            # 5. If odd number of unescaped underscores remain, escape all remaining
+            unescaped_underscores = len(re.findall(r"(?<!\\)_", protected))
+            if unescaped_underscores % 2 != 0:
+                protected = re.sub(r"(?<!\\)_", r"\\_", protected)
+
+            # 6. If odd number of unescaped asterisks remain, escape all remaining
+            unescaped_asterisks = len(re.findall(r"(?<!\\)\*", protected))
+            if unescaped_asterisks % 2 != 0:
+                protected = re.sub(r"(?<!\\)\*", r"\\*", protected)
+
+            sanitized_parts.append(protected)
+
+        return "".join(sanitized_parts)
+
     async def _send_single_payload(
         self,
         text: str,
@@ -923,14 +983,24 @@ class TelegramBotDispatcher:
                 ) as resp:
                     if resp.status != 200:
                         err_body = await resp.text()
-                        logger.warning(f"Telegram API response {resp.status}: {err_body}")
                         # Fallback without parse_mode if markdown parsing failed
                         if "can't parse entities" in err_body:
-                            payload.pop("parse_mode", None)
+                            logger.info(
+                                f"Telegram Markdown parsing failed ({err_body.strip()}); "
+                                "retrying payload in plain text..."
+                            )
+                            fallback_payload = dict(payload)
+                            fallback_payload.pop("parse_mode", None)
                             async with session.post(
-                                url, json=payload, timeout=aiohttp.ClientTimeout(total=5)
+                                url, json=fallback_payload, timeout=aiohttp.ClientTimeout(total=5)
                             ) as resp2:
-                                return resp2.status == 200
+                                if resp2.status == 200:
+                                    return True
+                                err_body2 = await resp2.text()
+                                logger.warning(
+                                    f"Telegram plain text fallback failed ({resp2.status}): {err_body2}"
+                                )
+                                return False
                         # Fallback if message is too long (emergency split)
                         if "message is too long" in err_body:
                             mid = len(text) // 2
@@ -941,6 +1011,7 @@ class TelegramBotDispatcher:
                                 p2, parse_mode=None, chat=chat, reply_markup=reply_markup
                             )
                             return s1 and s2
+                        logger.warning(f"Telegram API response {resp.status}: {err_body}")
                         return False
                     return True
         except Exception as e:
@@ -967,6 +1038,9 @@ class TelegramBotDispatcher:
             logger.info(f"[TELEGRAM LOCAL NOTIFICATION]\n{text}")
             return False
 
+        if parse_mode == "Markdown":
+            text = self.sanitize_telegram_markdown(text)
+
         chunks = self._split_message_chunks(text, max_chars=4000)
         if len(chunks) == 1:
             return await self._send_single_payload(
@@ -980,7 +1054,7 @@ class TelegramBotDispatcher:
         all_sent = True
         total = len(chunks)
         for idx, chunk in enumerate(chunks, 1):
-            header = f"📑 *[Part {idx}/{total}]*\n"
+            header = f"📑 [Part {idx}/{total}]\n"
             part_text = f"{header}{chunk}" if idx > 1 else chunk
             # Attach keyboard only to final chunk
             markup = reply_markup if idx == total else None
@@ -1011,6 +1085,9 @@ class TelegramBotDispatcher:
             logger.info(f"[TELEGRAM LOCAL PHOTO] {caption} ({len(photo_bytes)} bytes)")
             return False
 
+        if caption:
+            caption = self.sanitize_telegram_markdown(caption)
+
         url = f"https://api.telegram.org/bot{token}/sendPhoto"
         data = aiohttp.FormData()
         data.add_field("chat_id", str(chat))
@@ -1030,6 +1107,25 @@ class TelegramBotDispatcher:
                 ) as resp:
                     if resp.status != 200:
                         err = await resp.text()
+                        if "can't parse entities" in err:
+                            logger.info(
+                                "Telegram sendPhoto Markdown parse failed; retrying caption in plain text..."
+                            )
+                            data_fallback = aiohttp.FormData()
+                            data_fallback.add_field("chat_id", str(chat))
+                            if caption:
+                                data_fallback.add_field("caption", caption)
+                            if reply_markup:
+                                import json
+
+                                data_fallback.add_field("reply_markup", json.dumps(reply_markup))
+                            data_fallback.add_field(
+                                "photo", photo_bytes, filename=filename, content_type="image/png"
+                            )
+                            async with session.post(
+                                url, data=data_fallback, timeout=aiohttp.ClientTimeout(total=10)
+                            ) as resp_fallback:
+                                return resp_fallback.status == 200
                         logger.warning(f"Telegram sendPhoto failed ({resp.status}): {err}")
                         return False
                     return True
@@ -3117,6 +3213,8 @@ class TelegramBotDispatcher:
 desk_state_mind = DeskStateMind()
 telegram_bot = TelegramBotDispatcher()
 telegram_bot.state_mind = desk_state_mind
+TelegramBot = TelegramBotDispatcher
+sanitize_telegram_markdown = TelegramBotDispatcher.sanitize_telegram_markdown
 
 # Deliberate: this import must run AFTER the singletons above are constructed
 # (register_all_v5_commands binds handlers to them).
