@@ -12,8 +12,10 @@ echo "============================================================"
 echo "  CRYPTO BRAIN TERMINAL (CBT / SKY) - UBUNTU LAUNCHER"
 echo "============================================================"
 
-# Detect Python interpreter (prefer .venv, fallback to python3/python)
-if [ -f "$SCRIPT_DIR/.venv/bin/python" ]; then
+# Detect Python interpreter (prefer .venv-m18-verify, fallback to .venv, python3/python)
+if [ -f "$SCRIPT_DIR/.venv-m18-verify/bin/python" ]; then
+    PYTHON_CMD="$SCRIPT_DIR/.venv-m18-verify/bin/python"
+elif [ -f "$SCRIPT_DIR/.venv/bin/python" ]; then
     PYTHON_CMD="$SCRIPT_DIR/.venv/bin/python"
 elif command -v python3 &>/dev/null; then
     PYTHON_CMD="python3"
