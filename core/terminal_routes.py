@@ -14,6 +14,7 @@ Provides:
 from __future__ import annotations
 
 import logging
+import os
 import time
 from typing import Any
 
@@ -56,9 +57,12 @@ except ImportError:
 terminal_router = APIRouter(tags=["terminal"])
 
 # ==============================================================================
-# In-Memory Signal Blotter State (Persisted across sessions / approval actions)
+# Signal Blotter State (Configurable live vs fallback development fixture)
+# In production, returns empty list unless ALLOW_DEV_MOCK_SIGNALS=true
 # ==============================================================================
-signal_blotter: list[dict[str, Any]] = [
+ALLOW_DEV_MOCK_SIGNALS = os.getenv("ALLOW_DEV_MOCK_SIGNALS", "false").lower() in ("true", "1")
+
+_dev_signal_blotter: list[dict[str, Any]] = [
     {
         "id": "SIG-BTC-SWING-01",
         "symbol": "BTCUSDT",
@@ -81,6 +85,7 @@ signal_blotter: list[dict[str, Any]] = [
         "cooldownRemainingSecs": 0,
         "thesis": "HTF bullish BOS + 4H Order Block + positive CVD absorption divergence at session VWAP discount.",
         "createdAt": int(time.time() * 1000) - 2540000,
+        "isMockDev": True,
     },
     {
         "id": "SIG-BTC-SCALP-02",
@@ -105,6 +110,7 @@ signal_blotter: list[dict[str, Any]] = [
         "thesis": "Local 15m liquidity sweep above Asian high with bearish CVD exhaustion delta.",
         "createdAt": int(time.time() * 1000) - 940000,
         "approvedAt": int(time.time() * 1000) - 420000,
+        "isMockDev": True,
     },
     {
         "id": "SIG-BTC-DAY-03",
@@ -130,6 +136,7 @@ signal_blotter: list[dict[str, Any]] = [
         "createdAt": int(time.time() * 1000) - 4820000,
         "approvedAt": int(time.time() * 1000) - 4100000,
         "executedAt": int(time.time() * 1000) - 3900000,
+        "isMockDev": True,
     },
     {
         "id": "SIG-BTC-HIST-04",
@@ -158,8 +165,12 @@ signal_blotter: list[dict[str, Any]] = [
         "closedAt": int(time.time() * 1000) - 14400000,
         "realizedPnlUsd": 384.5,
         "realizedR": 3.1,
+        "isMockDev": True,
     },
 ]
+
+# Production signal blotter defaults to empty list unless ALLOW_DEV_MOCK_SIGNALS=true
+signal_blotter: list[dict[str, Any]] = _dev_signal_blotter if ALLOW_DEV_MOCK_SIGNALS else []
 
 
 def calibrate_blotter_for_price(symbol: str, cur_p: float) -> None:
@@ -212,7 +223,6 @@ def compute_volume_profile(candles: list[Any], cur_p: float) -> dict[str, Any]:
 
     highs = [float(c[2] if isinstance(c, list | tuple) else c.get("high", cur_p)) for c in candles]
     lows = [float(c[3] if isinstance(c, list | tuple) else c.get("low", cur_p)) for c in candles]
-    [float(c[5] if isinstance(c, list | tuple) else c.get("volume", 1.0)) for c in candles]
 
     min_p = min(lows) if lows else cur_p * 0.98
     max_p = max(highs) if highs else cur_p * 1.02
@@ -302,8 +312,16 @@ def compute_volume_profile(candles: list[Any], cur_p: float) -> dict[str, Any]:
 
 
 def compute_liquidation_map(cur_p: float) -> dict[str, Any]:
-    """Computes short/long liquidation cluster magnets around current price."""
+    """
+    Computes modeled liquidation cluster magnets around current price.
+    Tagged with explicit data provenance and modeling metadata.
+    """
     return {
+        "provenance": {
+            "source": "statistical_derivatives_model",
+            "is_synthetic_placeholder": False,
+            "disclaimer": "Modeled estimates derived from standard perpetual leverage tiers (25x, 50x).",
+        },
         "shortClusters": [
             {
                 "priceLevel": round(cur_p * 1.018, 2),
