@@ -42,13 +42,19 @@ class BtcMacroSpecialist(BaseSpecialistAgent):
         multi_tf_candles: dict[str, list[dict[str, Any]]],
         order_book: dict[str, Any] | None = None,
         macro_context: dict[str, Any] | None = None,
+        account_equity_usd: float | None = None,
     ) -> CandidateProposal:
+        effective_equity = (
+            account_equity_usd
+            if (account_equity_usd is not None and account_equity_usd > 0)
+            else 10_000.0
+        )
         decision = sky_orchestrator.analyze_market(
             symbol=self.target_symbol,
             timeframe="15m",
             candles=candles_15m,
             candles_by_tf=multi_tf_candles,
-            account_equity_usd=10_000.0,
+            account_equity_usd=effective_equity,
         )
 
         cur_price = float(candles_15m[-1]["close"]) if candles_15m else 0.0
@@ -106,13 +112,19 @@ class EthSpecialist(BaseSpecialistAgent):
         multi_tf_candles: dict[str, list[dict[str, Any]]],
         order_book: dict[str, Any] | None = None,
         macro_context: dict[str, Any] | None = None,
+        account_equity_usd: float | None = None,
     ) -> CandidateProposal:
+        effective_equity = (
+            account_equity_usd
+            if (account_equity_usd is not None and account_equity_usd > 0)
+            else 10_000.0
+        )
         decision = sky_orchestrator.analyze_market(
             symbol=self.target_symbol,
             timeframe="15m",
             candles=candles_15m,
             candles_by_tf=multi_tf_candles,
-            account_equity_usd=10_000.0,
+            account_equity_usd=effective_equity,
         )
 
         cur_price = float(candles_15m[-1]["close"]) if candles_15m else 0.0
@@ -167,13 +179,19 @@ class SolSpecialist(BaseSpecialistAgent):
         multi_tf_candles: dict[str, list[dict[str, Any]]],
         order_book: dict[str, Any] | None = None,
         macro_context: dict[str, Any] | None = None,
+        account_equity_usd: float | None = None,
     ) -> CandidateProposal:
+        effective_equity = (
+            account_equity_usd
+            if (account_equity_usd is not None and account_equity_usd > 0)
+            else 10_000.0
+        )
         decision = sky_orchestrator.analyze_market(
             symbol=self.target_symbol,
             timeframe="15m",
             candles=candles_15m,
             candles_by_tf=multi_tf_candles,
-            account_equity_usd=10_000.0,
+            account_equity_usd=effective_equity,
         )
 
         cur_price = float(candles_15m[-1]["close"]) if candles_15m else 0.0
@@ -231,6 +249,7 @@ class MemeMomentumSpecialist(BaseSpecialistAgent):
         multi_tf_candles: dict[str, list[dict[str, Any]]],
         order_book: dict[str, Any] | None = None,
         macro_context: dict[str, Any] | None = None,
+        account_equity_usd: float | None = None,
     ) -> CandidateProposal:
         if not candles_15m or len(candles_15m) < 20:
             return CandidateProposal(
@@ -329,6 +348,7 @@ class LowCapBreakoutSpecialist(BaseSpecialistAgent):
         multi_tf_candles: dict[str, list[dict[str, Any]]],
         order_book: dict[str, Any] | None = None,
         macro_context: dict[str, Any] | None = None,
+        account_equity_usd: float | None = None,
     ) -> CandidateProposal:
         if not candles_15m or len(candles_15m) < 15:
             return CandidateProposal(
@@ -434,6 +454,7 @@ class DynamicOpportunitySpecialist(BaseSpecialistAgent):
         multi_tf_candles: dict[str, list[dict[str, Any]]],
         order_book: dict[str, Any] | None = None,
         macro_context: dict[str, Any] | None = None,
+        account_equity_usd: float | None = None,
     ) -> CandidateProposal:
         if not candles_15m:
             cur_price = 1.0

@@ -255,13 +255,69 @@ class MastermindArbiterCouncil:
             )
             conn.commit()
 
-    def calculate_pairwise_correlation(self, sym_a: str, sym_b: str) -> float:
+    def calculate_pairwise_correlation(
+        self,
+        sym_a: str,
+        sym_b: str,
+        market_data_by_symbol: dict[str, dict[str, Any]] | None = None,
+    ) -> float:
         """
-        Calculates or retrieves empirical correlation prior between two assets.
-        Returns float in [-1.0, 1.0].
+        Calculates empirical rolling correlation from aligned 15m return series if available,
+        falling back to empirical cross-asset priors when data is insufficient.
+        Returns float clamped in [-1.0, 1.0].
         """
         if sym_a == sym_b:
             return 1.0
+
+        # Attempt dynamic Pearson correlation on aligned rolling returns
+        if market_data_by_symbol:
+            candles_a = market_data_by_symbol.get(sym_a, {}).get("15m", [])
+            candles_b = market_data_by_symbol.get(sym_b, {}).get("15m", [])
+            if candles_a and candles_b and len(candles_a) >= 20 and len(candles_b) >= 20:
+                try:
+                    # Align returns by timestamp or sequence
+                    map_a = {
+                        int(c[0] if isinstance(c, (list, tuple)) else c.get("timestamp", 0)): float(
+                            c[4] if isinstance(c, (list, tuple)) else c.get("close", 0.0)
+                        )
+                        for c in candles_a
+                    }
+                    map_b = {
+                        int(c[0] if isinstance(c, (list, tuple)) else c.get("timestamp", 0)): float(
+                            c[4] if isinstance(c, (list, tuple)) else c.get("close", 0.0)
+                        )
+                        for c in candles_b
+                    }
+                    common_ts = sorted(set(map_a.keys()) & set(map_b.keys()))
+                    if len(common_ts) >= 15:
+                        prices_a = [map_a[t] for t in common_ts]
+                        prices_b = [map_b[t] for t in common_ts]
+                        ret_a = [
+                            (prices_a[i] - prices_a[i - 1]) / prices_a[i - 1]
+                            for i in range(1, len(prices_a))
+                            if prices_a[i - 1] > 0
+                        ]
+                        ret_b = [
+                            (prices_b[i] - prices_b[i - 1]) / prices_b[i - 1]
+                            for i in range(1, len(prices_b))
+                            if prices_b[i - 1] > 0
+                        ]
+                        n = min(len(ret_a), len(ret_b))
+                        if n >= 14:
+                            ra = ret_a[:n]
+                            rb = ret_b[:n]
+                            mean_a = sum(ra) / n
+                            mean_b = sum(rb) / n
+                            var_a = sum((x - mean_a) ** 2 for x in ra)
+                            var_b = sum((x - mean_b) ** 2 for x in rb)
+                            if var_a > 1e-12 and var_b > 1e-12:
+                                cov = sum((ra[i] - mean_a) * (rb[i] - mean_b) for i in range(n))
+                                corr = cov / ((var_a**0.5) * (var_b**0.5))
+                                return max(-1.0, min(1.0, round(corr, 3)))
+                except Exception as corr_err:
+                    logger.debug("Empirical rolling correlation calculation failed: %s", corr_err)
+
+        # Fallback to empirical cross-asset priors
         if (sym_a, sym_b) in CORRELATION_PRIORS:
             return CORRELATION_PRIORS[(sym_a, sym_b)]
         if (sym_b, sym_a) in CORRELATION_PRIORS:
@@ -452,6 +508,7 @@ class MastermindArbiterCouncil:
                     candles_15m=candles_15m,
                     multi_tf_candles=multi_tf,
                     order_book=order_book,
+                    account_equity_usd=current_eq,
                 )
                 raw_candidates.append((spec, proposal))
             except Exception as e:
@@ -704,6 +761,7 @@ class MastermindArbiterCouncil:
                         from core.telegram_bot import telegram_bot
 
                         emoji_dir = "🟢 LONG" if direction_str == "LONG" else "🔴 SHORT"
+                        thesis_clean = (proposal.thesis or "")[:160].replace("_", " ").replace("[", "(").replace("]", ")")
                         telegram_msg = (
                             f"⚡ *MASTERMIND SPECIALIST TRADE DEPLOYED*\n"
                             f"━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -717,7 +775,7 @@ class MastermindArbiterCouncil:
                             f"📊 *Net EV:* `+{proposal.expected_value_r:.2f}R` | *Conf:* `{effective_confidence * 100:.0f}%`\n"
                             f"💼 *Approved Sizing:* `${approved_notional:,.2f}` ({units:.4f} units)\n"
                             f"🔍 *Overlap Discount:* `{overlap_discount:.2f}x` | *Calib:* `{calib_weight:.2f}x`\n"
-                            f"📝 *Thesis:* _{proposal.thesis[:160]}_\n"
+                            f"📝 *Thesis:* {thesis_clean}\n"
                             f"━━━━━━━━━━━━━━━━━━━━━━\n"
                             f"Darwinian Mastermind Council • Virtual Paper Execution"
                         )

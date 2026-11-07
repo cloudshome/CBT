@@ -252,6 +252,7 @@ class BaseSpecialistAgent(ABC):
         multi_tf_candles: dict[str, list[dict[str, Any]]],
         order_book: dict[str, Any] | None = None,
         macro_context: dict[str, Any] | None = None,
+        account_equity_usd: float | None = None,
     ) -> CandidateProposal:
         """
         Evaluates market data and produces a structured CandidateProposal.
