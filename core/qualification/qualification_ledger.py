@@ -19,7 +19,6 @@ Constitutional Principles:
 from __future__ import annotations
 
 import logging
-import sqlite3
 import time
 from dataclasses import asdict, dataclass
 from typing import Any
@@ -32,8 +31,8 @@ logger = logging.getLogger("sky.qualification.ledger")
 QUALIFICATION_ANCHOR_TIMESTAMP_MS: int = 1794044503006  # 2026-11-07T09:41:43.006Z
 QUALIFICATION_ANCHOR_EQUITY_USD: float = 7589.53
 QUALIFICATION_TARGET_DURATION_DAYS: int = 30
-QUALIFICATION_TARGET_END_TIMESTAMP_MS: int = (
-    QUALIFICATION_ANCHOR_TIMESTAMP_MS + (QUALIFICATION_TARGET_DURATION_DAYS * 86_400_000)
+QUALIFICATION_TARGET_END_TIMESTAMP_MS: int = QUALIFICATION_ANCHOR_TIMESTAMP_MS + (
+    QUALIFICATION_TARGET_DURATION_DAYS * 86_400_000
 )
 QUALIFICATION_ELIGIBLE_SYMBOLS: set[str] = {
     "BTC/USDT",

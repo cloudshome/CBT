@@ -41,7 +41,7 @@ class TestTelegramMarkdownSanitization(unittest.IsolatedAsyncioTestCase):
         self.assertIn("\\*", sanitized)
 
     def test_code_blocks_unmodified(self):
-        code_block = "```json\n{\"symbol\": \"ETH_USDT\", \"pos\": [1, 2]}\n```"
+        code_block = '```json\n{"symbol": "ETH_USDT", "pos": [1, 2]}\n```'
         sanitized = sanitize_telegram_markdown(code_block)
         # Inside code blocks, underscores and brackets must not be mutated
         self.assertEqual(sanitized, code_block)

@@ -13,19 +13,14 @@ Covers:
 7. Realized/unrealized PnL, fees, slippage, profit factor, win rate, and drawdown.
 """
 
-import os
-import time
 import pytest
-from unittest.mock import MagicMock, patch
 
-from core.database import db_manager
 from core.central_mind import CentralTradingMind, TradeProposal
+from core.database import db_manager
 from core.qualification.qualification_ledger import (
     QUALIFICATION_ANCHOR_EQUITY_USD,
     QUALIFICATION_ANCHOR_TIMESTAMP_MS,
-    QUALIFICATION_ELIGIBLE_SYMBOLS,
     QualificationLedger,
-    qualification_ledger,
 )
 
 
@@ -67,7 +62,11 @@ class TestQualificationUniverseAndLedger:
         mind = CentralTradingMind()
 
         # Mock live price lookup to return valid prices
-        monkeypatch.setattr(mind, "get_live_market_price", lambda sym: 150.0 if "SOL" in sym else (65000.0 if "BTC" in sym else 3400.0))
+        monkeypatch.setattr(
+            mind,
+            "get_live_market_price",
+            lambda sym: 150.0 if "SOL" in sym else (65000.0 if "BTC" in sym else 3400.0),
+        )
 
         # 1. SOL/USDT proposal -> Must be REJECTED with Qualification Universe Restriction
         sol_prop = TradeProposal(

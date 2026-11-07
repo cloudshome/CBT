@@ -631,7 +631,11 @@ class MastermindArbiterCouncil:
                 )
 
             # Guard 1f: Qualification Universe Restriction (BTC/USDT and ETH/USDT only during 30-day burn-in)
-            elif os.getenv("QUALIFICATION_MODE", "true").lower() in ("true", "1", "yes") and sym.replace("/", "").replace("_", "").upper() not in {"BTCUSDT", "ETHUSDT"}:
+            elif os.getenv("QUALIFICATION_MODE", "true").lower() in (
+                "true",
+                "1",
+                "yes",
+            ) and sym.replace("/", "").replace("_", "").upper() not in {"BTCUSDT", "ETHUSDT"}:
                 rejection_reason = (
                     f"Qualification Universe Restriction: Main Desk entry is strictly restricted to "
                     f"BTC/USDT and ETH/USDT during 30-day qualification burn-in. Dynamic opportunity "
@@ -769,7 +773,12 @@ class MastermindArbiterCouncil:
                             from core.telegram_bot import telegram_bot
 
                             emoji_dir = "🟢 LONG" if direction_str == "LONG" else "🔴 SHORT"
-                            thesis_clean = (proposal.thesis or "")[:160].replace("_", " ").replace("[", "(").replace("]", ")")
+                            thesis_clean = (
+                                (proposal.thesis or "")[:160]
+                                .replace("_", " ")
+                                .replace("[", "(")
+                                .replace("]", ")")
+                            )
                             telegram_msg = (
                                 f"⚡ *MASTERMIND SPECIALIST TRADE DEPLOYED*\n"
                                 f"━━━━━━━━━━━━━━━━━━━━━━\n"

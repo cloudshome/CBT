@@ -13,10 +13,10 @@ Guarantees:
 7. Verifies test telemetry tagging (execution_mode='PAPER_TEST').
 """
 
-import time
 import pytest
+
 from core.database import db_manager
-from core.hf_telemetry_pipeline import HFTelemetryPipeline, HFTelemetryRecord
+from core.hf_telemetry_pipeline import HFTelemetryPipeline
 
 
 class TestHFTelemetryPaperPipeline:
@@ -28,9 +28,9 @@ class TestHFTelemetryPaperPipeline:
     def test_nanosecond_monotonic_timing_precision(self, isolated_pipeline):
         """Verifies high-resolution latency decomposition across monotonic stages."""
         t_recv = 1_000_000_000
-        t_queue = 1_001_500_000    # +1.5ms
-        t_dec = 1_002_000_000      # +0.5ms
-        t_exec = 1_003_200_000     # +1.2ms
+        t_queue = 1_001_500_000  # +1.5ms
+        t_dec = 1_002_000_000  # +0.5ms
+        t_exec = 1_003_200_000  # +1.2ms
 
         rec = isolated_pipeline.record_telemetry(
             symbol="BTC/USDT",
@@ -59,9 +59,9 @@ class TestHFTelemetryPaperPipeline:
     def test_negative_clock_jump_clamping_integrity(self, isolated_pipeline):
         """Verifies backward clock jumps or NTP anomalies are clamped non-negatively."""
         t_recv = 2_000_000_000
-        t_queue = 1_900_000_000   # Negative jump: queue timestamp earlier than recv!
+        t_queue = 1_900_000_000  # Negative jump: queue timestamp earlier than recv!
         t_dec = 2_100_000_000
-        t_exec = 2_050_000_000   # Negative jump: exec timestamp earlier than decision!
+        t_exec = 2_050_000_000  # Negative jump: exec timestamp earlier than decision!
 
         rec = isolated_pipeline.record_telemetry(
             symbol="ETH/USDT",
