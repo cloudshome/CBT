@@ -501,6 +501,24 @@ class CentralTradingMind:
                 )
 
         # -------------------------------------------------------------
+        # INVARIANT 2f: 30-Day Qualification Universe Restriction
+        # -------------------------------------------------------------
+        # During the active 30-day paper-trading qualification window,
+        # new position entries are strictly restricted to BTC/USDT and ETH/USDT.
+        # Dynamic screening and out-of-scope research opportunities (SOL, BNB, etc.)
+        # continue to operate and record into research ledgers, but cannot authorize entries.
+        qualification_mode = os.getenv("QUALIFICATION_MODE", "true").lower() in ("true", "1", "yes")
+        if qualification_mode and not is_manual_approval:
+            clean_sym = proposal.symbol.replace("/", "").replace("_", "").upper()
+            qualification_keys = {"BTCUSDT", "BTCUSD", "ETHUSDT", "ETHUSD"}
+            if clean_sym not in qualification_keys:
+                return _reject(
+                    f"Qualification Universe Restriction: '{proposal.symbol}' is not eligible for entry "
+                    f"during the 30-day qualification burn-in window. Authorized universe: BTC/USDT and ETH/USDT. "
+                    f"Dynamic research opportunity preserved in surveillance ledger."
+                )
+
+        # -------------------------------------------------------------
         # INVARIANT 2d: Rolling Asset Performance Gate (True 20-Trade Rolling Window)
         # -------------------------------------------------------------
         try:

@@ -630,6 +630,14 @@ class MastermindArbiterCouncil:
                     f"Microcaps and meme tokens are prohibited from Master Portfolio."
                 )
 
+            # Guard 1f: Qualification Universe Restriction (BTC/USDT and ETH/USDT only during 30-day burn-in)
+            elif os.getenv("QUALIFICATION_MODE", "true").lower() in ("true", "1", "yes") and sym.replace("/", "").replace("_", "").upper() not in {"BTCUSDT", "ETHUSDT"}:
+                rejection_reason = (
+                    f"Qualification Universe Restriction: Main Desk entry is strictly restricted to "
+                    f"BTC/USDT and ETH/USDT during 30-day qualification burn-in. Dynamic opportunity "
+                    f"for {sym} preserved in research audit trail."
+                )
+
             # Guard 1e: Nervous System Cooldown Governor (Anti-Revenge Pause & Resting Period)
             elif not cooldown_governor.evaluate_entry_clearance(sym)[0]:
                 rejection_reason = cooldown_governor.evaluate_entry_clearance(sym)[1]
