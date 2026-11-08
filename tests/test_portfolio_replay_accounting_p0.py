@@ -21,14 +21,14 @@ Verifies all 15 mandatory institutional accounting requirements:
   15. Randomized accounting sequences (property-based simulation)
 """
 
-from decimal import Decimal
 import random
+from decimal import Decimal
+
 import pytest
 
 from core.research.portfolio_accounting_reconciler import (
-    PortfolioAccountingReconciler,
-    to_dec,
     ROUNDING_TOLERANCE_USD,
+    PortfolioAccountingReconciler,
 )
 
 
@@ -182,7 +182,9 @@ def test_07_full_close():
 def test_08_entry_and_exit_fees():
     """Requirement 8: Strict multi-leg friction ledger tracking."""
     rec = PortfolioAccountingReconciler(initial_cash=10_000.0)
-    rec.open_position("POS_FEE", "BTC/USDT", "LONG", 1000, 1000.0, 5.0, 100.0, friction_rate_bps=0.001)
+    rec.open_position(
+        "POS_FEE", "BTC/USDT", "LONG", 1000, 1000.0, 5.0, 100.0, friction_rate_bps=0.001
+    )
     # 5,000 notional, 0.1% entry fee = 5.00 USD
     assert rec.total_frictions_paid == Decimal("5.0000")
 
@@ -350,8 +352,8 @@ def test_15_randomized_accounting_sequences():
 def test_16_portfolio_replay_integration_and_integrity_gates():
     """Requirement 16: End-to-end integration test of historical replay with P0 accounting gates."""
     from scripts.research.portfolio_historical_replay import (
-        load_aligned_candles,
         extract_signal_stream,
+        load_aligned_candles,
         run_portfolio_simulation,
     )
 
@@ -370,10 +372,13 @@ def test_16_portfolio_replay_integration_and_integrity_gates():
     # Simulation Integrity Gates
     assert m_baseline.final_equity > 0.0
     assert m_displaced.final_equity > 0.0
-    assert m_baseline.max_drawdown_pct <= 100.0, f"Max DD {m_baseline.max_drawdown_pct}% exceeded 100%"
-    assert m_displaced.max_drawdown_pct <= 100.0, f"Max DD {m_displaced.max_drawdown_pct}% exceeded 100%"
+    assert m_baseline.max_drawdown_pct <= 100.0, (
+        f"Max DD {m_baseline.max_drawdown_pct}% exceeded 100%"
+    )
+    assert m_displaced.max_drawdown_pct <= 100.0, (
+        f"Max DD {m_displaced.max_drawdown_pct}% exceeded 100%"
+    )
 
     # Conservation of Capital on final cash balance
     assert len(trades_a) == m_baseline.total_trades_entered
     assert len(trades_b) == m_displaced.total_trades_entered
-

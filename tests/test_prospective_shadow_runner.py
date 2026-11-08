@@ -6,9 +6,7 @@ Unit and integration test suite for Prospective Shadow Runner (Phase 3).
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
-from tempfile import TemporaryDirectory
 
 import pytest
 

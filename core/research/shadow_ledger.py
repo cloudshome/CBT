@@ -18,9 +18,9 @@ import json
 import logging
 import os
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 logger = logging.getLogger("shadow_ledger")
 
@@ -48,13 +48,13 @@ class ShadowPredictionRecord:
     bars_elapsed: int = 0
     mfe_r: float = 0.0
     mae_r: float = 0.0
-    exit_timestamp_utc: Optional[str] = None
-    exit_price: Optional[float] = None
-    exit_reason: Optional[str] = None  # "TAKE_PROFIT", "STOP_LOSS", "TIMEOUT_EXPIRED", "INVALIDATED"
-    realized_gross_r: Optional[float] = None
-    realized_fees_r: Optional[float] = None
-    realized_slippage_r: Optional[float] = None
-    realized_net_r: Optional[float] = None
+    exit_timestamp_utc: str | None = None
+    exit_price: float | None = None
+    exit_reason: str | None = None  # "TAKE_PROFIT", "STOP_LOSS", "TIMEOUT_EXPIRED", "INVALIDATED"
+    realized_gross_r: float | None = None
+    realized_fees_r: float | None = None
+    realized_slippage_r: float | None = None
+    realized_net_r: float | None = None
     record_sha256: str = ""
 
     def compute_sha256(self) -> str:
@@ -69,16 +69,17 @@ class ShadowLedgerEngine:
     Append-only shadow tracking engine maintaining state machines
     and cryptographic integrity at rest.
     """
+
     def __init__(self, ledger_file_path: Path):
         self.ledger_file_path = Path(ledger_file_path)
         self.ledger_file_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        self.records: List[ShadowPredictionRecord] = []
-        self.active_predictions: Dict[str, ShadowPredictionRecord] = {}
+
+        self.records: list[ShadowPredictionRecord] = []
+        self.active_predictions: dict[str, ShadowPredictionRecord] = {}
         self.idempotency_set: set = set()
         self.last_hash: str = GENESIS_HASH
         self.next_sequence_id: int = 0
-        
+
         self._load_and_recover()
 
     def _load_and_recover(self) -> None:
@@ -92,7 +93,7 @@ class ShadowLedgerEngine:
         if not self.ledger_file_path.exists():
             return
 
-        with open(self.ledger_file_path, "r", encoding="utf-8") as f:
+        with open(self.ledger_file_path, encoding="utf-8") as f:
             for line_no, line in enumerate(f, 1):
                 line = line.strip()
                 if not line:
@@ -100,15 +101,19 @@ class ShadowLedgerEngine:
                 try:
                     data = json.loads(line)
                     rec = ShadowPredictionRecord(**data)
-                    
+
                     # Verify cryptographic hash of this record
                     expected_hash = rec.compute_sha256()
                     if rec.record_sha256 != expected_hash:
-                        raise ValueError(f"Tamper detected at line {line_no}: hash {rec.record_sha256} != {expected_hash}")
-                        
+                        raise ValueError(
+                            f"Tamper detected at line {line_no}: hash {rec.record_sha256} != {expected_hash}"
+                        )
+
                     # Verify hash chain continuity
                     if rec.prev_record_sha256 != self.last_hash:
-                        raise ValueError(f"Broken hash chain at line {line_no}: prev {rec.prev_record_sha256} != {self.last_hash}")
+                        raise ValueError(
+                            f"Broken hash chain at line {line_no}: prev {rec.prev_record_sha256} != {self.last_hash}"
+                        )
 
                     self.records.append(rec)
                     self.idempotency_set.add(rec.idempotency_key)
@@ -132,7 +137,7 @@ class ShadowLedgerEngine:
                             "max_hold_bars": rec.max_hold_bars,
                             "bars_elapsed": rec.bars_elapsed,
                             "mfe_r": rec.mfe_r,
-                            "mae_r": rec.mae_r
+                            "mae_r": rec.mae_r,
                         }
                     elif rec.lifecycle_state in ["RESOLVED", "INVALIDATED", "EXPIRED"]:
                         self.active_predictions.pop(rec.prediction_id, None)
@@ -141,7 +146,9 @@ class ShadowLedgerEngine:
                     logger.error(f"Failed recovering ledger line {line_no}: {e}")
                     raise
 
-        logger.info(f"Shadow Ledger recovered {len(self.records)} records ({len(self.active_predictions)} active).")
+        logger.info(
+            f"Shadow Ledger recovered {len(self.records)} records ({len(self.active_predictions)} active)."
+        )
 
     def _append_record(self, record: ShadowPredictionRecord) -> ShadowPredictionRecord:
         """Appends a new record to disk atomically with cryptographic linkage."""
@@ -172,14 +179,14 @@ class ShadowLedgerEngine:
         take_profit_price: float,
         risk_unit_usd: float,
         max_hold_bars: int,
-        timestamp_utc: Optional[str] = None,
-        idempotency_key: Optional[str] = None
-    ) -> Optional[ShadowPredictionRecord]:
+        timestamp_utc: str | None = None,
+        idempotency_key: str | None = None,
+    ) -> ShadowPredictionRecord | None:
         """
         Precommits a signal before the next bar opens.
         Returns the precommitted record, or None if duplicate.
         """
-        ts = timestamp_utc or datetime.now(timezone.utc).isoformat()
+        ts = timestamp_utc or datetime.now(UTC).isoformat()
         key = idempotency_key or f"{strategy_id}_{symbol}_{timeframe}_{direction}_{ts}"
 
         if key in self.idempotency_set:
@@ -204,7 +211,7 @@ class ShadowLedgerEngine:
             stop_loss_price=stop_loss_price,
             take_profit_price=take_profit_price,
             risk_unit_usd=risk_unit_usd,
-            max_hold_bars=max_hold_bars
+            max_hold_bars=max_hold_bars,
         )
 
         committed = self._append_record(rec)
@@ -224,7 +231,7 @@ class ShadowLedgerEngine:
             "max_hold_bars": committed.max_hold_bars,
             "bars_elapsed": 0,
             "mfe_r": 0.0,
-            "mae_r": 0.0
+            "mae_r": 0.0,
         }
         return committed
 
@@ -237,8 +244,8 @@ class ShadowLedgerEngine:
         bar_timestamp_utc: str,
         taker_fee_pct: float = 0.00040,
         maker_fee_pct: float = 0.00020,
-        slippage_pct: float = 0.00010
-    ) -> List[ShadowPredictionRecord]:
+        slippage_pct: float = 0.00010,
+    ) -> list[ShadowPredictionRecord]:
         """
         Updates open shadow positions on bar close, tracking MFE/MAE and resolving outcomes.
         Returns list of newly resolved records.
@@ -303,7 +310,13 @@ class ShadowLedgerEngine:
                 else:
                     gross_r = (entry - exit_price) / risk
 
-                fees_r = ((taker_fee_pct + (maker_fee_pct if exit_reason == "TAKE_PROFIT" else taker_fee_pct)) * entry) / risk
+                fees_r = (
+                    (
+                        taker_fee_pct
+                        + (maker_fee_pct if exit_reason == "TAKE_PROFIT" else taker_fee_pct)
+                    )
+                    * entry
+                ) / risk
                 slip_r = (slippage_pct * entry) / risk
                 net_r = gross_r - fees_r - slip_r
 
@@ -334,7 +347,7 @@ class ShadowLedgerEngine:
                     realized_gross_r=round(gross_r, 4),
                     realized_fees_r=round(fees_r, 4),
                     realized_slippage_r=round(slip_r, 4),
-                    realized_net_r=round(net_r, 4)
+                    realized_net_r=round(net_r, 4),
                 )
 
                 committed = self._append_record(resolution_rec)
@@ -343,7 +356,7 @@ class ShadowLedgerEngine:
 
         return resolved_records
 
-    def verify_ledger_integrity(self) -> Tuple[bool, str, int]:
+    def verify_ledger_integrity(self) -> tuple[bool, str, int]:
         """
         Validates hash-chain and internal cryptographic consistency from genesis.
         Returns: (is_valid, message, verified_record_count)
@@ -354,17 +367,25 @@ class ShadowLedgerEngine:
         current_hash = GENESIS_HASH
         for idx, rec in enumerate(self.records):
             if rec.prev_record_sha256 != current_hash:
-                return False, f"Broken chain at index {idx} (seq {rec.sequence_id}): expected prev {current_hash}, got {rec.prev_record_sha256}", idx
+                return (
+                    False,
+                    f"Broken chain at index {idx} (seq {rec.sequence_id}): expected prev {current_hash}, got {rec.prev_record_sha256}",
+                    idx,
+                )
 
             computed = rec.compute_sha256()
             if rec.record_sha256 != computed:
-                return False, f"Tampered record at index {idx} (seq {rec.sequence_id}): expected {computed}, got {rec.record_sha256}", idx
+                return (
+                    False,
+                    f"Tampered record at index {idx} (seq {rec.sequence_id}): expected {computed}, got {rec.record_sha256}",
+                    idx,
+                )
 
             current_hash = rec.record_sha256
 
         return True, "Cryptographic hash chain 100% verified", len(self.records)
 
-    def export_summary(self) -> Dict[str, Any]:
+    def export_summary(self) -> dict[str, Any]:
         """Exports statistical summary of shadow observation records."""
         resolved = [r for r in self.records if r.lifecycle_state == "RESOLVED"]
         net_returns = [r.realized_net_r for r in resolved if r.realized_net_r is not None]
@@ -380,14 +401,20 @@ class ShadowLedgerEngine:
             "resolved_predictions_count": len(resolved),
             "net_realized_r": round(sum(net_returns), 4) if net_returns else 0.0,
             "net_cumulative_r": round(sum(net_returns), 4) if net_returns else 0.0,
-            "avg_realized_net_r": round(sum(net_returns) / len(net_returns), 4) if net_returns else 0.0,
+            "avg_realized_net_r": round(sum(net_returns) / len(net_returns), 4)
+            if net_returns
+            else 0.0,
             "mean_net_r": round(sum(net_returns) / len(net_returns), 4) if net_returns else 0.0,
             "win_rate_pct": win_rate,
-            "mean_mfe_r": round(sum(r.mfe_r for r in resolved) / len(resolved), 4) if resolved else 0.0,
-            "mean_mae_r": round(sum(r.mae_r for r in resolved) / len(resolved), 4) if resolved else 0.0,
-            "integrity_verified": self.verify_ledger_integrity()[0]
+            "mean_mfe_r": round(sum(r.mfe_r for r in resolved) / len(resolved), 4)
+            if resolved
+            else 0.0,
+            "mean_mae_r": round(sum(r.mae_r for r in resolved) / len(resolved), 4)
+            if resolved
+            else 0.0,
+            "integrity_verified": self.verify_ledger_integrity()[0],
         }
 
-    def export_audit_records(self) -> List[Dict[str, Any]]:
+    def export_audit_records(self) -> list[dict[str, Any]]:
         """Exports all ledger records as dictionaries for auditing."""
         return [asdict(r) for r in self.records]

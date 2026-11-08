@@ -26,11 +26,9 @@ every ledger state transition with Decimal precision.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from decimal import Decimal, ROUND_HALF_EVEN
-from typing import Any, Dict, List, Optional, Tuple
 import math
-
+from dataclasses import dataclass
+from decimal import Decimal
 
 ROUNDING_TOLERANCE_USD = Decimal("0.001")
 
@@ -110,9 +108,9 @@ class PortfolioAccountingReconciler:
             raise ValueError(f"Initial cash must be strictly positive: {initial_cash}")
 
         self.cash: Decimal = self.initial_cash
-        self.open_positions: Dict[str, PositionLedgerItem] = {}
-        self.closed_trades: List[ClosedTradeRecord] = []
-        self.checkpoints: List[ReconciliationCheckpoint] = []
+        self.open_positions: dict[str, PositionLedgerItem] = {}
+        self.closed_trades: list[ClosedTradeRecord] = []
+        self.checkpoints: list[ReconciliationCheckpoint] = []
 
         self.total_realized_gross: Decimal = Decimal("0.0")
         self.total_frictions_paid: Decimal = Decimal("0.0")
@@ -179,11 +177,13 @@ class PortfolioAccountingReconciler:
     def update_mark_to_market(
         self,
         timestamp: int,
-        current_prices: Dict[str, float | Decimal],
+        current_prices: dict[str, float | Decimal],
     ) -> None:
         """Updates open position valuations and unrealized PnL."""
         if timestamp < self.last_timestamp:
-            raise ValueError(f"Out-of-order timestamp in MTM update: {timestamp} < {self.last_timestamp}")
+            raise ValueError(
+                f"Out-of-order timestamp in MTM update: {timestamp} < {self.last_timestamp}"
+            )
         self.last_timestamp = timestamp
 
         for pos in self.open_positions.values():
@@ -215,7 +215,7 @@ class PortfolioAccountingReconciler:
         pos = self.open_positions[position_id]
         f_rate = to_dec(funding_rate)
         mark_notional = pos.size * pos.current_price
-        
+
         # Long pays when funding is positive; Short receives when funding is positive
         if pos.direction == "LONG":
             payment = mark_notional * f_rate
@@ -329,7 +329,7 @@ class PortfolioAccountingReconciler:
         pos.size -= c_size
         pos.notional -= closed_notional
         pos.entry_frictions -= closed_entry_frictions
-        pos.allocated_risk_usd *= (Decimal("1.0") - closed_fraction)
+        pos.allocated_risk_usd *= Decimal("1.0") - closed_fraction
         if pos.direction == "LONG":
             pos.unrealized_pnl = (pos.current_price - pos.entry_price) * pos.size
         elif pos.direction == "SHORT":
