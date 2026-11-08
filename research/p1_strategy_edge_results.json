@@ -1,0 +1,198 @@
+{
+  "audit_version": "P1-STRATEGY-EDGE-ROBUSTNESS-REVALIDATION",
+  "timestamp_utc": "2026-11-08T08:04:20.673622+00:00",
+  "candidates": [
+    {
+      "candidate": "H3: BTC Open Interest Flush LONG",
+      "sample_sizes": {
+        "total_trades": 50,
+        "train_trades": 40,
+        "validation_trades": 8,
+        "sealed_oos_trades": 2
+      },
+      "full_series_expectancy": {
+        "base_1_0x": 0.267,
+        "conservative_1_5x": 0.24,
+        "stress_2_5x": 0.185,
+        "true_breakeven_multiplier": 5.89
+      },
+      "sealed_oos_performance": {
+        "expectancy_base_1_0x": 0.423,
+        "expectancy_conservative_1_5x": 0.384,
+        "expectancy_stress_2_5x": 0.308,
+        "win_rate_pct": 50.0,
+        "profit_factor": 1.77,
+        "t_statistic": 0.0,
+        "p_value": 1.0,
+        "deflated_sharpe_ratio": 0.0,
+        "calendar_bootstrap_95_ci": [
+          0.0,
+          0.0
+        ],
+        "prob_positive_expectancy": 0.0
+      },
+      "regime_attribution_oos": {
+        "TREND_BULL": {
+          "trades": 0,
+          "mean_r": 0.0,
+          "win_rate": 0.0
+        },
+        "TREND_BEAR": {
+          "trades": 1,
+          "mean_r": -1.092,
+          "win_rate": 0.0
+        },
+        "CHOP": {
+          "trades": 1,
+          "mean_r": 1.938,
+          "win_rate": 100.0
+        }
+      },
+      "governance_classification": "RESEARCH_CANDIDATE / INSUFFICIENT_OOS_SAMPLE"
+    },
+    {
+      "candidate": "H5: ETH Open Interest Compression SHORT",
+      "sample_sizes": {
+        "total_trades": 44,
+        "train_trades": 30,
+        "validation_trades": 8,
+        "sealed_oos_trades": 6
+      },
+      "full_series_expectancy": {
+        "base_1_0x": 0.486,
+        "conservative_1_5x": 0.441,
+        "stress_2_5x": 0.352,
+        "true_breakeven_multiplier": 6.43
+      },
+      "sealed_oos_performance": {
+        "expectancy_base_1_0x": 1.843,
+        "expectancy_conservative_1_5x": 1.803,
+        "expectancy_stress_2_5x": 1.724,
+        "win_rate_pct": 83.3,
+        "profit_factor": 11.31,
+        "t_statistic": 3.16,
+        "p_value": 0.0251,
+        "deflated_sharpe_ratio": 0.2404,
+        "calendar_bootstrap_95_ci": [
+          0.3129,
+          2.4349
+        ],
+        "prob_positive_expectancy": 0.985
+      },
+      "regime_attribution_oos": {
+        "TREND_BULL": {
+          "trades": 1,
+          "mean_r": 2.442,
+          "win_rate": 100.0
+        },
+        "TREND_BEAR": {
+          "trades": 4,
+          "mean_r": 1.551,
+          "win_rate": 75.0
+        },
+        "CHOP": {
+          "trades": 1,
+          "mean_r": 2.412,
+          "win_rate": 100.0
+        }
+      },
+      "governance_classification": "RESEARCH_CANDIDATE / INSUFFICIENT_OOS_SAMPLE"
+    },
+    {
+      "candidate": "HTF_OB: BTC Order Block Retest LONG",
+      "sample_sizes": {
+        "total_trades": 123,
+        "train_trades": 60,
+        "validation_trades": 27,
+        "sealed_oos_trades": 36
+      },
+      "full_series_expectancy": {
+        "base_1_0x": 0.007,
+        "conservative_1_5x": -0.039,
+        "stress_2_5x": -0.132,
+        "true_breakeven_multiplier": 1.08
+      },
+      "sealed_oos_performance": {
+        "expectancy_base_1_0x": -0.405,
+        "expectancy_conservative_1_5x": -0.46,
+        "expectancy_stress_2_5x": -0.569,
+        "win_rate_pct": 25.0,
+        "profit_factor": 0.5,
+        "t_statistic": -2.001,
+        "p_value": 0.0532,
+        "deflated_sharpe_ratio": 0.0,
+        "calendar_bootstrap_95_ci": [
+          -0.7534,
+          -0.0373
+        ],
+        "prob_positive_expectancy": 0.015
+      },
+      "regime_attribution_oos": {
+        "TREND_BULL": {
+          "trades": 4,
+          "mean_r": 0.402,
+          "win_rate": 50.0
+        },
+        "TREND_BEAR": {
+          "trades": 14,
+          "mean_r": -1.023,
+          "win_rate": 0.0
+        },
+        "CHOP": {
+          "trades": 18,
+          "mean_r": -0.105,
+          "win_rate": 38.9
+        }
+      },
+      "governance_classification": "REJECTED_NO_OOS_EDGE"
+    },
+    {
+      "candidate": "HTF_OB: ETH Order Block Retest LONG",
+      "sample_sizes": {
+        "total_trades": 106,
+        "train_trades": 48,
+        "validation_trades": 26,
+        "sealed_oos_trades": 32
+      },
+      "full_series_expectancy": {
+        "base_1_0x": -0.031,
+        "conservative_1_5x": -0.066,
+        "stress_2_5x": -0.135,
+        "true_breakeven_multiplier": 0.55
+      },
+      "sealed_oos_performance": {
+        "expectancy_base_1_0x": 0.199,
+        "expectancy_conservative_1_5x": 0.163,
+        "expectancy_stress_2_5x": 0.093,
+        "win_rate_pct": 46.9,
+        "profit_factor": 1.35,
+        "t_statistic": 0.782,
+        "p_value": 0.4403,
+        "deflated_sharpe_ratio": 0.0,
+        "calendar_bootstrap_95_ci": [
+          -0.2237,
+          0.7443
+        ],
+        "prob_positive_expectancy": 0.83
+      },
+      "regime_attribution_oos": {
+        "TREND_BULL": {
+          "trades": 11,
+          "mean_r": 0.667,
+          "win_rate": 63.6
+        },
+        "TREND_BEAR": {
+          "trades": 10,
+          "mean_r": -0.389,
+          "win_rate": 30.0
+        },
+        "CHOP": {
+          "trades": 11,
+          "mean_r": 0.265,
+          "win_rate": 45.5
+        }
+      },
+      "governance_classification": "PAPER_QUALIFICATION_CANDIDATE"
+    }
+  ]
+}

@@ -1,0 +1,102 @@
+{
+  "audit_title": "SKY / CBT — P0 Portfolio Accounting Forensic Repair & Reconciliation",
+  "audit_date_utc": "2026-11-08T06:55:00Z",
+  "starting_commit": "9dd15b7",
+  "status": "PASS",
+  "governance_invariants": {
+    "REAL_CAPITAL_ENABLED": false,
+    "certified_m18_protected": true,
+    "simulation_only": true
+  },
+  "accounting_convention": {
+    "model": "CASH_RESERVED_PORTFOLIO_CONVENTION",
+    "formula_mtm": "Equity_t = Cash_t + sum_{i in Open}(notional_i + unrealized_pnl_i)",
+    "formula_invariant": "Equity_t == InitialCash + RealizedGross_t + sum_{i in Open}(unrealized_pnl_i) - TotalFrictions_t - TotalFunding_t",
+    "precision": "DECIMAL_ROUND_HALF_EVEN",
+    "tolerance_usd": 0.001
+  },
+  "defect_forensic_root_cause": {
+    "file": "scripts/research/portfolio_historical_replay.py",
+    "lines_original": "478-479",
+    "defective_code": "sum(p.unrealized_pnl + p.notional for p in open_positions.values())\ncurrent_equity = cash + sum(p.unrealized_pnl for p in open_positions.values())",
+    "repaired_code": "open_position_equity = sum(p.notional + p.unrealized_pnl for p in open_positions.values())\ncurrent_equity = cash + open_position_equity",
+    "impact_description": "Reserved position notionals were deducted from cash at trade entry, but omitted from mark-to-market equity during the position holding period. This caused artificial equity crashes down to -$46.40 USD, manufactured an invalid 101.22% max drawdown on a cash-reserved non-leveraged model, heavily distorted position sizing on subsequent trades, and created artificial +800% daily return jumps upon position closure."
+  },
+  "before_vs_after_reconciliation": {
+    "policy_a_hard_wall": {
+      "metric": "Static Hard Wall",
+      "before_defect": {
+        "final_equity": 8329.07,
+        "net_return_pct": -16.71,
+        "max_drawdown_pct": 101.22,
+        "sharpe_ratio": 4.29,
+        "ulcer_index": 73.73,
+        "total_trades": 172,
+        "win_rate_pct": 29.7,
+        "profit_factor": 0.70
+      },
+      "after_repaired_accounting_trend_aligned": {
+        "final_equity": 12232.01,
+        "net_return_pct": 22.32,
+        "max_drawdown_pct": 3.31,
+        "sharpe_ratio": 6.56,
+        "ulcer_index": 1.11,
+        "total_trades": 48,
+        "win_rate_pct": 64.6,
+        "profit_factor": 2.82,
+        "total_frictions_usd": 497.84,
+        "reconciliation_discrepancy_usd": 0.0
+      }
+    },
+    "policy_b_displacement": {
+      "metric": "Opportunity Displacement Arbiter",
+      "before_defect": {
+        "final_equity": 8768.46,
+        "net_return_pct": -12.32,
+        "max_drawdown_pct": 101.22,
+        "sharpe_ratio": 4.07,
+        "ulcer_index": 73.30,
+        "total_trades": 175,
+        "win_rate_pct": 29.7,
+        "profit_factor": 0.77
+      },
+      "after_repaired_accounting_trend_aligned": {
+        "final_equity": 12232.01,
+        "net_return_pct": 22.32,
+        "max_drawdown_pct": 3.31,
+        "sharpe_ratio": 6.56,
+        "ulcer_index": 1.11,
+        "total_trades": 48,
+        "win_rate_pct": 64.6,
+        "profit_factor": 2.82,
+        "total_frictions_usd": 497.84,
+        "reconciliation_discrepancy_usd": 0.0
+      }
+    }
+  },
+  "verification_suite": {
+    "test_file": "tests/test_portfolio_replay_accounting_p0.py",
+    "total_tests": 16,
+    "passing_tests": 16,
+    "failing_tests": 0,
+    "reconciliation_status": "VERIFIED_100_PERCENT_GREEN",
+    "scenarios_covered": [
+      "No open positions baseline identity",
+      "One long position mark-to-market and cash reserve",
+      "One short position mark-to-market and cash reserve",
+      "Multiple simultaneous positions across distinct assets",
+      "Profitable and losing open positions concurrently",
+      "Partial close with proportional notional and fee return",
+      "Full close returning all reserved notional and locking realized PnL",
+      "Multi-leg entry and exit fees tracking",
+      "Funding payments debit for longs and credit for shorts",
+      "Consecutive entries and exits without cumulative drift",
+      "Price gaps adverse and favorable",
+      "Insufficient cash or collateral rejection",
+      "Restart/recovery state reconstruction from ledger",
+      "Duplicate position ID and out-of-order event rejection",
+      "Property-based randomized accounting sequences (100 discrete steps)",
+      "End-to-end replay engine integration with simulation integrity gates"
+    ]
+  }
+}

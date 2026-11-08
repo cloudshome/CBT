@@ -1,0 +1,53 @@
+{
+  "audit_version": "TEMPORAL-BLOCK-BOOTSTRAP-VALIDATION",
+  "timestamp_utc": "2026-11-08T07:01:15.586288+00:00",
+  "methodology": "Contiguous 720-hour (30-day) calendar market-data block resampling",
+  "results": {
+    "H3_BTC": {
+      "strategy_id": "H3_OI_FLUSH_CAPITULATION_LONG_BTC",
+      "total_trades": 50,
+      "effective_sample_size": 40.0,
+      "autocorrelation_lag1": 0.111,
+      "mean_expectancy_r": 0.3139,
+      "std_r": 1.2617,
+      "t_statistic": 1.7593,
+      "raw_p_value": 0.0848,
+      "deflated_sharpe_ratio": 0.0,
+      "fdr_adjusted_p_value": 1.0,
+      "true_breakeven_friction_multiplier": 4.83,
+      "calendar_block_bootstrap": {
+        "block_size_hours": 720,
+        "n_iterations": 1000,
+        "mean_bootstrap_expectancy_r": 0.3455,
+        "ci_95_low": -0.0111,
+        "ci_95_high": 0.7389,
+        "prob_positive_expectancy": 0.969,
+        "mean_resampled_trade_count": 50.0
+      },
+      "governance_classification": "RESEARCH_CANDIDATE / NEEDS_MORE_OOS_DATA"
+    },
+    "H5_ETH": {
+      "strategy_id": "H5_OI_COMPRESSION_BREAKDOWN_SHORT_ETH",
+      "total_trades": 48,
+      "effective_sample_size": 35.7,
+      "autocorrelation_lag1": 0.1468,
+      "mean_expectancy_r": 0.4559,
+      "std_r": 1.7443,
+      "t_statistic": 1.8106,
+      "raw_p_value": 0.0766,
+      "deflated_sharpe_ratio": 0.0,
+      "fdr_adjusted_p_value": 1.0,
+      "true_breakeven_friction_multiplier": 4.41,
+      "calendar_block_bootstrap": {
+        "block_size_hours": 720,
+        "n_iterations": 1000,
+        "mean_bootstrap_expectancy_r": 0.4479,
+        "ci_95_low": -0.1227,
+        "ci_95_high": 1.1225,
+        "prob_positive_expectancy": 0.925,
+        "mean_resampled_trade_count": 47.6
+      },
+      "governance_classification": "RESEARCH_CANDIDATE / NEEDS_MORE_OOS_DATA"
+    }
+  }
+}

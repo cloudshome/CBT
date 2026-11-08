@@ -1,34 +1,60 @@
 {
-  "manifest_version": "M38-HYPOTHESIS-FREEZE",
-  "generated_at_utc": "2026-11-05T05:49:09.735924+00:00",
+  "manifest_version": "M38-CRYPTOGRAPHIC-STRATEGY-MANIFEST-V2",
+  "binding_specification": "Cryptographically binds metadata configuration, executable AST/source code, environment dependencies, and git commit.",
   "candidates": {
     "H3_BTC": {
       "strategy_id": "H3_OI_FLUSH_CAPITULATION_LONG_BTC",
-      "asset": "BTCUSDT",
-      "timeframe": "1h",
-      "direction": "LONG",
-      "signal_rules": "oi_pct_chg_1h <= -0.040 AND close < open - 0.8 * atr_14",
-      "execution": "Next bar open (t+1)",
-      "stop_loss_r": 1.0,
-      "take_profit_r": 2.0,
-      "risk_unit": "1.5 * atr_14",
-      "max_hold_bars": 24,
-      "frictions": "Taker entry 0.04%, Maker exit 0.02%, Slippage 0.01%, Spread 0.01%, 8h funding settlement payments",
-      "sha256_fingerprint": "3497bd8b7bbad797c7c34e67be658ad8ba5f4b780cf44b729c81bc9c5cba2a68"
+      "canonical_config": {
+        "strategy_id": "H3_OI_FLUSH_CAPITULATION_LONG_BTC",
+        "asset": "BTCUSDT",
+        "timeframe": "1h",
+        "direction": "LONG",
+        "signal_rules": "oi_pct_chg_1h <= -0.040 AND close < open - 0.8 * atr_14",
+        "execution": "Next bar open (t+1)",
+        "stop_loss_r": 1.0,
+        "take_profit_r": 2.0,
+        "risk_unit": "1.5 * atr_14",
+        "max_hold_bars": 24,
+        "frictions": "Taker entry 0.04%, Maker exit 0.02%, Slippage 0.01%, Spread 0.01%, 8h funding settlement payments"
+      },
+      "executable_code_sha256": "356d28436690c0c3e1295a41d5ee586f3083e43c2f3c94290ed8781e1dcedc7e",
+      "data_schema_version": "v1.0-binance-derivatives-hourly",
+      "feature_schema_version": "v1.0-oi_pct_chg_1h-atr_14",
+      "commit_id": "9dd15b78532a0de4dbc5e0516003abd642babb46",
+      "dependencies": {
+        "python": "3.13.3",
+        "pandas": "2.2.3",
+        "numpy": "2.1.3",
+        "scipy": "1.14.1"
+      },
+      "composite_fingerprint": "9ce504a320576da9c78cf03ba5284e6a17d10e461b879ba65ba84a6584157145"
     },
     "H5_ETH": {
       "strategy_id": "H5_OI_COMPRESSION_BREAKDOWN_SHORT_ETH",
-      "asset": "ETHUSDT",
-      "timeframe": "1h",
-      "direction": "SHORT",
-      "signal_rules": "bb_width <= bb_width_q20 (90d lowest 20th percentile) AND oi_pct_chg_24h >= 0.030 AND close < bb_lower",
-      "execution": "Next bar open (t+1)",
-      "stop_loss_r": 1.0,
-      "take_profit_r": 2.5,
-      "risk_unit": "1.5 * atr_14",
-      "max_hold_bars": 72,
-      "frictions": "Taker entry 0.04%, Maker exit 0.02%, Slippage 0.01%, Spread 0.01%, 8h funding settlement payments",
-      "sha256_fingerprint": "5dcbd0e17edbbe42eff2af4dc31c93d07ebb47977bb3a8ea3f2e18f3dd23a53b"
+      "canonical_config": {
+        "strategy_id": "H5_OI_COMPRESSION_BREAKDOWN_SHORT_ETH",
+        "asset": "ETHUSDT",
+        "timeframe": "1h",
+        "direction": "SHORT",
+        "signal_rules": "bb_width <= bb_width_q20 (90d lowest 20th percentile) AND oi_pct_chg_24h >= 0.030 AND close < bb_lower",
+        "execution": "Next bar open (t+1)",
+        "stop_loss_r": 1.0,
+        "take_profit_r": 2.5,
+        "risk_unit": "1.5 * atr_14",
+        "max_hold_bars": 72,
+        "frictions": "Taker entry 0.04%, Maker exit 0.02%, Slippage 0.01%, Spread 0.01%, 8h funding settlement payments"
+      },
+      "executable_code_sha256": "5b2c40d292d075321799fc20286f8e34998c0edd7dc63f2b14848b1ccbe3bbca",
+      "data_schema_version": "v1.0-binance-derivatives-hourly",
+      "feature_schema_version": "v1.0-bb_width_q20-oi_pct_chg_24h",
+      "commit_id": "9dd15b78532a0de4dbc5e0516003abd642babb46",
+      "dependencies": {
+        "python": "3.13.3",
+        "pandas": "2.2.3",
+        "numpy": "2.1.3",
+        "scipy": "1.14.1"
+      },
+      "composite_fingerprint": "a5ecb231fc59638638f7428b25f29115041cb4c448bbd4e035b49dbef7498f2a"
     }
   }
 }
