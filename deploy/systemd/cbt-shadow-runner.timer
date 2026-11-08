@@ -1,0 +1,14 @@
+[Unit]
+Description=CBT Prospective Shadow Strategy Runner Hourly Timer
+Documentation=https://github.com/cloudshome/CBT
+
+[Timer]
+# Fire at 1 minute past every UTC hour (e.g. 00:01:00, 01:01:00 UTC)
+# This guarantees the previous hourly bar is closed and flushed before evaluation
+OnCalendar=*-*-* *:01:00 UTC
+Persistent=true
+AccuracySec=15s
+Unit=cbt-shadow-runner.service
+
+[Install]
+WantedBy=timers.target

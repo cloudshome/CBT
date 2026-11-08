@@ -1,0 +1,23 @@
+[Unit]
+Description=CBT Prospective Shadow Strategy Runner (Oneshot)
+Documentation=https://github.com/cloudshome/CBT
+After=network.target
+
+[Service]
+Type=oneshot
+User=cloudslover
+Group=cloudslover
+WorkingDirectory=/home/cloudslover/CBT
+Environment="PYTHONPATH=/home/cloudslover/CBT"
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=/home/cloudslover/CBT/.venv/bin/python /home/cloudslover/CBT/scripts/research/run_prospective_shadow_runner.py --poll-once
+TimeoutStartSec=300
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cbt-shadow-runner
+
+# Security Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/home/cloudslover/CBT/data /home/cloudslover/CBT/research /home/cloudslover/CBT/SHADOW_LEDGER_AUDIT_REPORT.md

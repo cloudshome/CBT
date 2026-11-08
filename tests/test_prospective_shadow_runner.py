@@ -6,6 +6,8 @@ Unit and integration test suite for Prospective Shadow Runner (Phase 3).
 
 from __future__ import annotations
 
+import sqlite3
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -143,3 +145,82 @@ def test_shadow_runner_tamper_fails_closed(tmp_path: Path):
     # Re-instantiate engine; must detect tamper on boot
     with pytest.raises(ValueError, match="Tamper detected"):
         ShadowLedgerEngine(ledger_file)
+
+
+def test_shadow_runner_candle_finalization_and_gap_recovery(tmp_path: Path):
+    """
+    Verifies that:
+    1. Unfinalized candles (in-progress bars) are excluded from evaluation.
+    2. Finalized candles are processed once closed.
+    3. Duplicate executions do not advance positions or re-evaluate bars.
+    4. Missed hourly bars are recovered chronologically without silent gaps.
+    """
+    db_file = tmp_path / "test_market_data.db"
+    conn = sqlite3.connect(db_file)
+    conn.execute("""
+        CREATE TABLE candles (
+            timestamp BIGINT, symbol TEXT, timeframe TEXT,
+            open REAL, high REAL, low REAL, close REAL, volume REAL, is_synthetic INT,
+            PRIMARY KEY (symbol, timeframe, timestamp)
+        )
+    """)
+
+    # Populate 35 baseline 1h bars for BTCUSDT (30 needed for ATR/SMA indicators)
+    base_ts = 1700000000000  # ms
+    for i in range(35):
+        ts = base_ts + i * 3600000
+        conn.execute(
+            "INSERT INTO candles VALUES (?, 'BTCUSDT', '1h', 50000.0, 50200.0, 49800.0, 50100.0, 100.0, 0)",
+            (ts,),
+        )
+    conn.commit()
+    conn.close()
+
+    ledger_file = tmp_path / "shadow_ledger.jsonl"
+    state_file = tmp_path / "runner_state.json"
+
+    runner = ProspectiveShadowRunner(
+        ledger_path=ledger_file,
+        state_path=state_file,
+        db_path=db_file,
+    )
+
+    bar34_ts = base_ts + 34 * 3600000
+    # 1. Bar 34 started at bar34_ts. It closes at bar34_ts + 3600_000.
+    # Set current time to 30 mins into bar 34 (still in progress / unfinalized).
+    time_during_bar34 = datetime.fromtimestamp((bar34_ts + 1800000) / 1000, tz=UTC)
+    res1 = runner.poll_cycle(now_utc=time_during_bar34)
+
+    # Bar 34 must be excluded; only bar 33 and earlier are finalized
+    bar33_ts = base_ts + 33 * 3600000
+    assert runner.state["last_processed_candle_ts"]["BTCUSDT"] == bar33_ts
+
+    # 2. Advance time to 1 minute past bar 34 close (now finalized)
+    time_after_bar34 = datetime.fromtimestamp((bar34_ts + 3660000) / 1000, tz=UTC)
+    res2 = runner.poll_cycle(now_utc=time_after_bar34)
+    assert runner.state["last_processed_candle_ts"]["BTCUSDT"] == bar34_ts
+
+    # 3. Deduplication: running again at the same time does not re-process bar 34
+    res3 = runner.poll_cycle(now_utc=time_after_bar34)
+    assert runner.state["last_processed_candle_ts"]["BTCUSDT"] == bar34_ts
+    assert res3["resolved_in_cycle"] == 0
+    assert res3["precommitted_in_cycle"] == 0
+
+    # 4. Missed hourly candles (Gap recovery): Insert 3 new bars (35, 36, 37)
+    conn = sqlite3.connect(db_file)
+    for i in (35, 36, 37):
+        ts = base_ts + i * 3600000
+        conn.execute(
+            "INSERT INTO candles VALUES (?, 'BTCUSDT', '1h', 50100.0, 50300.0, 49900.0, 50200.0, 120.0, 0)",
+            (ts,),
+        )
+    conn.commit()
+    conn.close()
+
+    # Time is after bar 37 close (3 hours elapsed without runner)
+    bar37_ts = base_ts + 37 * 3600000
+    time_after_bar37 = datetime.fromtimestamp((bar37_ts + 3660000) / 1000, tz=UTC)
+    res4 = runner.poll_cycle(now_utc=time_after_bar37)
+
+    # All 3 missed bars were recovered chronologically; checkpoint is now bar 37
+    assert runner.state["last_processed_candle_ts"]["BTCUSDT"] == bar37_ts

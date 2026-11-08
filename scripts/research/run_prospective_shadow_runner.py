@@ -62,6 +62,7 @@ MANIFEST_PATH = ROOT_DIR / "research" / "m38_hypothesis_manifest.json"
 DB_PATH = ROOT_DIR / "data" / "market_data.db"
 OUTPUT_AUDIT_REPORT = ROOT_DIR / "SHADOW_LEDGER_AUDIT_REPORT.md"
 LOCK_FILE_PATH = ROOT_DIR / "data" / "shadow_runner.lock"
+STATE_FILE_PATH = ROOT_DIR / "data" / "shadow_runner_state.json"
 
 
 class ProcessLock:
@@ -170,21 +171,34 @@ class ProcessLock:
         self.release()
 
 
-def get_latest_candles_from_db(symbol: str, limit: int = 150) -> pd.DataFrame:
-    """Loads the most recent hourly candles from market_data.db."""
-    conn = sqlite3.connect(str(DB_PATH))
+def get_latest_candles_from_db(
+    symbol: str,
+    limit: int = 150,
+    db_path: Path = DB_PATH,
+) -> pd.DataFrame:
+    """
+    Loads the most recent hourly candles from market_data.db.
+    Matches both unified (e.g. BTC/USDT) and exchange-native (e.g. BTCUSDT) formats.
+    """
+    alt_symbol = (
+        symbol.replace("/", "")
+        if "/" in symbol
+        else (symbol[:-4] + "/" + symbol[-4:] if symbol.endswith("USDT") else symbol)
+    )
+    conn = sqlite3.connect(str(db_path))
     query = """
         SELECT timestamp, open, high, low, close, volume
         FROM candles
-        WHERE symbol = ? AND timeframe = '1h'
+        WHERE symbol IN (?, ?) AND timeframe = '1h'
+        GROUP BY timestamp
         ORDER BY timestamp DESC
         LIMIT ?
     """
-    df = pd.read_sql_query(query, conn, params=(symbol, limit))
+    df = pd.read_sql_query(query, conn, params=(symbol, alt_symbol, limit))
     conn.close()
 
     if df.empty:
-        raise ValueError(f"No candle data found in {DB_PATH} for {symbol} 1h")
+        raise ValueError(f"No candle data found in {db_path} for {symbol} 1h")
 
     df = df.sort_values("timestamp").reset_index(drop=True)
     df["ts"] = df["timestamp"].astype(int)
@@ -320,10 +334,18 @@ class ProspectiveShadowRunner:
     path-dependent MFE/MAE recording, and tamper-evident append-only logging.
     """
 
-    def __init__(self, ledger_path: Path = LEDGER_PATH):
+    def __init__(
+        self,
+        ledger_path: Path = LEDGER_PATH,
+        state_path: Path = STATE_FILE_PATH,
+        db_path: Path = DB_PATH,
+    ):
         self.ledger_path = Path(ledger_path)
+        self.state_path = Path(state_path)
+        self.db_path = Path(db_path)
         self.engine = ShadowLedgerEngine(self.ledger_path)
         self.manifest = self._load_manifest()
+        self.state = self._load_state()
 
     def _load_manifest(self) -> dict[str, Any]:
         if MANIFEST_PATH.exists():
@@ -331,72 +353,136 @@ class ProspectiveShadowRunner:
                 return json.load(f)
         return {}
 
-    def poll_cycle(self) -> dict[str, Any]:
+    def _load_state(self) -> dict[str, Any]:
+        if self.state_path.exists():
+            try:
+                with open(self.state_path, encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, dict):
+                        return data
+            except Exception as e:
+                logger.warning(f"Failed to read runner state from {self.state_path}: {e}")
+        return {"last_processed_candle_ts": {}}
+
+    def _save_state(self) -> None:
+        try:
+            self.state_path.parent.mkdir(parents=True, exist_ok=True)
+            tmp_path = self.state_path.with_suffix(".tmp")
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(self.state, f, indent=2)
+            os.replace(tmp_path, self.state_path)
+        except Exception as e:
+            logger.error(f"Failed to persist shadow runner state to {self.state_path}: {e}")
+
+    def poll_cycle(
+        self,
+        now_utc: datetime | None = None,
+        max_catchup_bars: int = 24,
+    ) -> dict[str, Any]:
         """
-        Executes a single forward shadow cycle:
-        1. Ingests latest candles for BTC and ETH.
-        2. Updates open predictions with latest bar high/low/close (MFE/MAE tracking & SL/TP resolution).
-        3. Evaluates qualified alpha strategies on closed bar.
-        4. Precommits any newly triggered shadow signals.
-        5. Verifies cryptographic integrity of the ledger.
+        Executes a forward shadow cycle with candle finalization & gap recovery:
+        1. Ingests latest candles for BTC and ETH from SQLite market database.
+        2. Filters out unfinalized (in-progress) candles: strictly enforces bar_ts + 1h <= now.
+        3. Identifies unprocessed closed bars since last_processed_ts.
+        4. Sequentially evaluates any missed bars chronologically (up to max_catchup_bars).
+        5. Updates active positions and evaluates entry rules on closed bars.
+        6. Precommits new shadow signals and atomically updates runner checkpoint state.
+        7. Verifies cryptographic integrity of the ledger.
         """
         logger.info("[*] Starting Shadow Evaluation Cycle...")
-        cycle_start = datetime.now(UTC).isoformat()
+        current_time = now_utc or datetime.now(UTC)
+        current_ts_ms = int(current_time.timestamp() * 1000)
+        cycle_start = current_time.isoformat()
         resolved_total: list[ShadowPredictionRecord] = []
         new_precommits: list[ShadowPredictionRecord] = []
 
         symbols = ["BTCUSDT", "ETHUSDT"]
         for sym in symbols:
             try:
-                df = get_latest_candles_from_db(sym, limit=100)
-                latest_bar = df.iloc[-1]
-                ts_iso = datetime.fromtimestamp(latest_bar["ts"] / 1000, tz=UTC).isoformat()
+                df = get_latest_candles_from_db(sym, limit=150, db_path=self.db_path)
+                # Finalization filter: A 1h bar starting at ts is only finalized when ts + 3600_000 <= current_ts_ms
+                df_final = df[df["ts"] + 3600_000 <= current_ts_ms]
+                if df_final.empty:
+                    logger.info(f"[{sym}] No finalized 1h candles found at {cycle_start}. Skipping.")
+                    continue
 
-                # 1. Update active shadow predictions with latest bar
-                newly_resolved = self.engine.update_bar(
-                    symbol=sym,
-                    bar_high=float(latest_bar["high"]),
-                    bar_low=float(latest_bar["low"]),
-                    bar_close=float(latest_bar["close"]),
-                    bar_timestamp_utc=ts_iso,
-                    taker_fee_pct=0.00040,
-                    maker_fee_pct=0.00020,
-                    slippage_pct=0.00010,
-                )
-                if newly_resolved:
-                    for r in newly_resolved:
-                        logger.info(
-                            f"[RESOLVED] {r.strategy_id} {r.symbol} {r.direction} -> {r.exit_reason} "
-                            f"(Net R: {r.realized_net_r:+.2f}R, MFE: {r.mfe_r:.2f}R, MAE: {r.mae_r:.2f}R)"
-                        )
-                        resolved_total.append(r)
+                last_processed = self.state.get("last_processed_candle_ts", {}).get(sym)
+                if last_processed is None:
+                    # Cold bootstrap: initialize to latest finalized candle minus 1h
+                    # so that on first boot exactly 1 latest finalized candle is evaluated
+                    last_processed = int(df_final.iloc[-1]["ts"]) - 3600_000
 
-                # 2. Evaluate strategy entry rules on closed bar
-                cands = evaluate_signals_on_bar(sym, df, self.manifest)
-                for cand in cands:
-                    rec = self.engine.precommit_prediction(
-                        strategy_id=cand["strategy_id"],
-                        strategy_fingerprint=cand["strategy_fingerprint"],
-                        symbol=cand["symbol"],
-                        timeframe=cand["timeframe"],
-                        direction=cand["direction"],
-                        entry_price=cand["entry_price"],
-                        stop_loss_price=cand["stop_loss_price"],
-                        take_profit_price=cand["take_profit_price"],
-                        risk_unit_usd=cand["risk_unit_usd"],
-                        max_hold_bars=cand["max_hold_bars"],
-                        timestamp_utc=cand["timestamp_utc"],
-                        idempotency_key=cand["idempotency_key"],
+                pending_bars = df_final[df_final["ts"] > last_processed].sort_values("ts")
+                if pending_bars.empty:
+                    logger.info(
+                        f"[{sym}] Candle {df_final.iloc[-1]['ts']} already processed (last={last_processed}). Skipping duplicate."
                     )
-                    if rec is not None:
-                        logger.info(
-                            f"[PRECOMMITTED] {rec.strategy_id} {rec.symbol} {rec.direction} at ${rec.entry_precommitted_price:,.2f} "
-                            f"(SL: ${rec.stop_loss_price:,.2f}, TP: ${rec.take_profit_price:,.2f})"
+                    continue
+
+                if len(pending_bars) > max_catchup_bars:
+                    logger.warning(
+                        f"[{sym}] Detected {len(pending_bars)} missed bars; processing latest {max_catchup_bars} bars."
+                    )
+                    pending_bars = pending_bars.tail(max_catchup_bars)
+
+                for _, bar in pending_bars.iterrows():
+                    bar_ts = int(bar["ts"])
+                    ts_iso = datetime.fromtimestamp(bar_ts / 1000, tz=UTC).isoformat()
+
+                    # 1. Update active shadow predictions with this finalized bar
+                    newly_resolved = self.engine.update_bar(
+                        symbol=sym,
+                        bar_high=float(bar["high"]),
+                        bar_low=float(bar["low"]),
+                        bar_close=float(bar["close"]),
+                        bar_timestamp_utc=ts_iso,
+                        taker_fee_pct=0.00040,
+                        maker_fee_pct=0.00020,
+                        slippage_pct=0.00010,
+                    )
+                    if newly_resolved:
+                        for r in newly_resolved:
+                            logger.info(
+                                f"[RESOLVED] {r.strategy_id} {r.symbol} {r.direction} -> {r.exit_reason} "
+                                f"(Net R: {r.realized_net_r:+.2f}R, MFE: {r.mfe_r:.2f}R, MAE: {r.mae_r:.2f}R)"
+                            )
+                            resolved_total.append(r)
+
+                    # 2. Evaluate strategy entry rules on the point-in-time slice up to this bar
+                    df_slice = df[df["ts"] <= bar_ts]
+                    cands = evaluate_signals_on_bar(sym, df_slice, self.manifest)
+                    for cand in cands:
+                        rec = self.engine.precommit_prediction(
+                            strategy_id=cand["strategy_id"],
+                            strategy_fingerprint=cand["strategy_fingerprint"],
+                            symbol=cand["symbol"],
+                            timeframe=cand["timeframe"],
+                            direction=cand["direction"],
+                            entry_price=cand["entry_price"],
+                            stop_loss_price=cand["stop_loss_price"],
+                            take_profit_price=cand["take_profit_price"],
+                            risk_unit_usd=cand["risk_unit_usd"],
+                            max_hold_bars=cand["max_hold_bars"],
+                            timestamp_utc=cand["timestamp_utc"],
+                            idempotency_key=cand["idempotency_key"],
                         )
-                        new_precommits.append(rec)
+                        if rec is not None:
+                            logger.info(
+                                f"[PRECOMMITTED] {rec.strategy_id} {rec.symbol} {rec.direction} at ${rec.entry_precommitted_price:,.2f} "
+                                f"(SL: ${rec.stop_loss_price:,.2f}, TP: ${rec.take_profit_price:,.2f})"
+                            )
+                            new_precommits.append(rec)
+
+                    # Advance checkpoint for this symbol
+                    last_processed = bar_ts
+                    self.state.setdefault("last_processed_candle_ts", {})[sym] = last_processed
 
             except Exception as e:
                 logger.error(f"Error processing {sym} in shadow cycle: {e}")
+
+        # Persist checkpoint state
+        self.state["last_poll_utc"] = cycle_start
+        self._save_state()
 
         # 3. Cryptographic integrity check
         is_valid, msg, record_count = self.engine.verify_ledger_integrity()
