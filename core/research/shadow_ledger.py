@@ -368,14 +368,26 @@ class ShadowLedgerEngine:
         """Exports statistical summary of shadow observation records."""
         resolved = [r for r in self.records if r.lifecycle_state == "RESOLVED"]
         net_returns = [r.realized_net_r for r in resolved if r.realized_net_r is not None]
+        wins = [r for r in net_returns if r > 0]
+        win_rate = round(len(wins) / len(net_returns) * 100.0, 1) if net_returns else 0.0
 
         return {
+            "total_records": len(self.records),
             "total_records_logged": len(self.records),
+            "active_predictions": len(self.active_predictions),
             "active_positions_count": len(self.active_predictions),
+            "resolved_predictions": len(resolved),
             "resolved_predictions_count": len(resolved),
+            "net_realized_r": round(sum(net_returns), 4) if net_returns else 0.0,
             "net_cumulative_r": round(sum(net_returns), 4) if net_returns else 0.0,
+            "avg_realized_net_r": round(sum(net_returns) / len(net_returns), 4) if net_returns else 0.0,
             "mean_net_r": round(sum(net_returns) / len(net_returns), 4) if net_returns else 0.0,
+            "win_rate_pct": win_rate,
             "mean_mfe_r": round(sum(r.mfe_r for r in resolved) / len(resolved), 4) if resolved else 0.0,
             "mean_mae_r": round(sum(r.mae_r for r in resolved) / len(resolved), 4) if resolved else 0.0,
             "integrity_verified": self.verify_ledger_integrity()[0]
         }
+
+    def export_audit_records(self) -> List[Dict[str, Any]]:
+        """Exports all ledger records as dictionaries for auditing."""
+        return [asdict(r) for r in self.records]
