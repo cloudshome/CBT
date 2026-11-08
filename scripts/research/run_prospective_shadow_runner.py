@@ -27,6 +27,7 @@ import argparse
 import json
 import logging
 import math
+import os
 import sqlite3
 import sys
 import time
@@ -34,12 +35,18 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-import numpy as np
-import pandas as pd
-
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
+
+# Ensure invocation automatically uses local virtualenv if present
+venv_py = ROOT_DIR / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+if venv_py.exists() and sys.executable != str(venv_py) and os.environ.get("_CBT_RUNNER_WRAPPED") != "1":
+    os.environ["_CBT_RUNNER_WRAPPED"] = "1"
+    os.execv(str(venv_py), [str(venv_py)] + sys.argv)
+
+import numpy as np
+import pandas as pd
 
 from core.research.shadow_ledger import ShadowLedgerEngine, ShadowPredictionRecord
 from core.research.strategy_fingerprint import (

@@ -49,6 +49,8 @@ def main() -> None:
     print(f"    • Win Rate           : {metrics['win_rate_pct']:.1f}%")
     print(f"    • Profit Factor      : {metrics['profit_factor']:.2f}")
     print(f"    • Expectancy (R)     : {metrics['expectancy_r']:.2f}R")
+    if metrics.get("audit_hash_sha256"):
+        print(f"    • Ledger Audit Hash  : {metrics['audit_hash_sha256']}")
 
     # 2. Carried-over & Open Positions
     conn = sqlite3.connect("data/trading_logs.db")

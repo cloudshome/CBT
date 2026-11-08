@@ -18,6 +18,7 @@ Constitutional Principles:
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import time
 from dataclasses import asdict, dataclass
@@ -73,6 +74,7 @@ class QualificationMetrics:
     historical_trades_count: int
     historical_realized_pnl_usd: float
     status: str  # "ACTIVE_BURN_IN", "INSUFFICIENT_DATA", "COMPLETED"
+    audit_hash_sha256: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -243,6 +245,14 @@ class QualificationLedger:
 
         status = "ACTIVE_BURN_IN" if remaining_hours > 0 else "COMPLETED"
 
+        # Deterministic SHA-256 state signature over qualification metrics & baseline
+        audit_payload = (
+            f"{self.anchor_timestamp_ms}|{self.starting_equity_usd:.2f}|{current_virtual_equity:.2f}|"
+            f"{len(unique_qual_positions)}|{len(closed_qual)}|{historical_count}|"
+            f"{historical_realized_pnl:.2f}|{status}"
+        )
+        audit_hash = hashlib.sha256(audit_payload.encode("utf-8")).hexdigest()
+
         return QualificationMetrics(
             anchor_timestamp_iso="2026-11-07T09:41:43.006Z",
             anchor_timestamp_ms=self.anchor_timestamp_ms,
@@ -273,6 +283,7 @@ class QualificationLedger:
             historical_trades_count=historical_count,
             historical_realized_pnl_usd=historical_realized_pnl,
             status=status,
+            audit_hash_sha256=audit_hash,
         )
 
 
