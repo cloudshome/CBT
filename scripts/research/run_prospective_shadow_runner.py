@@ -24,16 +24,16 @@ Strict Safety & Institutional Rigor:
 from __future__ import annotations
 
 import argparse
+import errno
 import json
 import logging
-import math
 import os
 import sqlite3
 import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 if str(ROOT_DIR) not in sys.path:
@@ -43,16 +43,12 @@ if str(ROOT_DIR) not in sys.path:
 venv_py = ROOT_DIR / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
 if venv_py.exists() and sys.executable != str(venv_py) and os.environ.get("_CBT_RUNNER_WRAPPED") != "1":
     os.environ["_CBT_RUNNER_WRAPPED"] = "1"
-    os.execv(str(venv_py), [str(venv_py)] + sys.argv)
+    os.execv(str(venv_py), [str(venv_py), *sys.argv])
 
-import numpy as np
-import pandas as pd
+import numpy as np  # noqa: E402
+import pandas as pd  # noqa: E402
 
-from core.research.shadow_ledger import ShadowLedgerEngine, ShadowPredictionRecord
-from core.research.strategy_fingerprint import (
-    StrategyCryptographicFingerprint,
-    hash_source_code,
-)
+from core.research.shadow_ledger import ShadowLedgerEngine, ShadowPredictionRecord  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -65,6 +61,113 @@ LEDGER_PATH = ROOT_DIR / "research" / "m38_shadow_prediction_ledger.jsonl"
 MANIFEST_PATH = ROOT_DIR / "research" / "m38_hypothesis_manifest.json"
 DB_PATH = ROOT_DIR / "data" / "market_data.db"
 OUTPUT_AUDIT_REPORT = ROOT_DIR / "SHADOW_LEDGER_AUDIT_REPORT.md"
+LOCK_FILE_PATH = ROOT_DIR / "data" / "shadow_runner.lock"
+
+
+class ProcessLock:
+    """
+    Advisory process lock enforcing single-instance execution via Linux fcntl.flock
+    (with Windows msvcrt locking fallback).
+
+    Safety Invariants:
+    1. Lock file is NEVER deleted/unlinked upon release (kernel descriptor management).
+    2. Non-blocking acquisition (LOCK_NB): If locked, fails fast without hanging.
+    3. Context manager guarantee: Releases open descriptor cleanly on exit.
+    """
+
+    def __init__(self, lock_path: Path = LOCK_FILE_PATH):
+        self.lock_path = Path(lock_path)
+        self.file_obj: Any | None = None
+        self.acquired: bool = False
+
+    def _close_fd(self) -> None:
+        if self.file_obj is not None:
+            try:
+                self.file_obj.close()
+            except Exception:
+                pass
+            self.file_obj = None
+
+    def acquire(self) -> bool:
+        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        # 1. Open descriptor: Genuine filesystem errors (PermissionError, EROFS, etc.)
+        # are not caught here and will propagate rather than being masked as lock contention.
+        self.file_obj = open(self.lock_path, "a+")
+        try:
+            if os.name == "nt":
+                import msvcrt
+
+                self.file_obj.seek(0)
+                try:
+                    msvcrt.locking(self.file_obj.fileno(), msvcrt.LK_NBLCK, 1)
+                except (BlockingIOError, OSError) as e:
+                    # Windows msvcrt raises EACCES or EDEADLK on lock contention
+                    if isinstance(e, BlockingIOError) or e.errno in (errno.EACCES, errno.EDEADLK):
+                        self._close_fd()
+                        self.acquired = False
+                        return False
+                    raise
+            else:
+                import fcntl
+
+                try:
+                    fcntl.flock(self.file_obj.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    # POSIX standard non-blocking lock contention
+                    self._close_fd()
+                    self.acquired = False
+                    return False
+                except OSError as e:
+                    if e.errno in (errno.EAGAIN, errno.EWOULDBLOCK):
+                        self._close_fd()
+                        self.acquired = False
+                        return False
+                    # Genuine OS locking errors (ENOLCK, EBADF, etc.) must not be masked
+                    raise
+
+            # 2. Record PID and timestamp for operator observability while holding the lock
+            try:
+                self.file_obj.seek(0)
+                self.file_obj.truncate(0)
+                self.file_obj.write(f"pid={os.getpid()}\nstarted_utc={datetime.now(UTC).isoformat()}\n")
+                self.file_obj.flush()
+            except Exception:
+                # If write fails (e.g. ENOSPC), release lock and re-raise genuine error
+                self.release()
+                raise
+
+            self.acquired = True
+            return True
+        except Exception:
+            self._close_fd()
+            self.acquired = False
+            raise
+
+    def release(self) -> None:
+        if self.file_obj is not None:
+            try:
+                if self.acquired:
+                    if os.name == "nt":
+                        import msvcrt
+
+                        self.file_obj.seek(0)
+                        msvcrt.locking(self.file_obj.fileno(), msvcrt.LK_UNLCK, 1)
+                    else:
+                        import fcntl
+
+                        fcntl.flock(self.file_obj.fileno(), fcntl.LOCK_UN)
+            except Exception:
+                pass
+            finally:
+                self._close_fd()
+        self.acquired = False
+
+    def __enter__(self) -> ProcessLock:
+        self.acquire()
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        self.release()
 
 
 def get_latest_candles_from_db(symbol: str, limit: int = 150) -> pd.DataFrame:
@@ -115,8 +218,8 @@ def get_latest_candles_from_db(symbol: str, limit: int = 150) -> pd.DataFrame:
 def evaluate_signals_on_bar(
     symbol: str,
     df: pd.DataFrame,
-    manifest: Dict[str, Any],
-) -> List[Dict[str, Any]]:
+    manifest: dict[str, Any],
+) -> list[dict[str, Any]]:
     """
     Evaluates candidate strategy rules on the latest completed bar (index -1).
     Zero-Lookahead: Evaluated on closed candle, signal targeted at next bar open.
@@ -222,13 +325,13 @@ class ProspectiveShadowRunner:
         self.engine = ShadowLedgerEngine(self.ledger_path)
         self.manifest = self._load_manifest()
 
-    def _load_manifest(self) -> Dict[str, Any]:
+    def _load_manifest(self) -> dict[str, Any]:
         if MANIFEST_PATH.exists():
-            with open(MANIFEST_PATH, "r", encoding="utf-8") as f:
+            with open(MANIFEST_PATH, encoding="utf-8") as f:
                 return json.load(f)
         return {}
 
-    def poll_cycle(self) -> Dict[str, Any]:
+    def poll_cycle(self) -> dict[str, Any]:
         """
         Executes a single forward shadow cycle:
         1. Ingests latest candles for BTC and ETH.
@@ -239,8 +342,8 @@ class ProspectiveShadowRunner:
         """
         logger.info("[*] Starting Shadow Evaluation Cycle...")
         cycle_start = datetime.now(UTC).isoformat()
-        resolved_total: List[ShadowPredictionRecord] = []
-        new_precommits: List[ShadowPredictionRecord] = []
+        resolved_total: list[ShadowPredictionRecord] = []
+        new_precommits: list[ShadowPredictionRecord] = []
 
         symbols = ["BTCUSDT", "ETHUSDT"]
         for sym in symbols:
@@ -320,7 +423,7 @@ class ProspectiveShadowRunner:
     def emit_audit_report(self) -> None:
         """Generates comprehensive markdown report of the shadow prediction ledger."""
         summary = self.engine.export_summary()
-        is_valid, msg, record_count = self.engine.verify_ledger_integrity()
+        is_valid, _msg, record_count = self.engine.verify_ledger_integrity()
         audit_recs = self.engine.export_audit_records()
 
         lines = [
@@ -329,7 +432,7 @@ class ProspectiveShadowRunner:
             f"**Audit Status:** `{'VERIFIED_TAMPER_FREE' if is_valid else 'COMPROMISED'}`  ",
             f"**Audit Timestamp:** `{datetime.now(UTC).isoformat()}`  ",
             f"**Cryptographic Verification:** SHA-256 Hash Chain ({record_count} sequential records)  ",
-            f"**Governance Safety:** `REAL_CAPITAL_ENABLED = False` (Mandatory Signal-Only Sandbox)  ",
+            "**Governance Safety:** `REAL_CAPITAL_ENABLED = False` (Mandatory Signal-Only Sandbox)  ",
             "",
             "---",
             "",
@@ -399,14 +502,21 @@ def main():
     parser.add_argument("--interval", type=int, default=3600, help="Polling interval in seconds for daemon")
     args = parser.parse_args()
 
-    runner = ProspectiveShadowRunner()
+    with ProcessLock() as lock:
+        if not lock.acquired:
+            logger.warning(
+                "Another instance of ProspectiveShadowRunner is currently active (lock held). Skipping execution."
+            )
+            sys.exit(0)
 
-    if args.daemon:
-        runner.run_daemon(poll_interval_seconds=args.interval)
-    else:
-        # Default: poll once and emit audit report
-        runner.poll_cycle()
-        runner.emit_audit_report()
+        runner = ProspectiveShadowRunner()
+
+        if args.daemon:
+            runner.run_daemon(poll_interval_seconds=args.interval)
+        else:
+            # Default: poll once and emit audit report
+            runner.poll_cycle()
+            runner.emit_audit_report()
 
 
 if __name__ == "__main__":
