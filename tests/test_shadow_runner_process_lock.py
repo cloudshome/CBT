@@ -8,7 +8,8 @@ Enforces non-blocking mutual exclusion, kernel cleanup, and lockfile persistence
 from __future__ import annotations
 
 import errno
-import multiprocessing
+import os
+import stat
 import subprocess
 import sys
 import time
@@ -20,10 +21,14 @@ import pytest
 from scripts.research.run_prospective_shadow_runner import ProcessLock
 
 
-def _hold_lock_process(lock_path_str: str, duration_sec: float) -> None:
-    """Helper worker that acquires lock, holds it for duration, and exits."""
+def _hold_lock_process(
+    lock_path_str: str, duration_sec: float, ready_file_str: str | None = None
+) -> None:
+    """Helper worker that acquires lock, signals readiness, holds it for duration, and exits."""
     lock = ProcessLock(Path(lock_path_str))
     if lock.acquire():
+        if ready_file_str:
+            Path(ready_file_str).write_text("ready")
         time.sleep(duration_sec)
         lock.release()
     else:
@@ -74,21 +79,37 @@ def test_process_lock_context_manager(tmp_path: Path):
 def test_process_lock_cross_process_kernel_cleanup(tmp_path: Path):
     """Verifies OS kernel automatically releases lock when child process terminates."""
     lock_file = tmp_path / "test_cross_proc.lock"
+    ready_file = tmp_path / "child_ready.txt"
 
-    # Start child process holding the lock for 0.5s
-    p = multiprocessing.Process(target=_hold_lock_process, args=(str(lock_file), 0.5))
-    p.start()
+    worker_code = (
+        "import sys, time\n"
+        "from pathlib import Path\n"
+        "from scripts.research.run_prospective_shadow_runner import ProcessLock\n"
+        f"lock = ProcessLock(Path(r'{lock_file}'))\n"
+        "if lock.acquire():\n"
+        f"    Path(r'{ready_file}').write_text('ready')\n"
+        "    time.sleep(3.0)\n"
+        "    lock.release()\n"
+        "else:\n"
+        "    sys.exit(1)\n"
+    )
 
-    # Give child a moment to acquire
-    time.sleep(0.1)
+    proc = subprocess.Popen([sys.executable, "-c", worker_code])
+
+    # Wait for child to explicitly signal it acquired the lock (fast break on creation)
+    for _ in range(200):
+        if ready_file.exists():
+            break
+        time.sleep(0.05)
+
+    assert ready_file.exists(), "Child process failed to signal lock acquisition in time"
 
     parent_lock = ProcessLock(lock_file)
     # While child is active, parent must be locked out
     assert parent_lock.acquire() is False
 
     # Wait for child to exit
-    p.join(timeout=3.0)
-    assert not p.is_alive()
+    proc.wait(timeout=6.0)
 
     # Now parent must acquire immediately
     assert parent_lock.acquire() is True
@@ -121,10 +142,9 @@ def test_runner_cli_skips_when_lock_held(tmp_path: Path):
 
 def test_process_lock_genuine_filesystem_error_raises_not_masked(tmp_path: Path):
     """Verifies filesystem errors (e.g. permission denied) raise and are not masked as active process."""
-    readonly_dir = tmp_path / "readonly_dir"
-    readonly_dir.mkdir(parents=True, exist_ok=True)
-    readonly_dir.chmod(0o555)
-    lock_file = readonly_dir / "unwritable.lock"
+    lock_file = tmp_path / "unwritable.lock"
+    lock_file.write_text("existing_content")
+    os.chmod(lock_file, stat.S_IREAD)
     lock = ProcessLock(lock_file)
 
     try:
@@ -133,7 +153,7 @@ def test_process_lock_genuine_filesystem_error_raises_not_masked(tmp_path: Path)
         assert lock.acquired is False
         assert lock.file_obj is None
     finally:
-        readonly_dir.chmod(0o755)
+        os.chmod(lock_file, stat.S_IWRITE | stat.S_IREAD)
 
 
 def test_process_lock_genuine_flock_failure_raises_not_masked(tmp_path: Path):
@@ -141,8 +161,8 @@ def test_process_lock_genuine_flock_failure_raises_not_masked(tmp_path: Path):
     lock_file = tmp_path / "flock_fail.lock"
     lock = ProcessLock(lock_file)
 
-    # Simulate ENOLCK (No locks available in system)
-    with patch("fcntl.flock", side_effect=OSError(errno.ENOLCK, "No locks available")):
+    patch_target = "msvcrt.locking" if os.name == "nt" else "fcntl.flock"
+    with patch(patch_target, side_effect=OSError(errno.ENOLCK, "No locks available")):
         with pytest.raises(OSError) as excinfo:
             lock.acquire()
         assert excinfo.value.errno == errno.ENOLCK

@@ -349,18 +349,34 @@ class DatabaseManager:
                     trailing_stop REAL,
                     breakeven_triggered INTEGER DEFAULT 0,
                     entry_reason TEXT,
-                    exit_reason TEXT
+                    exit_reason TEXT,
+                    book_id TEXT DEFAULT 'MAIN_SOVEREIGN',
+                    initial_stop_loss REAL,
+                    fee_usd REAL DEFAULT 0.0
                 );
             """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_pos_status ON shadow_positions (status);")
-
-            # Ensure entry_reason and exit_reason columns exist for backwards-compatibility migrations
+            # Ensure backwards-compatibility migrations exist for legacy databases BEFORE indexing
             cursor = conn.execute("PRAGMA table_info(shadow_positions);")
-            cols = [row[1] for row in cursor.fetchall()]
+            cols = {row[1] for row in cursor.fetchall()}
             if "entry_reason" not in cols:
                 conn.execute("ALTER TABLE shadow_positions ADD COLUMN entry_reason TEXT;")
             if "exit_reason" not in cols:
                 conn.execute("ALTER TABLE shadow_positions ADD COLUMN exit_reason TEXT;")
+            if "book_id" not in cols:
+                conn.execute(
+                    "ALTER TABLE shadow_positions ADD COLUMN book_id TEXT DEFAULT 'MAIN_SOVEREIGN';"
+                )
+            if "initial_stop_loss" not in cols:
+                conn.execute("ALTER TABLE shadow_positions ADD COLUMN initial_stop_loss REAL;")
+            if "fee_usd" not in cols:
+                conn.execute("ALTER TABLE shadow_positions ADD COLUMN fee_usd REAL DEFAULT 0.0;")
+
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_pos_status ON shadow_positions (status);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_pos_book ON shadow_positions (book_id);")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_pos_opened_at ON shadow_positions (opened_at);"
+            )
+            conn.commit()
 
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS execution_audits (
