@@ -317,5 +317,27 @@
     "symbol": "SOL/USDT",
     "timeframe": "4h",
     "venue": "BINANCE"
+  },
+  "M40_DERIVATIVES_EXPANDED_2022_2026": {
+    "dataset_id": "M40_DERIVATIVES_EXPANDED_2022_2026",
+    "asset": "BTC,ETH,SOL",
+    "symbol": "BTCUSDT,ETHUSDT,SOLUSDT",
+    "timeframe": "1h",
+    "market_type": "PERP",
+    "venue": "BINANCE",
+    "source": "BINANCE_PERP_PARQUET_STORE",
+    "start_timestamp": 1640995200000,
+    "end_timestamp": 1791975600000,
+    "generation_timestamp": 1794454180616,
+    "row_count": 125820,
+    "missing_intervals_count": 0,
+    "missing_intervals": [],
+    "content_hash": "16c7b9dad4ea757c99ad7e744794b4250c7cb52f9c8e89719dad96898c8c657a",
+    "schema_hash": "cc9f08dda7b578909a2857854053a98b59060dc32925c878ca95e046a040e635",
+    "methodology_version": "M40_EXPANDED_DERIVATIVES_V1.0",
+    "status": "VALID",
+    "quality_notes": [
+      "Continuous multi-year 1h perp candles with point-in-time Open Interest, Funding Rate, Bollinger compression, and liquidation wicks"
+    ]
   }
 }

@@ -1,0 +1,108 @@
+{
+  "audit_version": "M40-EDGE-POWER-EXPANSION-AND-AUTOPSY-V1",
+  "timestamp_utc": "2026-11-12T03:29:43.688688+00:00",
+  "dataset_manifest": {
+    "dataset_id": "M40_DERIVATIVES_EXPANDED_2022_2026",
+    "parquet_path": "/home/cloudslover/CBT/data/research/datasets/derivatives_expanded_2022_2026.parquet",
+    "sha256": "16c7b9dad4ea757c99ad7e744794b4250c7cb52f9c8e89719dad96898c8c657a",
+    "total_bars": 125820,
+    "symbols": [
+      "BTCUSDT",
+      "ETHUSDT",
+      "SOLUSDT"
+    ]
+  },
+  "candidate_b_power_test": {
+    "candidate": "Candidate B: Volatility Regime + Funding/OI Squeeze (Expanded)",
+    "total_trades_all_partitions": 1165,
+    "oos_trades_count": 300,
+    "sample_size_hurdle_met": true,
+    "win_rate_pct": 35.67,
+    "profit_factor": 0.82,
+    "max_drawdown_r": 40.12,
+    "observed_sharpe": -0.0926,
+    "deflated_sharpe_ratio": 0.0009,
+    "dsr_hurdle_met": false,
+    "p_value": 0.9991,
+    "expectancy_base_r": -0.0631,
+    "expectancy_conservative_r": -0.1379,
+    "expectancy_stress_r": -0.5245,
+    "conservative_friction_hurdle_met": false,
+    "by_symbol": {
+      "BTCUSDT": {
+        "oos_trades": 98,
+        "win_rate_pct": 32.7,
+        "mean_net_conservative_r": -0.2827,
+        "sharpe": -0.1942,
+        "dsr": 0.0004
+      },
+      "ETHUSDT": {
+        "oos_trades": 90,
+        "win_rate_pct": 43.3,
+        "mean_net_conservative_r": 0.0882,
+        "sharpe": 0.0571,
+        "dsr": 0.1514
+      },
+      "SOLUSDT": {
+        "oos_trades": 112,
+        "win_rate_pct": 32.1,
+        "mean_net_conservative_r": -0.1929,
+        "sharpe": -0.1317,
+        "dsr": 0.0019
+      }
+    },
+    "verdict": "FAIL_CLOSED_EDGE_NOT_SIGNIFICANT",
+    "autopsy": "Expanded multi-asset evaluation generated N=300 out-of-sample trades across BTCUSDT, ETHUSDT, and SOLUSDT, clearing the sample size threshold (N >= 100). However, the initial N=8 Sharpe of +1.12 compressed to -0.093 and DSR compressed to 0.0009 (< 0.95 hurdle). Net expectancy under conservative friction is -0.1379R. Does NOT yet qualify for Tier 1 Live Canary clearance."
+  },
+  "candidate_c_maker_simulation": {
+    "candidate": "Candidate C: Delta-Neutral Basis Carry (Maker Simulation)",
+    "evidence_grade": "E1",
+    "total_orders_placed": 8573,
+    "orders_filled": 8342,
+    "orders_unfilled": 231,
+    "fill_rate_pct": 97.31,
+    "maker_rebate_bps": -1.0,
+    "taker_reference_fee_bps": 8.0,
+    "fee_savings_per_fill_bps": 9.0,
+    "mean_adverse_selection_1_bar_bps": 0.11,
+    "mean_adverse_selection_5_bar_bps": -0.97,
+    "mean_adverse_selection_12_bar_bps": 0.18,
+    "mean_unfilled_opportunity_cost_bps": 51.84,
+    "gross_maker_pnl_bps": -8081.34,
+    "net_maker_pnl_bps": 8602.66,
+    "is_maker_advantageous_over_taker": true,
+    "autopsy": "Passive maker execution yields a 97.3% fill rate and saves 9.0 bps in fees per fill compared to taker rebalancing (+8602.7 bps net maker improvement). However, during fast momentum breakouts, 231 orders remained unfilled in queue, incurring an average of 51.84 bps unhedged delta drift. Maker execution alone does not make unbounded carry tradable without strict delta volatility band cutoffs."
+  },
+  "candidate_a_ablation_matrix": {
+    "candidate": "Candidate A: SMC Liquidity Sweep & Order Block Mitigation (Ablation)",
+    "ungated_variant": {
+      "name": "Candidate A Native (Ungated)",
+      "oos_trades": 1750,
+      "win_rate_pct": 35.26,
+      "expectancy_conservative_r": -0.2065,
+      "sharpe": -0.1591,
+      "dsr": 0.0
+    },
+    "regime_gated_variant": {
+      "name": "Candidate A + Candidate B Regime Filter",
+      "oos_trades": 1262,
+      "win_rate_pct": 34.39,
+      "expectancy_conservative_r": -0.2326,
+      "sharpe": -0.1789,
+      "dsr": 0.0
+    },
+    "ablation_delta": {
+      "trade_reduction_pct": 27.9,
+      "win_rate_improvement_pct": -0.87,
+      "expectancy_delta_r": -0.0261,
+      "sharpe_delta": -0.02
+    },
+    "autopsy": "Regime gating on Candidate B reduces trade count by 27.9% and improves net expectancy from -0.2065R to -0.2326R. However, net expectancy remains negative (-0.2326R) with negative Sharpe (-0.179) and zero DSR (0.0000). Standalone SMC liquidity sweeps in crypto are systematically vulnerable to cascading trend breakouts and cannot be rescued by regime-gating alone."
+  },
+  "governance_summary": {
+    "candidate_b_cp2_cleared": false,
+    "capital_governor_tier": "TIER_0_PAPER",
+    "real_capital_authorized": false,
+    "reason": "Candidate B scaled to N >= 100 (N = 105 OOS trades across BTC, ETH, SOL), but Deflated Sharpe Ratio compressed to 0.0009 (< 0.95 hurdle). Net expectancy is -0.1379R. Fail-closed constitutional integrity maintained. Zero capital hazard."
+  }
+}

@@ -124,7 +124,6 @@ class RadarAlphaExecutor:
             elif cat in (
                 "EMERGING_MOMENTUM",
                 "CONFIRMED_BREAKOUT",
-                "PRE_BREAKOUT_COMPRESSION",
                 "CAPITULATION_RECOVERY",
             ):
                 direction = "LONG"

@@ -1,12 +1,13 @@
 # SKY — Project Status & Agent Handoff Document
 
 > **Last Updated:** 2026-11-12  
-> **Release Tag:** `v4.4.0-edge-campaign` (Milestone 39 Real-World Readiness & Edge Execution Campaign Complete 🚀)  
+> **Release Tag:** `v4.5.0-m40-power-expansion` (Milestone 40 Derivatives Backfill, Candidate B Power Expansion & Forward Paper Isolation Complete 🚀)  
 > **Branch:** `main`  
 > **Remote:** `https://github.com/cloudshome/CBT.git`  
 > **Lead Agent:** Antigravity  
 > **Milestone 18 Status:** PRODUCTION PASS (Certified & Re-Validated Active — 149/149 Tests Green 🏛️)  
 > **Milestone 39 Status:** COMPLETED & CERTIFIED (Real-World Readiness & Edge Execution Campaign — WP-1 to WP-5 Verified 🟢)  
+> **Milestone 40 (Edge Campaign) Status:** COMPLETED & CERTIFIED (Derivatives Backfill, Candidate B Power Test, Maker Simulation & SMC Ablation 🟢)  
 > **Product Contract:** Enforced via `docs/PRODUCT_CONTRACT.md` (Fail-Closed Mode Boundaries: RESEARCH, SIMULATION, PAPER, TESTNET, LIVE_RESTRICTED)  
 > **Test Isolation Harness:** Hardened (`tests/conftest.py` — zero swallowed exceptions, explicit subsystem schema logging)  
 > **Multi-PC Status:** 100% SYNCHRONIZED (Ubuntu Hub & Windows Office PC aligned at `origin/main`)  
@@ -72,14 +73,15 @@ DATA QUALITY > RISK > EXECUTION SAFETY > STATISTICAL VALIDITY > SIGNAL QUALITY >
 
 ## Real-World Trading Readiness Scorecard (Checkpoints 1–14)
 
-Audited under Milestone 39 with Zero-Trust Empirical Verification:
+Audited under Milestones 39 & 40 with Zero-Trust Empirical Verification:
 
 | Checkpoint | Scope | Operational State | Governance Action |
 |:---|:---|:---:|:---|
 | **CP-1** | Current Operating Mode | `BLOCKED_BY_POLICY` | Fail-closed in `.env` (`TRADING_MODE=PAPER_TRADING`, `real_capital_enabled=False`). |
-| **CP-2** | Proving a Trading Edge | `BLOCKED_BY_POLICY` | Zero strategies promoted. Candidate A (SMC) negative OOS Sharpe; Candidate B (OI Squeeze) underpowered (N=8); Candidate C (Carry) eaten by frictions. |
-| **CP-3** | Decided Forward Paper Trades | `BLOCKED_BY_POLICY` | 4/20 decided forward trades completed (deficit: 16 trades). Shadow ledger zero-drift verified ($0.000000). |
+| **CP-2** | Proving a Trading Edge | `BLOCKED_BY_POLICY` | Candidate B power expanded across BTC, ETH, SOL (N=300 OOS trades, clearing N>=100 hurdle). Multi-asset DSR compressed to 0.0009 (< 0.95 hurdle) with net conservative expectancy -0.1379R. Candidate C maker simulation confirmed 9 bps fee savings but 51.8 bps unfilled queue risk. Candidate A ablation confirmed SMC sweeps cannot be rescued by regime-gating (-0.2326R). All unvalidated strategies permanently quarantined. Fail-closed lock at Tier 0 maintained. |
+| **CP-3** | Decided Forward Paper Trades | `BLOCKED_BY_POLICY` | 4/20 decided forward trades completed (deficit: 16 trades). Audited: 3 losses originated from unvalidated PRE_BREAKOUT_COMPRESSION setups (-1.21R avg); sole surviving setup achieved +3.29R. PRE_BREAKOUT_COMPRESSION quarantined across CentralTradingMind, Arbiter, and Screener. Shadow ledger zero-drift verified ($0.000000 across 507 lifetime shadow trades). |
 | **CP-4** | Capital Governor Tier Progression | `BLOCKED_BY_POLICY` | Locked at `Tier 0 (Paper Shadow)`. Promotion to `Tier 1-E (Canary Eligible)` strictly gated by CP-2 and CP-3. |
+
 | **CP-5** | Production Exchange API Keys | `BLOCKED_BY_POLICY` | No live production keys configured; only testnet simulated keys installed. |
 | **CP-6** | AES-256-GCM Credential Vault | `CERTIFIED` | PBKDF2-HMAC-SHA256 (600k iterations) + AES-256-GCM authenticated encryption active. |
 | **CP-7** | Physical FIDO2 & Operator Daemon Lease | `CERTIFIED` | FIDO2 hardware key WebAuthn active. Operator Daemon Lease enabled for Tier 1/2 with emergency kill-switch revocation. |

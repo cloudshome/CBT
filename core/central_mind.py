@@ -431,19 +431,44 @@ class CentralTradingMind:
             )
 
         # -------------------------------------------------------------
-        # INVARIANT 2b: Empirically Falsified Strategy Firewall Gate
+        # INVARIANT 2b: Empirically Falsified Strategy & Quarantine Firewall Gate
         # -------------------------------------------------------------
         thesis_upper = (proposal.thesis or "").upper()
         strat_upper = (proposal.strategy_name if hasattr(proposal, "strategy_name") else "").upper()
         combined_text = f"{thesis_upper} {strat_upper}"
         if any(
             falsified in combined_text
-            for falsified in ["BREAKOUT BUY", "SWEEP REVERSAL", "SETUP_C_BREAKOUT"]
+            for falsified in [
+                "BREAKOUT BUY",
+                "SWEEP REVERSAL",
+                "SETUP_C_BREAKOUT",
+                "PRE_BREAKOUT_COMPRESSION",
+                "CANDIDATE_A",
+                "SMC_ORDER_BLOCK",
+                "SMC LIQUIDITY SWEEP",
+                "CANDIDATE_C_DELTA_NEUTRAL",
+                "DELTA_NEUTRAL_CARRY",
+            ]
         ):
             return _reject(
                 f"Empirical Research Gate: Strategy in '{proposal.thesis}' was falsified during multi-year "
-                f"out-of-sample backtest (Win Rate < 10%, Expectancy < -0.80R). Execution rejected."
+                f"out-of-sample backtest or forward paper qualification. Execution rejected."
             )
+
+        try:
+            from core.execution.strategy_gateway.research_eligibility import (
+                strategy_eligibility_verifier,
+            )
+
+            for quarantined in strategy_eligibility_verifier._quarantined_strategies:
+                if quarantined in combined_text or quarantined in origin_upper:
+                    return _reject(
+                        f"Strategy Quarantine Gate: Strategy '{quarantined}' is actively quarantined "
+                        f"in Research Eligibility Authority. Execution rejected."
+                    )
+        except Exception as elig_err:
+            logger.debug("Strategy eligibility verification check bypassed: %s", elig_err)
+
 
         # -------------------------------------------------------------
         # INVARIANT 2c: EventShock & Volatility Circuit Breaker Check

@@ -75,6 +75,9 @@ class QualificationMetrics:
     historical_realized_pnl_usd: float
     status: str  # "ACTIVE_BURN_IN", "INSUFFICIENT_DATA", "COMPLETED"
     audit_hash_sha256: str = ""
+    quarantined_trades_count: int = 0
+    surviving_trades_count: int = 0
+    surviving_expectancy_r: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -135,7 +138,7 @@ class QualificationLedger:
                 """
                 SELECT position_id, symbol, direction, size, entry_price, current_price,
                        stop_loss, take_profit, realized_pnl, unrealized_pnl, fee_usd,
-                       status, opened_at, closed_at, initial_stop_loss
+                       status, opened_at, closed_at, initial_stop_loss, entry_reason
                 FROM shadow_positions
                 WHERE opened_at >= ?
                 ORDER BY opened_at ASC;
@@ -205,19 +208,44 @@ class QualificationLedger:
 
         # Expectancy in R: Sum( realized_pnl / initial_risk_usd ) / total_closed
         r_multiples: list[float] = []
+        surviving_r_multiples: list[float] = []
+        quarantined_trades_count = 0
+
         for p in closed_qual:
             realized = float(p["realized_pnl"] or 0.0)
             ep = float(p["entry_price"] or 0.0)
             init_sl = float(p["initial_stop_loss"] or p["stop_loss"] or ep)
             sz = float(p["size"] or 0.0)
             risk_usd = sz * abs(ep - init_sl)
-            if risk_usd > 0.01:
-                r_multiples.append(realized / risk_usd)
+            r_val = (realized / risk_usd) if risk_usd > 0.01 else 0.0
+            r_multiples.append(r_val)
+
+            # Check if this position originated from an empirically quarantined / falsified mechanism
+            reason_text = (
+                str(p["entry_reason"] or "").upper() if "entry_reason" in p.keys() else ""
+            )
+            is_quarantined = any(
+                q in reason_text
+                for q in [
+                    "PRE_BREAKOUT_COMPRESSION",
+                    "CANDIDATE_A",
+                    "SMC_ORDER_BLOCK",
+                    "SWEEP REVERSAL",
+                ]
+            )
+            if is_quarantined:
+                quarantined_trades_count += 1
             else:
-                r_multiples.append(0.0)
+                surviving_r_multiples.append(r_val)
 
         expectancy_r = (
             round(sum(r_multiples) / len(r_multiples), 2) if len(r_multiples) > 0 else 0.0
+        )
+        surviving_trades_count = len(surviving_r_multiples)
+        surviving_expectancy_r = (
+            round(sum(surviving_r_multiples) / surviving_trades_count, 2)
+            if surviving_trades_count > 0
+            else 0.0
         )
 
         # Drawdown calculation across qualification trajectory
@@ -284,6 +312,9 @@ class QualificationLedger:
             historical_realized_pnl_usd=historical_realized_pnl,
             status=status,
             audit_hash_sha256=audit_hash,
+            quarantined_trades_count=quarantined_trades_count,
+            surviving_trades_count=surviving_trades_count,
+            surviving_expectancy_r=surviving_expectancy_r,
         )
 
 

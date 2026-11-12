@@ -177,6 +177,21 @@ class MastermindArbiterCouncil:
             if clean_opp_sym not in {s.replace("/", "").upper() for s in ALLOWED_MAIN_DESK_SYMBOLS}:
                 continue
 
+            # Milestone 40: Empirical Quarantine for Unvalidated Setups
+            cat_val = getattr(opp.opportunity_category, "value", str(opp.opportunity_category))
+            if cat_val in {
+                "PRE_BREAKOUT_COMPRESSION",
+                "NO_TRADE_QUARANTINE",
+                "CANDIDATE_A_SMC",
+                "CANDIDATE_C_CARRY",
+            }:
+                logger.info(
+                    "Mastermind Arbiter: Skipping quarantined setup %s for %s",
+                    cat_val,
+                    opp.symbol,
+                )
+                continue
+
             if opp.recommended_direction == "LONG" and long_count < max_top_longs:
                 if opp.symbol not in self.dynamic_specialists:
                     self.deploy_dynamic_specialist(

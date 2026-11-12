@@ -365,3 +365,24 @@ class StrategyEligibilityVerifier:
             logger.error(f"[Eligibility] Failed to persist audit record: {exc}")
 
         return record
+
+
+# Authoritative Global Singleton Instance
+strategy_eligibility_verifier = StrategyEligibilityVerifier()
+strategy_eligibility_verifier.quarantine_strategy(
+    "PRE_BREAKOUT_COMPRESSION",
+    "Falsified in forward paper trading (-0.09R expectancy, 3 consecutive stop-loss hits).",
+)
+strategy_eligibility_verifier.quarantine_strategy(
+    "CANDIDATE_A_SMC",
+    "Falsified in M39 multi-year out-of-sample backtest (OOS Sharpe -0.18, net expectancy -0.039R).",
+)
+strategy_eligibility_verifier.quarantine_strategy(
+    "SMC_ORDER_BLOCK",
+    "Negative expectancy under Tier-2 Conservative friction (-0.039R).",
+)
+strategy_eligibility_verifier.quarantine_strategy(
+    "CANDIDATE_C_DELTA_NEUTRAL_CARRY",
+    "Rejected due to friction erosion under conservative rebalance taker drag (-0.015R).",
+)
+

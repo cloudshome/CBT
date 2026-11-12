@@ -596,6 +596,9 @@ class OpportunityHunter:
             # Timing stage determination
             if category == OpportunityCategory.PRE_BREAKOUT_COMPRESSION:
                 timing_stage = TimingStage.PRE_SPIKE.value
+                # Milestone 40: Empirical quarantine - unvalidated compression setups cannot autoroute to execution
+                spot_eligible = False
+                futures_eligible = False
             elif category in (
                 OpportunityCategory.EMERGING_MOMENTUM,
                 OpportunityCategory.CAPITULATION_RECOVERY,
