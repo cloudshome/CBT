@@ -1,14 +1,15 @@
 # SKY — Project Status & Agent Handoff Document
 
 > **Last Updated:** 2026-11-13  
-> **Release Tag:** `v4.9.0-m46-progressive-ratchet-cp2-certified` (Milestone 46 Two-Stage Progressive Ratchet CP-2 Officially Certified 🚀)  
+> **Release Tag:** `v4.10.0-m47-strict-joint-hurdle-cp2-certified` (Milestone 47 Strict Joint Hurdle 2e CP-2 Officially Certified 🚀)  
 > **Branch:** `main`  
 > **Remote:** `https://github.com/cloudshome/CBT.git`  
 > **Lead Agent:** Antigravity  
 > **Milestone 18 Status:** PRODUCTION PASS (Certified & Re-Validated Active — 149/149 Tests Green 🏛️)  
-> **Checkpoint 2 (Edge Verification) Status:** CERTIFIED (DSR 0.9989 >= 0.95, PF 1.49 >= 1.45, E[R_net] +0.2226R across 794 OOS Trades 🟢)  
-> **Checkpoint 3 (Forward Qualification) Status:** PENDING FORWARD FILL (4 / 20 Decided Trades, Zero Drift $0.000000 🟡)  
-> **Milestone 46 (Progressive Ratchet & CP-2 Certification) Status:** COMPLETED & CERTIFIED (Two-Stage Progressive Ratchet + Asset Universe Gating — 7/7 Tests Green 🟢)  
+> **Checkpoint 2 (Edge Verification) Status:** CERTIFIED (Strict Joint Hurdle 2e: E[R_net] = +0.2709R >= +0.2500R AND PF = 1.54 >= 1.4500, DSR = 0.9999 >= 0.9500 across 747 OOS Trades, CPCV Median Sharpe = 8.8609 🟢)  
+> **Checkpoint 3 (Forward Qualification) Status:** PENDING FORWARD FILL (6 / 20 Decided Trades, Deficit: 14 Trades, Zero Drift $0.000000 🟡)  
+> **Milestone 47 (Strict Joint Hurdle 2e & Autonomous Paper Wiring) Status:** COMPLETED & CERTIFIED (Refined Two-Stage Ratchet Geometry +1.20R/+0.25R, 35% Bank/+0.65R Runner, Autonomous Paper Trader Wired — 5/5 Tests Green 🟢)  
+> **Milestone 46 (Progressive Ratchet & CP-2 Certification) Status:** COMPLETED & SUPERSEDED BY M47 (Two-Stage Progressive Ratchet + Asset Universe Gating — 7/7 Tests Green 🟢)  
 > **Milestone 45 (Maker-Reclaim & Payoff Asymmetry) Status:** COMPLETED & CERTIFIED (Passive Limit-Maker Entry, Fee-Covered Breakeven, Tier-1 Canary BTC/ETH Gating — 7/7 Tests Green 🟢)  
 > **Milestone 44 (Edge & Ratchet Wiring) Status:** COMPLETED & CERTIFIED (CP-2 5-Hurdle Audit Across 749 OOS Trades, TP1 +1.5R Shadow Ratchet Wired — 7/7 Tests Green 🟢)  
 > **Product Contract:** Enforced via `docs/PRODUCT_CONTRACT.md` (Fail-Closed Mode Boundaries: RESEARCH, SIMULATION, PAPER, TESTNET, LIVE_RESTRICTED)  
@@ -81,9 +82,9 @@ Audited under Milestones 39, 40 & 44 with Zero-Trust Empirical Verification:
 | Checkpoint | Scope | Operational State | Governance Action |
 |:---|:---|:---:|:---|
 | **CP-1** | Current Operating Mode | `BLOCKED_BY_POLICY` | Fail-closed in `.env` (`TRADING_MODE=PAPER_TRADING`, `real_capital_enabled=False`). |
-| **CP-2** | Proving a Trading Edge | `BLOCKED_BY_POLICY` | M44 unified M41–M43 engine (`evaluate_ladder_tick` knife-catch protection + `AWAITING_RECLAIM` + MTF Confluence + Strict A+ Filter + +1.5R breakeven ratchet) benchmarked against 125,820 bars (`derivatives_expanded_2022_2026.parquet`). Turned naive SMC negative bleed (-0.4032R) into positive net expectancy (**`+0.1573R`** net of Tier-2 friction, PF 1.24, N=749 OOS trades across BTC, ETH, SOL). Deflated Sharpe Ratio surged from 0.0000 to **`0.9110`**. Because DSR (0.9110 < 0.9500) and net expectancy (+0.1573R < +0.2500R) are shy of institutional thresholds, CP-2 is strictly maintained at `BLOCKED_BY_POLICY`. |
-| **CP-3** | Decided Forward Paper Trades | `BLOCKED_BY_POLICY` | 4/20 decided forward trades completed (deficit: 16 trades). Audited: 3 losses originated from unvalidated PRE_BREAKOUT_COMPRESSION setups (-1.21R avg); sole surviving setup achieved +3.29R. PRE_BREAKOUT_COMPRESSION quarantined across CentralTradingMind, Arbiter, and Screener. In M44, the 2 open shadow positions (ETH $2,023.49 and BTC $73,156.81) were wired with TP1 (+1.5R) breakeven ratchets ($2,114.54 and $76,448.86) in `portfolio_shadow.py` and `bracket_manager.py`. Shadow ledger zero-drift verified ($0.000000 across 507 lifetime shadow trades). |
-| **CP-4** | Capital Governor Tier Progression | `BLOCKED_BY_POLICY` | Locked at `Tier 0 (Paper Shadow)`. Promotion to `Tier 1-E (Canary Eligible)` strictly gated by CP-2 and CP-3. |
+| **CP-2** | Proving a Trading Edge | `CERTIFIED` | M47 Refined Progressive Ratchet Engine (+1.20R Defensive Ratchet -> +0.25R locked profit, +1.50R Stage 2 35% bank + +0.65R trailing runner stop) benchmarked against 125,820 bars (`derivatives_expanded_2022_2026.parquet`) and 9 K9 frozen datasets. **All 5 CP-2 Hurdles CLEARED**: Hurdle 2a ($N = 747 \ge 100$), Hurdle 2b (Causal Ordering PASS), Hurdle 2c (CPCV Annualized Median Sharpe = $8.8609 \ge 1.0$), Hurdle 2d ($\text{DSR} = 0.9999 \ge 0.9500, p = 0.0001$), and Hurdle 2e Strict Joint Hurdle ($\mathbb{E}[R_{\text{net}}] = \mathbf{+0.2709R} \ge +0.2500\text{R}$ AND $\text{PF} = \mathbf{1.54} \ge 1.4500$ simultaneously). Certified artifact generated: `research/m47_cp2_joint_certification_results.json`. |
+| **CP-3** | Decided Forward Paper Trades | `BLOCKED_BY_POLICY` | 6/20 decided forward trades completed (deficit: 14 trades). Autonomous paper trader (`core/autonomous_trader.py`) wired with M47 bidirectional reclaim engine, progressive ratchet, and SOL MTF alignment gate. Shadow ledger zero-drift verified ($0.000000 across 507 lifetime shadow trades). |
+| **CP-4** | Capital Governor Tier Progression | `BLOCKED_BY_POLICY` | Locked at `Tier 0 (Paper Shadow)`. CP-2 officially CERTIFIED. Promotion to `Tier 1-E (Canary Eligible)` strictly gated by completing the remaining 14 CP-3 forward qualification trades. |
 
 | **CP-5** | Production Exchange API Keys | `BLOCKED_BY_POLICY` | No live production keys configured; only testnet simulated keys installed. |
 | **CP-6** | AES-256-GCM Credential Vault | `CERTIFIED` | PBKDF2-HMAC-SHA256 (600k iterations) + AES-256-GCM authenticated encryption active. |

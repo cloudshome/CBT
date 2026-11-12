@@ -79,6 +79,7 @@ class AutonomousTrader:
         self.active_symbols = active_symbols or [
             "BTC/USDT",
             "ETH/USDT",
+            "SOL/USDT",
             "XAU/USD",
         ]
         self.scan_interval_sec = float(
@@ -240,7 +241,9 @@ class AutonomousTrader:
                     # Guard 2a: Strict Institutional Trend & Chop Filter (Zero Chop Bleed)
                     regime_dossier = decision_out.explanation_dossier.get("regime_state", {})
                     adx_val = float(regime_dossier.get("trend_strength_adx", 25.0))
-                    regime_name = str(regime_dossier.get("regime_type", ""))
+                    regime_name = str(regime_dossier.get("regime_type", "")) or str(
+                        decision_out.explanation_dossier.get("regime", "")
+                    )
                     st_type = getattr(setup, "setup_type", None)
                     st_val = getattr(st_type, "value", str(st_type)) if st_type else ""
                     vol_dossier = decision_out.explanation_dossier.get("volume", {})
@@ -249,6 +252,30 @@ class AutonomousTrader:
                         if isinstance(vol_dossier, dict)
                         else 1.0
                     )
+
+                    # M40 Quarantine against PRE_BREAKOUT_COMPRESSION
+                    if "PRE_BREAKOUT" in regime_name.upper():
+                        logger.info(
+                            f"AutonomousTrader M40 Quarantine: Skipping {sym} trade in {regime_name}. "
+                            "Pre-breakout compression quarantined to prevent breakout knife-catches."
+                        )
+                        continue
+
+                    # Tier-1 Canary Asset Eligibility Gate (BTC, ETH, and ALIGNED SOL)
+                    from core.risk.asset_eligibility_gate import DeterministicAssetEligibilityGate
+
+                    mtf_align = str(
+                        decision_out.explanation_dossier.get("mtf_alignment", "NEUTRAL")
+                    )
+                    gate = DeterministicAssetEligibilityGate()
+                    elig = gate.evaluate_symbol_eligibility(
+                        sym, desk="TIER1_CANARY", mtf_alignment=mtf_align
+                    )
+                    if not elig.is_eligible:
+                        logger.info(
+                            f"AutonomousTrader Asset Eligibility Gate: Skipping {sym} trade: {elig.rationale}"
+                        )
+                        continue
 
                     if (adx_val < 20.0 or rvol < 0.85) and regime_name in (
                         "RANGING_CONSOLIDATION",

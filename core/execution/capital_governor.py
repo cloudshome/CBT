@@ -667,19 +667,48 @@ class CapitalGovernor:
         if evidence.get("checkpoint_2_certified") is True or evidence.get("edge_verified") is True:
             return True, "Checkpoint 2 certified via explicit cryptographic evidence"
 
-        cpcv_dsr = float(evidence.get("cpcv_dsr", evidence.get("dsr", 0.0)))
-        oos_trades = int(evidence.get("oos_trade_count", evidence.get("oos_trades", 0)))
-        net_exp_r = float(evidence.get("net_expectancy_r", evidence.get("expectancy_r", 0.0)))
+        if evidence and (
+            "oos_trade_count" in evidence
+            or "oos_trades" in evidence
+            or "net_expectancy_r" in evidence
+            or "expectancy_r" in evidence
+        ):
+            cpcv_dsr = float(evidence.get("cpcv_dsr", evidence.get("dsr", 0.0)))
+            oos_trades = int(evidence.get("oos_trade_count", evidence.get("oos_trades", 0)))
+            net_exp_r = float(evidence.get("net_expectancy_r", evidence.get("expectancy_r", 0.0)))
+            profit_factor = float(evidence.get("profit_factor", 0.0))
 
-        if cpcv_dsr >= 0.95 and oos_trades >= 100 and net_exp_r > 0.0:
+            if (
+                cpcv_dsr >= 0.95
+                and oos_trades >= 100
+                and net_exp_r >= 0.2500
+                and profit_factor >= 1.4500
+            ):
+                return (
+                    True,
+                    f"Checkpoint 2 certified: CPCV DSR {cpcv_dsr:.4f} >= 0.95 across {oos_trades} OOS trades ({net_exp_r:+.4f}R net, PF {profit_factor:.2f})",
+                )
+            reasons = []
+            if oos_trades < 100:
+                reasons.append(f"OOS trades {oos_trades} < 100")
+            if cpcv_dsr < 0.95:
+                reasons.append(f"DSR {cpcv_dsr:.4f} < 0.9500")
+            if net_exp_r < 0.2500:
+                reasons.append(f"net expectancy {net_exp_r:+.4f}R < +0.2500R")
+            if profit_factor < 1.4500:
+                reasons.append(f"profit factor {profit_factor:.2f} < 1.4500")
             return (
-                True,
-                f"Checkpoint 2 certified: CPCV DSR {cpcv_dsr:.4f} >= 0.95 across {oos_trades} OOS trades ({net_exp_r:+.3f}R net)",
+                False,
+                f"Checkpoint 2 failed: Evidence fell short of strict joint Hurdle 2e ({', '.join(reasons)})",
             )
 
-        # Check empirical results from m46_cp2_certification_results.json, m45, m44, m40, or m39
+        # Check empirical results from m47, m46, m45, m44, m40, or m39
         research_dir = Path(__file__).resolve().parent.parent.parent / "research"
-        if "M45" in strategy_id.upper():
+        if "M47" in strategy_id.upper():
+            res_names = ["m47_cp2_joint_certification_results.json"]
+        elif "M46" in strategy_id.upper():
+            res_names = ["m46_cp2_certification_results.json"]
+        elif "M45" in strategy_id.upper():
             res_names = ["m45_cp2_certification_results.json"]
         elif "M44" in strategy_id.upper():
             res_names = ["m44_cp2_unified_results.json"]
@@ -687,10 +716,9 @@ class CapitalGovernor:
             res_names = ["m40_edge_verification_results.json"]
         elif "M39" in strategy_id.upper():
             res_names = ["m39_edge_verification_results.json"]
-        elif "M46" in strategy_id.upper():
-            res_names = ["m46_cp2_certification_results.json"]
         else:
             res_names = [
+                "m47_cp2_joint_certification_results.json",
                 "m46_cp2_certification_results.json",
                 "m45_cp2_certification_results.json",
                 "m44_cp2_unified_results.json",
@@ -704,6 +732,21 @@ class CapitalGovernor:
                     data = json.loads(res_file.read_text(encoding="utf-8"))
                     gov = data.get("governance_decision", {})
                     if gov.get("checkpoint_2_status") == "CERTIFIED":
+                        multi_p = (
+                            data.get("derivatives_expanded", {}).get("multi_asset_portfolio", {})
+                            or data.get("k9_frozen_datasets", {}).get("pooled_m46", {})
+                            or data.get("k9_frozen_datasets", {}).get("pooled_m45", {})
+                        )
+                        art_exp = float(multi_p.get("expectancy_r", 0.0))
+                        art_pf = float(multi_p.get("profit_factor", 0.0))
+                        # M47 Strict Joint Hurdle 2e: E[R] >= +0.2500R AND PF >= 1.4500
+                        # When detailed portfolio metrics are present in the artifact, reject if either condition fails
+                        if multi_p and (art_exp < 0.2500 or art_pf < 1.4500):
+                            logger.info(
+                                f"Checkpoint 2 rejected artifact {res_name}: Strict Joint Hurdle 2e not met "
+                                f"(E[R]={art_exp:+.4f}R < +0.2500R or PF={art_pf:.2f} < 1.4500)."
+                            )
+                            continue
                         return (
                             True,
                             f"Checkpoint 2 certified via {data.get('meta', {}).get('eval_engine', res_name)}",
@@ -714,6 +757,8 @@ class CapitalGovernor:
                             c_res.get("passed_all_hurdles") is True
                             and c_res.get("dsr", 0.0) >= 0.95
                             and c_res.get("oos_trade_count", 0) >= 100
+                            and c_res.get("expectancy_r", 0.0) >= 0.25
+                            and c_res.get("profit_factor", 0.0) >= 1.45
                         ):
                             return True, f"Checkpoint 2 certified via verified candidate {c_name}"
                 except Exception as exc:
@@ -723,7 +768,7 @@ class CapitalGovernor:
 
         return (
             False,
-            "Checkpoint 2 failed: Requires CPCV + DSR > 0.95 across 100+ out-of-sample trades with positive net expectancy.",
+            "Checkpoint 2 failed: Requires CPCV + DSR > 0.95 across 100+ out-of-sample trades with positive net expectancy (>= +0.25R, PF >= 1.45).",
         )
 
     def verify_checkpoint_3_forward_qualification(

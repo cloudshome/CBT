@@ -566,7 +566,7 @@ class PortfolioShadowManager:
                 "PAYOFF_ASYMMETRY_PRESERVE_FULL_SIZE", "false"
             ).lower() in ("true", "1", "yes")
         if progressive_ratchet is None:
-            progressive_ratchet = os.getenv("PROGRESSIVE_RATCHET_ENABLED", "false").lower() in (
+            progressive_ratchet = os.getenv("PROGRESSIVE_RATCHET_ENABLED", "true").lower() in (
                 "true",
                 "1",
                 "yes",
@@ -616,156 +616,31 @@ class PortfolioShadowManager:
             # 2. Check Breakeven Trigger & Progressive Ratchet
             is_hitting_tp = (current_price >= tp_p) if is_long else (current_price <= tp_p)
 
-            if progressive_ratchet and risk_dist > 0 and not is_hitting_tp:
+            reason_upper = (
+                str(r["entry_reason"] or "").upper() if "entry_reason" in r.keys() else ""
+            )
+
+            # Check if position belongs to legacy / prior milestone modes
+            is_m46 = "M46" in reason_upper
+            is_m45 = ("M45" in reason_upper) or (preserve_full_runner is True)
+            is_legacy_twotier = (
+                ("TWO-TIER" in reason_upper)
+                or ("M44" in reason_upper)
+                or ("CUMULATIVE" in reason_upper)
+                or ("RETRACEMENT" in reason_upper)
+                or (progressive_ratchet is False)
+            )
+
+            if risk_dist > 0 and not is_hitting_tp:
                 current_r = (
                     ((current_price - entry_p) / risk_dist)
                     if is_long
                     else ((entry_p - current_price) / risk_dist)
                 )
 
-                if current_r >= 1.50 and be_trig_int < 2:
-                    # Stage 2 Profit-Lock Ratchet at +1.5R (TP1): Bank 25%, move SL to +0.60R
-                    sl_p = (
-                        round(entry_p + (0.60 * risk_dist), 6)
-                        if is_long
-                        else round(entry_p - (0.60 * risk_dist), 6)
-                    )
-                    trailing_stop = sl_p
-                    closed_quarter_size = round(size * 0.25, 6)
-                    remaining_size = round(size - closed_quarter_size, 6)
-                    partial_profit_gross = (
-                        (current_price - entry_p) * closed_quarter_size
-                        if is_long
-                        else (entry_p - current_price) * closed_quarter_size
-                    )
-                    eff_fee_rate = self._get_effective_fee_rate()
-                    partial_notional = (entry_p * closed_quarter_size) + (
-                        current_price * closed_quarter_size
-                    )
-                    partial_fee = round(partial_notional * eff_fee_rate, 4)
-                    partial_profit_usd = round(partial_profit_gross - partial_fee, 4)
-
-                    prior_fee = float(r["fee_usd"] or 0.0) if "fee_usd" in r.keys() else 0.0
-                    acc_fee_usd = round(prior_fee + partial_fee, 4)
-                    acc_realized_pnl = float(r["realized_pnl"] or 0.0) + partial_profit_usd
-                    be_message = (
-                        f"🛡️ {symbol} reached +1.5R (TP1)! 25% profit secured (+${partial_profit_usd:,.2f}), "
-                        f"Stop Loss ratcheted to +0.60R (${sl_p:,.2f}), remaining {remaining_size:g} units riding to TP2/runner."
-                    )
-
-                    with db_manager.get_trading_conn() as conn:
-                        conn.execute(
-                            """
-                            UPDATE shadow_positions SET
-                                size = ?,
-                                realized_pnl = ?,
-                                fee_usd = ?,
-                                stop_loss = ?,
-                                trailing_stop = ?,
-                                breakeven_triggered = 2
-                            WHERE position_id = ?;
-                            """,
-                            (
-                                remaining_size,
-                                acc_realized_pnl,
-                                acc_fee_usd,
-                                sl_p,
-                                trailing_stop,
-                                pos_id,
-                            ),
-                        )
-                        conn.commit()
-
-                    size = remaining_size
-                    be_trig_int = 2
-                    be_trig = True
-                    events.append(
-                        {
-                            "event": "BREAKEVEN_TRIGGERED",
-                            "position_id": pos_id,
-                            "stage": 2,
-                            "new_stop_loss": sl_p,
-                            "partial_realized_pnl": partial_profit_usd,
-                            "remaining_size": remaining_size,
-                            "message": be_message,
-                        }
-                    )
-                elif current_r >= 1.00 and be_trig_int < 1:
-                    # Stage 1 Defensive Ratchet at +1.0R: Move SL to Fee-Covered Breakeven (+0.10R), keep 100% size
-                    sl_p = (
-                        round(entry_p + (0.10 * risk_dist), 6)
-                        if is_long
-                        else round(entry_p - (0.10 * risk_dist), 6)
-                    )
-                    trailing_stop = (
-                        entry_p + (0.5 * risk_dist) if is_long else entry_p - (0.5 * risk_dist)
-                    )
-                    remaining_size = size
-                    partial_profit_usd = 0.0
-                    acc_fee_usd = float(r["fee_usd"] or 0.0) if "fee_usd" in r.keys() else 0.0
-                    acc_realized_pnl = float(r["realized_pnl"] or 0.0)
-                    be_message = (
-                        f"🛡️ {symbol} reached +1.0R! Stop Loss ratcheted to Fee-Covered Breakeven +0.10R (${sl_p:,.2f}), "
-                        f"loss denominator compressed, 100% size ({remaining_size:g} units) open."
-                    )
-
-                    with db_manager.get_trading_conn() as conn:
-                        conn.execute(
-                            """
-                            UPDATE shadow_positions SET
-                                stop_loss = ?,
-                                trailing_stop = ?,
-                                breakeven_triggered = 1
-                            WHERE position_id = ?;
-                            """,
-                            (
-                                sl_p,
-                                trailing_stop,
-                                pos_id,
-                            ),
-                        )
-                        conn.commit()
-
-                    be_trig_int = 1
-                    be_trig = True
-                    events.append(
-                        {
-                            "event": "BREAKEVEN_TRIGGERED",
-                            "position_id": pos_id,
-                            "stage": 1,
-                            "new_stop_loss": sl_p,
-                            "partial_realized_pnl": partial_profit_usd,
-                            "remaining_size": remaining_size,
-                            "message": be_message,
-                        }
-                    )
-
-            elif not be_trig and risk_dist > 0 and not is_hitting_tp:
-                current_r = (
-                    ((current_price - entry_p) / risk_dist)
-                    if is_long
-                    else ((entry_p - current_price) / risk_dist)
-                )
-                if current_r >= 1.50:
-                    be_trig = True
-                    if preserve_full_runner:
-                        # M45: Ratchet stop-loss to Fee-Covered Breakeven (+0.10R) with 100% position size open
-                        be_sl_p = (
-                            round(entry_p + (0.10 * risk_dist), 6)
-                            if is_long
-                            else round(entry_p - (0.10 * risk_dist), 6)
-                        )
-                        sl_p = be_sl_p
-                        trailing_stop = (
-                            entry_p + (0.5 * risk_dist) if is_long else entry_p - (0.5 * risk_dist)
-                        )
-                        remaining_size = size
-                        partial_profit_usd = 0.0
-                        acc_fee_usd = float(r["fee_usd"] or 0.0) if "fee_usd" in r.keys() else 0.0
-                        acc_realized_pnl = float(r["realized_pnl"] or 0.0)
-                        be_message = f"🛡️ {symbol} reached +1.5R! Stop Loss ratcheted to Fee-Covered Breakeven +0.10R (${sl_p:,.2f}), 100% size ({remaining_size:g} units) riding to TP2/runner."
-                    else:
-                        # Legacy Two-Tier Partial Exit Engine: Secure 50% profit at +1.5R milestone
+                if is_legacy_twotier:
+                    if not be_trig and current_r >= 1.50:
+                        be_trig = True
                         sl_p = entry_p  # Move SL to flat Breakeven
                         trailing_stop = (
                             entry_p + (0.5 * risk_dist) if is_long else entry_p - (0.5 * risk_dist)
@@ -789,42 +664,320 @@ class PortfolioShadowManager:
                         acc_realized_pnl = float(r["realized_pnl"] or 0.0) + partial_profit_usd
                         be_message = f"🛡️ {symbol} reached +1.5R! 50% profit secured (+${partial_profit_usd:,.2f}), Stop Loss adjusted to Breakeven (${sl_p:,.2f}), remaining {remaining_size:g} units trailing."
 
-                    with db_manager.get_trading_conn() as conn:
-                        conn.execute(
-                            """
-                            UPDATE shadow_positions SET
-                                size = ?,
-                                realized_pnl = ?,
-                                fee_usd = ?,
-                                stop_loss = ?,
-                                trailing_stop = ?,
-                                breakeven_triggered = 1
-                            WHERE position_id = ?;
-                            """,
-                            (
-                                remaining_size,
-                                acc_realized_pnl,
-                                acc_fee_usd,
-                                sl_p,
-                                trailing_stop,
-                                pos_id,
-                            ),
-                        )
-                        conn.commit()
+                        with db_manager.get_trading_conn() as conn:
+                            conn.execute(
+                                """
+                                UPDATE shadow_positions SET
+                                    size = ?,
+                                    realized_pnl = ?,
+                                    fee_usd = ?,
+                                    stop_loss = ?,
+                                    trailing_stop = ?,
+                                    breakeven_triggered = 1
+                                WHERE position_id = ?;
+                                """,
+                                (
+                                    remaining_size,
+                                    acc_realized_pnl,
+                                    acc_fee_usd,
+                                    sl_p,
+                                    trailing_stop,
+                                    pos_id,
+                                ),
+                            )
+                            conn.commit()
 
-                    size = remaining_size
-                    be_trig_int = 1
-                    be_trig = True
-                    events.append(
-                        {
-                            "event": "BREAKEVEN_TRIGGERED",
-                            "position_id": pos_id,
-                            "new_stop_loss": sl_p,
-                            "partial_realized_pnl": partial_profit_usd,
-                            "remaining_size": remaining_size,
-                            "message": be_message,
-                        }
-                    )
+                        size = remaining_size
+                        be_trig_int = 1
+                        be_trig = True
+                        events.append(
+                            {
+                                "event": "BREAKEVEN_TRIGGERED",
+                                "position_id": pos_id,
+                                "new_stop_loss": sl_p,
+                                "partial_realized_pnl": partial_profit_usd,
+                                "remaining_size": remaining_size,
+                                "message": be_message,
+                            }
+                        )
+                elif is_m45:
+                    if not be_trig and current_r >= 1.50:
+                        be_trig = True
+                        be_sl_p = (
+                            round(entry_p + (0.10 * risk_dist), 6)
+                            if is_long
+                            else round(entry_p - (0.10 * risk_dist), 6)
+                        )
+                        sl_p = be_sl_p
+                        trailing_stop = (
+                            entry_p + (0.5 * risk_dist) if is_long else entry_p - (0.5 * risk_dist)
+                        )
+                        remaining_size = size
+                        partial_profit_usd = 0.0
+                        acc_fee_usd = float(r["fee_usd"] or 0.0) if "fee_usd" in r.keys() else 0.0
+                        acc_realized_pnl = float(r["realized_pnl"] or 0.0)
+                        be_message = f"🛡️ {symbol} reached +1.5R! Stop Loss ratcheted to Fee-Covered Breakeven +0.10R (${sl_p:,.2f}), 100% size ({remaining_size:g} units) riding to TP2/runner."
+
+                        with db_manager.get_trading_conn() as conn:
+                            conn.execute(
+                                """
+                                UPDATE shadow_positions SET
+                                    stop_loss = ?,
+                                    trailing_stop = ?,
+                                    breakeven_triggered = 1
+                                WHERE position_id = ?;
+                                """,
+                                (
+                                    sl_p,
+                                    trailing_stop,
+                                    pos_id,
+                                ),
+                            )
+                            conn.commit()
+
+                        be_trig_int = 1
+                        be_trig = True
+                        events.append(
+                            {
+                                "event": "BREAKEVEN_TRIGGERED",
+                                "position_id": pos_id,
+                                "new_stop_loss": sl_p,
+                                "partial_realized_pnl": partial_profit_usd,
+                                "remaining_size": remaining_size,
+                                "message": be_message,
+                            }
+                        )
+                elif is_m46:
+                    if current_r >= 1.50 and be_trig_int < 2:
+                        # M46 Stage 2: Bank 25%, move SL to +0.60R
+                        sl_p = (
+                            round(entry_p + (0.60 * risk_dist), 6)
+                            if is_long
+                            else round(entry_p - (0.60 * risk_dist), 6)
+                        )
+                        trailing_stop = sl_p
+                        closed_portion_size = round(size * 0.25, 6)
+                        remaining_size = round(size - closed_portion_size, 6)
+                        partial_profit_gross = (
+                            (current_price - entry_p) * closed_portion_size
+                            if is_long
+                            else (entry_p - current_price) * closed_portion_size
+                        )
+                        eff_fee_rate = self._get_effective_fee_rate()
+                        partial_notional = (entry_p * closed_portion_size) + (
+                            current_price * closed_portion_size
+                        )
+                        partial_fee = round(partial_notional * eff_fee_rate, 4)
+                        partial_profit_usd = round(partial_profit_gross - partial_fee, 4)
+
+                        prior_fee = float(r["fee_usd"] or 0.0) if "fee_usd" in r.keys() else 0.0
+                        acc_fee_usd = round(prior_fee + partial_fee, 4)
+                        acc_realized_pnl = float(r["realized_pnl"] or 0.0) + partial_profit_usd
+                        be_message = (
+                            f"🛡️ {symbol} reached +1.5R (TP1)! 25% profit secured (+${partial_profit_usd:,.2f}), "
+                            f"Stop Loss ratcheted to +0.60R (${sl_p:,.2f}), remaining {remaining_size:g} units riding to TP2/runner."
+                        )
+
+                        with db_manager.get_trading_conn() as conn:
+                            conn.execute(
+                                """
+                                UPDATE shadow_positions SET
+                                    size = ?,
+                                    realized_pnl = ?,
+                                    fee_usd = ?,
+                                    stop_loss = ?,
+                                    trailing_stop = ?,
+                                    breakeven_triggered = 2
+                                WHERE position_id = ?;
+                                """,
+                                (
+                                    remaining_size,
+                                    acc_realized_pnl,
+                                    acc_fee_usd,
+                                    sl_p,
+                                    trailing_stop,
+                                    pos_id,
+                                ),
+                            )
+                            conn.commit()
+
+                        size = remaining_size
+                        be_trig_int = 2
+                        be_trig = True
+                        events.append(
+                            {
+                                "event": "BREAKEVEN_TRIGGERED",
+                                "position_id": pos_id,
+                                "stage": 2,
+                                "new_stop_loss": sl_p,
+                                "partial_realized_pnl": partial_profit_usd,
+                                "remaining_size": remaining_size,
+                                "message": be_message,
+                            }
+                        )
+                    elif current_r >= 1.00 and be_trig_int < 1:
+                        # M46 Stage 1: Move SL to +0.10R, keep 100% size
+                        sl_p = (
+                            round(entry_p + (0.10 * risk_dist), 6)
+                            if is_long
+                            else round(entry_p - (0.10 * risk_dist), 6)
+                        )
+                        trailing_stop = sl_p
+                        remaining_size = size
+                        partial_profit_usd = 0.0
+                        acc_fee_usd = float(r["fee_usd"] or 0.0) if "fee_usd" in r.keys() else 0.0
+                        acc_realized_pnl = float(r["realized_pnl"] or 0.0)
+                        be_message = (
+                            f"🛡️ {symbol} reached +1.0R! Stop Loss ratcheted to Fee-Covered Breakeven +0.10R (${sl_p:,.2f}), "
+                            f"loss denominator compressed, 100% size ({remaining_size:g} units) open."
+                        )
+
+                        with db_manager.get_trading_conn() as conn:
+                            conn.execute(
+                                """
+                                UPDATE shadow_positions SET
+                                    stop_loss = ?,
+                                    trailing_stop = ?,
+                                    breakeven_triggered = 1
+                                WHERE position_id = ?;
+                                """,
+                                (
+                                    sl_p,
+                                    trailing_stop,
+                                    pos_id,
+                                ),
+                            )
+                            conn.commit()
+
+                        be_trig_int = 1
+                        be_trig = True
+                        events.append(
+                            {
+                                "event": "BREAKEVEN_TRIGGERED",
+                                "position_id": pos_id,
+                                "stage": 1,
+                                "new_stop_loss": sl_p,
+                                "partial_realized_pnl": partial_profit_usd,
+                                "remaining_size": remaining_size,
+                                "message": be_message,
+                            }
+                        )
+                else:
+                    # M47 Certified Geometry (Default):
+                    if current_r >= 1.50 and be_trig_int < 2:
+                        # Stage 2 Profit-Lock Ratchet at +1.5R (TP1): Bank 35%, move SL to +0.65R
+                        sl_p = (
+                            round(entry_p + (0.65 * risk_dist), 6)
+                            if is_long
+                            else round(entry_p - (0.65 * risk_dist), 6)
+                        )
+                        trailing_stop = sl_p
+                        closed_portion_size = round(size * 0.35, 6)
+                        remaining_size = round(size - closed_portion_size, 6)
+                        partial_profit_gross = (
+                            (current_price - entry_p) * closed_portion_size
+                            if is_long
+                            else (entry_p - current_price) * closed_portion_size
+                        )
+                        eff_fee_rate = self._get_effective_fee_rate()
+                        partial_notional = (entry_p * closed_portion_size) + (
+                            current_price * closed_portion_size
+                        )
+                        partial_fee = round(partial_notional * eff_fee_rate, 4)
+                        partial_profit_usd = round(partial_profit_gross - partial_fee, 4)
+
+                        prior_fee = float(r["fee_usd"] or 0.0) if "fee_usd" in r.keys() else 0.0
+                        acc_fee_usd = round(prior_fee + partial_fee, 4)
+                        acc_realized_pnl = float(r["realized_pnl"] or 0.0) + partial_profit_usd
+                        be_message = (
+                            f"🛡️ {symbol} reached +1.5R (TP1)! 35% profit secured (+${partial_profit_usd:,.2f}), "
+                            f"Stop Loss ratcheted to +0.65R (${sl_p:,.2f}), remaining {remaining_size:g} units riding to TP2/runner."
+                        )
+
+                        with db_manager.get_trading_conn() as conn:
+                            conn.execute(
+                                """
+                                UPDATE shadow_positions SET
+                                    size = ?,
+                                    realized_pnl = ?,
+                                    fee_usd = ?,
+                                    stop_loss = ?,
+                                    trailing_stop = ?,
+                                    breakeven_triggered = 2
+                                WHERE position_id = ?;
+                                """,
+                                (
+                                    remaining_size,
+                                    acc_realized_pnl,
+                                    acc_fee_usd,
+                                    sl_p,
+                                    trailing_stop,
+                                    pos_id,
+                                ),
+                            )
+                            conn.commit()
+
+                        size = remaining_size
+                        be_trig_int = 2
+                        be_trig = True
+                        events.append(
+                            {
+                                "event": "BREAKEVEN_TRIGGERED",
+                                "position_id": pos_id,
+                                "stage": 2,
+                                "new_stop_loss": sl_p,
+                                "partial_realized_pnl": partial_profit_usd,
+                                "remaining_size": remaining_size,
+                                "message": be_message,
+                            }
+                        )
+                    elif current_r >= 1.20 and be_trig_int < 1:
+                        # Stage 1 Defensive Ratchet at +1.20R: Move SL to Defensively Locked Profit (+0.25R), keep 100% size
+                        sl_p = (
+                            round(entry_p + (0.25 * risk_dist), 6)
+                            if is_long
+                            else round(entry_p - (0.25 * risk_dist), 6)
+                        )
+                        trailing_stop = sl_p
+                        remaining_size = size
+                        partial_profit_usd = 0.0
+                        acc_fee_usd = float(r["fee_usd"] or 0.0) if "fee_usd" in r.keys() else 0.0
+                        acc_realized_pnl = float(r["realized_pnl"] or 0.0)
+                        be_message = (
+                            f"🛡️ {symbol} reached +1.20R! Stop Loss ratcheted to defensively locked profit +0.25R (${sl_p:,.2f}), "
+                            f"loss denominator compressed, 100% size ({remaining_size:g} units) open."
+                        )
+
+                        with db_manager.get_trading_conn() as conn:
+                            conn.execute(
+                                """
+                                UPDATE shadow_positions SET
+                                    stop_loss = ?,
+                                    trailing_stop = ?,
+                                    breakeven_triggered = 1
+                                WHERE position_id = ?;
+                                """,
+                                (
+                                    sl_p,
+                                    trailing_stop,
+                                    pos_id,
+                                ),
+                            )
+                            conn.commit()
+
+                        be_trig_int = 1
+                        be_trig = True
+                        events.append(
+                            {
+                                "event": "BREAKEVEN_TRIGGERED",
+                                "position_id": pos_id,
+                                "stage": 1,
+                                "new_stop_loss": sl_p,
+                                "partial_realized_pnl": partial_profit_usd,
+                                "remaining_size": remaining_size,
+                                "message": be_message,
+                            }
+                        )
 
             # 3. Trailing Stop Ratchet
             if be_trig and trailing_stop is not None:

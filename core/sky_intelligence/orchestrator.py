@@ -395,6 +395,7 @@ class SKYIntelligenceOrchestrator:
                 "deviation_sigmas": vwap_feat.deviation_sigmas,
                 "mean_reversion_prob": vwap_feat.mean_reversion_prob,
             },
+            "mtf_alignment": getattr(mtf_context, "stack_alignment", "NEUTRAL"),
             "explanation": best_setup.explanation_text,
         }
 

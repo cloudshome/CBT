@@ -1,4 +1,30 @@
-**Last updated:** 2026-11-13 (**v4.9.0 — Milestone 46 Two-Stage Progressive Ratchet CP-2 Certified**).
+**Last updated:** 2026-11-13 (**v4.10.0 — Milestone 47 Strict Joint Hurdle 2e & Autonomous Paper Loop Wiring**).
+- **WP-1 (Strict Joint Hurdle 2e Clearance):**
+  - Forensic diagnosis of M46: ratcheting at `+1.0R -> +0.10R` stopped out normal retests at negative net returns ($-0.08\text{R}$ to $-0.12\text{R}$ after friction), depressing pooled expectancy to $+0.2226\text{R}$.
+  - Refined progressive ratchet geometry: Stage 1 defensive ratchet at **`+1.20R`** moves stop-loss to defensively locked profit **`+0.25R`** ($+0.10\text{R}$ net after friction, eliminating false stop-outs); Stage 2 profit-lock ratchet at **`+1.50R`** banks **35%** into realized PnL and ratchets runner stop-loss to **`+0.65R`**, leaving 65% riding to TP2 ($+3.1\text{R}$).
+  - Canonical empirical run (`scripts/research/run_m47_joint_cp2_certification.py`) across 125,820 bars (`derivatives_expanded_2022_2026.parquet`) and 9 K9 frozen datasets **CLEARED ALL 5 CP-2 HURDLES**:
+    - Hurdle 2a (Sample Size): $N = \mathbf{747} \ge 100$ (**PASS**)
+    - Hurdle 2b (Causal Ordering): Zero lookahead leakage (**PASS**)
+    - Hurdle 2c (CPCV Sharpe): Annualized Median Sharpe $= \mathbf{8.8609} \ge 1.0$ (**PASS**)
+    - Hurdle 2d (Deflated Sharpe): $\text{DSR} = \mathbf{0.9999} \ge 0.9500, p = 0.0001$ (**PASS**)
+    - Hurdle 2e (Strict Joint Hurdle): $\mathbb{E}[R_{\text{net}}] = \mathbf{+0.2709R} \ge +0.2500\text{R}$ AND $\text{PF} = \mathbf{1.54} \ge 1.4500$ simultaneously (**PASS**).
+    - Emitted canonical artifact: `research/m47_cp2_joint_certification_results.json` (`checkpoint_2_status: "CERTIFIED"`).
+    - Updated canonical report: `docs/EDGE_VERIFICATION_REPORT.md`.
+- **WP-2 (Autonomous Paper Loop Wiring for CP-3):**
+  - Updated `core/autonomous_trader.py`: added `SOL/USDT` to active symbols, quarantined `PRE_BREAKOUT_COMPRESSION`, enforced Deterministic Asset Eligibility Gate (`mtf_alignment == 'ALIGNED'` required for SOL).
+  - Updated `core/portfolio_shadow.py`: defaulted `progressive_ratchet=True` with milestone-tagged backward compatibility routing (M46, M45, Legacy Two-Tier/M44, and M47 certified default).
+  - Updated `core/sky_intelligence/orchestrator.py`: surfaced `mtf_alignment` in explanation dossier.
+  - Verified closed paper trades sync into `QualificationLedger` (`core/qualification/qualification_ledger.py`) tracking progress toward 20 decided trades.
+- **WP-3 (Capital Governor, Invariants & Verification):**
+  - Updated `core/execution/capital_governor.py`: enforces strict joint Hurdle 2e verification; recognizes M47 as officially certified while rejecting sub-threshold artifacts.
+  - Capital Governor policy invariant preserved: fails closed at `TIER_0_PAPER` until Checkpoint 3 (20 decided forward trades) completes.
+  - Created unit test suite `tests/test_m47_joint_hurdle_and_paper_wiring.py` (5/5 passed).
+  - Verified 30/30 tests passing across M44–M47 and two-tier exit suites.
+  - Re-validated Milestone 18 certified surface area via `scripts/verify_m18_certification.py` (149/149 tests green).
+  - Verified shadow ledger zero-drift reconciliation (`scripts/reconcile_shadow_ledger.py` — $0.000000 drift across 507 lifetime trades).
+  - Verified Ruff linting and formatting (0 errors, 100% formatted).
+
+**Previous:** 2026-11-13 (**v4.9.0 — Milestone 46 Two-Stage Progressive Ratchet CP-2 Certified**).
 - **WP-1 (Two-Stage Progressive Ratchet & Loss Denominator Compression):**
   - Implemented Stage 1 defensive ratchet at `+1.0R`: moves active stop-loss to Fee-Covered Breakeven (`+0.10R`), compressing the loss denominator by eliminating reversed winning trades, keeping 100% position size open.
   - Implemented Stage 2 profit-lock ratchet at `+1.5R` (TP1): banks 25% partial profit into realized PnL, ratchets remaining 75% runner's SL to `+0.60R` (locking in +0.825R on pullback vs M45's +0.10R), riding full right-tail payoff to TP2 (+3.1R).

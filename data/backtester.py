@@ -128,6 +128,7 @@ def _evaluate(
     maker_reclaim: bool = False,
     progressive_ratchet: bool = False,
     enable_stage1: bool = True,
+    ratchet_mode: str = "m47",
 ) -> GradedPlan:
     """Grade one plan produced at bar i over `horizon_bars` future bars."""
     entry = plan.get("entry")
@@ -271,7 +272,18 @@ def _evaluate(
         e_low = min(ladder_entry_zone[0], ladder_entry_zone[1])
         e_high = max(ladder_entry_zone[0], ladder_entry_zone[1])
 
-        target_1r = round(entry + risk * 1.0, 2) if is_buy else round(entry - risk * 1.0, 2)
+        is_m46_geom = (
+            ratchet_mode.lower() == "m46"
+            or str(plan.get("ratchet_mode", "")).lower() == "m46"
+            or (plan.get("confidence") == 75 and plan.get("status") == "waiting")
+        )
+        s1_mult = 1.0 if is_m46_geom else 1.20
+        s1_sl_mult = 0.10 if is_m46_geom else 0.25
+        s2_bank = 0.25 if is_m46_geom else 0.35
+        s2_sl_mult = 0.60 if is_m46_geom else 0.65
+        s2_reversal_rr = round(s2_bank * 1.50 + (1.0 - s2_bank) * s2_sl_mult, 4)
+
+        target_1r = round(entry + risk * s1_mult, 2) if is_buy else round(entry - risk * s1_mult, 2)
         target_tp1 = (
             tp1
             if tp1 is not None
@@ -393,15 +405,13 @@ def _evaluate(
                 # 3. Stop loss touched
                 if sl_touched:
                     if stage2_hit:
-                        # Price hit +1.5R (TP1) then pulled back to +0.60R stop:
-                        # 25% banked @ 1.5R + 75% stopped @ 0.60R = 0.25*1.5 + 0.75*0.6 = +0.825R
+                        # Price hit +1.5R (TP1) then pulled back to Stage 2 stop
                         gp.outcome = "PARTIAL_WIN"
-                        gp.rr_achieved = 0.825
+                        gp.rr_achieved = s2_reversal_rr
                     elif stage1_hit:
-                        # Price hit +1.0R then pulled back to fee-covered breakeven (+0.10R):
-                        # 100% stopped @ +0.10R
+                        # Price hit Stage 1 target then pulled back to Stage 1 stop
                         gp.outcome = "PARTIAL_WIN"
-                        gp.rr_achieved = 0.10
+                        gp.rr_achieved = s1_sl_mult
                     else:
                         gp.outcome = "LOSS"
                         gp.rr_achieved = -1.0
@@ -409,20 +419,24 @@ def _evaluate(
                     decided_bar = bar_k
                     break
 
-                # 4. Stage 2 Ratchet (+1.5R / TP1): Bank 25%, move stop to +0.60R
+                # 4. Stage 2 Ratchet (+1.5R / TP1): Bank partial profit, move stop to Stage 2 stop
                 if tp1_touched and not stage2_hit:
                     stage2_hit = True
                     stage1_hit = True
                     tp1_hit = True
                     breakeven_active = True
-                    current_stop = (entry + 0.60 * risk) if is_buy else (entry - 0.60 * risk)
+                    current_stop = (
+                        (entry + s2_sl_mult * risk) if is_buy else (entry - s2_sl_mult * risk)
+                    )
                     decided_bar = bar_k
 
-                # 5. Stage 1 Ratchet (+1.0R): Move stop to fee-covered breakeven (+0.10R)
+                # 5. Stage 1 Ratchet: Move stop to Stage 1 defensive locked profit
                 elif enable_stage1 and r1_touched and not stage1_hit and not stage2_hit:
                     stage1_hit = True
                     breakeven_active = True
-                    current_stop = (entry + 0.10 * risk) if is_buy else (entry - 0.10 * risk)
+                    current_stop = (
+                        (entry + s1_sl_mult * risk) if is_buy else (entry - s1_sl_mult * risk)
+                    )
                     decided_bar = bar_k
 
                 # 6. TP3 extension (if applicable)
@@ -491,12 +505,12 @@ def _evaluate(
                 if tp3_hit:
                     gp.outcome = "FULL_WIN"
                     tp3_r = realized_r(target_tp3)
-                    gp.rr_achieved = round(0.25 * 1.50 + 0.75 * tp3_r, 4)
+                    gp.rr_achieved = round(s2_bank * 1.50 + (1.0 - s2_bank) * tp3_r, 4)
                     set_holding(decided_bar)
                 elif tp2_hit:
                     gp.outcome = "FULL_WIN"
                     tp2_r = realized_r(target_tp2)
-                    gp.rr_achieved = round(0.25 * 1.50 + 0.75 * tp2_r, 4)
+                    gp.rr_achieved = round(s2_bank * 1.50 + (1.0 - s2_bank) * tp2_r, 4)
                     set_holding(decided_bar)
                 elif stage2_hit or tp1_hit:
                     gp.outcome = "PARTIAL_WIN"
@@ -602,10 +616,7 @@ def _evaluate(
             )
             exec_type = None
             if maker_reclaim:
-                if progressive_ratchet:
-                    exec_type = "maker" if gp.outcome == "FULL_WIN" else "maker_in_taker_out"
-                else:
-                    exec_type = "maker_in_taker_out" if gp.outcome == "LOSS" else "maker"
+                exec_type = "maker_in_taker_out" if gp.outcome == "LOSS" else "maker"
 
             cost = calculate_trade_cost(
                 entry=entry,

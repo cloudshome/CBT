@@ -1,0 +1,213 @@
+{
+  "meta": {
+    "milestone": "M47",
+    "campaign": "Refined Progressive Ratchet Strict Joint CP-2 Certification",
+    "timestamp": "2026-11-12T20:35:07.542669+00:00",
+    "git_commit": "dfccab7",
+    "eval_engine": "M47_REFINED_PROGRESSIVE_RATCHET"
+  },
+  "k9_frozen_datasets": {
+    "datasets": {
+      "BTCUSDT_15m": {
+        "symbol": "BTCUSDT",
+        "timeframe": "15m",
+        "trades": 23,
+        "win_rate_pct": 52.2,
+        "expectancy_r": 0.226,
+        "profit_factor": 1.37
+      },
+      "BTCUSDT_1h": {
+        "symbol": "BTCUSDT",
+        "timeframe": "1h",
+        "trades": 15,
+        "win_rate_pct": 60.0,
+        "expectancy_r": 0.471,
+        "profit_factor": 2.03
+      },
+      "BTCUSDT_4h": {
+        "symbol": "BTCUSDT",
+        "timeframe": "4h",
+        "trades": 0,
+        "win_rate_pct": 0.0,
+        "expectancy_r": 0.0,
+        "profit_factor": 99.0
+      },
+      "ETHUSDT_15m": {
+        "symbol": "ETHUSDT",
+        "timeframe": "15m",
+        "trades": 8,
+        "win_rate_pct": 50.0,
+        "expectancy_r": -0.196,
+        "profit_factor": 0.71
+      },
+      "ETHUSDT_1h": {
+        "symbol": "ETHUSDT",
+        "timeframe": "1h",
+        "trades": 7,
+        "win_rate_pct": 42.9,
+        "expectancy_r": 0.343,
+        "profit_factor": 1.54
+      },
+      "ETHUSDT_4h": {
+        "symbol": "ETHUSDT",
+        "timeframe": "4h",
+        "trades": 0,
+        "win_rate_pct": 0.0,
+        "expectancy_r": 0.0,
+        "profit_factor": 99.0
+      },
+      "SOLUSDT_15m": {
+        "symbol": "SOLUSDT",
+        "timeframe": "15m",
+        "trades": 74,
+        "win_rate_pct": 43.2,
+        "expectancy_r": -0.168,
+        "profit_factor": 0.69
+      },
+      "SOLUSDT_1h": {
+        "symbol": "SOLUSDT",
+        "timeframe": "1h",
+        "trades": 4,
+        "win_rate_pct": 50.0,
+        "expectancy_r": 0.677,
+        "profit_factor": 2.25
+      },
+      "SOLUSDT_4h": {
+        "symbol": "SOLUSDT",
+        "timeframe": "4h",
+        "trades": 0,
+        "win_rate_pct": 0.0,
+        "expectancy_r": 0.0,
+        "profit_factor": 99.0
+      }
+    },
+    "pooled_m47": {
+      "trades": 131,
+      "win_rate_pct": 47.3,
+      "expectancy_r": 0.026,
+      "profit_factor": 1.05,
+      "sharpe": 0.018,
+      "dsr": 0.0857,
+      "p_value": 0.9143
+    }
+  },
+  "derivatives_expanded": {
+    "symbols": {
+      "BTCUSDT": {
+        "symbol": "BTCUSDT",
+        "bars": 11292,
+        "tier1_canary_eligible": true,
+        "trades": 274,
+        "win_rate_pct": 56.9,
+        "expectancy_r": 0.2832,
+        "profit_factor": 1.57,
+        "sharpe": 0.1877,
+        "dsr": 0.9532,
+        "p_value": 0.0468
+      },
+      "ETHUSDT": {
+        "symbol": "ETHUSDT",
+        "bars": 11292,
+        "tier1_canary_eligible": true,
+        "trades": 250,
+        "win_rate_pct": 56.8,
+        "expectancy_r": 0.2654,
+        "profit_factor": 1.54,
+        "sharpe": 0.1801,
+        "dsr": 0.9204,
+        "p_value": 0.0796
+      },
+      "SOLUSDT": {
+        "symbol": "SOLUSDT",
+        "bars": 11292,
+        "tier1_canary_eligible": false,
+        "trades": 223,
+        "win_rate_pct": 56.1,
+        "expectancy_r": 0.2619,
+        "profit_factor": 1.51,
+        "sharpe": 0.1764,
+        "dsr": 0.8792,
+        "p_value": 0.1208
+      }
+    },
+    "tier1_canary_portfolio": {
+      "universe_name": "TIER_1_CANARY_PORTFOLIO (BTCUSDT + ETHUSDT)",
+      "oos_trades": 524,
+      "win_rate_pct": 56.9,
+      "expectancy_r": 0.2747,
+      "profit_factor": 1.56,
+      "sharpe": 0.1843,
+      "dsr": 0.9978,
+      "p_value": 0.0022,
+      "cpcv": {
+        "folds_count": 15,
+        "fold_sharpes": [
+          0.2784,
+          0.2178,
+          0.3307,
+          0.2683,
+          0.2862,
+          0.0671,
+          0.1955,
+          0.1255,
+          0.1417,
+          0.1347,
+          0.0688,
+          0.0811,
+          0.1885,
+          0.2055,
+          0.1376
+        ],
+        "median_oos_sharpe": 0.1885,
+        "annualized_median_sharpe": 8.8333,
+        "cpcv_passed": true
+      }
+    },
+    "multi_asset_portfolio": {
+      "universe_name": "MULTI_ASSET_PORTFOLIO (BTCUSDT + ETHUSDT + SOLUSDT)",
+      "oos_trades": 747,
+      "win_rate_pct": 56.6,
+      "expectancy_r": 0.2709,
+      "profit_factor": 1.54,
+      "sharpe": 0.1821,
+      "dsr": 0.9999,
+      "p_value": 0.0001,
+      "cpcv": {
+        "folds_count": 15,
+        "fold_sharpes": [
+          0.1891,
+          0.3186,
+          0.2432,
+          0.2368,
+          0.2769,
+          0.1455,
+          0.0662,
+          0.0549,
+          0.1074,
+          0.2026,
+          0.1952,
+          0.2386,
+          0.1153,
+          0.1631,
+          0.1549
+        ],
+        "median_oos_sharpe": 0.1891,
+        "annualized_median_sharpe": 8.8609,
+        "cpcv_passed": true
+      }
+    }
+  },
+  "hurdles_evaluation": {
+    "hurdle_2a_sample_size_met": true,
+    "hurdle_2b_causality_met": true,
+    "hurdle_2c_cpcv_sharpe_met": true,
+    "hurdle_2d_dsr_met": true,
+    "hurdle_2e_tier2_friction_met": true,
+    "all_hurdles_passed": true
+  },
+  "governance_decision": {
+    "checkpoint_2_status": "CERTIFIED",
+    "tier_progression_allowed": false,
+    "reason": "Checkpoint 2 certified: CPCV DSR 0.9999 >= 0.95 and Profit Factor 1.54 >= 1.45 verified across 747 OOS trades (+0.2709R net)"
+  }
+}
