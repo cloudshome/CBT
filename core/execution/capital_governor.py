@@ -677,9 +677,10 @@ class CapitalGovernor:
                 f"Checkpoint 2 certified: CPCV DSR {cpcv_dsr:.4f} >= 0.95 across {oos_trades} OOS trades ({net_exp_r:+.3f}R net)",
             )
 
-        # Check empirical results from m44_cp2_unified_results.json, m40, or m39
+        # Check empirical results from m45_cp2_certification_results.json, m44, m40, or m39
         research_dir = Path(__file__).resolve().parent.parent.parent / "research"
         for res_name in [
+            "m45_cp2_certification_results.json",
             "m44_cp2_unified_results.json",
             "m40_edge_verification_results.json",
             "m39_edge_verification_results.json",
@@ -690,7 +691,10 @@ class CapitalGovernor:
                     data = json.loads(res_file.read_text(encoding="utf-8"))
                     gov = data.get("governance_decision", {})
                     if gov.get("checkpoint_2_status") == "CERTIFIED":
-                        return True, "Checkpoint 2 certified via M44 Unified Audit"
+                        return (
+                            True,
+                            f"Checkpoint 2 certified via {data.get('meta', {}).get('eval_engine', res_name)}",
+                        )
                     results = data.get("results", {})
                     for c_name, c_res in results.items():
                         if (

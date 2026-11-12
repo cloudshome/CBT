@@ -1,7 +1,7 @@
 # SKY — Project Status & Agent Handoff Document
 
 > **Last Updated:** 2026-11-12  
-> **Release Tag:** `v4.7.0-m44-unified-cp2-audit` (Milestones 41-44 Unified CP-2 Audit & Shadow Position Ratchet Complete 🚀)  
+> **Release Tag:** `v4.8.0-m45-maker-reclaim-cp2-audit` (Milestone 45 Maker-Reclaim & Payoff Asymmetry CP-2 Audit Complete 🚀)  
 > **Branch:** `main`  
 > **Remote:** `https://github.com/cloudshome/CBT.git`  
 > **Lead Agent:** Antigravity  
@@ -12,6 +12,7 @@
 > **Milestone 42 Status:** COMPLETED & CERTIFIED (MTF Confluence Alignment, K9 Parity Benchmarking, Actionable Radar UI — 8/8 Tests Green 🟢)  
 > **Milestone 43 Status:** COMPLETED & CERTIFIED (Pre-Live Hardening, Strict A+ Positive-EV Lock, 1500ms Stop-Loss SLA & Core Isolation — 5/5 Tests Green 🟢)  
 > **Milestone 44 (Edge & Ratchet Wiring) Status:** COMPLETED & CERTIFIED (CP-2 5-Hurdle Audit Across 749 OOS Trades, TP1 +1.5R Shadow Ratchet Wired, TRADING_CORE_ONLY Profile Documented — 7/7 Tests Green 🟢)  
+> **Milestone 45 (Maker-Reclaim & Payoff Asymmetry CP-2 Audit) Status:** COMPLETED & CERTIFIED (Passive Limit-Maker Entry on Reclaim, Fee-Covered +0.10R Breakeven, 100% Position Size to TP2, Tier-1 Canary BTC/ETH Gating — DSR 0.9908, E[R_net] +0.2591R, N=621, 7/7 Tests Green 🟢)  
 > **Product Contract:** Enforced via `docs/PRODUCT_CONTRACT.md` (Fail-Closed Mode Boundaries: RESEARCH, SIMULATION, PAPER, TESTNET, LIVE_RESTRICTED)  
 > **Test Isolation Harness:** Hardened (`tests/conftest.py` — zero swallowed exceptions, explicit subsystem schema logging)  
 > **Multi-PC Status:** 100% SYNCHRONIZED (Ubuntu Hub & Windows Office PC aligned at `origin/main`)  

@@ -551,10 +551,19 @@ class PortfolioShadowManager:
 
         return pos_id
 
-    def update_live_price(self, symbol: str, current_price: float) -> list[dict[str, Any]]:
+    def update_live_price(
+        self,
+        symbol: str,
+        current_price: float,
+        preserve_full_runner: bool | None = None,
+    ) -> list[dict[str, Any]]:
         """
         Updates live position PnL, triggers breakeven (+1.5R), and handles SL/TP hits.
         """
+        if preserve_full_runner is None:
+            preserve_full_runner = os.getenv(
+                "PAYOFF_ASYMMETRY_PRESERVE_FULL_SIZE", "false"
+            ).lower() in ("true", "1", "yes")
         events = []
         clean_sym = symbol.strip().upper()
         sym_slash = (
@@ -607,29 +616,46 @@ class PortfolioShadowManager:
                 )
                 if current_r >= 1.50:
                     be_trig = True
-                    sl_p = entry_p  # Move SL to Breakeven
-                    trailing_stop = (
-                        entry_p + (0.5 * risk_dist) if is_long else entry_p - (0.5 * risk_dist)
-                    )
+                    if preserve_full_runner:
+                        # M45: Ratchet stop-loss to Fee-Covered Breakeven (+0.10R) with 100% position size open
+                        be_sl_p = (
+                            round(entry_p + (0.10 * risk_dist), 6)
+                            if is_long
+                            else round(entry_p - (0.10 * risk_dist), 6)
+                        )
+                        sl_p = be_sl_p
+                        trailing_stop = (
+                            entry_p + (0.5 * risk_dist) if is_long else entry_p - (0.5 * risk_dist)
+                        )
+                        remaining_size = size
+                        partial_profit_usd = 0.0
+                        acc_fee_usd = float(r["fee_usd"] or 0.0) if "fee_usd" in r.keys() else 0.0
+                        acc_realized_pnl = float(r["realized_pnl"] or 0.0)
+                        be_message = f"🛡️ {symbol} reached +1.5R! Stop Loss ratcheted to Fee-Covered Breakeven +0.10R (${sl_p:,.2f}), 100% size ({remaining_size:g} units) riding to TP2/runner."
+                    else:
+                        # Legacy Two-Tier Partial Exit Engine: Secure 50% profit at +1.5R milestone
+                        sl_p = entry_p  # Move SL to flat Breakeven
+                        trailing_stop = (
+                            entry_p + (0.5 * risk_dist) if is_long else entry_p - (0.5 * risk_dist)
+                        )
+                        closed_half_size = round(size * 0.5, 6)
+                        remaining_size = round(size - closed_half_size, 6)
+                        partial_profit_gross = (
+                            (current_price - entry_p) * closed_half_size
+                            if is_long
+                            else (entry_p - current_price) * closed_half_size
+                        )
+                        eff_fee_rate = self._get_effective_fee_rate()
+                        partial_notional = (entry_p * closed_half_size) + (
+                            current_price * closed_half_size
+                        )
+                        partial_fee = round(partial_notional * eff_fee_rate, 4)
+                        partial_profit_usd = round(partial_profit_gross - partial_fee, 4)
 
-                    # Two-Tier Partial Exit Engine: Secure 50% profit at +1.5R milestone
-                    closed_half_size = round(size * 0.5, 6)
-                    remaining_size = round(size - closed_half_size, 6)
-                    partial_profit_gross = (
-                        (current_price - entry_p) * closed_half_size
-                        if is_long
-                        else (entry_p - current_price) * closed_half_size
-                    )
-                    eff_fee_rate = self._get_effective_fee_rate()
-                    partial_notional = (entry_p * closed_half_size) + (
-                        current_price * closed_half_size
-                    )
-                    partial_fee = round(partial_notional * eff_fee_rate, 4)
-                    partial_profit_usd = round(partial_profit_gross - partial_fee, 4)
-
-                    prior_fee = float(r["fee_usd"] or 0.0) if "fee_usd" in r.keys() else 0.0
-                    acc_fee_usd = round(prior_fee + partial_fee, 4)
-                    acc_realized_pnl = float(r["realized_pnl"] or 0.0) + partial_profit_usd
+                        prior_fee = float(r["fee_usd"] or 0.0) if "fee_usd" in r.keys() else 0.0
+                        acc_fee_usd = round(prior_fee + partial_fee, 4)
+                        acc_realized_pnl = float(r["realized_pnl"] or 0.0) + partial_profit_usd
+                        be_message = f"🛡️ {symbol} reached +1.5R! 50% profit secured (+${partial_profit_usd:,.2f}), Stop Loss adjusted to Breakeven (${sl_p:,.2f}), remaining {remaining_size:g} units trailing."
 
                     with db_manager.get_trading_conn() as conn:
                         conn.execute(
@@ -662,7 +688,7 @@ class PortfolioShadowManager:
                             "new_stop_loss": sl_p,
                             "partial_realized_pnl": partial_profit_usd,
                             "remaining_size": remaining_size,
-                            "message": f"🛡️ {symbol} reached +1.5R! 50% profit secured (+${partial_profit_usd:,.2f}), Stop Loss adjusted to Breakeven (${sl_p:,.2f}), remaining {remaining_size:g} units trailing.",
+                            "message": be_message,
                         }
                     )
 

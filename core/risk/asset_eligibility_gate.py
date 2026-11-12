@@ -28,6 +28,20 @@ TIER1_CORE_WHITELIST = {
     "XAUUSD",
 }
 
+# Tier-1 Canary Eligible Universe (BTC & ETH only for initial live canary)
+TIER1_CANARY_WHITELIST = {
+    "BTC/USDT",
+    "BTCUSDT",
+    "ETH/USDT",
+    "ETHUSDT",
+}
+
+# Assets placed under forward paper observation pending statistical qualification
+PAPER_OBSERVATION_SYMBOLS = {
+    "SOL/USDT",
+    "SOLUSDT",
+}
+
 BANNED_MICROCAP_SYMBOLS = {
     "KORU",
     "AKE",
@@ -43,6 +57,7 @@ BANNED_MICROCAP_SYMBOLS = {
 class AssetEligibilityStatus(StrEnum):
     ELIGIBLE = "ELIGIBLE"
     REJECTED_NOT_WHITELISTED = "REJECTED_NOT_WHITELISTED"
+    REJECTED_TIER1_CANARY_RESTRICTED = "REJECTED_TIER1_CANARY_RESTRICTED"
     REJECTED_INSUFFICIENT_VOLUME = "REJECTED_INSUFFICIENT_VOLUME"
     REJECTED_INSUFFICIENT_DEPTH = "REJECTED_INSUFFICIENT_DEPTH"
     REJECTED_EXCESSIVE_SPREAD = "REJECTED_EXCESSIVE_SPREAD"
@@ -105,6 +120,24 @@ class DeterministicAssetEligibilityGate:
                 desk=desk,
                 ai_override_attempted=bool(ai_opportunity_score is not None),
             )
+
+        # Tier-1 Canary Live Whitelist Check (BTC and ETH only)
+        if desk in ("TIER1_CANARY", "CANARY"):
+            is_canary = any(
+                clean_sym == t.replace("/", "").replace("_", "") for t in TIER1_CANARY_WHITELIST
+            )
+            if not is_canary:
+                return AssetEligibilityDecision(
+                    symbol=symbol,
+                    status=AssetEligibilityStatus.REJECTED_TIER1_CANARY_RESTRICTED,
+                    is_eligible=False,
+                    rationale=(
+                        f"Asset '{symbol}' is restricted to PAPER_ONLY_OBSERVATION. "
+                        f"Only BTC and ETH are approved for Tier-1 Canary Execution."
+                    ),
+                    desk=desk,
+                    ai_override_attempted=bool(ai_opportunity_score is not None),
+                )
 
         # Main Sovereign Desk Whitelist Check
         if desk == "MAIN_SOVEREIGN":
@@ -173,3 +206,8 @@ class DeterministicAssetEligibilityGate:
             desk=desk,
             ai_override_attempted=False,
         )
+
+    def is_tier1_canary_eligible(self, symbol: str) -> bool:
+        """Returns True only if symbol is on the restricted Tier-1 Canary Whitelist (BTC, ETH)."""
+        clean_sym = symbol.replace("/", "").replace("_", "").upper()
+        return any(clean_sym == t.replace("/", "").replace("_", "") for t in TIER1_CANARY_WHITELIST)

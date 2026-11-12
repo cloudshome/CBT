@@ -210,10 +210,11 @@ def test_m44_capital_governor_cp2_certified_mock():
     if checkpoint_2_status is set to CERTIFIED.
     """
     mock_m44_data = {
+        "meta": {"eval_engine": "M44 Unified Audit"},
         "governance_decision": {
             "checkpoint_2_status": "CERTIFIED",
             "reason": "All 5 hurdles passed",
-        }
+        },
     }
 
     with patch.object(Path, "exists", return_value=True):

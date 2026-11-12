@@ -81,9 +81,7 @@ class GradedPlan:
     def __post_init__(self):
         if self.rr_net is None:
             if self.rr_achieved is not None:
-                self.rr_net = round(
-                    float(self.rr_achieved) - float(self.cost_r or 0.0), 3
-                )
+                self.rr_net = round(float(self.rr_achieved) - float(self.cost_r or 0.0), 3)
             else:
                 self.rr_net = None
 
@@ -126,6 +124,8 @@ def _evaluate(
     sentiment: dict | None = None,
     ladder_parity: bool = False,
     strict_a_plus_only: bool = False,
+    payoff_asymmetry: bool = False,
+    maker_reclaim: bool = False,
 ) -> GradedPlan:
     """Grade one plan produced at bar i over `horizon_bars` future bars."""
     entry = plan.get("entry")
@@ -192,11 +192,7 @@ def _evaluate(
 
         rr_val = plan.get("riskRewardRatio") or plan.get("rr") or plan.get("risk_reward")
         if rr_val is None:
-            best_tp = (
-                max(tps)
-                if is_buy and tps
-                else (min(tps) if not is_buy and tps else None)
-            )
+            best_tp = max(tps) if is_buy and tps else (min(tps) if not is_buy and tps else None)
             target_tp = best_tp if best_tp is not None else tp1
             rr_val = (
                 (abs(target_tp - entry) / max(risk, 1e-6))
@@ -265,19 +261,35 @@ def _evaluate(
     if use_ladder:
         from core.prediction_ladder import evaluate_ladder_tick
 
-        ladder_entry_zone = plan.get("entryZone") or plan.get("entry_zone") or [round(entry - 0.001 * entry, 2), round(entry + 0.001 * entry, 2)]
+        ladder_entry_zone = (
+            plan.get("entryZone")
+            or plan.get("entry_zone")
+            or [round(entry - 0.001 * entry, 2), round(entry + 0.001 * entry, 2)]
+        )
         e_low = min(ladder_entry_zone[0], ladder_entry_zone[1])
         e_high = max(ladder_entry_zone[0], ladder_entry_zone[1])
 
-        target_tp1 = tp1 if tp1 is not None else (round(entry + risk * 1.5, 2) if is_buy else round(entry - risk * 1.5, 2))
-        target_tp2 = tp2 if tp2 is not None else (round(entry + risk * 3.1, 2) if is_buy else round(entry - risk * 3.1, 2))
-        target_tp3 = (tps[2] if len(tps) > 2 else None) or (round(entry + risk * 6.2, 2) if is_buy else round(entry - risk * 6.2, 2))
+        target_tp1 = (
+            tp1
+            if tp1 is not None
+            else (round(entry + risk * 1.5, 2) if is_buy else round(entry - risk * 1.5, 2))
+        )
+        target_tp2 = (
+            tp2
+            if tp2 is not None
+            else (round(entry + risk * 3.1, 2) if is_buy else round(entry - risk * 3.1, 2))
+        )
+        target_tp3 = (tps[2] if len(tps) > 2 else None) or (
+            round(entry + risk * 6.2, 2) if is_buy else round(entry - risk * 6.2, 2)
+        )
 
         ladder_plan = {
             "side": "LONG" if is_buy else "SHORT",
             "entryZone": [e_low, e_high],
             "stopLoss": sl,
-            "invalidationPrice": plan.get("invalidationPrice") or plan.get("invalidation_level") or sl,
+            "invalidationPrice": plan.get("invalidationPrice")
+            or plan.get("invalidation_level")
+            or sl,
             "tp1": target_tp1,
             "tp2": target_tp2,
             "tp3": target_tp3,
@@ -326,6 +338,16 @@ def _evaluate(
             gp.outcome = "NOT_TRIGGERED"
             return gp
 
+        if maker_reclaim:
+            # Gated by realistic intrabar queue fill: limit order must fill within 2 bars
+            if fill_bar_idx > 1:
+                gp.outcome = "NOT_TRIGGERED"
+                return gp
+            penetrated = (lows[fill_bar_idx] <= entry) if is_buy else (highs[fill_bar_idx] >= entry)
+            if not penetrated:
+                gp.outcome = "NOT_TRIGGERED"
+                return gp
+
         current_stop = sl
         breakeven_active = False
         tp1_hit = False
@@ -339,6 +361,11 @@ def _evaluate(
 
             sl_touched = (b_l <= current_stop) if is_buy else (b_h >= current_stop)
             tp1_touched = (b_h >= target_tp1) if is_buy else (b_l <= target_tp1)
+            tp2_touched = (
+                ((b_h >= target_tp2) if is_buy else (b_l <= target_tp2))
+                if target_tp2 is not None
+                else False
+            )
 
             if sl_touched and tp1_touched and not tp1_hit:
                 gp.outcome = "LOSS"
@@ -347,10 +374,17 @@ def _evaluate(
                 set_holding(bar_k)
                 return gp
 
+            if payoff_asymmetry and tp2_touched and (tp1_hit or tp1_touched):
+                gp.outcome = "FULL_WIN"
+                gp.rr_achieved = realized_r(target_tp2)
+                set_holding(bar_k)
+                decided_bar = bar_k
+                break
+
             if sl_touched:
                 if breakeven_active:
                     gp.outcome = "PARTIAL_WIN"
-                    gp.rr_achieved = realized_r(target_tp1)
+                    gp.rr_achieved = 0.10 if payoff_asymmetry else realized_r(target_tp1)
                 else:
                     gp.outcome = "LOSS"
                     gp.rr_achieved = -1.0
@@ -361,11 +395,14 @@ def _evaluate(
             if tp1_touched and not tp1_hit:
                 tp1_hit = True
                 breakeven_active = True
-                current_stop = entry  # Stop-to-breakeven after TP1!
+                current_stop = (
+                    ((entry + 0.10 * risk) if is_buy else (entry - 0.10 * risk))
+                    if payoff_asymmetry
+                    else entry
+                )
                 decided_bar = bar_k
 
-            if target_tp2 is not None:
-                tp2_touched = (b_h >= target_tp2) if is_buy else (b_l <= target_tp2)
+            if not payoff_asymmetry and target_tp2 is not None:
                 if tp2_touched:
                     tp2_hit = True
                     decided_bar = bar_k
@@ -474,8 +511,14 @@ def _evaluate(
     if gp.outcome in ("LOSS", "FULL_WIN", "PARTIAL_WIN"):
         try:
             is_passive = bool(
-                plan.get("status") == "waiting" or plan.get("trigger_level") is not None
+                maker_reclaim
+                or plan.get("status") == "waiting"
+                or plan.get("trigger_level") is not None
             )
+            exec_type = None
+            if maker_reclaim:
+                exec_type = "maker_in_taker_out" if gp.outcome == "LOSS" else "maker"
+
             cost = calculate_trade_cost(
                 entry=entry,
                 stop_loss=sl,
@@ -485,6 +528,7 @@ def _evaluate(
                 symbol=df.attrs.get("symbol", "BTCUSDT"),
                 ts=gp.ts,
                 is_passive_limit=is_passive,
+                execution_type=exec_type,
             )
             gp.fee_r = cost.fee_r
             gp.funding_r = cost.funding_r
@@ -544,9 +588,7 @@ def _aggregate(graded: list[GradedPlan]) -> dict:
     rr_vals = [g.rr_achieved for g in decided]
     avg_rr = round(sum(rr_vals) / len(rr_vals), 3) if rr_vals else 0.0
     # expectancy: average R per decided trade (wins positive, losses -1R)
-    exp = (
-        round(sum(g.rr_achieved for g in decided) / len(decided), 3) if decided else 0.0
-    )
+    exp = round(sum(g.rr_achieved for g in decided) / len(decided), 3) if decided else 0.0
 
     # Net metrics (P12.6)
     rr_net_vals = [getattr(g, "rr_net", g.rr_achieved) for g in decided]
@@ -600,6 +642,8 @@ def run_backtest(
     min_confidence: int = 55,
     ladder_parity: bool = False,
     strict_a_plus_only: bool = False,
+    payoff_asymmetry: bool = False,
+    maker_reclaim: bool = False,
 ) -> dict:
     """Walk the engine over history and grade every plan at every horizon."""
     symbol = normalize_symbol(symbol)
@@ -672,6 +716,8 @@ def run_backtest(
                         sentiment=sentiment,
                         ladder_parity=ladder_parity,
                         strict_a_plus_only=strict_a_plus_only,
+                        payoff_asymmetry=payoff_asymmetry,
+                        maker_reclaim=maker_reclaim,
                     )
                 )
 
@@ -692,23 +738,16 @@ def run_backtest(
             # the walk couldn't see (funding/news/fear&greed/MTF excluded).
             "sentiment_mode": "historical",
         },
-        "summary": _aggregate(
-            [g for g in all_graded if g.horizon_hours == horizons[0]]
-        ),
+        "summary": _aggregate([g for g in all_graded if g.horizon_hours == horizons[0]]),
         "per_horizon": {
-            str(h): _aggregate([g for g in all_graded if g.horizon_hours == h])
-            for h in horizons
+            str(h): _aggregate([g for g in all_graded if g.horizon_hours == h]) for h in horizons
         },
         "by_type": group_by(all_graded, lambda g: g.plan_type),
         "by_action": group_by(all_graded, lambda g: g.action),
         "by_confidence": group_by(
             all_graded,
             lambda g: (
-                "HIGH"
-                if g.confidence_pct >= 80
-                else "MEDIUM"
-                if g.confidence_pct >= 60
-                else "LOW"
+                "HIGH" if g.confidence_pct >= 80 else "MEDIUM" if g.confidence_pct >= 60 else "LOW"
             ),
         ),
         "by_regime": group_by(all_graded, lambda g: g.regime or "UNKNOWN"),
@@ -826,9 +865,7 @@ def print_report(report: dict) -> None:
         )
     print("-" * 66)
     print("by plan type:")
-    for t, agg in sorted(
-        report["by_type"].items(), key=lambda kv: -(kv[1]["executed"] or 0)
-    ):
+    for t, agg in sorted(report["by_type"].items(), key=lambda kv: -(kv[1]["executed"] or 0)):
         wr = agg["win_rate"]
         print(
             f"  {t:<24} exec {agg['executed']:>4}  win "
