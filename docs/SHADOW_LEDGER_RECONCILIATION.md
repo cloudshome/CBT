@@ -1,7 +1,7 @@
 # SKY / CBT — Shadow Ledger Accounting & Reconciliation Report
 
 **Audit Status:** `VERIFIED_ZERO_DRIFT`  
-**Audit Timestamp:** `2026-11-12T03:29:48.744475+00:00`  
+**Audit Timestamp:** `2026-11-12T14:26:37.151775+00:00`  
 **Tolerance Level:** `< $0.001`  
 **Governance Guard:** `REAL_CAPITAL_ENABLED = False` (Isolated Paper/Simulation Sandbox)  
 
@@ -22,12 +22,12 @@ $$\text{Equity}_t \equiv \text{SettledCash}_t + \sum_{i \in \text{Open}} \text{U
 | **Closed Decided Trades** | 505 | 4 |
 | **Active Open Positions** | 2 | 2 |
 | **Cumulative Realized PnL** | $-2,359.49 | $1.30 |
-| **Open Unrealized PnL** | $2.17 | $2.17 |
+| **Open Unrealized PnL** | $-2.86 | $-2.86 |
 | **Total Accrued Fees** | $0.4898 | $0.3536 |
 | **Estimated Slippage** | N/A | $0.1401 |
-| **Estimated Funding** | N/A | $0.1136 |
+| **Estimated Funding** | N/A | $0.1375 |
 | **Settled Virtual Cash** | $7,640.51 | $7,590.83 |
-| **Total Virtual Equity** | $7,642.68 | $7,593.00 |
+| **Total Virtual Equity** | $7,637.65 | $7,587.97 |
 | **Reconciliation Discrepancy** | **$0.000000** (`PASS`) | **$0.000000** (`PASS`) |
 
 ---
@@ -36,8 +36,8 @@ $$\text{Equity}_t \equiv \text{SettledCash}_t + \sum_{i \in \text{Open}} \text{U
 
 | Position ID | Symbol | Direction | Size | Entry Price | Current Price | Stop Loss | Take Profit | Unrealized PnL | Calc Drift |
 |:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| `POS_ETH_USDT_1794329104981_1b1ff8e4` | **ETH/USDT** | `LONG` | 0.0432 | $2,023.49 | $2,054.93 | $1,962.79 | $2,157.04 | $+1.3582 | `$0.000000` |
-| `POS_BTC_USDT_1794329104880_1c979561` | **BTC/USDT** | `LONG` | 0.0012 | $73,156.81 | $73,834.26 | $70,962.11 | $77,985.16 | $+0.8129 | `$0.000000` |
+| `POS_ETH_USDT_1794329104981_1b1ff8e4` | **ETH/USDT** | `LONG` | 0.0432 | $2,023.49 | $1,991.68 | $1,962.79 | $2,157.04 | $-1.3742 | `$0.000000` |
+| `POS_BTC_USDT_1794329104880_1c979561` | **BTC/USDT** | `LONG` | 0.0012 | $73,156.81 | $71,916.15 | $70,962.11 | $77,985.16 | $-1.4888 | `$0.000000` |
 
 ---
 
@@ -59,4 +59,4 @@ $$\text{Equity}_t \equiv \text{SettledCash}_t + \sum_{i \in \text{Open}} \text{U
 - [x] **Decimal Integrity:** All currency computations grounded via `Decimal` without floating-point accumulation drift.
 - [x] **Zero Lookahead:** Open positions evaluate strictly against live ticks; closed positions remain immutable.
 - [x] **Friction Model:** Taker fees (4 bps) and funding rate (1 bp/8h) continuously accounted.
-- [x] **Cryptographic Audit Hash:** Qualification ledger sealed with SHA-256 digest: `22ccac43d901d5ad2502132b50e9b8bd5dbf6138c6da87ca85694eb992b8521d`.
+- [x] **Cryptographic Audit Hash:** Qualification ledger sealed with SHA-256 digest: `d3b7f16d2b562c4d146534afb75914750b52fa0a6c27cb1fbd15ee4126ed85f5`.

@@ -54,7 +54,9 @@ def test_m43_positive_net_expectancy_a_plus_scorecard():
     """
     runner = K9ParityBenchmarkRunner()
     ds_list = runner.discover_datasets()
-    btc_15m = next((d for d in ds_list if "BTCUSDT" in d["symbol"] and d["timeframe"] == "15m"), None)
+    btc_15m = next(
+        (d for d in ds_list if "BTCUSDT" in d["symbol"] and d["timeframe"] == "15m"), None
+    )
     assert btc_15m is not None, "K9_BTCUSDT_15m dataset must exist"
 
     with open(btc_15m["path"], encoding="utf-8") as f:
@@ -310,7 +312,9 @@ async def test_m43_opportunity_hunter_strict_a_plus_radar():
     """
     entries = await opportunity_hunter.get_actionable_entries(strict_a_plus_only=True)
     for e in entries:
-        assert e["readinessGrade"] == "A+", f"Setup {e['symbol']} had non-A+ grade {e['readinessGrade']}"
+        assert e["readinessGrade"] == "A+", (
+            f"Setup {e['symbol']} had non-A+ grade {e['readinessGrade']}"
+        )
         assert e["entryReadinessScore"] >= 85.0
         assert e["mtfAlignment"] == "ALIGNED"
         assert e["entryTriggerState"] == "IN_ZONE_CONFIRMED"

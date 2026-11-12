@@ -869,7 +869,9 @@ class OpportunityHunter:
                         quote_asset="USDT",
                         spot_eligible=True,
                         futures_eligible=True,
-                        current_price=68000.0 if "BTC" in anchor else (2400.0 if "ETH" in anchor else 180.0),
+                        current_price=68000.0
+                        if "BTC" in anchor
+                        else (2400.0 if "ETH" in anchor else 180.0),
                         price_change_24h_pct=1.2,
                         quote_volume_24h_usd=50_000_000.0,
                         trade_count_24h=10000,
@@ -991,7 +993,8 @@ class OpportunityHunter:
                     final_score = min(100.0, round(raw_readiness, 1))
                     # Cap counter-trend at grade B (max 69.0) unless structural liquidity sweep reclaim with confirmed CVD absorption
                     is_sweep_absorption = (zone_origin == "LIQUIDITY_SWEEP_RECLAIM") and (
-                        trigger_state == "IN_ZONE_CONFIRMED" or orderflow_alignment == "STRONGLY_ALIGNED"
+                        trigger_state == "IN_ZONE_CONFIRMED"
+                        or orderflow_alignment == "STRONGLY_ALIGNED"
                     )
                     if mtf_alignment == "COUNTER_TREND" and not is_sweep_absorption:
                         final_score = min(69.0, final_score)
@@ -1023,29 +1026,31 @@ class OpportunityHunter:
                 if final_score < min_score:
                     continue
 
-                actionable_results.append({
-                    "symbol": sym,
-                    "side": side,
-                    "style": sig["style"],
-                    "currentPrice": cur_p,
-                    "entryZone": [e_low, e_high],
-                    "distancePct": distance_pct,
-                    "entryTriggerState": trigger_state,
-                    "zoneOrigin": zone_origin,
-                    "riskRewardRatio": rr,
-                    "stopLoss": sig["stopLoss"],
-                    "invalidationPrice": sig["invalidationPrice"],
-                    "takeProfits": [sig["tp1"], sig["tp2"], sig["tp3"]],
-                    "orderflowAlignment": orderflow_alignment,
-                    "cvdDelta": round(cvd_delta, 3),
-                    "l2Imbalance": round(obi, 3),
-                    "oosValidated": is_oos_validated,
-                    "quarantined": is_quarantined,
-                    "mtfAlignment": mtf_alignment,
-                    "entryReadinessScore": final_score,
-                    "readinessGrade": readiness_grade,
-                    "thesis": sig["thesis"],
-                })
+                actionable_results.append(
+                    {
+                        "symbol": sym,
+                        "side": side,
+                        "style": sig["style"],
+                        "currentPrice": cur_p,
+                        "entryZone": [e_low, e_high],
+                        "distancePct": distance_pct,
+                        "entryTriggerState": trigger_state,
+                        "zoneOrigin": zone_origin,
+                        "riskRewardRatio": rr,
+                        "stopLoss": sig["stopLoss"],
+                        "invalidationPrice": sig["invalidationPrice"],
+                        "takeProfits": [sig["tp1"], sig["tp2"], sig["tp3"]],
+                        "orderflowAlignment": orderflow_alignment,
+                        "cvdDelta": round(cvd_delta, 3),
+                        "l2Imbalance": round(obi, 3),
+                        "oosValidated": is_oos_validated,
+                        "quarantined": is_quarantined,
+                        "mtfAlignment": mtf_alignment,
+                        "entryReadinessScore": final_score,
+                        "readinessGrade": readiness_grade,
+                        "thesis": sig["thesis"],
+                    }
+                )
 
         actionable_results.sort(key=lambda x: x["entryReadinessScore"], reverse=True)
         return actionable_results
@@ -1115,7 +1120,9 @@ def evaluate_and_dispatch_radar_telegram_alert(
 
         direction = "LONG" if side == "LONG" else "SHORT"
         cur_p = float(entry.get("currentPrice") or (entry.get("entryZone", [0.0, 0.0])[0]))
-        stop_loss = float(entry.get("stopLoss") or (cur_p * 0.98 if direction == "LONG" else cur_p * 1.02))
+        stop_loss = float(
+            entry.get("stopLoss") or (cur_p * 0.98 if direction == "LONG" else cur_p * 1.02)
+        )
         notional_usd = 500.0
         size = round(notional_usd / max(cur_p, 1.0), 6)
 
@@ -1157,7 +1164,9 @@ def evaluate_and_dispatch_radar_telegram_alert(
 
             try:
                 loop = asyncio.get_running_loop()
-                _task = loop.create_task(telegram_bot.send_message(alert_text, parse_mode="Markdown"))
+                _task = loop.create_task(
+                    telegram_bot.send_message(alert_text, parse_mode="Markdown")
+                )
                 # Suppress unused variable warning while retaining strong reference
                 if _task is None:
                     pass

@@ -385,4 +385,3 @@ strategy_eligibility_verifier.quarantine_strategy(
     "CANDIDATE_C_DELTA_NEUTRAL_CARRY",
     "Rejected due to friction erosion under conservative rebalance taker drag (-0.015R).",
 )
-

@@ -82,12 +82,14 @@ class K9ParityBenchmarkRunner:
             fname = os.path.basename(f)
             parts = fname.replace(".json", "").split("_")
             if len(parts) >= 3:
-                discovered.append({
-                    "symbol": parts[1],
-                    "timeframe": parts[2],
-                    "dataset_id": fname.replace(".json", ""),
-                    "path": f,
-                })
+                discovered.append(
+                    {
+                        "symbol": parts[1],
+                        "timeframe": parts[2],
+                        "dataset_id": fname.replace(".json", ""),
+                        "path": f,
+                    }
+                )
         # Sort predictably by symbol and timeframe
         tf_order = {"15m": 1, "1h": 2, "4h": 3}
         discovered.sort(key=lambda x: (x["symbol"], tf_order.get(x["timeframe"], 99)))
@@ -104,7 +106,11 @@ class K9ParityBenchmarkRunner:
         win_rate = (wins / (wins + losses) * 100.0) if (wins + losses) > 0 else 0.0
 
         returns = [
-            float(p.rr_net if p.rr_net is not None else (p.rr_achieved if p.rr_achieved is not None else 0.0))
+            float(
+                p.rr_net
+                if p.rr_net is not None
+                else (p.rr_achieved if p.rr_achieved is not None else 0.0)
+            )
             for p in executed
         ]
         expectancy = float(np.mean(returns)) if returns else 0.0
@@ -122,7 +128,9 @@ class K9ParityBenchmarkRunner:
             max_dd = float(np.max(dd))
 
         # Deflated Sharpe Ratio
-        dsr, p_val = compute_deflated_sharpe(np.array(returns) if len(returns) >= 10 else np.array([]), num_trials=6)
+        dsr, p_val = compute_deflated_sharpe(
+            np.array(returns) if len(returns) >= 10 else np.array([]), num_trials=6
+        )
 
         return ModeMetrics(
             mode=mode_name,
@@ -236,23 +244,29 @@ class K9ParityBenchmarkRunner:
         t0 = time.time()
 
         for d in datasets:
-            bench = self.run_dataset_benchmark(d, step_override=step_override, strict_a_plus_only=True)
+            bench = self.run_dataset_benchmark(
+                d, step_override=step_override, strict_a_plus_only=True
+            )
             res = bench.parity
-            results.append({
-                "dataset_id": bench.dataset_id,
-                "symbol": bench.symbol,
-                "timeframe": bench.timeframe,
-                "bars_count": bench.bars_count,
-                "trades_executed": res.trades_executed,
-                "wins": res.wins,
-                "losses": res.losses,
-                "win_rate_pct": res.win_rate_pct,
-                "net_expectancy_r": res.expectancy_r,
-                "profit_factor": res.profit_factor,
-                "max_drawdown_r": res.max_drawdown_r,
-                "knife_catches_avoided": bench.knife_catches_avoided,
-                "hurdle_positive_ev": bool(res.expectancy_r >= 0.25 and res.profit_factor >= 1.45),
-            })
+            results.append(
+                {
+                    "dataset_id": bench.dataset_id,
+                    "symbol": bench.symbol,
+                    "timeframe": bench.timeframe,
+                    "bars_count": bench.bars_count,
+                    "trades_executed": res.trades_executed,
+                    "wins": res.wins,
+                    "losses": res.losses,
+                    "win_rate_pct": res.win_rate_pct,
+                    "net_expectancy_r": res.expectancy_r,
+                    "profit_factor": res.profit_factor,
+                    "max_drawdown_r": res.max_drawdown_r,
+                    "knife_catches_avoided": bench.knife_catches_avoided,
+                    "hurdle_positive_ev": bool(
+                        res.expectancy_r >= 0.25 and res.profit_factor >= 1.45
+                    ),
+                }
+            )
 
         elapsed = round(time.time() - t0, 2)
         total_trades = sum(r["trades_executed"] for r in results)
@@ -319,7 +333,9 @@ class K9ParityBenchmarkRunner:
                 "naive_total_losses": total_naive_losses,
                 "parity_total_losses": total_parity_losses,
                 "loss_reduction_pct": round(
-                    ((total_naive_losses - total_parity_losses) / max(1, total_naive_losses)) * 100.0, 1
+                    ((total_naive_losses - total_parity_losses) / max(1, total_naive_losses))
+                    * 100.0,
+                    1,
                 ),
                 "avg_expectancy_delta_r": round(avg_exp_delta, 3),
                 "avg_profit_factor_delta": round(avg_pf_delta, 3),
@@ -353,15 +369,17 @@ class K9ParityBenchmarkRunner:
             )
 
         agg = report.get("aggregate_summary", {})
-        lines.extend([
-            "==================================================================================================",
-            f"TOTAL KNIFE-CATCHES AVOIDED : {agg.get('total_knife_catches_avoided', 0)} setups",
-            f"OVERALL LOSS REDUCTION      : {agg.get('loss_reduction_pct', 0.0)}% (Naive: {agg.get('naive_total_losses', 0)} losses -> Parity: {agg.get('parity_total_losses', 0)} losses)",
-            f"AVERAGE EXPECTANCY DELTA    : {agg.get('avg_expectancy_delta_r', 0.0):+.3f}R per trade",
-            f"AVERAGE PROFIT FACTOR DELTA : {agg.get('avg_profit_factor_delta', 0.0):+.2f}",
-            f"AVERAGE MAX DRAWDOWN SAVED  : {agg.get('avg_drawdown_reduction_r', 0.0):+.2f}R",
-            "==================================================================================================",
-        ])
+        lines.extend(
+            [
+                "==================================================================================================",
+                f"TOTAL KNIFE-CATCHES AVOIDED : {agg.get('total_knife_catches_avoided', 0)} setups",
+                f"OVERALL LOSS REDUCTION      : {agg.get('loss_reduction_pct', 0.0)}% (Naive: {agg.get('naive_total_losses', 0)} losses -> Parity: {agg.get('parity_total_losses', 0)} losses)",
+                f"AVERAGE EXPECTANCY DELTA    : {agg.get('avg_expectancy_delta_r', 0.0):+.3f}R per trade",
+                f"AVERAGE PROFIT FACTOR DELTA : {agg.get('avg_profit_factor_delta', 0.0):+.2f}",
+                f"AVERAGE MAX DRAWDOWN SAVED  : {agg.get('avg_drawdown_reduction_r', 0.0):+.2f}R",
+                "==================================================================================================",
+            ]
+        )
         return "\n".join(lines)
 
 

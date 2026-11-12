@@ -221,9 +221,7 @@ class QualificationLedger:
             r_multiples.append(r_val)
 
             # Check if this position originated from an empirically quarantined / falsified mechanism
-            reason_text = (
-                str(p["entry_reason"] or "").upper() if "entry_reason" in p.keys() else ""
-            )
+            reason_text = str(p["entry_reason"] or "").upper() if "entry_reason" in p.keys() else ""
             is_quarantined = any(
                 q in reason_text
                 for q in [

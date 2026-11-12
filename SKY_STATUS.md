@@ -1,13 +1,16 @@
 # SKY — Project Status & Agent Handoff Document
 
 > **Last Updated:** 2026-11-12  
-> **Release Tag:** `v4.5.0-m40-power-expansion` (Milestone 40 Derivatives Backfill, Candidate B Power Expansion & Forward Paper Isolation Complete 🚀)  
+> **Release Tag:** `v4.6.0-m43-pre-live-hardened` (Milestones 41-43 Bidirectional Entry, MTF Confluence & Pre-Live Hardening Complete 🚀)  
 > **Branch:** `main`  
 > **Remote:** `https://github.com/cloudshome/CBT.git`  
 > **Lead Agent:** Antigravity  
 > **Milestone 18 Status:** PRODUCTION PASS (Certified & Re-Validated Active — 149/149 Tests Green 🏛️)  
 > **Milestone 39 Status:** COMPLETED & CERTIFIED (Real-World Readiness & Edge Execution Campaign — WP-1 to WP-5 Verified 🟢)  
 > **Milestone 40 (Edge Campaign) Status:** COMPLETED & CERTIFIED (Derivatives Backfill, Candidate B Power Test, Maker Simulation & SMC Ablation 🟢)  
+> **Milestone 41 Status:** COMPLETED & CERTIFIED (Bidirectional Entry Engine, SMC Structure Zones, Orderflow Triggers — 8/8 Tests Green 🟢)  
+> **Milestone 42 Status:** COMPLETED & CERTIFIED (MTF Confluence Alignment, K9 Parity Benchmarking, Actionable Radar UI — 8/8 Tests Green 🟢)  
+> **Milestone 43 Status:** COMPLETED & CERTIFIED (Pre-Live Hardening, Strict A+ Positive-EV Lock, 1500ms Stop-Loss SLA & Core Isolation — 5/5 Tests Green 🟢)  
 > **Product Contract:** Enforced via `docs/PRODUCT_CONTRACT.md` (Fail-Closed Mode Boundaries: RESEARCH, SIMULATION, PAPER, TESTNET, LIVE_RESTRICTED)  
 > **Test Isolation Harness:** Hardened (`tests/conftest.py` — zero swallowed exceptions, explicit subsystem schema logging)  
 > **Multi-PC Status:** 100% SYNCHRONIZED (Ubuntu Hub & Windows Office PC aligned at `origin/main`)  

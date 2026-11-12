@@ -28,11 +28,17 @@ def test_mtf_alignment_gate_evaluation():
     """Verifies that MTF alignment evaluates cleanly for both LONG and SHORT against regime bias."""
     # Bull regime: LONG is ALIGNED, SHORT is COUNTER_TREND
     assert multi_timeframe_engine.evaluate_mtf_alignment("LONG", is_bull_regime=True) == "ALIGNED"
-    assert multi_timeframe_engine.evaluate_mtf_alignment("SHORT", is_bull_regime=True) == "COUNTER_TREND"
+    assert (
+        multi_timeframe_engine.evaluate_mtf_alignment("SHORT", is_bull_regime=True)
+        == "COUNTER_TREND"
+    )
 
     # Bear regime: SHORT is ALIGNED, LONG is COUNTER_TREND
     assert multi_timeframe_engine.evaluate_mtf_alignment("SHORT", is_bull_regime=False) == "ALIGNED"
-    assert multi_timeframe_engine.evaluate_mtf_alignment("LONG", is_bull_regime=False) == "COUNTER_TREND"
+    assert (
+        multi_timeframe_engine.evaluate_mtf_alignment("LONG", is_bull_regime=False)
+        == "COUNTER_TREND"
+    )
 
     # Neutral fallback
     assert multi_timeframe_engine.evaluate_mtf_alignment("LONG", is_bull_regime=None) == "NEUTRAL"
@@ -195,12 +201,16 @@ def test_evaluate_and_dispatch_radar_telegram_alert_cooldown_and_gates():
         "zoneOrigin": "BULLISH_OB_FVG",
         "thesis": "A+ confluence entry.",
     }
-    r2 = evaluate_and_dispatch_radar_telegram_alert(qualified_entry, cooldown_secs=1800.0, dry_run=True)
+    r2 = evaluate_and_dispatch_radar_telegram_alert(
+        qualified_entry, cooldown_secs=1800.0, dry_run=True
+    )
     assert r2["dispatched"] is True
     assert "BTCUSDT:SWING:LONG" in r2["key"]
     assert "ACTIONABLE ENTRY CONFIRMED" in r2["alert_text"]
 
     # 3. Subsequent immediate call must be rejected by cooldown
-    r3 = evaluate_and_dispatch_radar_telegram_alert(qualified_entry, cooldown_secs=1800.0, dry_run=True)
+    r3 = evaluate_and_dispatch_radar_telegram_alert(
+        qualified_entry, cooldown_secs=1800.0, dry_run=True
+    )
     assert r3["dispatched"] is False
     assert "COOLDOWN_ACTIVE" in r3["reason"]

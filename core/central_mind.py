@@ -469,7 +469,6 @@ class CentralTradingMind:
         except Exception as elig_err:
             logger.debug("Strategy eligibility verification check bypassed: %s", elig_err)
 
-
         # -------------------------------------------------------------
         # INVARIANT 2c: EventShock & Volatility Circuit Breaker Check
         # -------------------------------------------------------------

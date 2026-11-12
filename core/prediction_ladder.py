@@ -222,7 +222,11 @@ def evaluate_ladder_tick(
         if bar_low <= e_high and bar_high >= e_low:
             lower_wick = min(bar_open, bar_close) - bar_low
             wick_ratio = lower_wick / bar_range
-            confirmed = bool((cvd_score >= 0.05) or (wick_ratio >= 0.25) or (bar_close >= e_low and bar_open <= bar_close))
+            confirmed = bool(
+                (cvd_score >= 0.05)
+                or (wick_ratio >= 0.25)
+                or (bar_close >= e_low and bar_open <= bar_close)
+            )
             if confirmed:
                 return LadderTickEvaluation(
                     state="IN_ZONE_CONFIRMED",
@@ -338,7 +342,11 @@ def evaluate_ladder_tick(
         if bar_high >= e_low and bar_low <= e_high:
             upper_wick = bar_high - max(bar_open, bar_close)
             wick_ratio = upper_wick / bar_range
-            confirmed = bool((cvd_score <= -0.05) or (wick_ratio >= 0.25) or (bar_close <= e_high and bar_open >= bar_close))
+            confirmed = bool(
+                (cvd_score <= -0.05)
+                or (wick_ratio >= 0.25)
+                or (bar_close <= e_high and bar_open >= bar_close)
+            )
             if confirmed:
                 return LadderTickEvaluation(
                     state="IN_ZONE_CONFIRMED",
@@ -446,10 +454,30 @@ def compute_bidirectional_style_signals(
     real_fvgs = real_fvgs or []
 
     # Find Bullish & Bearish structural candidates
-    bull_obs = [ob for ob in real_obs if getattr(ob, "pattern_type", "") in ("BULLISH_OB", "CANDIDATE_BULLISH_OB") or "BULL" in str(getattr(ob, "pattern_type", "")).upper()]
-    bear_obs = [ob for ob in real_obs if getattr(ob, "pattern_type", "") in ("BEARISH_OB", "CANDIDATE_BEARISH_OB") or "BEAR" in str(getattr(ob, "pattern_type", "")).upper()]
-    bull_fvgs = [f for f in real_fvgs if getattr(f, "pattern_type", "") in ("BULLISH_FVG", "BULLISH") or "BULL" in str(getattr(f, "pattern_type", "")).upper()]
-    bear_fvgs = [f for f in real_fvgs if getattr(f, "pattern_type", "") in ("BEARISH_FVG", "BEARISH") or "BEAR" in str(getattr(f, "pattern_type", "")).upper()]
+    bull_obs = [
+        ob
+        for ob in real_obs
+        if getattr(ob, "pattern_type", "") in ("BULLISH_OB", "CANDIDATE_BULLISH_OB")
+        or "BULL" in str(getattr(ob, "pattern_type", "")).upper()
+    ]
+    bear_obs = [
+        ob
+        for ob in real_obs
+        if getattr(ob, "pattern_type", "") in ("BEARISH_OB", "CANDIDATE_BEARISH_OB")
+        or "BEAR" in str(getattr(ob, "pattern_type", "")).upper()
+    ]
+    bull_fvgs = [
+        f
+        for f in real_fvgs
+        if getattr(f, "pattern_type", "") in ("BULLISH_FVG", "BULLISH")
+        or "BULL" in str(getattr(f, "pattern_type", "")).upper()
+    ]
+    bear_fvgs = [
+        f
+        for f in real_fvgs
+        if getattr(f, "pattern_type", "") in ("BEARISH_FVG", "BEARISH")
+        or "BEAR" in str(getattr(f, "pattern_type", "")).upper()
+    ]
 
     # Helper to calculate single-side plan
     def _build_plan(style: str, side: str) -> dict[str, Any]:
@@ -467,7 +495,10 @@ def compute_bidirectional_style_signals(
             rr_ratio = 2.8
 
             if is_long:
-                fvg = next((f for f in reversed(bull_fvgs) if getattr(f, "top_price", 0) <= cur_p * 1.015), None)
+                fvg = next(
+                    (f for f in reversed(bull_fvgs) if getattr(f, "top_price", 0) <= cur_p * 1.015),
+                    None,
+                )
                 if fvg:
                     e_zone = [round(fvg.bottom_price, 2), round(fvg.top_price, 2)]
                     sl = round(getattr(fvg, "invalidation_level", fvg.bottom_price * 0.998), 2)
@@ -475,7 +506,10 @@ def compute_bidirectional_style_signals(
                     origin = "BULLISH_OB_FVG"
                     thesis = f"5m Bullish FVG retest anchored at ${fvg.bottom_price:,.2f}-${fvg.top_price:,.2f} with CVD absorption confirmation."
                 else:
-                    e_zone = [round(low_50 + range_50 * 0.42, 2), round(low_50 + range_50 * 0.49, 2)]
+                    e_zone = [
+                        round(low_50 + range_50 * 0.42, 2),
+                        round(low_50 + range_50 * 0.49, 2),
+                    ]
                     sl = round(low_50 + range_50 * 0.36, 2)
                     inv = round(sl * 0.999, 2)
                     origin = "VWAP_VAL_CONFLUENCE"
@@ -485,7 +519,14 @@ def compute_bidirectional_style_signals(
                 tp2 = round(e_zone[1] + r_dist * 3.1, 2)
                 tp3 = round(e_zone[1] + r_dist * 6.2, 2)
             else:
-                fvg = next((f for f in reversed(bear_fvgs) if getattr(f, "bottom_price", float("inf")) >= cur_p * 0.985), None)
+                fvg = next(
+                    (
+                        f
+                        for f in reversed(bear_fvgs)
+                        if getattr(f, "bottom_price", float("inf")) >= cur_p * 0.985
+                    ),
+                    None,
+                )
                 if fvg:
                     e_zone = [round(fvg.bottom_price, 2), round(fvg.top_price, 2)]
                     sl = round(getattr(fvg, "invalidation_level", fvg.top_price * 1.002), 2)
@@ -493,7 +534,10 @@ def compute_bidirectional_style_signals(
                     origin = "BEARISH_OB_FVG"
                     thesis = f"5m Bearish FVG rejection anchored at ${fvg.bottom_price:,.2f}-${fvg.top_price:,.2f} with CVD absorption confirmation."
                 else:
-                    e_zone = [round(high_50 - range_50 * 0.49, 2), round(high_50 - range_50 * 0.42, 2)]
+                    e_zone = [
+                        round(high_50 - range_50 * 0.49, 2),
+                        round(high_50 - range_50 * 0.42, 2),
+                    ]
                     sl = round(high_50 - range_50 * 0.36, 2)
                     inv = round(sl * 1.001, 2)
                     origin = "VWAP_VAL_CONFLUENCE"
@@ -515,7 +559,10 @@ def compute_bidirectional_style_signals(
             rr_ratio = 3.6
 
             if is_long:
-                ob = next((o for o in reversed(bull_obs) if getattr(o, "top_price", 0) <= cur_p * 1.02), None)
+                ob = next(
+                    (o for o in reversed(bull_obs) if getattr(o, "top_price", 0) <= cur_p * 1.02),
+                    None,
+                )
                 if ob:
                     e_zone = [round(ob.bottom_price, 2), round(ob.top_price, 2)]
                     sl = round(getattr(ob, "invalidation_level", ob.bottom_price * 0.997), 2)
@@ -523,7 +570,10 @@ def compute_bidirectional_style_signals(
                     origin = "BULLISH_OB_FVG"
                     thesis = f"15m Order Block anchored at ${ob.bottom_price:,.2f}-${ob.top_price:,.2f} aligning with session discount liquidity."
                 else:
-                    e_zone = [round(low_50 + range_50 * 0.28, 2), round(low_50 + range_50 * 0.38, 2)]
+                    e_zone = [
+                        round(low_50 + range_50 * 0.28, 2),
+                        round(low_50 + range_50 * 0.38, 2),
+                    ]
                     sl = round(low_50 + range_50 * 0.20, 2)
                     inv = round(sl * 0.998, 2)
                     origin = "LIQUIDITY_SWEEP_RECLAIM"
@@ -533,7 +583,14 @@ def compute_bidirectional_style_signals(
                 tp2 = round(e_zone[1] + r_dist * 3.1, 2)
                 tp3 = round(e_zone[1] + r_dist * 6.2, 2)
             else:
-                ob = next((o for o in reversed(bear_obs) if getattr(o, "bottom_price", float("inf")) >= cur_p * 0.98), None)
+                ob = next(
+                    (
+                        o
+                        for o in reversed(bear_obs)
+                        if getattr(o, "bottom_price", float("inf")) >= cur_p * 0.98
+                    ),
+                    None,
+                )
                 if ob:
                     e_zone = [round(ob.bottom_price, 2), round(ob.top_price, 2)]
                     sl = round(getattr(ob, "invalidation_level", ob.top_price * 1.003), 2)
@@ -541,7 +598,10 @@ def compute_bidirectional_style_signals(
                     origin = "BEARISH_OB_FVG"
                     thesis = f"15m Supply Block anchored at ${ob.bottom_price:,.2f}-${ob.top_price:,.2f} aligning with session premium liquidity."
                 else:
-                    e_zone = [round(high_50 - range_50 * 0.38, 2), round(high_50 - range_50 * 0.28, 2)]
+                    e_zone = [
+                        round(high_50 - range_50 * 0.38, 2),
+                        round(high_50 - range_50 * 0.28, 2),
+                    ]
                     sl = round(high_50 - range_50 * 0.20, 2)
                     inv = round(sl * 1.002, 2)
                     origin = "LIQUIDITY_SWEEP_RECLAIM"
@@ -671,14 +731,22 @@ def compute_bidirectional_style_signals(
         }
 
         tick_eval = evaluate_ladder_tick(plan_dict, cur_p, cur_p, cur_p, cur_p, cvd_score=cvd_score)
-        
+
         # Calculate distance to entry
         e_l = min(e_zone[0], e_zone[1])
         e_h = max(e_zone[0], e_zone[1])
         if is_long:
-            dst = -round(((e_l - cur_p) / cur_p) * 100, 2) if cur_p < e_l else (round(((cur_p - e_h) / cur_p) * 100, 2) if cur_p > e_h else 0.0)
+            dst = (
+                -round(((e_l - cur_p) / cur_p) * 100, 2)
+                if cur_p < e_l
+                else (round(((cur_p - e_h) / cur_p) * 100, 2) if cur_p > e_h else 0.0)
+            )
         else:
-            dst = round(((cur_p - e_h) / cur_p) * 100, 2) if cur_p > e_h else (-round(((e_l - cur_p) / cur_p) * 100, 2) if cur_p < e_l else 0.0)
+            dst = (
+                round(((cur_p - e_h) / cur_p) * 100, 2)
+                if cur_p > e_h
+                else (-round(((e_l - cur_p) / cur_p) * 100, 2) if cur_p < e_l else 0.0)
+            )
 
         is_a_plus = bool(
             plan_dict.get("mtfAlignment") == "ALIGNED"
@@ -686,17 +754,26 @@ def compute_bidirectional_style_signals(
             and tick_eval.state == "IN_ZONE_CONFIRMED"
         )
 
-        plan_dict.update({
-            "executionState": tick_eval.state if tick_eval.state in ("IN_ZONE", "AWAITING_RECLAIM", "WAITING_PULLBACK", "INVALIDATED") else ("IN_ZONE" if "IN_ZONE" in tick_eval.state else tick_eval.state),
-            "entryTriggerState": tick_eval.state,
-            "executionStateNote": tick_eval.note,
-            "distanceToEntryPct": dst,
-            "strictAPlusEligible": is_a_plus,
-        })
+        plan_dict.update(
+            {
+                "executionState": tick_eval.state
+                if tick_eval.state
+                in ("IN_ZONE", "AWAITING_RECLAIM", "WAITING_PULLBACK", "INVALIDATED")
+                else ("IN_ZONE" if "IN_ZONE" in tick_eval.state else tick_eval.state),
+                "entryTriggerState": tick_eval.state,
+                "executionStateNote": tick_eval.note,
+                "distanceToEntryPct": dst,
+                "strictAPlusEligible": is_a_plus,
+            }
+        )
         return plan_dict
 
     recommended_side = "LONG" if is_bull_regime else "SHORT"
-    active_side = force_side.upper() if (force_side and force_side.upper() in ("LONG", "SHORT")) else recommended_side
+    active_side = (
+        force_side.upper()
+        if (force_side and force_side.upper() in ("LONG", "SHORT"))
+        else recommended_side
+    )
 
     results: list[dict[str, Any]] = []
     for style_name in ("SCALP", "DAY", "SWING", "MOMENTUM", "POSITION"):
@@ -717,4 +794,3 @@ def compute_bidirectional_style_signals(
         results.append(combined_item)
 
     return results
-
