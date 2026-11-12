@@ -838,6 +838,7 @@ class OpportunityHunter:
         self,
         min_score: float = 0.0,
         include_quarantined: bool = False,
+        strict_a_plus_only: bool = False,
     ) -> list[dict[str, Any]]:
         """
         Actionable Entry Radar: Ranks all tracked instruments by composite entryReadinessScore.
@@ -1008,6 +1009,16 @@ class OpportunityHunter:
 
                 if not include_quarantined and is_quarantined:
                     continue
+
+                if strict_a_plus_only:
+                    if (
+                        readiness_grade != "A+"
+                        or final_score < 85.0
+                        or mtf_alignment != "ALIGNED"
+                        or trigger_state != "IN_ZONE_CONFIRMED"
+                        or is_quarantined
+                    ):
+                        continue
 
                 if final_score < min_score:
                     continue

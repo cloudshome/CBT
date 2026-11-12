@@ -125,6 +125,7 @@ def _evaluate(
     regime: str = "",
     sentiment: dict | None = None,
     ladder_parity: bool = False,
+    strict_a_plus_only: bool = False,
 ) -> GradedPlan:
     """Grade one plan produced at bar i over `horizon_bars` future bars."""
     entry = plan.get("entry")
@@ -160,6 +161,52 @@ def _evaluate(
         return gp
 
     risk = abs(entry - sl)
+    if strict_a_plus_only:
+        # Grade A+ requires high-conviction institutional confidence (confidence >= 65)
+        if gp.confidence_pct < 65:
+            gp.outcome = "NOT_TRIGGERED"
+            return gp
+
+        mtf_alignment = plan.get("mtfAlignment")
+        if mtf_alignment is not None:
+            if mtf_alignment != "ALIGNED":
+                gp.outcome = "NOT_TRIGGERED"
+                return gp
+        else:
+            # Chronological sentiment & structural regime alignment
+            s_score = float(sentiment.get("score", 0.0) or 0.0)
+            s_bucket = (sentiment.get("bucket") or "").upper()
+            reg_up = (regime or "").upper()
+            if "BULL" in reg_up or "BEAR" in reg_up:
+                is_aligned = (is_buy and ("BULL" in reg_up or "UP" in reg_up)) or (
+                    not is_buy and ("BEAR" in reg_up or "DOWN" in reg_up)
+                )
+            elif "BULL" in s_bucket or "BEAR" in s_bucket:
+                is_aligned = (is_buy and "BULL" in s_bucket) or (not is_buy and "BEAR" in s_bucket)
+            else:
+                is_aligned = (is_buy and s_score >= 0.0) or (not is_buy and s_score <= 0.0)
+
+            if not is_aligned:
+                gp.outcome = "NOT_TRIGGERED"
+                return gp
+
+        rr_val = plan.get("riskRewardRatio") or plan.get("rr") or plan.get("risk_reward")
+        if rr_val is None:
+            best_tp = (
+                max(tps)
+                if is_buy and tps
+                else (min(tps) if not is_buy and tps else None)
+            )
+            target_tp = best_tp if best_tp is not None else tp1
+            rr_val = (
+                (abs(target_tp - entry) / max(risk, 1e-6))
+                if target_tp is not None and risk > 0
+                else 0.0
+            )
+        if float(rr_val or 0.0) < 2.5:
+            gp.outcome = "NOT_TRIGGERED"
+            return gp
+
     end = min(len(df), i + 1 + horizon_bars)
     window = df.iloc[i + 1 : end]
     if window.empty:
@@ -181,7 +228,8 @@ def _evaluate(
         or "entry_zone" in plan
     )
     use_ladder = bool(
-        ladder_parity
+        strict_a_plus_only
+        or ladder_parity
         or plan.get("ladder_parity")
         or plan.get("use_ladder_parity")
         or "entryZone" in plan
@@ -238,6 +286,20 @@ def _evaluate(
         is_filled = not conditional
         fill_bar_idx = 0 if not conditional else None
 
+        if not conditional and strict_a_plus_only and len(window) > 0:
+            b_o = float(opens[0])
+            b_h = float(highs[0])
+            b_l = float(lows[0])
+            b_c = float(closes[0])
+            cvd_v = float(cvd_vals[0])
+            tick_eval = evaluate_ladder_tick(ladder_plan, b_o, b_h, b_l, b_c, cvd_score=cvd_v)
+            if not (
+                tick_eval.fill_allowed
+                and (tick_eval.state == "IN_ZONE_CONFIRMED" or tick_eval.rejection_confirmed)
+            ):
+                is_filled = False
+                fill_bar_idx = None
+
         if conditional:
             for bar_k in range(len(window)):
                 b_o = float(opens[bar_k])
@@ -250,7 +312,12 @@ def _evaluate(
                 if tick_eval.state == "INVALIDATED":
                     # Knife catch avoided: price plunged to stop before confirming entry
                     break
-                if tick_eval.fill_allowed:
+                fill_confirmed = tick_eval.fill_allowed and (
+                    not strict_a_plus_only
+                    or tick_eval.state == "IN_ZONE_CONFIRMED"
+                    or tick_eval.rejection_confirmed
+                )
+                if fill_confirmed:
                     is_filled = True
                     fill_bar_idx = bar_k
                     break
@@ -532,6 +599,7 @@ def run_backtest(
     step: int = BACKTEST_STEP,
     min_confidence: int = 55,
     ladder_parity: bool = False,
+    strict_a_plus_only: bool = False,
 ) -> dict:
     """Walk the engine over history and grade every plan at every horizon."""
     symbol = normalize_symbol(symbol)
@@ -540,6 +608,10 @@ def run_backtest(
     df = df.reset_index(drop=True).copy()
     df.attrs["timeframe"] = timeframe
     df.attrs["symbol"] = symbol
+
+    if strict_a_plus_only:
+        ladder_parity = True
+        min_confidence = max(min_confidence, 65)
 
     # P13.4 — precompute the indicator columns once over the whole series,
     # then walk with windowed per-bar analysis instead of re-running the full
@@ -599,6 +671,7 @@ def run_backtest(
                         regime=regime,
                         sentiment=sentiment,
                         ladder_parity=ladder_parity,
+                        strict_a_plus_only=strict_a_plus_only,
                     )
                 )
 

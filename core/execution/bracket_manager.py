@@ -154,7 +154,7 @@ class LiveBracketManager:
             ctx=ctx,
             connector=conn,
             protection_adapter=adapter,
-            protection_timeout_sec=5.0,
+            protection_timeout_sec=1.5,
         )
 
         if res_ctx.bracket and res_ctx.bracket.is_active:
@@ -223,6 +223,39 @@ class LiveBracketManager:
             )
 
         return result
+
+    async def handle_tp_milestone_hit(
+        self,
+        symbol: str,
+        milestone: str = "TP1",
+        exchange: str = "BINANCE",
+        environment: str = "TESTNET",
+    ) -> ProtectionResult:
+        """
+        Emits an atomic amend_stop_to_breakeven instruction when TP1 (+1.5R) is hit.
+        """
+        clean_symbol = symbol.upper().replace("/", "").replace("-", "").strip()
+        logger.info(
+            f"[BracketManager] Handling milestone '{milestone}' for {clean_symbol} on {exchange} [{environment}]"
+        )
+        if milestone.upper() == "TP1":
+            res = await self.move_to_breakeven(
+                symbol=clean_symbol, exchange=exchange, environment=environment
+            )
+            audit_bus.emit_event(
+                event_type="TP_MILESTONE_BREACHED",
+                symbol=clean_symbol,
+                severity="INFO",
+                reason=f"TP1 hit: Stop amended to breakeven (success={res.success})",
+                details=res.to_dict(),
+            )
+            return res
+        return ProtectionResult(
+            success=False,
+            bracket_id="",
+            status=ProtectionStatus.REJECTED,
+            error_message=f"Unhandled TP milestone: {milestone}",
+        )
 
     async def cancel_order(
         self,

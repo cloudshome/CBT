@@ -295,3 +295,19 @@ SOURCE_TIER_NAMES = {
 SIGNAL_COOLDOWN_MINUTES = int(os.getenv("SIGNAL_COOLDOWN_MINUTES", "30"))  # global floor
 FLIP_PRICE_THRESHOLD_PCT = float(os.getenv("FLIP_PRICE_THRESHOLD_PCT", "0.8"))
 MAX_FLIPS_PER_HOUR = int(os.getenv("MAX_FLIPS_PER_HOUR", "2"))
+
+# ── Trading Core Runtime Isolation (Pre-Live Hardening) ─────────────────
+# When TRADING_CORE_ONLY=True (default), non-trading background tasks
+# (knowledge_os, youtube, crawler daemons) are suppressed to guarantee zero
+# CPU or memory contention on the Golden Execution loop.
+TRADING_CORE_ONLY = os.getenv("TRADING_CORE_ONLY", "true").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+)
+
+
+def is_trading_core_only() -> bool:
+    """Returns True if runtime is isolated to trading core execution and market telemetry."""
+    return TRADING_CORE_ONLY
+

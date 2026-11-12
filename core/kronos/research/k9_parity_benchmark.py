@@ -143,6 +143,7 @@ class K9ParityBenchmarkRunner:
         self,
         dataset_info: dict[str, str],
         step_override: int | None = None,
+        strict_a_plus_only: bool = False,
     ) -> DatasetBenchmarkResult:
         """Executes comparative benchmark on a single K9 dataset."""
         path = dataset_info["path"]
@@ -179,7 +180,7 @@ class K9ParityBenchmarkRunner:
         )
         naive_graded = naive_out["graded"]
 
-        # Run 2: M41 Ladder Parity Mode
+        # Run 2: M41 Ladder Parity Mode (with optional Strict A+ filter)
         parity_out = run_backtest(
             df,
             symbol=sym,
@@ -188,6 +189,7 @@ class K9ParityBenchmarkRunner:
             min_bars=30,
             step=step,
             ladder_parity=True,
+            strict_a_plus_only=strict_a_plus_only,
         )
         parity_graded = parity_out["graded"]
 
@@ -200,8 +202,9 @@ class K9ParityBenchmarkRunner:
             if g_naive.outcome == "LOSS" and g_parity.outcome == "NOT_TRIGGERED":
                 knife_catches_avoided += 1
 
+        mode_lbl = "A_PLUS_LADDER" if strict_a_plus_only else "LADDER_PARITY"
         naive_m = self._compute_metrics("NAIVE", naive_graded)
-        parity_m = self._compute_metrics("LADDER_PARITY", parity_graded)
+        parity_m = self._compute_metrics(mode_lbl, parity_graded)
 
         exp_delta = round(parity_m.expectancy_r - naive_m.expectancy_r, 3)
         pf_delta = round(parity_m.profit_factor - naive_m.profit_factor, 3)
@@ -219,6 +222,67 @@ class K9ParityBenchmarkRunner:
             naive=naive_m,
             parity=parity_m,
         )
+
+    def run_a_plus_scorecard(self, step_override: int | None = None) -> dict[str, Any]:
+        """
+        Executes strict Grade A+ Net-of-Cost Benchmark across all 9 K9 datasets.
+        Deducts round-trip maker/taker fees and slippage on every trade.
+        Verifies positive net expectancy (E[R] > 0.25R) and profit factor >= 1.45.
+        """
+        datasets = self.discover_datasets()
+        results: list[dict[str, Any]] = []
+
+        logger.info(f"Running A+ Net-of-Cost Benchmark across {len(datasets)} K9 datasets...")
+        t0 = time.time()
+
+        for d in datasets:
+            bench = self.run_dataset_benchmark(d, step_override=step_override, strict_a_plus_only=True)
+            res = bench.parity
+            results.append({
+                "dataset_id": bench.dataset_id,
+                "symbol": bench.symbol,
+                "timeframe": bench.timeframe,
+                "bars_count": bench.bars_count,
+                "trades_executed": res.trades_executed,
+                "wins": res.wins,
+                "losses": res.losses,
+                "win_rate_pct": res.win_rate_pct,
+                "net_expectancy_r": res.expectancy_r,
+                "profit_factor": res.profit_factor,
+                "max_drawdown_r": res.max_drawdown_r,
+                "knife_catches_avoided": bench.knife_catches_avoided,
+                "hurdle_positive_ev": bool(res.expectancy_r >= 0.25 and res.profit_factor >= 1.45),
+            })
+
+        elapsed = round(time.time() - t0, 2)
+        total_trades = sum(r["trades_executed"] for r in results)
+        total_wins = sum(r["wins"] for r in results)
+        total_losses = sum(r["losses"] for r in results)
+        total_avoided = sum(r["knife_catches_avoided"] for r in results)
+        overall_win_rate = (total_wins / max(1, total_wins + total_losses)) * 100.0
+
+        active_res = [r for r in results if r["trades_executed"] > 0]
+        avg_exp = float(np.mean([r["net_expectancy_r"] for r in active_res])) if active_res else 0.0
+        avg_pf = float(np.mean([r["profit_factor"] for r in active_res])) if active_res else 0.0
+
+        all_hurdles_met = bool(avg_exp >= 0.25 and avg_pf >= 1.45)
+
+        return {
+            "timestamp": time.time(),
+            "elapsed_seconds": elapsed,
+            "datasets_evaluated": len(results),
+            "aggregate_scorecard": {
+                "total_trades_executed": total_trades,
+                "total_wins": total_wins,
+                "total_losses": total_losses,
+                "overall_win_rate_pct": round(overall_win_rate, 2),
+                "avg_net_expectancy_r": round(avg_exp, 3),
+                "avg_profit_factor": round(avg_pf, 3),
+                "total_knife_catches_avoided": total_avoided,
+                "hurdle_target_met": all_hurdles_met,
+            },
+            "per_dataset": results,
+        }
 
     def run_all(self, step_override: int | None = None) -> dict[str, Any]:
         """Runs the benchmark across all discovered K9 datasets."""
@@ -308,6 +372,15 @@ def run_k9_parity_benchmark(
     """Helper entry point for external runners and test suites."""
     runner = K9ParityBenchmarkRunner(dataset_dir=dataset_dir)
     return runner.run_all(step_override=step_override)
+
+
+def run_k9_a_plus_scorecard(
+    dataset_dir: str = "data/research/datasets",
+    step_override: int | None = None,
+) -> dict[str, Any]:
+    """Helper entry point for Grade A+ Net-of-Cost Benchmark across K9 datasets."""
+    runner = K9ParityBenchmarkRunner(dataset_dir=dataset_dir)
+    return runner.run_a_plus_scorecard(step_override=step_override)
 
 
 if __name__ == "__main__":

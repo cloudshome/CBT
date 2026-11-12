@@ -203,7 +203,7 @@ class ProtectedEntryStateMachine:
         ctx: ProtectedTradeContext,
         connector: BaseExchangeConnector,
         protection_adapter: BaseProtectionAdapter,
-        protection_timeout_sec: float = 5.0,
+        protection_timeout_sec: float = 1.5,
     ) -> ProtectedTradeContext:
         """
         Coordinates full protected-entry sequence:
@@ -386,6 +386,30 @@ class ProtectedEntryStateMachine:
             reason=f"Fail-closed escalation: {flatten_reason}",
         )
 
+        # Trip symbol circuit breaker immediately in CooldownGovernor
+        try:
+            from core.cooldown_governor import cooldown_governor
+
+            cooldown_governor.trip_symbol_circuit_breaker(
+                ctx.symbol, reason=f"STOP_LOSS_1500MS_TIMEOUT: {flatten_reason}"
+            )
+        except Exception as cg_err:
+            logger.error(f"[StateMachine] Failed to trip cooldown governor: {cg_err}")
+
+        # Audit Event Emission
+        try:
+            from core.audit_bus import audit_bus
+
+            audit_bus.emit_event(
+                event_type="STOP_LOSS_ACK_TIMEOUT_FLATTEN",
+                symbol=ctx.symbol,
+                severity="CRITICAL",
+                reason=flatten_reason,
+                details={"trade_id": ctx.trade_id, "timeout_sec": protection_timeout_sec},
+            )
+        except Exception as ab_err:
+            logger.error(f"[StateMachine] Failed to emit audit event: {ab_err}")
+
         panic_result = await self.panic_engine.emergency_flatten(
             exchange=ctx.exchange,
             symbol=ctx.symbol,
@@ -410,6 +434,81 @@ class ProtectedEntryStateMachine:
             )
 
         return ctx
+
+    async def amend_stop_to_breakeven(
+        self,
+        ctx: ProtectedTradeContext,
+        protection_adapter: BaseProtectionAdapter,
+        new_sl_price: float | None = None,
+    ) -> bool:
+        """
+        Atomically amends active stop loss order to breakeven (entry price or designated level).
+        Transitions: PROTECTED -> BREAKEVEN_PENDING -> BREAKEVEN_ACTIVE.
+        """
+        if ctx.state not in (EntryState.PROTECTED, EntryState.BREAKEVEN_PENDING):
+            logger.warning(
+                f"[StateMachine] Cannot amend stop to breakeven: current state is {ctx.state.value}"
+            )
+            return False
+
+        if not ctx.bracket:
+            logger.error(f"[StateMachine] Missing active bracket for trade {ctx.trade_id}")
+            return False
+
+        be_price = new_sl_price or ctx.executed_price
+        if be_price <= 0.0:
+            logger.error(f"[StateMachine] Invalid breakeven price {be_price} for {ctx.symbol}")
+            return False
+
+        self.transition(
+            ctx,
+            EntryState.BREAKEVEN_PENDING,
+            reason=f"Amending stop loss to breakeven @ {be_price}",
+        )
+
+        try:
+            res = await protection_adapter.amend_stop_loss(
+                bracket=ctx.bracket,
+                new_sl_price=be_price,
+            )
+            if res.success:
+                ctx.bracket.stop_loss_price = be_price
+                ctx.sl_price = be_price
+                ctx.bracket.status = ProtectionStatus.BREAKEVEN_ACTIVE
+                self.transition(
+                    ctx,
+                    EntryState.BREAKEVEN_ACTIVE,
+                    reason=f"Stop loss successfully amended to breakeven @ {be_price}",
+                )
+                try:
+                    from core.audit_bus import audit_bus
+
+                    audit_bus.emit_event(
+                        event_type="STOP_AMENDED_TO_BREAKEVEN",
+                        symbol=ctx.symbol,
+                        severity="INFO",
+                        reason=f"Stop amended to BE {be_price}",
+                        details={"trade_id": ctx.trade_id, "be_price": be_price},
+                    )
+                except Exception as ab_e:
+                    logger.debug(f"Audit bus error: {ab_e}")
+                return True
+            else:
+                self.transition(
+                    ctx,
+                    EntryState.PROTECTED,
+                    reason=f"Breakeven amendment rejected: {res.error_message}",
+                )
+                return False
+        except Exception as exc:
+            msg = sanitize_text(str(exc))
+            logger.error(f"[StateMachine] Breakeven amendment exception: {msg}")
+            self.transition(
+                ctx,
+                EntryState.PROTECTED,
+                reason=f"Breakeven amendment failed: {msg}",
+            )
+            return False
 
 
 protected_state_machine = ProtectedEntryStateMachine()

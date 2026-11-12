@@ -18,15 +18,19 @@ screener_router = APIRouter(prefix="/api/screener", tags=["Dynamic Universe Oppo
 async def get_actionable_entries(
     min_score: float = 0.0,
     include_quarantined: bool = False,
+    strict_a_plus_only: bool = False,
 ) -> dict[str, Any]:
     """
     Returns ranked actionable trade entries across tracked instruments.
     Ranked by composite entryReadinessScore combining entry zone distance,
     structural R:R (>= 2.5:1), CVD + L2 orderbook alignment, and OOS validation status.
+    When strict_a_plus_only is enabled, only Grade A+ (>=85.0) setups with
+    aligned MTF and confirmed orderflow are returned.
     """
     entries = await opportunity_hunter.get_actionable_entries(
         min_score=min_score,
         include_quarantined=include_quarantined,
+        strict_a_plus_only=strict_a_plus_only,
     )
     return {
         "status": "SUCCESS",

@@ -432,6 +432,7 @@ def compute_bidirectional_style_signals(
     obi_score: float = 0.0,
     force_side: str | None = None,
     is_bull_regime: bool = True,
+    strict_a_plus_only: bool = False,
 ) -> list[dict[str, Any]]:
     """
     Computes true institutional bidirectional Style Signal Plans across 5 styles:
@@ -679,11 +680,18 @@ def compute_bidirectional_style_signals(
         else:
             dst = round(((cur_p - e_h) / cur_p) * 100, 2) if cur_p > e_h else (-round(((e_l - cur_p) / cur_p) * 100, 2) if cur_p < e_l else 0.0)
 
+        is_a_plus = bool(
+            plan_dict.get("mtfAlignment") == "ALIGNED"
+            and float(plan_dict.get("riskRewardRatio", 0.0)) >= 2.5
+            and tick_eval.state == "IN_ZONE_CONFIRMED"
+        )
+
         plan_dict.update({
             "executionState": tick_eval.state if tick_eval.state in ("IN_ZONE", "AWAITING_RECLAIM", "WAITING_PULLBACK", "INVALIDATED") else ("IN_ZONE" if "IN_ZONE" in tick_eval.state else tick_eval.state),
             "entryTriggerState": tick_eval.state,
             "executionStateNote": tick_eval.note,
             "distanceToEntryPct": dst,
+            "strictAPlusEligible": is_a_plus,
         })
         return plan_dict
 
@@ -696,11 +704,15 @@ def compute_bidirectional_style_signals(
         short_plan = _build_plan(style_name, "SHORT")
         primary_plan = long_plan if active_side == "LONG" else short_plan
 
+        if strict_a_plus_only and not primary_plan.get("strictAPlusEligible", False):
+            continue
+
         combined_item = {
             **primary_plan,
             "recommendedSide": recommended_side,
             "longPlan": long_plan,
             "shortPlan": short_plan,
+            "strictAPlusEligible": primary_plan.get("strictAPlusEligible", False),
         }
         results.append(combined_item)
 

@@ -178,6 +178,35 @@ class CooldownGovernor:
                 f"Asset resting cooldown active for {self.asset_cooldown_sec / 60:.0f}m."
             )
 
+    def trip_symbol_circuit_breaker(
+        self, symbol: str, reason: str = "PROTECTION_FAILED", cooldown_sec: float = 3600.0
+    ) -> None:
+        """
+        Immediately trips circuit breaker for symbol after critical execution failure (e.g. SL timeout).
+        Places asset into quarantined resting period and activates global anti-revenge pause.
+        """
+        norm_sym = self._normalize_sym(symbol)
+        now = time.time()
+        self._last_closed_trades[norm_sym] = {
+            "closed_at": now,
+            "pnl": -1.0,
+            "reason": reason,
+        }
+        self._last_loss_exit_time = now
+        self._last_loss_symbol = norm_sym
+        logger.critical(
+            f"🚨 CooldownGovernor: Circuit breaker TRIPPED for {norm_sym} ({reason}). "
+            f"Asset quarantined for {cooldown_sec / 60:.0f}m, global pause activated."
+        )
+        try:
+            from core.auth.hardware_key import hardware_key_manager
+
+            hardware_key_manager.revoke_all_daemon_leases(
+                reason=f"CIRCUIT_BREAKER_TRIPPED: {norm_sym} ({reason})"
+            )
+        except Exception as e:
+            logger.debug(f"Failed to revoke daemon leases on circuit breaker: {e}")
+
     def is_asset_in_cooldown(self, symbol: str) -> tuple[bool, str, float]:
         """
         Returns (in_cooldown, reason, remaining_seconds).

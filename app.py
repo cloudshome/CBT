@@ -38,6 +38,7 @@ from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
+from config import is_trading_core_only
 from core.analogue_engine import analogue_engine
 from core.api_health_guard import api_health_guard
 from core.arbitrage.cexdex_routes import router as cexdex_router
@@ -253,27 +254,36 @@ async def lifespan_ctx(_app: FastAPI) -> AsyncIterator[None]:
     ]
 
     run_daemons = should_run_background_daemons()
+    trading_core_only = is_trading_core_only()
 
     # Heavy background daemons can be decoupled to dedicated worker process (core/worker.py)
     if run_daemons:
-        tasks.extend(
-            [
-                asyncio.create_task(empirical_accumulator_loop()),
-                asyncio.create_task(telegram_bot.start_polling()),
-                asyncio.create_task(
-                    telegram_bot.start_continuous_broadcaster(interval_seconds=180)
-                ),
-                asyncio.create_task(autonomous_trader.start_loop()),
-                asyncio.create_task(shadow_burn_in_orchestrator.start_loop()),
-                asyncio.create_task(research_automation_orchestrator.start_loop()),
-                asyncio.create_task(mastermind_arbiter.start_loop(interval_sec=60.0)),
-                asyncio.create_task(cluster_sync_daemon.start()),
-            ]
-        )
-        logger.info(
-            "AI Quant Sentinel FastAPI online with Autonomous Trader, Mastermind Swarm, "
-            "Burn-In Orchestrator, Telemetry Pipeline, Research Automation Orchestrator & Cluster Sync Daemon."
-        )
+        daemon_tasks = [
+            asyncio.create_task(empirical_accumulator_loop()),
+            asyncio.create_task(telegram_bot.start_polling()),
+            asyncio.create_task(
+                telegram_bot.start_continuous_broadcaster(interval_seconds=180)
+            ),
+            asyncio.create_task(autonomous_trader.start_loop()),
+            asyncio.create_task(shadow_burn_in_orchestrator.start_loop()),
+            asyncio.create_task(mastermind_arbiter.start_loop(interval_sec=60.0)),
+            asyncio.create_task(cluster_sync_daemon.start()),
+        ]
+        if not trading_core_only:
+            daemon_tasks.append(
+                asyncio.create_task(research_automation_orchestrator.start_loop())
+            )
+            logger.info(
+                "AI Quant Sentinel FastAPI online with Autonomous Trader, Mastermind Swarm, "
+                "Burn-In Orchestrator, Telemetry Pipeline, Research Automation Orchestrator & Cluster Sync Daemon."
+            )
+        else:
+            logger.info(
+                "AI Quant Sentinel FastAPI online in TRADING_CORE_ONLY mode: "
+                "Autonomous Trader, Mastermind Swarm, Burn-In Orchestrator & Telemetry active. "
+                "Non-trading research/crawler daemons isolated to eliminate CPU contention."
+            )
+        tasks.extend(daemon_tasks)
     else:
         logger.info(
             "AI Quant Sentinel FastAPI online in Web-Only mode (RUN_BACKGROUND_DAEMONS=False; daemons managed by external worker)."
@@ -285,7 +295,8 @@ async def lifespan_ctx(_app: FastAPI) -> AsyncIterator[None]:
         if run_daemons:
             await cluster_sync_daemon.stop()
             shadow_burn_in_orchestrator.stop()
-            research_automation_orchestrator.stop()
+            if not trading_core_only:
+                research_automation_orchestrator.stop()
         hf_telemetry_pipeline.flush_to_sqlite()
         for task in tasks:
             task.cancel()
@@ -2067,6 +2078,11 @@ async def explore_youtube_source(req: YouTubeExploreRequest):
     Triggers YouTube V5 Autonomous Channel & Playlist Exploration.
     Runs asynchronously and returns an instant Job ID receipt.
     """
+    if is_trading_core_only():
+        raise HTTPException(
+            status_code=503,
+            detail="TRADING_CORE_ONLY active: YouTube background exploration disabled to protect execution latency.",
+        )
 
     clean_src = req.source_url_or_handle.strip()
     if not clean_src:
