@@ -531,6 +531,7 @@ def run_backtest(
     min_bars: int = BACKTEST_MIN_BARS,
     step: int = BACKTEST_STEP,
     min_confidence: int = 55,
+    ladder_parity: bool = False,
 ) -> dict:
     """Walk the engine over history and grade every plan at every horizon."""
     symbol = normalize_symbol(symbol)
@@ -591,7 +592,13 @@ def run_backtest(
             for plan in plans:
                 all_graded.append(
                     _evaluate(
-                        plan, df, i, horizon_bars, regime=regime, sentiment=sentiment
+                        plan,
+                        df,
+                        i,
+                        horizon_bars,
+                        regime=regime,
+                        sentiment=sentiment,
+                        ladder_parity=ladder_parity,
                     )
                 )
 

@@ -30,6 +30,8 @@ async def get_actionable_entries(
     )
     return {
         "status": "SUCCESS",
+        "success": True,
+        "count": len(entries),
         "total_actionable": len(entries),
         "timestamp_utc": time.time(),
         "entries": entries,

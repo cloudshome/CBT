@@ -807,6 +807,7 @@ terminalRouter.get(['/telemetry', '/master-telemetry'], async (req: Request, res
         stableDurationSecs: def.stableDurationSecs,
         reaffirmsCount: def.reaffirmsCount,
         cooldownRemainingSecs: def.cooldownRemainingSecs,
+        mtfAlignment: (recommendedSide === 'LONG' ? 'ALIGNED' : 'COUNTER_TREND') as 'ALIGNED' | 'COUNTER_TREND',
         ...def.long,
         ...longState,
       };
@@ -824,6 +825,7 @@ terminalRouter.get(['/telemetry', '/master-telemetry'], async (req: Request, res
         stableDurationSecs: def.stableDurationSecs,
         reaffirmsCount: def.reaffirmsCount,
         cooldownRemainingSecs: def.cooldownRemainingSecs,
+        mtfAlignment: (recommendedSide === 'SHORT' ? 'ALIGNED' : 'COUNTER_TREND') as 'ALIGNED' | 'COUNTER_TREND',
         ...def.short,
         ...shortState,
       };

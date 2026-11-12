@@ -124,6 +124,38 @@ class MultiTimeframeEngine:
             return "BEARISH_DISPLACEMENT_TRIGGER"
         return "NEUTRAL_CONSOLIDATION"
 
+    def evaluate_mtf_alignment(
+        self,
+        plan_side: str,
+        is_bull_regime: bool | None = None,
+        candles_by_tf: dict[str, list[dict[str, Any]]] | None = None,
+    ) -> str:
+        """
+        Determines structural alignment of a plan side (LONG or SHORT) against
+        higher-timeframe (4h/1d) bias.
+        Returns: "ALIGNED" | "COUNTER_TREND" | "NEUTRAL"
+        """
+        side = plan_side.upper()
+        if candles_by_tf:
+            c_1d = candles_by_tf.get("1d", [])
+            c_4h = candles_by_tf.get("4h", [])
+            trend_1d = self._eval_tf_trend(c_1d)
+            trend_4h = self._eval_tf_trend(c_4h)
+            htf_bull = ("BULL" in trend_1d) or ("BULL" in trend_4h)
+            htf_bear = ("BEAR" in trend_1d) or ("BEAR" in trend_4h)
+            if htf_bull and not htf_bear:
+                return "ALIGNED" if side == "LONG" else "COUNTER_TREND"
+            if htf_bear and not htf_bull:
+                return "ALIGNED" if side == "SHORT" else "COUNTER_TREND"
+
+        if is_bull_regime is not None:
+            if is_bull_regime:
+                return "ALIGNED" if side == "LONG" else "COUNTER_TREND"
+            else:
+                return "ALIGNED" if side == "SHORT" else "COUNTER_TREND"
+
+        return "NEUTRAL"
+
 
 # Global singleton instance
 multi_timeframe_engine = MultiTimeframeEngine()

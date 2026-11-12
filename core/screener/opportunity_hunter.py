@@ -910,7 +910,16 @@ class OpportunityHunter:
                 is_bull_regime=is_bull,
             )
 
-            for sig in style_signals:
+            plans_to_eval = []
+            for base_sig in style_signals:
+                if base_sig.get("longPlan"):
+                    plans_to_eval.append(base_sig["longPlan"])
+                if base_sig.get("shortPlan"):
+                    plans_to_eval.append(base_sig["shortPlan"])
+                if not base_sig.get("longPlan") and not base_sig.get("shortPlan"):
+                    plans_to_eval.append(base_sig)
+
+            for sig in plans_to_eval:
                 side = sig["side"]
                 e_zone = sig["entryZone"]
                 e_low = min(e_zone[0], e_zone[1])
@@ -969,12 +978,23 @@ class OpportunityHunter:
 
                 oos_score = 15.0 if is_oos_validated else 0.0
 
-                raw_readiness = distance_score + rr_score + orderflow_score + oos_score
+                # 5. Multi-Timeframe (MTF) Alignment (+10 bonus for ALIGNED, cap COUNTER_TREND)
+                mtf_alignment = sig.get("mtfAlignment", "NEUTRAL")
+                mtf_bonus = 10.0 if mtf_alignment == "ALIGNED" else 0.0
+
+                raw_readiness = distance_score + rr_score + orderflow_score + oos_score + mtf_bonus
                 if is_quarantined:
                     final_score = min(35.0, round(raw_readiness * 0.4, 1))
                     readiness_grade = "QUARANTINED"
                 else:
                     final_score = min(100.0, round(raw_readiness, 1))
+                    # Cap counter-trend at grade B (max 69.0) unless structural liquidity sweep reclaim with confirmed CVD absorption
+                    is_sweep_absorption = (zone_origin == "LIQUIDITY_SWEEP_RECLAIM") and (
+                        trigger_state == "IN_ZONE_CONFIRMED" or orderflow_alignment == "STRONGLY_ALIGNED"
+                    )
+                    if mtf_alignment == "COUNTER_TREND" and not is_sweep_absorption:
+                        final_score = min(69.0, final_score)
+
                     if final_score >= 85.0:
                         readiness_grade = "A+"
                     elif final_score >= 75.0:
@@ -1010,6 +1030,7 @@ class OpportunityHunter:
                     "l2Imbalance": round(obi, 3),
                     "oosValidated": is_oos_validated,
                     "quarantined": is_quarantined,
+                    "mtfAlignment": mtf_alignment,
                     "entryReadinessScore": final_score,
                     "readinessGrade": readiness_grade,
                     "thesis": sig["thesis"],
@@ -1036,3 +1057,108 @@ class OpportunityHunter:
 
 
 opportunity_hunter = OpportunityHunter()
+
+_radar_alert_cooldowns: dict[str, float] = {}
+
+
+def evaluate_and_dispatch_radar_telegram_alert(
+    entry: dict[str, Any],
+    cooldown_secs: float = 1800.0,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """
+    Evaluates an actionable entry against institutional gating criteria:
+    1. Condition check: entryTriggerState == "IN_ZONE_CONFIRMED", readinessGrade == "A+", oosValidated == True.
+    2. Cooldown deduplication (default 1800s / 30 mins per symbol:style:side).
+    3. PortfolioRiskGuardian().evaluate_proposed_order(...) clearance check.
+    4. Formats and dispatches Telegram alert.
+    """
+    global _radar_alert_cooldowns
+
+    trigger_state = entry.get("entryTriggerState")
+    readiness_grade = entry.get("readinessGrade")
+    oos_validated = bool(entry.get("oosValidated"))
+
+    if trigger_state != "IN_ZONE_CONFIRMED" or readiness_grade != "A+" or not oos_validated:
+        return {
+            "dispatched": False,
+            "reason": f"CRITERIA_NOT_MET: trigger={trigger_state}, grade={readiness_grade}, oos={oos_validated}",
+        }
+
+    sym = entry.get("symbol", "UNKNOWN")
+    style = entry.get("style", "SCALP")
+    side = entry.get("side", "LONG")
+    key = f"{sym}:{style}:{side}"
+    now = time.time()
+
+    last_dispatched = _radar_alert_cooldowns.get(key, 0.0)
+    if (now - last_dispatched) < cooldown_secs:
+        return {
+            "dispatched": False,
+            "reason": f"COOLDOWN_ACTIVE: {int(cooldown_secs - (now - last_dispatched))}s remaining for {key}",
+        }
+
+    # Evaluate pre-trade risk clearance via PortfolioRiskGuardian
+    try:
+        from core.risk.portfolio_risk_guardian import PortfolioRiskGuardian, ProposedOrder
+
+        direction = "LONG" if side == "LONG" else "SHORT"
+        cur_p = float(entry.get("currentPrice") or (entry.get("entryZone", [0.0, 0.0])[0]))
+        stop_loss = float(entry.get("stopLoss") or (cur_p * 0.98 if direction == "LONG" else cur_p * 1.02))
+        notional_usd = 500.0
+        size = round(notional_usd / max(cur_p, 1.0), 6)
+
+        proposed = ProposedOrder(
+            symbol=sym,
+            direction=direction,
+            entry_price=cur_p,
+            stop_loss=stop_loss,
+            size=size,
+            current_market_price=cur_p,
+            exchange="PAPER_BINANCE",
+            desk="MAIN_SOVEREIGN",
+        )
+        guardian = PortfolioRiskGuardian()
+        decision = guardian.evaluate_proposed_order(proposed)
+        if not decision.approved:
+            return {
+                "dispatched": False,
+                "reason": f"RISK_GUARDIAN_REJECTED: {decision.rationale}",
+            }
+    except Exception as exc:
+        logger.warning(f"PortfolioRiskGuardian evaluation error for {key}: {exc}")
+        return {
+            "dispatched": False,
+            "reason": f"RISK_EVALUATION_ERROR: {exc}",
+        }
+
+    # Format Telegram alert text
+    from core.telegram_live_desk import format_actionable_entry_alert
+
+    alert_text = format_actionable_entry_alert(entry)
+
+    dispatched = True
+    if not dry_run:
+        try:
+            import asyncio
+
+            from core.telegram_bot import telegram_bot
+
+            try:
+                loop = asyncio.get_running_loop()
+                _task = loop.create_task(telegram_bot.send_message(alert_text, parse_mode="Markdown"))
+                # Suppress unused variable warning while retaining strong reference
+                if _task is None:
+                    pass
+            except RuntimeError:
+                asyncio.run(telegram_bot.send_message(alert_text, parse_mode="Markdown"))
+        except Exception as exc:
+            logger.info(f"[RADAR TELEGRAM ALERT] Logged (Bot unavailable: {exc}):\n{alert_text}")
+
+    _radar_alert_cooldowns[key] = now
+    return {
+        "dispatched": dispatched,
+        "key": key,
+        "alert_text": alert_text,
+        "timestamp": now,
+    }

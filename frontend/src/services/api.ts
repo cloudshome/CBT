@@ -38,6 +38,7 @@ import {
   ResearchGapItem,
   KnowledgeAuditReport,
   MasterTerminalTelemetry,
+  ActionableEntriesResponse,
   ProvenanceGraphData,
   ReplaySnapshotData,
   SMCGlossaryItem,
@@ -2515,6 +2516,23 @@ export const api = {
     }
     const res = await authFetch(url);
     return handleResponse<MasterTerminalTelemetry>(res);
+  },
+
+  /**
+   * GET /api/screener/actionable-entries
+   * Institutional Smart Money entry readiness radar across supported symbols
+   */
+  async getActionableEntries(
+    minScore: number = 0,
+    includeQuarantined: boolean = false
+  ): Promise<ActionableEntriesResponse> {
+    const params = new URLSearchParams();
+    if (minScore > 0) params.append('min_score', minScore.toString());
+    if (includeQuarantined) params.append('include_quarantined', 'true');
+    const qs = params.toString();
+    const url = `${BASE_URL}/api/screener/actionable-entries${qs ? `?${qs}` : ''}`;
+    const res = await authFetch(url);
+    return handleResponse<ActionableEntriesResponse>(res);
   },
 
   /**

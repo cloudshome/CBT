@@ -8,12 +8,14 @@ import { SignalCommandDeck } from './SignalCommandDeck';
 import { ExecutionBlotterAndRisk } from './ExecutionBlotterAndRisk';
 import { MacroRadarStrip } from './MacroRadarStrip';
 import { DecisionMentorAndProvenance } from './DecisionMentorAndProvenance';
+import { ActionableEntryRadar } from './ActionableEntryRadar';
 import {
   MasterTerminalTelemetry,
   TerminalDensityMode,
   StyleSignalPlan,
   SupportedTimeframe,
   OHLCVCandle,
+  ActionableEntryItem,
 } from '../../types';
 import { api } from '../../services/api';
 
@@ -64,8 +66,20 @@ export const InstitutionalMasterTerminal: React.FC<InstitutionalMasterTerminalPr
   const [telemetry, setTelemetry] = useState<MasterTerminalTelemetry | null>(null);
   const [candles, setCandles] = useState<OHLCVCandle[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+  const [actionableEntries, setActionableEntries] = useState<ActionableEntryItem[]>([]);
 
-  // 1. Fetch Complete Telemetry Payload
+  // 1. Fetch Complete Telemetry Payload & Actionable Radar
+  const fetchRadar = useCallback(async () => {
+    try {
+      const res = await api.getActionableEntries(0, false);
+      if (res?.entries) {
+        setActionableEntries(res.entries);
+      }
+    } catch (err: unknown) {
+      console.warn('Actionable radar refresh skipped:', err);
+    }
+  }, []);
+
   const fetchTelemetry = useCallback(async () => {
     try {
       const data = await api.getMasterTerminalTelemetry(symbol, timeframe);
@@ -82,13 +96,17 @@ export const InstitutionalMasterTerminal: React.FC<InstitutionalMasterTerminalPr
     const maxAttempts = 3;
     while (attempts < maxAttempts) {
       try {
-        const [telRes, candleRes] = await Promise.all([
+        const [telRes, candleRes, radarRes] = await Promise.all([
           api.getMasterTerminalTelemetry(symbol, timeframe),
           api.getCandles(symbol, timeframe, 150).catch(() => null),
+          api.getActionableEntries(0, false).catch(() => null),
         ]);
         setTelemetry(telRes);
         if (candleRes?.candles) {
           setCandles(candleRes.candles);
+        }
+        if (radarRes?.entries) {
+          setActionableEntries(radarRes.entries);
         }
         setLoading(false);
         return;
@@ -118,9 +136,16 @@ export const InstitutionalMasterTerminal: React.FC<InstitutionalMasterTerminalPr
   useEffect(() => {
     const interval = setInterval(() => {
       fetchTelemetry();
+      fetchRadar();
     }, 10000);
     return () => clearInterval(interval);
-  }, [fetchTelemetry]);
+  }, [fetchTelemetry, fetchRadar]);
+
+  const handleSelectRadarEntry = (entry: ActionableEntryItem) => {
+    handleSelectSymbol(entry.symbol);
+    setSelectedStyle(entry.style as 'SCALP' | 'DAY' | 'SWING' | 'MOMENTUM' | 'POSITION');
+    setDirectionFilter(entry.side as 'LONG' | 'SHORT');
+  };
 
   // Handle Signal State Transitions in Blotter
   const handleUpdateSignalState = async (
@@ -190,6 +215,16 @@ export const InstitutionalMasterTerminal: React.FC<InstitutionalMasterTerminalPr
 
       {/* Main Cockpit Layout based on Density Mode */}
       <div className="p-3 space-y-3 max-w-[1920px] w-full mx-auto flex-1">
+        {/* Actionable Entry Radar across all supported symbols */}
+        <ActionableEntryRadar
+          entries={actionableEntries}
+          selectedSymbol={symbol}
+          selectedStyle={selectedStyle}
+          directionFilter={directionFilter}
+          onSelectEntry={handleSelectRadarEntry}
+          loading={loading}
+        />
+
         {/* MODE: COMMAND (Active Institutional Trading Cockpit) */}
         {densityMode === 'COMMAND' && telemetry && (
           <>

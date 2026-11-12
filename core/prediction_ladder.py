@@ -666,6 +666,7 @@ def compute_bidirectional_style_signals(
             "cooldownRemainingSecs": 0,
             "thesis": thesis,
             "zoneOrigin": origin,
+            "mtfAlignment": "ALIGNED" if (is_long == is_bull_regime) else "COUNTER_TREND",
         }
 
         tick_eval = evaluate_ladder_tick(plan_dict, cur_p, cur_p, cur_p, cur_p, cvd_score=cvd_score)

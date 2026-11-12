@@ -1665,8 +1665,41 @@ export interface StyleSignalPlan {
   entryTriggerState?: string;
   executionStateNote?: string;
   distanceToEntryPct?: number;
+  mtfAlignment?: 'ALIGNED' | 'COUNTER_TREND' | 'NEUTRAL';
   longPlan?: StyleSignalPlan;
   shortPlan?: StyleSignalPlan;
+}
+
+export interface ActionableEntryItem {
+  symbol: string;
+  style: 'SCALP' | 'DAY' | 'SWING' | 'MOMENTUM' | 'POSITION' | string;
+  side: 'LONG' | 'SHORT';
+  currentPrice: number;
+  entryZone: [number, number];
+  distancePct: number;
+  entryTriggerState: string;
+  orderflowAlignment: string;
+  riskRewardRatio: number;
+  suggestedRiskPct: number;
+  notionalUsd: number;
+  cvdScore: number;
+  l2Imbalance: number;
+  oosValidated: boolean;
+  quarantined: boolean;
+  mtfAlignment: 'ALIGNED' | 'COUNTER_TREND' | 'NEUTRAL' | string;
+  entryReadinessScore: number;
+  readinessGrade: 'A+' | 'A' | 'B' | 'QUARANTINED' | string;
+  thesis: string;
+  zoneOrigin: string;
+  timestamp: string;
+}
+
+export interface ActionableEntriesResponse {
+  success: boolean;
+  count: number;
+  minScore: number;
+  timestamp: string;
+  entries: ActionableEntryItem[];
 }
 
 export interface SignalBlotterRecord {

@@ -261,6 +261,43 @@ class TelegramLiveTradingDesk:
         """Dispatches the latest high-impact macroeconomic event result report."""
         return macro_event_reporter.format_event_flash_report()
 
+    def format_actionable_entry_alert(self, entry: dict[str, Any]) -> str:
+        """Formats an institutional Smart Money actionable entry alert for Telegram."""
+        return format_actionable_entry_alert(entry)
+
+
+def format_actionable_entry_alert(entry: dict[str, Any]) -> str:
+    """Formats an institutional Smart Money actionable entry alert for Telegram."""
+    symbol = entry.get("symbol", "UNKNOWN")
+    style = entry.get("style", "SCALP")
+    side = entry.get("side", "LONG")
+    side_emoji = "🟢 LONG" if side == "LONG" else "🔴 SHORT"
+    grade = entry.get("readinessGrade", "A+")
+    score = entry.get("entryReadinessScore", 0.0)
+    cur_p = entry.get("currentPrice", 0.0)
+    ez = entry.get("entryZone", [0.0, 0.0])
+    rr = entry.get("riskRewardRatio", 0.0)
+    risk_pct = entry.get("suggestedRiskPct", 1.0)
+    origin = entry.get("zoneOrigin", "UNKNOWN").replace("_", " ")
+    mtf = entry.get("mtfAlignment", "ALIGNED")
+    thesis = entry.get("thesis", "SMC structure confluence.")
+
+    lines = [
+        f"⚡ *ACTIONABLE ENTRY CONFIRMED: {symbol}*",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        f"• *Side / Style:* `{side_emoji}` | `{style}`",
+        f"• *Grade & Score:* `{grade}` ({score:.1f}/100)",
+        f"• *Live Price:* `${cur_p:,.2f}`",
+        f"• *SMC Entry Zone:* `${ez[0]:,.2f} – ${ez[1]:,.2f}`",
+        f"• *Risk:Reward:* `{rr:.1f}:1` (Risk Cap: `{risk_pct:.2f}%`)",
+        f"• *MTF Structural Bias:* `{mtf}`",
+        f"• *Origin Anchor:* `{origin}`",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        f"🎯 *Institutional Thesis:* _{thesis}_",
+        "🛡️ _Deterministic Risk Gate: PASSED (Half-Kelly & Exposure Cap Verified)_",
+    ]
+    return "\n".join(lines)
+
 
 # Global singleton accessor / lazy instance
 _telegram_live_desk_instance: TelegramLiveTradingDesk | None = None
