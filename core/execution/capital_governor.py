@@ -794,11 +794,16 @@ class CapitalGovernor:
             )
 
         # Check evidence overrides if provided
-        fwd_trades = evidence.get("forward_decided_trades")
+        fwd_trades = evidence.get(
+            "surviving_forward_decided_trades", evidence.get("forward_decided_trades")
+        )
         if fwd_trades is not None:
             fwd_trades = int(fwd_trades)
             fwd_exp = float(
-                evidence.get("forward_net_expectancy", evidence.get("expectancy_r", 0.0))
+                evidence.get(
+                    "surviving_net_expectancy",
+                    evidence.get("forward_net_expectancy", evidence.get("expectancy_r", 0.0)),
+                )
             )
             drift = float(evidence.get("reconciliation_drift", 0.0))
             if fwd_trades >= 20 and fwd_exp > 0.0 and drift < 0.001:
@@ -819,8 +824,13 @@ class CapitalGovernor:
         try:
             ql = QualificationLedger()
             m = ql.get_qualification_metrics()
-            trades = m.qualification_closed_count
-            exp = m.expectancy_r
+            # Clean CP-3 Expectancy Attribution: Use surviving (non-quarantined) metrics
+            trades = (
+                m.surviving_trades_count
+                if m.surviving_trades_count > 0
+                else m.qualification_closed_count
+            )
+            exp = m.surviving_expectancy_r if m.surviving_trades_count > 0 else m.expectancy_r
 
             mgr = PortfolioShadowManager()
             acct = mgr.get_portfolio_accounting()
@@ -832,12 +842,14 @@ class CapitalGovernor:
             if trades >= 20 and exp > 0.0 and drift < 0.001:
                 return (
                     True,
-                    f"Checkpoint 3 certified: {trades} decided forward trades ({exp:+.3f}R net, drift=${drift:.4f})",
+                    f"Checkpoint 3 certified: {trades} decided forward trades ({exp:+.3f}R net, drift=${drift:.4f}, quarantined={m.quarantined_trades_count})",
                 )
 
             reasons = []
             if trades < 20:
-                reasons.append(f"insufficient forward trades ({trades}/20 required)")
+                reasons.append(
+                    f"insufficient forward trades ({trades}/20 required, quarantined={m.quarantined_trades_count})"
+                )
             if exp <= 0.0:
                 reasons.append(f"non-positive forward expectancy ({exp:+.3f}R)")
             if drift >= 0.001:

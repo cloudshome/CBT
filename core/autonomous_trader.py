@@ -44,8 +44,8 @@ def classify_trading_style(
     asset_prefix = symbol.split("/")[0].upper() if "/" in symbol else symbol.upper()
     stop_dist_pct = abs(entry_price - stop_loss) / entry_price if entry_price > 0 else 0.0
 
-    # 1. Swing Trading: Higher timeframes (4h/1d) or wide structural stop distance (>= 3.5%)
-    if timeframe in ("4h", "1d", "1D") or stop_dist_pct >= 0.035:
+    # 1. Swing Trading: Higher timeframes (1h/4h/1d) or wide structural stop distance (>= 3.5%)
+    if timeframe in ("1h", "1H", "4h", "1d", "1D") or stop_dist_pct >= 0.035:
         return "SWING", f"{asset_prefix} Desk (Macro Swing)"
 
     if setup:
@@ -95,10 +95,47 @@ class AutonomousTrader:
         self.total_trades_executed: int = 0
         self._last_traded_candle_ts: dict[str, int] = {}
 
+    async def sync_open_positions(self) -> list[dict[str, Any]]:
+        """
+        Synchronizes live prices and replays latest closed candle ticks across all open positions
+        in PortfolioShadowManager to execute M47 ratchets and stop/target fills in real market time.
+        """
+        open_positions = portfolio_shadow.get_open_positions()
+        if not open_positions:
+            return []
+
+        events = []
+        for p in open_positions:
+            sym = p.get("symbol")
+            if not sym:
+                continue
+            try:
+                candles = data_streamer.get_candles(sym, "15m", limit=3)
+                if not candles:
+                    try:
+                        candles = await data_streamer.fetch_external_ohlcv(sym, "15m", limit=3)
+                    except Exception as c_err:
+                        logger.debug("Failed external candle fetch for %s sync: %s", sym, c_err)
+
+                if candles:
+                    evs = portfolio_shadow.replay_candle(sym, candles[-1])
+                    if evs:
+                        events.extend(evs)
+                else:
+                    live_p = await data_streamer.get_live_ticker(sym)
+                    if live_p > 0:
+                        evs = portfolio_shadow.update_live_price(sym, live_p)
+                        if evs:
+                            events.extend(evs)
+            except Exception as sync_ex:
+                logger.debug("Error during sync_open_positions for %s: %s", sym, sync_ex)
+
+        return events
+
     async def scan_and_execute(self) -> list[dict[str, Any]]:
         """
-        Scans all active assets, evaluates 12-stage SKY decision model,
-        and deploys qualified setups into the Shadow Portfolio.
+        Scans all active assets across multi-horizons (15m DAY and 1h SWING),
+        evaluates 12-stage SKY decision model, and deploys qualified setups into the Shadow Portfolio.
         """
         # 1. Health & Disk Guard Check
         disk_status = api_health_guard.check_disk_space()
@@ -125,472 +162,527 @@ class AutonomousTrader:
             logger.warning(f"AutonomousTrader halted by Risk Gate: {gate_status.reason}")
             return []
 
+        # Step 0: Sync live prices & replay latest intrabar ticks across all open positions
+        try:
+            await self.sync_open_positions()
+        except Exception as sync_err:
+            logger.debug(f"Sync open positions deferred: {sync_err}")
+
         executed_actions: list[dict[str, Any]] = []
         self.last_scan_time = time.time()
 
         # Strictly locked to Tier-1 Institutional Assets (BTC, ETH, SOL, BNB, GOLD)
         scan_symbols = list(self.active_symbols)
+        scan_timeframes = ["15m", "1h"]
 
-        for sym in scan_symbols:
-            try:
-                # 2. Fetch/Refresh Live MTF Candlesticks from market gateway
+        for tf_scan in scan_timeframes:
+            for sym in scan_symbols:
                 try:
-                    candles_15m = await data_streamer.fetch_external_ohlcv(sym, "15m", limit=60)
-                except Exception as ex:
-                    logger.debug(f"Falling back to local cache for {sym} 15m: {ex}")
-                    candles_15m = data_streamer.get_candles(sym, "15m", limit=60)
-
-                if not candles_15m or len(candles_15m) < 15:
-                    continue
-
-                # Constitutional Anti-Fabrication Guard: Never trade on synthetic random-walk candles
-                if any(int(c.get("is_synthetic", 0) or 0) == 1 for c in candles_15m):
-                    logger.warning(
-                        f"AutonomousTrader skipping {sym}: 15m series contains synthetic/fabricated bars."
-                    )
-                    continue
-
-                # Guard 1: Closed-Candle Evaluation & Deduplication
-                # Distinguish candles_15m[-1] (forming candle) from candles_15m[-2] (last fully closed 15m candle)
-                last_closed_candle = candles_15m[-2] if len(candles_15m) >= 2 else candles_15m[-1]
-                closed_candle_ts = int(last_closed_candle["timestamp"])
-
-                if self._last_traded_candle_ts.get(sym) == closed_candle_ts:
-                    continue
-
-                tf_map: dict[str, list[dict[str, Any]]] = {"15m": candles_15m}
-                for tf in ("1d", "4h", "1h", "5m", "1m"):
-                    cached_tf = data_streamer.get_candles(sym, tf, limit=30)
-                    if (
-                        not cached_tf
-                        or len(cached_tf) < 15
-                        or any(int(c.get("is_synthetic", 0) or 0) == 1 for c in cached_tf)
-                    ):
-                        try:
-                            fresh_tf = await data_streamer.fetch_external_ohlcv(sym, tf, limit=30)
-                            if fresh_tf:
-                                cached_tf = fresh_tf
-                        except Exception as tf_ex:
-                            logger.debug(f"Could not refresh {sym} {tf} external OHLCV: {tf_ex}")
-                    tf_map[tf] = cached_tf
-
-                # 3. Evaluate 12-Stage SKY Decision Engine
-                decision_out = sky_orchestrator.analyze_market(
-                    symbol=sym,
-                    timeframe="15m",
-                    candles=candles_15m,
-                    candles_by_tf=tf_map,
-                    account_equity_usd=self.account_equity_usd,
-                )
-
-                self.last_decisions[sym] = asdict(decision_out)
-
-                # 4. Check Risk Gate & Qualified Setups
-                if decision_out.risk_gate_passed and decision_out.decision in (
-                    DecisionAction.LONG,
-                    DecisionAction.SHORT,
-                ):
-                    open_positions = portfolio_shadow.get_open_positions()
-
-                    # Enforce max open positions limit with Opportunity Reserve headroom for elite setups
-                    base_max = self.max_open_positions
-                    elite_max = int(os.getenv("MAX_ELITE_POSITIONS", str(base_max + 2)))
-                    conf = getattr(decision_out, "confluence_score", None)
-                    if conf is None and getattr(decision_out, "setup_qualified", None):
-                        conf = getattr(decision_out.setup_qualified, "confluence_score", None)
-                    if conf is None and hasattr(decision_out, "confidence"):
-                        raw_c = float(decision_out.confidence)
-                        conf = raw_c * 100.0 if raw_c <= 1.0 else raw_c
-                    is_elite = conf is not None and conf >= 85.0
-                    eff_limit = elite_max if is_elite else base_max
-
-                    if len(open_positions) >= eff_limit:
-                        logger.info(
-                            f"Skipping {sym} trade: Max open positions ({eff_limit}) reached."
-                        )
-                        continue
-
-                    # Guard 1b: Nervous System Cooldown Governor (Anti-Revenge & Resting Period)
-                    can_enter, cooldown_reason = cooldown_governor.evaluate_entry_clearance(sym)
-                    if not can_enter:
-                        logger.info(f"AutonomousTrader skipping {sym}: {cooldown_reason}")
-                        continue
-
-                    # Check existing open positions for this symbol
-                    existing_sym_positions = [p for p in open_positions if p.get("symbol") == sym]
-                    if existing_sym_positions:
-                        # Anti-Cannibalization Guard: reject opposing direction (fail-closed)
-                        if any(
-                            p.get("direction") != decision_out.decision.value
-                            for p in existing_sym_positions
-                        ):
-                            logger.info(
-                                f"Skipping {sym} trade: Opposing {existing_sym_positions[0].get('direction')} position already open (anti-cannibalization guard)."
-                            )
-                            continue
-
-                    # Guard 2: Live Market Price Alignment
+                    # 2. Fetch/Refresh Live MTF Candlesticks from market gateway
                     try:
-                        live_price = await data_streamer.get_live_ticker(sym)
-                    except Exception:
-                        live_price = float(candles_15m[-1]["close"])
+                        candles_tf = await data_streamer.fetch_external_ohlcv(
+                            sym, tf_scan, limit=60
+                        )
+                    except Exception as ex:
+                        logger.debug(f"Falling back to local cache for {sym} {tf_scan}: {ex}")
+                        candles_tf = data_streamer.get_candles(sym, tf_scan, limit=60)
 
-                    cur_price = live_price if live_price > 0 else float(candles_15m[-1]["close"])
-                    setup = decision_out.setup_qualified
+                    if not candles_tf or len(candles_tf) < 15:
+                        continue
 
-                    # Guard 2a: Strict Institutional Trend & Chop Filter (Zero Chop Bleed)
-                    regime_dossier = decision_out.explanation_dossier.get("regime_state", {})
-                    adx_val = float(regime_dossier.get("trend_strength_adx", 25.0))
-                    regime_name = str(regime_dossier.get("regime_type", "")) or str(
-                        decision_out.explanation_dossier.get("regime", "")
-                    )
-                    st_type = getattr(setup, "setup_type", None)
-                    st_val = getattr(st_type, "value", str(st_type)) if st_type else ""
-                    vol_dossier = decision_out.explanation_dossier.get("volume", {})
-                    rvol = (
-                        float(vol_dossier.get("relative_volume", 1.0))
-                        if isinstance(vol_dossier, dict)
-                        else 1.0
-                    )
-
-                    # M40 Quarantine against PRE_BREAKOUT_COMPRESSION
-                    if "PRE_BREAKOUT" in regime_name.upper():
-                        logger.info(
-                            f"AutonomousTrader M40 Quarantine: Skipping {sym} trade in {regime_name}. "
-                            "Pre-breakout compression quarantined to prevent breakout knife-catches."
+                    # Constitutional Anti-Fabrication Guard: Never trade on synthetic random-walk candles
+                    if any(int(c.get("is_synthetic", 0) or 0) == 1 for c in candles_tf):
+                        logger.warning(
+                            f"AutonomousTrader skipping {sym} {tf_scan}: series contains synthetic/fabricated bars."
                         )
                         continue
 
-                    # Tier-1 Canary Asset Eligibility Gate (BTC, ETH, and ALIGNED SOL)
-                    from core.risk.asset_eligibility_gate import DeterministicAssetEligibilityGate
+                    # Guard 1: Closed-Candle Evaluation & Deduplication
+                    last_closed_candle = candles_tf[-2] if len(candles_tf) >= 2 else candles_tf[-1]
+                    closed_candle_ts = int(last_closed_candle["timestamp"])
 
-                    mtf_align = str(
-                        decision_out.explanation_dossier.get("mtf_alignment", "NEUTRAL")
-                    )
-                    gate = DeterministicAssetEligibilityGate()
-                    elig = gate.evaluate_symbol_eligibility(
-                        sym, desk="TIER1_CANARY", mtf_alignment=mtf_align
-                    )
-                    if not elig.is_eligible:
-                        logger.info(
-                            f"AutonomousTrader Asset Eligibility Gate: Skipping {sym} trade: {elig.rationale}"
-                        )
+                    tf_key = f"{sym}:{tf_scan}"
+                    if self._last_traded_candle_ts.get(tf_key) == closed_candle_ts:
                         continue
 
-                    if (adx_val < 20.0 or rvol < 0.85) and regime_name in (
-                        "RANGING_CONSOLIDATION",
-                        "COMPRESSION_SQUEEZE",
-                        "LOW_VOLATILITY",
+                    tf_map: dict[str, list[dict[str, Any]]] = {tf_scan: candles_tf}
+                    for tf in ("1d", "4h", "1h", "15m", "5m", "1m"):
+                        if tf == tf_scan:
+                            continue
+                        cached_tf = data_streamer.get_candles(sym, tf, limit=30)
+                        if (
+                            not cached_tf
+                            or len(cached_tf) < 15
+                            or any(int(c.get("is_synthetic", 0) or 0) == 1 for c in cached_tf)
+                        ):
+                            try:
+                                fresh_tf = await data_streamer.fetch_external_ohlcv(
+                                    sym, tf, limit=30
+                                )
+                                if fresh_tf:
+                                    cached_tf = fresh_tf
+                            except Exception as tf_ex:
+                                logger.debug(
+                                    f"Could not refresh {sym} {tf} external OHLCV: {tf_ex}"
+                                )
+                        tf_map[tf] = cached_tf
+
+                    # 3. Evaluate 12-Stage SKY Decision Engine
+                    decision_out = sky_orchestrator.analyze_market(
+                        symbol=sym,
+                        timeframe=tf_scan,
+                        candles=candles_tf,
+                        candles_by_tf=tf_map,
+                        account_equity_usd=self.account_equity_usd,
+                    )
+
+                    self.last_decisions[sym] = asdict(decision_out)
+
+                    # 4. Check Risk Gate & Qualified Setups
+                    if decision_out.risk_gate_passed and decision_out.decision in (
+                        DecisionAction.LONG,
+                        DecisionAction.SHORT,
                     ):
-                        if st_val != "SETUP_D_RANGE_SWEEP_RECLAIM":
+                        open_positions = portfolio_shadow.get_open_positions()
+
+                        # Enforce max open positions limit with Opportunity Reserve headroom for elite setups
+                        base_max = self.max_open_positions
+                        elite_max = int(os.getenv("MAX_ELITE_POSITIONS", str(base_max + 2)))
+                        conf = getattr(decision_out, "confluence_score", None)
+                        if conf is None and getattr(decision_out, "setup_qualified", None):
+                            conf = getattr(decision_out.setup_qualified, "confluence_score", None)
+                        if conf is None and hasattr(decision_out, "confidence"):
+                            raw_c = float(decision_out.confidence)
+                            conf = raw_c * 100.0 if raw_c <= 1.0 else raw_c
+                        is_elite = conf is not None and conf >= 85.0
+                        eff_limit = elite_max if is_elite else base_max
+
+                        if len(open_positions) >= eff_limit:
                             logger.info(
-                                f"AutonomousTrader Chop Filter: Skipping {sym} ({st_val or 'SMC'}) in low-volatility chop "
-                                f"(ADX={adx_val:.1f} < 20.0, RVOL={rvol:.2f}x < 0.85x, Regime={regime_name}). Preserving capital in 100% Cash."
+                                f"Skipping {sym} trade: Max open positions ({eff_limit}) reached."
                             )
                             continue
 
-                    # Setup Confluence Hurdle: Only institutional A+ grade setups (>= 72.0)
-                    setup_conf = float(getattr(setup, "confluence_score", 0.0) or 0.0)
-                    if setup_conf > 0.0 and setup_conf < 72.0:
-                        logger.info(
-                            f"AutonomousTrader Confluence Hurdle: Skipping {sym} trade (Confluence={setup_conf:.1f} < 72.0 institutional threshold)."
-                        )
-                        continue
+                        # Guard 1b: Nervous System Cooldown Governor (Anti-Revenge & Resting Period)
+                        can_enter, cooldown_reason = cooldown_governor.evaluate_entry_clearance(sym)
+                        if not can_enter:
+                            logger.info(f"AutonomousTrader skipping {sym}: {cooldown_reason}")
+                            continue
 
-                    # Guard 2b: Rolling Asset Performance Gate (True 20-Trade Rolling Window anchored to post-patch epoch)
-                    with db_manager.get_trading_conn() as conn:
-                        epoch_cutoff_ms = int(os.getenv("ASSET_GATE_EPOCH_MS", "1793469018542"))
-
-                        p_cur = conn.execute(
-                            """
-                            SELECT 
-                                SUM(CASE WHEN realized_pnl > 0 THEN realized_pnl ELSE 0 END) as gross_win,
-                                SUM(CASE WHEN realized_pnl < 0 THEN ABS(realized_pnl) ELSE 0 END) as gross_loss,
-                                COUNT(*) as trade_count
-                            FROM (
-                                SELECT realized_pnl
-                                FROM shadow_positions
-                                WHERE symbol = ? AND status = 'CLOSED' AND opened_at >= ?
-                                ORDER BY closed_at DESC
-                                LIMIT 20
-                            );
-                            """,
-                            (sym, epoch_cutoff_ms),
-                        )
-                        p_row = p_cur.fetchone()
-                        if p_row and p_row["trade_count"] and p_row["trade_count"] >= 8:
-                            g_win = float(p_row["gross_win"] or 0.0)
-                            g_loss = float(p_row["gross_loss"] or 0.0)
-                            asset_pf = (
-                                (g_win / g_loss) if g_loss > 0 else (99.0 if g_win > 0 else 0.0)
-                            )
-
-                            # Hard-pause symbol if severe recent bleed (PF < 0.40 over >= 10 trades)
-                            if p_row["trade_count"] >= 10 and asset_pf < 0.40:
-                                logger.warning(
-                                    f"Asset Performance Gate HARD-PAUSE: Halting {sym} (Rolling PF={asset_pf:.2f} < 0.40 across {p_row['trade_count']} trades). Preserving capital in 100% Cash."
+                        # Check existing open positions for this symbol
+                        existing_sym_positions = [
+                            p for p in open_positions if p.get("symbol") == sym
+                        ]
+                        if existing_sym_positions:
+                            # Anti-Cannibalization Guard: reject opposing direction (fail-closed)
+                            if any(
+                                p.get("direction") != decision_out.decision.value
+                                for p in existing_sym_positions
+                            ):
+                                logger.info(
+                                    f"Skipping {sym} trade: Opposing {existing_sym_positions[0].get('direction')} position already open (anti-cannibalization guard)."
                                 )
                                 continue
 
-                            if asset_pf < 0.85:
-                                confluence = float(getattr(setup, "confluence_score", 0.0) or 0.0)
-                                if confluence < 86.0:
-                                    logger.info(
-                                        f"Asset Performance Gate: Skipping {sym} trade (Rolling 20-trade PF={asset_pf:.2f} < 0.85 across {p_row['trade_count']} trades, Confluence={confluence:.1f} < 86.0)."
+                        # Guard 2: Live Market Price Alignment
+                        try:
+                            live_price = await data_streamer.get_live_ticker(sym)
+                        except Exception:
+                            live_price = float(candles_tf[-1]["close"])
+
+                        cur_price = live_price if live_price > 0 else float(candles_tf[-1]["close"])
+                        setup = decision_out.setup_qualified
+
+                        # Guard 2a: Strict Institutional Trend & Chop Filter (Zero Chop Bleed)
+                        regime_dossier = decision_out.explanation_dossier.get("regime_state", {})
+                        adx_val = float(regime_dossier.get("trend_strength_adx", 25.0))
+                        regime_name = str(regime_dossier.get("regime_type", "")) or str(
+                            decision_out.explanation_dossier.get("regime", "")
+                        )
+                        st_type = getattr(setup, "setup_type", None)
+                        st_val = getattr(st_type, "value", str(st_type)) if st_type else ""
+                        vol_dossier = decision_out.explanation_dossier.get("volume", {})
+                        rvol = (
+                            float(vol_dossier.get("relative_volume", 1.0))
+                            if isinstance(vol_dossier, dict)
+                            else 1.0
+                        )
+
+                        # M40 Quarantine against PRE_BREAKOUT_COMPRESSION
+                        if "PRE_BREAKOUT" in regime_name.upper():
+                            logger.info(
+                                f"AutonomousTrader M40 Quarantine: Skipping {sym} trade in {regime_name}. "
+                                "Pre-breakout compression quarantined to prevent breakout knife-catches."
+                            )
+                            continue
+
+                        # Tier-1 Canary Asset Eligibility Gate (BTC, ETH, and ALIGNED SOL)
+                        from core.risk.asset_eligibility_gate import (
+                            DeterministicAssetEligibilityGate,
+                        )
+
+                        mtf_align = str(
+                            decision_out.explanation_dossier.get("mtf_alignment", "NEUTRAL")
+                        )
+                        gate = DeterministicAssetEligibilityGate()
+                        elig = gate.evaluate_symbol_eligibility(
+                            sym, desk="TIER1_CANARY", mtf_alignment=mtf_align
+                        )
+                        if not elig.is_eligible:
+                            logger.info(
+                                f"AutonomousTrader Asset Eligibility Gate: Skipping {sym} trade: {elig.rationale}"
+                            )
+                            continue
+
+                        if (adx_val < 20.0 or rvol < 0.85) and regime_name in (
+                            "RANGING_CONSOLIDATION",
+                            "COMPRESSION_SQUEEZE",
+                            "LOW_VOLATILITY",
+                        ):
+                            if st_val != "SETUP_D_RANGE_SWEEP_RECLAIM":
+                                logger.info(
+                                    f"AutonomousTrader Chop Filter: Skipping {sym} ({st_val or 'SMC'}) in low-volatility chop "
+                                    f"(ADX={adx_val:.1f} < 20.0, RVOL={rvol:.2f}x < 0.85x, Regime={regime_name}). Preserving capital in 100% Cash."
+                                )
+                                continue
+
+                        # Setup Confluence Hurdle: Only institutional A+ grade setups (>= 72.0)
+                        setup_conf = float(getattr(setup, "confluence_score", 0.0) or 0.0)
+                        if setup_conf > 0.0 and setup_conf < 72.0:
+                            logger.info(
+                                f"AutonomousTrader Confluence Hurdle: Skipping {sym} trade (Confluence={setup_conf:.1f} < 72.0 institutional threshold)."
+                            )
+                            continue
+
+                        # Guard 2b: Rolling Asset Performance Gate (True 20-Trade Rolling Window anchored to post-patch epoch)
+                        with db_manager.get_trading_conn() as conn:
+                            epoch_cutoff_ms = int(os.getenv("ASSET_GATE_EPOCH_MS", "1793469018542"))
+
+                            p_cur = conn.execute(
+                                """
+                                SELECT 
+                                    SUM(CASE WHEN realized_pnl > 0 THEN realized_pnl ELSE 0 END) as gross_win,
+                                    SUM(CASE WHEN realized_pnl < 0 THEN ABS(realized_pnl) ELSE 0 END) as gross_loss,
+                                    COUNT(*) as trade_count
+                                FROM (
+                                    SELECT realized_pnl
+                                    FROM shadow_positions
+                                    WHERE symbol = ? AND status = 'CLOSED' AND opened_at >= ?
+                                    ORDER BY closed_at DESC
+                                    LIMIT 20
+                                );
+                                """,
+                                (sym, epoch_cutoff_ms),
+                            )
+                            p_row = p_cur.fetchone()
+                            if p_row and p_row["trade_count"] and p_row["trade_count"] >= 8:
+                                g_win = float(p_row["gross_win"] or 0.0)
+                                g_loss = float(p_row["gross_loss"] or 0.0)
+                                asset_pf = (
+                                    (g_win / g_loss) if g_loss > 0 else (99.0 if g_win > 0 else 0.0)
+                                )
+
+                                # Hard-pause symbol if severe recent bleed (PF < 0.40 over >= 10 trades)
+                                if p_row["trade_count"] >= 10 and asset_pf < 0.40:
+                                    logger.warning(
+                                        f"Asset Performance Gate HARD-PAUSE: Halting {sym} (Rolling PF={asset_pf:.2f} < 0.40 across {p_row['trade_count']} trades). Preserving capital in 100% Cash."
                                     )
                                     continue
 
-                    # Guard 2c: Closed-Candle Directional Confirmation Guard
-                    c_open = float(last_closed_candle.get("open", 0.0))
-                    c_close = float(last_closed_candle.get("close", 0.0))
-                    if decision_out.decision == DecisionAction.LONG and c_close < c_open:
-                        c_low = float(last_closed_candle.get("low", c_close))
-                        bar_range = max(
-                            float(last_closed_candle.get("high", c_close)) - c_low, 1e-4
-                        )
-                        lower_wick_ratio = (min(c_open, c_close) - c_low) / bar_range
-                        if lower_wick_ratio < 0.35:
-                            logger.info(
-                                f"AutonomousTrader skipping {sym} LONG: Last closed 15m bar was bearish without absorption wick ({lower_wick_ratio:.1%} < 35%)."
+                                if asset_pf < 0.85:
+                                    confluence = float(
+                                        getattr(setup, "confluence_score", 0.0) or 0.0
+                                    )
+                                    if confluence < 86.0:
+                                        logger.info(
+                                            f"Asset Performance Gate: Skipping {sym} trade (Rolling 20-trade PF={asset_pf:.2f} < 0.85 across {p_row['trade_count']} trades, Confluence={confluence:.1f} < 86.0)."
+                                        )
+                                        continue
+
+                        # Guard 2c: Closed-Candle Directional Confirmation Guard
+                        c_open = float(last_closed_candle.get("open", 0.0))
+                        c_close = float(last_closed_candle.get("close", 0.0))
+                        if decision_out.decision == DecisionAction.LONG and c_close < c_open:
+                            c_low = float(last_closed_candle.get("low", c_close))
+                            bar_range = max(
+                                float(last_closed_candle.get("high", c_close)) - c_low, 1e-4
                             )
-                            continue
-                    elif decision_out.decision == DecisionAction.SHORT and c_close > c_open:
-                        c_high = float(last_closed_candle.get("high", c_close))
-                        bar_range = max(
-                            c_high - float(last_closed_candle.get("low", c_close)), 1e-4
-                        )
-                        upper_wick_ratio = (c_high - max(c_open, c_close)) / bar_range
-                        if upper_wick_ratio < 0.35:
-                            logger.info(
-                                f"AutonomousTrader skipping {sym} SHORT: Last closed 15m bar was bullish without absorption wick ({upper_wick_ratio:.1%} < 35%)."
+                            lower_wick_ratio = (min(c_open, c_close) - c_low) / bar_range
+                            if lower_wick_ratio < 0.35:
+                                logger.info(
+                                    f"AutonomousTrader skipping {sym} LONG: Last closed 15m bar was bearish without absorption wick ({lower_wick_ratio:.1%} < 35%)."
+                                )
+                                continue
+                        elif decision_out.decision == DecisionAction.SHORT and c_close > c_open:
+                            c_high = float(last_closed_candle.get("high", c_close))
+                            bar_range = max(
+                                c_high - float(last_closed_candle.get("low", c_close)), 1e-4
                             )
-                            continue
+                            upper_wick_ratio = (c_high - max(c_open, c_close)) / bar_range
+                            if upper_wick_ratio < 0.35:
+                                logger.info(
+                                    f"AutonomousTrader skipping {sym} SHORT: Last closed 15m bar was bullish without absorption wick ({upper_wick_ratio:.1%} < 35%)."
+                                )
+                                continue
 
-                    # If setup entry is missing or divergent (>1.5% away from live price), anchor to live market
-                    if (
-                        setup
-                        and setup.entry_price > 0
-                        and abs(setup.entry_price - cur_price) / cur_price < 0.015
-                    ):
-                        entry_price = setup.entry_price
-                    else:
-                        entry_price = cur_price
-
-                    # Dynamic ATR Volatility Sizing Anchor (No Arbitrary Static Percentages)
-                    vol_state = volatility_engine.compute_volatility(candles_15m)
-                    atr_val = (
-                        vol_state.atr if vol_state and vol_state.atr > 0 else (cur_price * 0.015)
-                    )
-
-                    # Fix 5: Strict Minimum Stop Distance Floor (at least 1.2x ATR or 0.45% from entry)
-                    min_sl_dist = max(1.2 * atr_val, entry_price * 0.0045)
-                    min_sl_dist = min(
-                        min_sl_dist, entry_price * 0.030
-                    )  # Bound within 3.0% to prevent ceiling breach
-
-                    if setup and setup.invalidation_sl > 0:
-                        raw_sl = setup.invalidation_sl
-                    else:
-                        raw_sl = (
-                            round(cur_price - 2.0 * atr_val, 6)
-                            if decision_out.decision == DecisionAction.LONG
-                            else round(cur_price + 2.0 * atr_val, 6)
-                        )
-
-                    # Only widen if the stop is too tight (micro-stop)
-                    if abs(entry_price - raw_sl) < min_sl_dist:
-                        if decision_out.decision == DecisionAction.LONG:
-                            sl = round(entry_price - min_sl_dist, 6)
+                        # If setup entry is missing or divergent (>1.5% away from live price), anchor to live market
+                        if (
+                            setup
+                            and setup.entry_price > 0
+                            and abs(setup.entry_price - cur_price) / cur_price < 0.015
+                        ):
+                            entry_price = setup.entry_price
                         else:
-                            sl = round(entry_price + min_sl_dist, 6)
-                    else:
-                        sl = raw_sl
+                            entry_price = cur_price
 
-                    risk_dist = abs(entry_price - sl)
-                    sl_dist_pct = (risk_dist / entry_price * 100.0) if entry_price > 0 else 0.0
-                    if sl_dist_pct > 3.5:
-                        logger.info(
-                            f"AutonomousTrader: Skipping {sym} trade: Stop distance ({sl_dist_pct:.1f}%) exceeds 3.5% institutional ceiling."
-                        )
-                        continue
-
-                    min_tp_dist = max(risk_dist * 2.0, 3.0 * atr_val)
-
-                    if (
-                        setup
-                        and setup.target_tp > 0
-                        and abs(setup.target_tp - entry_price) >= risk_dist * 2.0
-                    ):
-                        tp = setup.target_tp
-                    else:
-                        # Target at least 2.0R to guarantee asymmetric positive mathematical expectancy
-                        tp = (
-                            round(entry_price + min_tp_dist, 6)
-                            if decision_out.decision == DecisionAction.LONG
-                            else round(entry_price - min_tp_dist, 6)
+                        # Dynamic ATR Volatility Sizing Anchor (No Arbitrary Static Percentages)
+                        vol_state = volatility_engine.compute_volatility(candles_tf)
+                        atr_val = (
+                            vol_state.atr
+                            if vol_state and vol_state.atr > 0
+                            else (cur_price * 0.015)
                         )
 
-                    rr_ratio = abs(tp - entry_price) / max(risk_dist, 1e-4)
-                    if rr_ratio < 2.0:
-                        logger.info(
-                            f"AutonomousTrader: Skipping {sym} trade due to insufficient R:R ({rr_ratio:.2f} < 2.0R minimum hurdle)."
-                        )
-                        continue
+                        # Fix 5: Strict Minimum Stop Distance Floor (at least 1.2x ATR or 0.45% from entry)
+                        min_sl_dist = max(1.2 * atr_val, entry_price * 0.0045)
+                        min_sl_dist = min(
+                            min_sl_dist, entry_price * 0.030
+                        )  # Bound within 3.0% to prevent ceiling breach
 
-                    # Guard 3: Invalidate expired setups where market has already breached target or stop
-                    if decision_out.decision == DecisionAction.LONG:
-                        if cur_price >= tp:
-                            logger.info(
-                                f"Rejecting {sym} LONG setup: Live price ({cur_price:.2f}) is already at/above TP ({tp:.2f})."
+                        if setup and setup.invalidation_sl > 0:
+                            raw_sl = setup.invalidation_sl
+                        else:
+                            raw_sl = (
+                                round(cur_price - 2.0 * atr_val, 6)
+                                if decision_out.decision == DecisionAction.LONG
+                                else round(cur_price + 2.0 * atr_val, 6)
                             )
-                            continue
-                        if cur_price <= sl:
+
+                        # Only widen if the stop is too tight (micro-stop)
+                        if abs(entry_price - raw_sl) < min_sl_dist:
+                            if decision_out.decision == DecisionAction.LONG:
+                                sl = round(entry_price - min_sl_dist, 6)
+                            else:
+                                sl = round(entry_price + min_sl_dist, 6)
+                        else:
+                            sl = raw_sl
+
+                        risk_dist = abs(entry_price - sl)
+                        sl_dist_pct = (risk_dist / entry_price * 100.0) if entry_price > 0 else 0.0
+                        if sl_dist_pct > 3.5:
                             logger.info(
-                                f"Rejecting {sym} LONG setup: Live price ({cur_price:.2f}) has already breached SL ({sl:.2f})."
-                            )
-                            continue
-                    elif decision_out.decision == DecisionAction.SHORT:
-                        if cur_price <= tp:
-                            logger.info(
-                                f"Rejecting {sym} SHORT setup: Live price ({cur_price:.2f}) is already at/below TP ({tp:.2f})."
-                            )
-                            continue
-                        if cur_price >= sl:
-                            logger.info(
-                                f"Rejecting {sym} SHORT setup: Live price ({cur_price:.2f}) has already breached SL ({sl:.2f})."
+                                f"AutonomousTrader: Skipping {sym} trade: Stop distance ({sl_dist_pct:.1f}%) exceeds 3.5% institutional ceiling."
                             )
                             continue
 
-                    # Multi-Style Classification & Sub-Book Dedup
-                    style_code, desk_label = classify_trading_style(
-                        symbol=sym,
-                        setup=setup,
-                        entry_price=entry_price,
-                        stop_loss=sl,
-                        timeframe="15m",
-                    )
-                    asset_prefix = sym.split("/")[0].upper() if "/" in sym else sym.upper()
-                    style_tag = f"[{asset_prefix}_{style_code}]"
+                        min_tp_dist = max(risk_dist * 2.0, 3.0 * atr_val)
 
-                    # Prevent duplicate positions of the exact same style sub-book on this asset
-                    if any(
-                        p.get("entry_reason")
-                        and style_tag.upper() in p.get("entry_reason", "").upper()
-                        for p in existing_sym_positions
-                    ):
+                        if (
+                            setup
+                            and setup.target_tp > 0
+                            and abs(setup.target_tp - entry_price) >= risk_dist * 2.0
+                        ):
+                            tp = setup.target_tp
+                        else:
+                            # Target at least 2.0R to guarantee asymmetric positive mathematical expectancy
+                            tp = (
+                                round(entry_price + min_tp_dist, 6)
+                                if decision_out.decision == DecisionAction.LONG
+                                else round(entry_price - min_tp_dist, 6)
+                            )
+
+                        rr_ratio = abs(tp - entry_price) / max(risk_dist, 1e-4)
+                        if rr_ratio < 2.0:
+                            logger.info(
+                                f"AutonomousTrader: Skipping {sym} trade due to insufficient R:R ({rr_ratio:.2f} < 2.0R minimum hurdle)."
+                            )
+                            continue
+
+                        # Guard 3: Invalidate expired setups where market has already breached target or stop
+                        if decision_out.decision == DecisionAction.LONG:
+                            if cur_price >= tp:
+                                logger.info(
+                                    f"Rejecting {sym} LONG setup: Live price ({cur_price:.2f}) is already at/above TP ({tp:.2f})."
+                                )
+                                continue
+                            if cur_price <= sl:
+                                logger.info(
+                                    f"Rejecting {sym} LONG setup: Live price ({cur_price:.2f}) has already breached SL ({sl:.2f})."
+                                )
+                                continue
+                        elif decision_out.decision == DecisionAction.SHORT:
+                            if cur_price <= tp:
+                                logger.info(
+                                    f"Rejecting {sym} SHORT setup: Live price ({cur_price:.2f}) is already at/below TP ({tp:.2f})."
+                                )
+                                continue
+                            if cur_price >= sl:
+                                logger.info(
+                                    f"Rejecting {sym} SHORT setup: Live price ({cur_price:.2f}) has already breached SL ({sl:.2f})."
+                                )
+                                continue
+
+                        # M47 Ladder Knife-Catch & Reclaim Guard
+                        from core.prediction_ladder import evaluate_ladder_tick
+
+                        ladder_plan = {
+                            "side": decision_out.decision.value,
+                            "entryZone": getattr(setup, "entry_zone", None)
+                            or [entry_price * 0.999, entry_price * 1.001],
+                            "stopLoss": sl,
+                            "tp1": tp,
+                        }
+                        c_open = float(last_closed_candle.get("open", entry_price))
+                        c_high = float(last_closed_candle.get("high", entry_price))
+                        c_low = float(last_closed_candle.get("low", entry_price))
+                        c_close = float(last_closed_candle.get("close", entry_price))
+                        ladder_eval = evaluate_ladder_tick(
+                            ladder_plan,
+                            bar_open=c_open,
+                            bar_high=c_high,
+                            bar_low=c_low,
+                            bar_close=c_close,
+                        )
+                        if ladder_eval.state == "AWAITING_RECLAIM":
+                            logger.info(
+                                f"AutonomousTrader M47 Knife-Catch Guard: Skipping {sym} ({tf_scan}) trade: "
+                                f"{ladder_eval.note} Awaiting reclaim confirmation."
+                            )
+                            continue
+
+                        # Multi-Style Classification & Sub-Book Dedup
+                        style_code, desk_label = classify_trading_style(
+                            symbol=sym,
+                            setup=setup,
+                            entry_price=entry_price,
+                            stop_loss=sl,
+                            timeframe=tf_scan,
+                        )
+                        asset_prefix = sym.split("/")[0].upper() if "/" in sym else sym.upper()
+                        style_tag = f"[{asset_prefix}_{style_code}]"
+
+                        # Prevent duplicate positions of the exact same style sub-book on this asset
+                        if any(
+                            p.get("entry_reason")
+                            and style_tag.upper() in p.get("entry_reason", "").upper()
+                            for p in existing_sym_positions
+                        ):
+                            logger.info(
+                                f"Skipping {sym} trade: Style sub-book {style_tag} already active."
+                            )
+                            continue
+
+                        # Half-Kelly Position Sizing with cumulative asset risk cap (1.5% max risk per asset)
+                        raw_pos_size_usd = decision_out.suggested_position_size_usd or (
+                            current_eq * 0.02
+                        )
+                        pos_size_usd = min(raw_pos_size_usd, current_eq * 1.0)
+                        stop_dist = abs(entry_price - sl)
+
+                        # Deduct existing open risk on this symbol to respect 1.5% constitutional asset cap
+                        existing_sym_risk = sum(
+                            float(p.get("size", 0.0))
+                            * abs(float(p.get("entry_price", 0.0)) - float(p.get("stop_loss", 0.0)))
+                            for p in existing_sym_positions
+                            if p.get("stop_loss") is not None
+                        )
+                        max_allowed_asset_risk = current_eq * 0.015
+                        remaining_asset_risk = max(0.0, max_allowed_asset_risk - existing_sym_risk)
+                        max_stop_loss_usd = min(current_eq * 0.01, remaining_asset_risk)
+
+                        if max_stop_loss_usd <= 0.0:
+                            logger.info(
+                                f"Skipping {sym} trade: Cumulative risk cap on {sym} (${existing_sym_risk:.2f}/${max_allowed_asset_risk:.2f}) reached."
+                            )
+                            continue
+
+                        if stop_dist > 0:
+                            risk_capped_units = max_stop_loss_usd / stop_dist
+                            notional_units = pos_size_usd / entry_price
+                            units = max(0.001, round(min(notional_units, risk_capped_units), 4))
+                        else:
+                            units = max(0.001, round(pos_size_usd / entry_price, 4))
+                        direction_str = decision_out.decision.value
+
+                        # 5. Route through Supreme Central Trading Mind & Risk Gateway (Finding D-01)
+                        st_obj = getattr(setup, "setup_type", None) if setup else None
+                        if hasattr(st_obj, "value"):
+                            setup_label = st_obj.value
+                        elif st_obj:
+                            setup_label = str(st_obj)
+                        else:
+                            setup_label = "SMC Structure"
+                        reason_desc = (
+                            f"{style_tag} {setup_label} ({direction_str}) | "
+                            f"Net-EV: {decision_out.net_ev_r:.2f}R | Kelly: {decision_out.kelly_fraction:.1%}"
+                        )
+
+                        from core.central_mind import CentralTradingMind, TradeProposal
+
+                        data_streamer._last_known_prices[sym] = entry_price
+
+                        mind = getattr(self, "central_mind", None) or CentralTradingMind()
+                        proposal = TradeProposal(
+                            origin="AUTONOMOUS_TRADER",
+                            symbol=sym,
+                            direction=direction_str,
+                            style=style_tag,
+                            planned_entry=entry_price,
+                            stop_loss=sl,
+                            take_profit=tp,
+                            thesis=reason_desc,
+                            requested_size=units,
+                            confluence_score=conf,
+                            expected_value_r=getattr(decision_out, "net_ev_r", None),
+                        )
+                        verdict = mind.evaluate_and_route(proposal)
+                        if not verdict.is_approved:
+                            logger.warning(
+                                f"Central Trading Mind REJECTED [{style_tag}] {sym}: {verdict.rejection_reason}"
+                            )
+                            continue
+                        pos_id = (
+                            verdict.executed_position_id or f"POS_{sym}_{int(time.time() * 1000)}"
+                        )
+                        self.total_trades_executed += 1
+                        self._last_traded_candle_ts[tf_key] = closed_candle_ts
+                        self._last_traded_candle_ts[sym] = closed_candle_ts
+
+                        action_record = {
+                            "position_id": pos_id,
+                            "symbol": sym,
+                            "direction": direction_str,
+                            "size": units,
+                            "entry_price": entry_price,
+                            "stop_loss": sl,
+                            "take_profit": tp,
+                            "net_ev_r": decision_out.net_ev_r,
+                            "kelly_fraction": decision_out.kelly_fraction,
+                            "style": style_code,
+                            "desk": desk_label,
+                            "timestamp": int(time.time() * 1000),
+                        }
+                        executed_actions.append(action_record)
+
+                        # 6. Audit & Log
+                        audit_bus.emit_event(
+                            event_type="AUTONOMOUS_PAPER_TRADE_OPENED",
+                            symbol=sym,
+                            reason=f"Opened {direction_str} paper trade {pos_id}",
+                            severity="INFO",
+                            details=action_record,
+                        )
                         logger.info(
-                            f"Skipping {sym} trade: Style sub-book {style_tag} already active."
+                            f"AutonomousTrader executed {direction_str} on {sym}: {pos_id} (Size: {units})"
                         )
-                        continue
 
-                    # Half-Kelly Position Sizing with cumulative asset risk cap (1.5% max risk per asset)
-                    raw_pos_size_usd = decision_out.suggested_position_size_usd or (
-                        current_eq * 0.02
-                    )
-                    pos_size_usd = min(raw_pos_size_usd, current_eq * 1.0)
-                    stop_dist = abs(entry_price - sl)
-
-                    # Deduct existing open risk on this symbol to respect 1.5% constitutional asset cap
-                    existing_sym_risk = sum(
-                        float(p.get("size", 0.0))
-                        * abs(float(p.get("entry_price", 0.0)) - float(p.get("stop_loss", 0.0)))
-                        for p in existing_sym_positions
-                        if p.get("stop_loss") is not None
-                    )
-                    max_allowed_asset_risk = current_eq * 0.015
-                    remaining_asset_risk = max(0.0, max_allowed_asset_risk - existing_sym_risk)
-                    max_stop_loss_usd = min(current_eq * 0.01, remaining_asset_risk)
-
-                    if max_stop_loss_usd <= 0.0:
-                        logger.info(
-                            f"Skipping {sym} trade: Cumulative risk cap on {sym} (${existing_sym_risk:.2f}/${max_allowed_asset_risk:.2f}) reached."
+                        # 7. Mirror qualified crypto trade to real Binance Spot Testnet during burn-in
+                        await self._mirror_trade_to_testnet(
+                            sym, direction_str, sl_price=sl, tp_price=tp
                         )
-                        continue
 
-                    if stop_dist > 0:
-                        risk_capped_units = max_stop_loss_usd / stop_dist
-                        notional_units = pos_size_usd / entry_price
-                        units = max(0.001, round(min(notional_units, risk_capped_units), 4))
-                    else:
-                        units = max(0.001, round(pos_size_usd / entry_price, 4))
-                    direction_str = decision_out.decision.value
-
-                    # 5. Route through Supreme Central Trading Mind & Risk Gateway (Finding D-01)
-                    st_obj = getattr(setup, "setup_type", None) if setup else None
-                    if hasattr(st_obj, "value"):
-                        setup_label = st_obj.value
-                    elif st_obj:
-                        setup_label = str(st_obj)
-                    else:
-                        setup_label = "SMC Structure"
-                    reason_desc = (
-                        f"{style_tag} {setup_label} ({direction_str}) | "
-                        f"Net-EV: {decision_out.net_ev_r:.2f}R | Kelly: {decision_out.kelly_fraction:.1%}"
-                    )
-
-                    from core.central_mind import CentralTradingMind, TradeProposal
-
-                    data_streamer._last_known_prices[sym] = entry_price
-
-                    mind = getattr(self, "central_mind", None) or CentralTradingMind()
-                    proposal = TradeProposal(
-                        origin="AUTONOMOUS_TRADER",
-                        symbol=sym,
-                        direction=direction_str,
-                        style=style_tag,
-                        planned_entry=entry_price,
-                        stop_loss=sl,
-                        take_profit=tp,
-                        thesis=reason_desc,
-                        requested_size=units,
-                        confluence_score=conf,
-                        expected_value_r=getattr(decision_out, "net_ev_r", None),
-                    )
-                    verdict = mind.evaluate_and_route(proposal)
-                    if not verdict.is_approved:
-                        logger.warning(
-                            f"Central Trading Mind REJECTED [{style_tag}] {sym}: {verdict.rejection_reason}"
-                        )
-                        continue
-                    pos_id = verdict.executed_position_id or f"POS_{sym}_{int(time.time() * 1000)}"
-                    self.total_trades_executed += 1
-                    self._last_traded_candle_ts[sym] = closed_candle_ts
-
-                    action_record = {
-                        "position_id": pos_id,
-                        "symbol": sym,
-                        "direction": direction_str,
-                        "size": units,
-                        "entry_price": entry_price,
-                        "stop_loss": sl,
-                        "take_profit": tp,
-                        "net_ev_r": decision_out.net_ev_r,
-                        "kelly_fraction": decision_out.kelly_fraction,
-                        "style": style_code,
-                        "desk": desk_label,
-                        "timestamp": int(time.time() * 1000),
-                    }
-                    executed_actions.append(action_record)
-
-                    # 6. Audit & Log
-                    audit_bus.emit_event(
-                        event_type="AUTONOMOUS_PAPER_TRADE_OPENED",
-                        symbol=sym,
-                        reason=f"Opened {direction_str} paper trade {pos_id}",
-                        severity="INFO",
-                        details=action_record,
-                    )
-                    logger.info(
-                        f"AutonomousTrader executed {direction_str} on {sym}: {pos_id} (Size: {units})"
-                    )
-
-                    # 7. Mirror qualified crypto trade to real Binance Spot Testnet during burn-in
-                    await self._mirror_trade_to_testnet(
-                        sym, direction_str, sl_price=sl, tp_price=tp
-                    )
-
-            except Exception as e:
-                logger.error(f"AutonomousTrader scan error for {sym}: {e}")
+                except Exception as e:
+                    logger.error(f"AutonomousTrader scan error for {sym}: {e}")
 
         # Execute Arena cycle across all 10 specialists
         try:

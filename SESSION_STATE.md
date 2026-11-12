@@ -1,4 +1,22 @@
-**Last updated:** 2026-11-13 (**v4.10.0 — Milestone 47 Strict Joint Hurdle 2e & Autonomous Paper Loop Wiring**).
+**Last updated:** 2026-11-13 (**v4.11.0 — Milestone 48 Forward Qualification Throughput, Multi-Horizon Isolation & Live Tick Sync**).
+- **WP-1 (Live Mark-to-Market & Intrabar High/Low Tick Sync):**
+  - Audited live price pipeline in `core/autonomous_trader.py`, `core/data_streamer.py`, and `cbt_backend.py`.
+  - Implemented `replay_candle()` and `replay_candles()` in `core/portfolio_shadow.py` using chronological 4-point intrabar reconstruction (`O -> L -> H -> C` for bullish bars, `O -> H -> L -> C` for bearish bars) to evaluate Stage 1 (`+1.20R`), Stage 2 (`+1.50R`), and stop/target executions with zero lookahead bias.
+  - Built CLI & daemon sync script `scripts/sync_forward_paper_book.py` supporting `--symbol`, `--position-id`, `--scan`, `--dry-run`, settled position audit extraction, and automatic shadow ledger reconciliation.
+  - Wired `sync_open_positions()` into `core/autonomous_trader.py` to maintain mark-to-market accuracy and ratchet progression on every scan cycle.
+- **WP-2 (Multi-Horizon Slot Isolation & M47 Signal Routing):**
+  - Resolved single-horizon symbol lockout: enabled orthogonal multi-horizon co-existence (`DAY` on 15m and `SWING` on 1h) per asset up to risk limits by defaulting `allow_multi_style = True` and enforcing deduplication on `(symbol, style_tag, zone_id)` in `core/portfolio_shadow.py`.
+  - Preserved strict anti-cannibalization: opposing directions (`LONG` vs `SHORT`) on the same asset are fail-closed rejected.
+  - Upgraded `core/autonomous_trader.py` to scan across both `15m` (`DAY`) and `1h` (`SWING`) for `BTC/USDT`, `ETH/USDT`, and `SOL/USDT` (`ALIGNED`-only) with M47 `evaluate_ladder_tick` knife-catch protection (`AWAITING_RECLAIM` rejected).
+  - Cleaned Checkpoint 3 expectancy attribution: updated `core/execution/capital_governor.py` and `scripts/reconcile_shadow_ledger.py` to isolate quarantined `PRE_BREAKOUT_COMPRESSION` setups (`quarantined_trades_count = 5`), certifying CP-3 when `surviving_trades_count >= 20` and `surviving_expectancy_r > 0.0`.
+- **WP-3 (Verification, Invariants & Commit):**
+  - Created unit test suite `tests/test_m48_forward_paper_sync_and_slots.py` (6/6 tests green).
+  - Verified 36/36 tests green across M44–M48 and two-tier exit suites.
+  - Re-validated Milestone 18 certified surface area via `scripts/verify_m18_certification.py` (149/149 tests green).
+  - Verified shadow ledger zero-drift reconciliation (`scripts/reconcile_shadow_ledger.py` — $0.000000 drift across 507 lifetime trades).
+  - Verified Ruff linting and formatting (0 errors, 100% formatted).
+
+**Previous:** 2026-11-13 (**v4.10.0 — Milestone 47 Strict Joint Hurdle 2e & Autonomous Paper Loop Wiring**).
 - **WP-1 (Strict Joint Hurdle 2e Clearance):**
   - Forensic diagnosis of M46: ratcheting at `+1.0R -> +0.10R` stopped out normal retests at negative net returns ($-0.08\text{R}$ to $-0.12\text{R}$ after friction), depressing pooled expectancy to $+0.2226\text{R}$.
   - Refined progressive ratchet geometry: Stage 1 defensive ratchet at **`+1.20R`** moves stop-loss to defensively locked profit **`+0.25R`** ($+0.10\text{R}$ net after friction, eliminating false stop-outs); Stage 2 profit-lock ratchet at **`+1.50R`** banks **35%** into realized PnL and ratchets runner stop-loss to **`+0.65R`**, leaving 65% riding to TP2 ($+3.1\text{R}$).

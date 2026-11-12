@@ -158,7 +158,8 @@ class PortfolioShadowManager:
         max_risk_usd: float | None = None,
         prevent_duplicate_symbol: bool = True,
         style_tag: str | None = None,
-        allow_multi_style: bool = False,
+        allow_multi_style: bool = True,
+        zone_id: str | None = None,
         book_id: str = "MAIN_SOVEREIGN",
         confluence_score: float | None = None,
     ) -> str:
@@ -239,11 +240,14 @@ class PortfolioShadowManager:
         # and a lost trade. UUID suffix makes the ID collision-proof.
         pos_id = f"POS_{symbol.replace('/', '_')}_{now}_{uuid.uuid4().hex[:8]}"
 
-        reason_text = (
-            entry_reason
-            if entry_reason
-            else f"SMC Order Flow Structure ({direction.upper()} Confluence)"
+        tag_part = (
+            f"[{style_tag}]" if style_tag and not style_tag.startswith("[") else (style_tag or "")
         )
+        zone_part = f"[{zone_id}]" if zone_id and not zone_id.startswith("[") else (zone_id or "")
+        base_reason = entry_reason or f"SMC Order Flow Structure ({direction.upper()} Confluence)"
+
+        prefix_parts = [p for p in (tag_part, zone_part) if p]
+        reason_text = f"{' '.join(prefix_parts)} {base_reason}".strip()
 
         with db_manager.get_trading_conn() as conn:
             conn.execute("BEGIN IMMEDIATE;")
@@ -287,12 +291,24 @@ class PortfolioShadowManager:
                                 f"Risk Gate Rejection: an OPEN position for {symbol} already exists (no distinct style_tag)."
                             )
                     else:
+                        eff_clean = eff_style.strip("[]").upper()
                         for _, _, ex_reason, _, _, _ in existing_sym_positions:
-                            if ex_reason and eff_style.upper() in ex_reason.upper():
+                            ex_str = str(ex_reason or "")
+                            if ex_str and (
+                                eff_style.upper() in ex_str.upper()
+                                or f"[{eff_clean}]" in ex_str.upper()
+                            ):
                                 conn.rollback()
                                 raise ValueError(
                                     f"Risk Gate Rejection: An OPEN position for {symbol} with style '{eff_style}' already exists."
                                 )
+                            if zone_id:
+                                zone_clean = zone_id.strip("[]")
+                                if zone_id in ex_str or f"[{zone_clean}]" in ex_str:
+                                    conn.rollback()
+                                    raise ValueError(
+                                        f"Risk Gate Rejection: An OPEN position for {symbol} on zone '{zone_id}' already exists."
+                                    )
 
             if enforce_atomic_limits:
                 cursor = conn.execute(
@@ -1218,6 +1234,59 @@ class PortfolioShadowManager:
                     conn.commit()
 
         return events
+
+    def replay_candle(
+        self,
+        symbol: str,
+        candle: dict[str, Any],
+        preserve_full_runner: bool | None = None,
+        progressive_ratchet: bool | None = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Replays a candle's intrabar price path chronologically through update_live_price.
+        Chronological 4-point intrabar reconstruction:
+        - If close >= open (bullish bar): open -> low -> high -> close
+        - If close < open (bearish bar): open -> high -> low -> close
+        """
+        o = float(candle.get("open", 0.0))
+        h = float(candle.get("high", 0.0))
+        l = float(candle.get("low", 0.0))
+        c = float(candle.get("close", 0.0))
+        if o <= 0 or h <= 0 or l <= 0 or c <= 0:
+            return []
+
+        path = [o, l, h, c] if c >= o else [o, h, l, c]
+        all_events = []
+        for p in path:
+            evs = self.update_live_price(
+                symbol,
+                p,
+                preserve_full_runner=preserve_full_runner,
+                progressive_ratchet=progressive_ratchet,
+            )
+            if evs:
+                all_events.extend(evs)
+        return all_events
+
+    def replay_candles(
+        self,
+        symbol: str,
+        candles: list[dict[str, Any]],
+        preserve_full_runner: bool | None = None,
+        progressive_ratchet: bool | None = None,
+    ) -> list[dict[str, Any]]:
+        """Replays a chronological series of candles through replay_candle."""
+        all_events = []
+        for c in candles:
+            evs = self.replay_candle(
+                symbol,
+                c,
+                preserve_full_runner=preserve_full_runner,
+                progressive_ratchet=progressive_ratchet,
+            )
+            if evs:
+                all_events.extend(evs)
+        return all_events
 
     def close_position(
         self,
