@@ -239,30 +239,40 @@ class PDFBookExtractor:
         if not image_bytes:
             return "", "NONE"
 
-        api_key = self.api_key or os.getenv("GEMINI_API_KEY", "") or os.getenv("GOOGLE_API_KEY", "")
-        if api_key:
-            try:
-                from google import genai
-                from google.genai import types
+        api_key = (
+            self.api_key
+            if self.api_key is not None
+            else (os.getenv("GEMINI_API_KEY", "") or os.getenv("GOOGLE_API_KEY", ""))
+        )
+        if not api_key:
+            return "", "OFFLINE_FALLBACK"
 
-                client = genai.Client(api_key=api_key)
-                prompt = custom_prompt or (
-                    "You are an institutional quantitative document OCR engine for financial literature. "
-                    "Transcribe all text, formulas, numbers, tables, and headings from this scanned monograph page verbatim. "
-                    "Preserve paragraphs, mathematical notation, and structure. Do not summarize, add commentary, or omit sections."
-                )
-                part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
-                response = client.models.generate_content(
-                    model=self.vision_model,
-                    contents=[part, prompt],
-                )
-                text = (response.text or "").strip()
-                if text:
-                    return text, "GEMINI_VISION"
-            except Exception as e:
-                logger.warning(f"Gemini Vision OCR extraction failed: {e}")
+        try:
+            from google import genai
+            from google.genai import types
 
-        return "", "OFFLINE_FALLBACK"
+            client = genai.Client(api_key=api_key)
+            prompt = custom_prompt or (
+                "You are an institutional quantitative document OCR engine for financial literature. "
+                "Transcribe all text, formulas, numbers, tables, and headings from this scanned monograph page verbatim. "
+                "Preserve paragraphs, mathematical notation, and structure. Do not summarize, add commentary, or omit sections."
+            )
+            part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+            response = client.models.generate_content(
+                model=self.vision_model,
+                contents=[part, prompt],
+            )
+            text = (response.text or "").strip()
+            if text:
+                return text, "GEMINI_VISION"
+        except Exception as e:
+            logger.warning(f"Gemini Vision OCR extraction failed: {e}")
+            err_str = str(e)
+            if "403" in err_str or "Forbidden" in err_str or "policy" in err_str:
+                return "", "API_KEY_POLICY_BLOCKED_403"
+            return "", f"GEMINI_VISION_ERROR: {e}"
+
+        return "", "EMPTY_VISION_RESPONSE"
 
     def extract_metadata_and_isbn(
         self, reader: pypdf.PdfReader, raw_front_matter: str

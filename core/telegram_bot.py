@@ -2207,6 +2207,11 @@ class TelegramBotDispatcher:
             caption_lower = (caption or text or "").lower()
             trade_keywords = [
                 "trade",
+                "setup",
+                "chart",
+                "analyze",
+                "analysis",
+                "smc",
                 "enter",
                 "entry",
                 "stop loss",
@@ -2238,7 +2243,7 @@ class TelegramBotDispatcher:
                     f"You are the Senior Quantitative Market Structure & SMC Architect of SKY. "
                     f"The trader uploaded this chart with question: '{caption or 'Analyze trade setup'}'.\n\n"
                     f"Provide an institutional, actionable trade answer formatted cleanly in Telegram Markdown:\n"
-                    f"1. 📊 *Asset & Timeframe:* [e.g. Gold Spot XAU/USD 15m]\n"
+                    f"1. 📊 *Asset & Timeframe:* [Exact asset symbol and timeframe visible on chart, e.g. BTC/USDT 1W]\n"
                     f"2. 🧭 *Market Structure:* [Current price, trend bias, recent BOS/CHoCH, liquidity sweeps, Order Blocks, and FVGs]\n"
                     f"3. ⚡ *Direct Verdict:* [Enter now vs WAIT for trigger: LONG / SHORT / WAIT]\n"
                     f"4. 🎯 *Actionable Trade Setup:*\n"
@@ -2265,25 +2270,37 @@ class TelegramBotDispatcher:
                     await self.send_message(reply, chat_id=chat_id)
                     return {"status": "TRADE_ANALYSIS_COMPLETED", "type": "CHART_SETUP"}
                 else:
-                    # Deterministic Fallback if Vision API offline
-                    fallback_reply = (
-                        "🎯 *SKY INSTITUTIONAL CHART ANALYSIS*\n"
+                    # Constitutional Anti-Fabrication Rule (AGENTS.md Section 4):
+                    # Never hallucinate or return hardcoded mock setups when vision analysis fails.
+                    diag = _provider or "UNKNOWN_VISION_ERROR"
+                    if "403" in diag or "POLICY" in diag:
+                        reason_desc = (
+                            "• *Root Cause:* Generative Language API call rejected (`403 Forbidden: not allowed by policy`).\n"
+                            "• *Action Required:* In Google Cloud Console, inspect API restrictions on your `GEMINI_API_KEY` "
+                            "and enable the *Generative Language API*."
+                        )
+                    elif "NO_API_KEY" in diag:
+                        reason_desc = (
+                            "• *Root Cause:* `GEMINI_API_KEY` is not set in `.env`.\n"
+                            "• *Action Required:* Add a valid Gemini API key to your environment."
+                        )
+                    else:
+                        reason_desc = (
+                            f"• *Provider Status:* `{diag}`\n"
+                            "• *Diagnosis:* Vision model returned no content or connection timed out."
+                        )
+
+                    fail_reply = (
+                        "⚠️ *SKY Multimodal Vision: Inference Unavailable*\n"
                         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                        "📊 *Asset:* Gold Spot / U.S. Dollar (`XAU/USD`) • 15m\n"
-                        "🧭 *Market Structure:* Severe bearish impulse followed by a double-bottom liquidity sweep at `$3,980.00`. Current price `$3,995.80` consolidating under `$4,000` psychological resistance.\n\n"
-                        "⚡ *Direct Verdict:* **DO NOT MARKET-BUY IN CHOP AT 3,995.** Wait for confirmed trigger.\n\n"
-                        "🎯 *Primary Setup (Trend Continuation SHORT - Recommended):*\n"
-                        "• *Entry Zone:* `$4,015.00 – $4,025.00` (Bearish FVG & Order Block mitigation)\n"
-                        "• *Stop Loss:* `$4,038.50` (Above swing lower high)\n"
-                        "• *Take Profit 1:* `$3,995.00` | *TP2:* `$3,980.00` (Sweep low)\n"
-                        "• *Risk / Reward:* `1:2.4R`\n\n"
-                        "🎯 *Alternative Setup (Counter-Trend LONG):*\n"
-                        "• *Trigger:* Wait for 15m candle close ABOVE `$4,005.00`\n"
-                        "• *Entry:* `$4,000.00 – $4,005.00` | *Stop Loss:* `$3,976.00` | *TP:* `$4,030.00`\n\n"
-                        "⚠️ *Risk Invariant:* Always risk ≤ 1.5% Half-Kelly equity per trade."
+                        "The terminal received your chart image, but multimodal vision inference could not be completed.\n\n"
+                        f"{reason_desc}\n\n"
+                        "🛡️ *Zero-Hallucination Policy:*\n"
+                        "SKY strictly prohibits generating fabricated trade setups when live visual inspection fails.\n\n"
+                        "💡 *Alternative Command:* Send `/market BTC/USDT` or `/signal BTC/USDT` to pull real-time SMC order-flow analysis directly from our exchange data feeds."
                     )
-                    await self.send_message(fallback_reply, chat_id=chat_id)
-                    return {"status": "TRADE_ANALYSIS_FALLBACK", "type": "CHART_SETUP"}
+                    await self.send_message(fail_reply, chat_id=chat_id)
+                    return {"status": "TRADE_ANALYSIS_FAILED", "provider": diag}
 
             # Otherwise, if user explicitly asked for research archival:
             await self.send_message(
