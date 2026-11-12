@@ -1,11 +1,12 @@
 # SKY — Project Status & Agent Handoff Document
 
-> **Last Updated:** 2026-11-02  
-> **Release Tag:** `v4.3.0-quant-alpha` (Phase 13 Risk Ceiling Guards, Tier-1 Firewall, Bayesian Calibration & Hardened Fixtures 🚀)  
-> **Branch:** `main` (Aligned at commit `fd26e9e`)  
+> **Last Updated:** 2026-11-12  
+> **Release Tag:** `v4.4.0-edge-campaign` (Milestone 39 Real-World Readiness & Edge Execution Campaign Complete 🚀)  
+> **Branch:** `main`  
 > **Remote:** `https://github.com/cloudshome/CBT.git`  
 > **Lead Agent:** Antigravity  
 > **Milestone 18 Status:** PRODUCTION PASS (Certified & Re-Validated Active — 149/149 Tests Green 🏛️)  
+> **Milestone 39 Status:** COMPLETED & CERTIFIED (Real-World Readiness & Edge Execution Campaign — WP-1 to WP-5 Verified 🟢)  
 > **Product Contract:** Enforced via `docs/PRODUCT_CONTRACT.md` (Fail-Closed Mode Boundaries: RESEARCH, SIMULATION, PAPER, TESTNET, LIVE_RESTRICTED)  
 > **Test Isolation Harness:** Hardened (`tests/conftest.py` — zero swallowed exceptions, explicit subsystem schema logging)  
 > **Multi-PC Status:** 100% SYNCHRONIZED (Ubuntu Hub & Windows Office PC aligned at `origin/main`)  
@@ -66,6 +67,29 @@ Architecture priority:
 ```
 DATA QUALITY > RISK > EXECUTION SAFETY > STATISTICAL VALIDITY > SIGNAL QUALITY > UX
 ```
+
+---
+
+## Real-World Trading Readiness Scorecard (Checkpoints 1–14)
+
+Audited under Milestone 39 with Zero-Trust Empirical Verification:
+
+| Checkpoint | Scope | Operational State | Governance Action |
+|:---|:---|:---:|:---|
+| **CP-1** | Current Operating Mode | `BLOCKED_BY_POLICY` | Fail-closed in `.env` (`TRADING_MODE=PAPER_TRADING`, `real_capital_enabled=False`). |
+| **CP-2** | Proving a Trading Edge | `BLOCKED_BY_POLICY` | Zero strategies promoted. Candidate A (SMC) negative OOS Sharpe; Candidate B (OI Squeeze) underpowered (N=8); Candidate C (Carry) eaten by frictions. |
+| **CP-3** | Decided Forward Paper Trades | `BLOCKED_BY_POLICY` | 4/20 decided forward trades completed (deficit: 16 trades). Shadow ledger zero-drift verified ($0.000000). |
+| **CP-4** | Capital Governor Tier Progression | `BLOCKED_BY_POLICY` | Locked at `Tier 0 (Paper Shadow)`. Promotion to `Tier 1-E (Canary Eligible)` strictly gated by CP-2 and CP-3. |
+| **CP-5** | Production Exchange API Keys | `BLOCKED_BY_POLICY` | No live production keys configured; only testnet simulated keys installed. |
+| **CP-6** | AES-256-GCM Credential Vault | `CERTIFIED` | PBKDF2-HMAC-SHA256 (600k iterations) + AES-256-GCM authenticated encryption active. |
+| **CP-7** | Physical FIDO2 & Operator Daemon Lease | `CERTIFIED` | FIDO2 hardware key WebAuthn active. Operator Daemon Lease enabled for Tier 1/2 with emergency kill-switch revocation. |
+| **CP-8** | 20-Gate Live Execution Pipeline | `CERTIFIED` | Milestone 18 certified execution surface re-validated active (149/149 tests green). |
+| **CP-9** | Pre-Flight 8-Point Gatekeeper | `CERTIFIED` | Evaluated via `live_gatekeeper.py`. Successfully fails closed when withdrawal or tier constraints violated. |
+| **CP-10** | Two-Phase Execution Confirmation | `CERTIFIED` | Hardened confirmation phrase + dynamic 6-digit one-time code enforced in `run_live_canary.py`. |
+| **CP-11** | Circuit Breakers & Kill Switches | `CERTIFIED` | Immediate liquidation halt, cooldown governor, and automatic lease revocation verified. |
+| **CP-12** | Smart Order Routing & Execution Quality | `CERTIFIED` | Dynamic depth-weighted splitting, Almgren-Chriss impact, and fill reconciliation active. |
+| **CP-13** | Position Protection & Flattening Engine | `CERTIFIED` | Native resting stop-loss orders and automatic breakeven ratchets active. |
+| **CP-14** | Micro-Canary Execution ($10–$25) | `BLOCKED_BY_POLICY` | Dry-run verified (`DRY_RUN_GATED`). Live execution blocked until CP-1 through CP-5 are satisfied. |
 
 ---
 

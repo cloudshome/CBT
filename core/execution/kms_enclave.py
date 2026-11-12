@@ -229,4 +229,18 @@ class KmsEnclaveManager:
         return self.__repr__()
 
 
+# Canonical singleton
 kms_enclave = KmsEnclaveManager()
+
+# Backward-compatibility re-export shim: Unify split namespace with core.auth.kms_enclave
+from core.auth.kms_enclave import (  # noqa: E402, F401
+    AWSKMSEnclave,
+    BaseKMSEnclave,
+    GCPKMSEnclave,
+    KMSEnclaveConfigurationError,
+    KMSEnclaveDecryptionError,
+    KMSEnclaveError,
+    KMSEnclaveKillSwitchActiveError,
+    MockKMSEnclave,
+    create_kms_enclave,
+)

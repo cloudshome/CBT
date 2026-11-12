@@ -14,7 +14,7 @@ from pathlib import Path
 import pandas as pd
 import requests
 
-ROOT_DIR = Path("C:/Users/azims/CBT")
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("m37_spot_ingest")
 

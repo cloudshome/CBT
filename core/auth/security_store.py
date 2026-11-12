@@ -128,6 +128,51 @@ class ClearanceSession:
         }
 
 
+@dataclass
+class DaemonLease:
+    """Cryptographic Operator Daemon Lease for unattended Tier 1/2 execution."""
+
+    lease_id: str
+    credential_id: str
+    operator_id: str
+    pid: int
+    host_fingerprint: str
+    tier_cap: str  # TIER_1_CANARY or TIER_2_MICRO_LIVE
+    max_daily_loss_pct: float
+    issued_at_ms: int
+    expires_at_ms: int
+    is_revoked: bool
+    revocation_reason: str | None
+    signature_digest: str | None
+
+    def is_valid(self, current_time_ms: int | None = None) -> bool:
+        now = current_time_ms if current_time_ms is not None else int(time.time() * 1000)
+        return (not self.is_revoked) and (now < self.expires_at_ms)
+
+    def remaining_seconds(self, current_time_ms: int | None = None) -> int:
+        now = current_time_ms if current_time_ms is not None else int(time.time() * 1000)
+        return max(0, int((self.expires_at_ms - now) / 1000))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "lease_id": self.lease_id,
+            "credential_id_masked": f"{self.credential_id[:6]}...{self.credential_id[-4:]}"
+            if len(self.credential_id) > 12
+            else self.credential_id,
+            "operator_id": self.operator_id,
+            "pid": self.pid,
+            "host_fingerprint": self.host_fingerprint,
+            "tier_cap": self.tier_cap,
+            "max_daily_loss_pct": self.max_daily_loss_pct,
+            "issued_at_ms": self.issued_at_ms,
+            "expires_at_ms": self.expires_at_ms,
+            "remaining_seconds": self.remaining_seconds(),
+            "is_valid": self.is_valid(),
+            "is_revoked": self.is_revoked,
+            "revocation_reason": self.revocation_reason,
+        }
+
+
 class SecurityStore:
     """Manages persistence in data/security.db."""
 
@@ -198,6 +243,32 @@ class SecurityStore:
             )
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_clearance_active ON clearance_sessions(is_revoked, expires_at_ms);"
+            )
+
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS daemon_leases (
+                    lease_id TEXT PRIMARY KEY,
+                    credential_id TEXT NOT NULL,
+                    operator_id TEXT NOT NULL,
+                    pid INTEGER NOT NULL,
+                    host_fingerprint TEXT NOT NULL,
+                    tier_cap TEXT NOT NULL,
+                    max_daily_loss_pct REAL NOT NULL DEFAULT 0.03,
+                    issued_at_ms INTEGER NOT NULL,
+                    expires_at_ms INTEGER NOT NULL,
+                    is_revoked INTEGER NOT NULL DEFAULT 0,
+                    revocation_reason TEXT,
+                    signature_digest TEXT,
+                    FOREIGN KEY(credential_id) REFERENCES webauthn_credentials(credential_id)
+                );
+                """
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_daemon_lease_active ON daemon_leases(is_revoked, expires_at_ms);"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_daemon_lease_pid ON daemon_leases(pid, host_fingerprint);"
             )
 
             conn.execute(
@@ -584,9 +655,175 @@ class SecurityStore:
             return cur.rowcount
 
     def revoke_all_clearances(self, reason: str = "EMERGENCY_KILL_SWITCH") -> int:
+        self.revoke_all_daemon_leases(reason=reason)
         with self.get_connection() as conn:
             cur = conn.execute(
                 "UPDATE clearance_sessions SET is_revoked = 1, revocation_reason = ? WHERE is_revoked = 0",
+                (reason,),
+            )
+            conn.commit()
+            return cur.rowcount
+
+    def create_daemon_lease(
+        self,
+        credential_id: str,
+        operator_id: str,
+        pid: int,
+        host_fingerprint: str,
+        tier_cap: str = "TIER_1_CANARY",
+        max_daily_loss_pct: float = 0.03,
+        ttl_seconds: int = 86400,
+        signature_digest: str | None = None,
+    ) -> DaemonLease:
+        lease_id = str(uuid.uuid4())
+        now_ms = int(time.time() * 1000)
+        expires_at_ms = now_ms + (ttl_seconds * 1000)
+
+        with self.get_connection() as conn:
+            conn.execute(
+                """
+                UPDATE daemon_leases
+                SET is_revoked = 1, revocation_reason = 'SUPERSEDED_BY_NEW_LEASE'
+                WHERE pid = ? AND host_fingerprint = ? AND is_revoked = 0
+                """,
+                (pid, host_fingerprint),
+            )
+            conn.execute(
+                """
+                INSERT INTO daemon_leases (
+                    lease_id, credential_id, operator_id, pid, host_fingerprint,
+                    tier_cap, max_daily_loss_pct, issued_at_ms, expires_at_ms,
+                    is_revoked, revocation_reason, signature_digest
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?)
+                """,
+                (
+                    lease_id,
+                    credential_id,
+                    operator_id,
+                    pid,
+                    host_fingerprint,
+                    tier_cap,
+                    max_daily_loss_pct,
+                    now_ms,
+                    expires_at_ms,
+                    signature_digest,
+                ),
+            )
+            conn.commit()
+
+        return DaemonLease(
+            lease_id=lease_id,
+            credential_id=credential_id,
+            operator_id=operator_id,
+            pid=pid,
+            host_fingerprint=host_fingerprint,
+            tier_cap=tier_cap,
+            max_daily_loss_pct=max_daily_loss_pct,
+            issued_at_ms=now_ms,
+            expires_at_ms=expires_at_ms,
+            is_revoked=False,
+            revocation_reason=None,
+            signature_digest=signature_digest,
+        )
+
+    def get_active_daemon_lease(
+        self,
+        pid: int | None = None,
+        host_fingerprint: str | None = None,
+        lease_id: str | None = None,
+    ) -> DaemonLease | None:
+        now_ms = int(time.time() * 1000)
+        query = "SELECT * FROM daemon_leases WHERE is_revoked = 0 AND expires_at_ms > ?"
+        params: list[Any] = [now_ms]
+
+        if lease_id:
+            query += " AND lease_id = ?"
+            params.append(lease_id)
+        if pid is not None:
+            query += " AND pid = ?"
+            params.append(pid)
+        if host_fingerprint:
+            query += " AND host_fingerprint = ?"
+            params.append(host_fingerprint)
+
+        query += " ORDER BY issued_at_ms DESC LIMIT 1"
+
+        with self.get_connection() as conn:
+            cur = conn.execute(query, params)
+            row = cur.fetchone()
+            if not row:
+                return None
+
+            return DaemonLease(
+                lease_id=row["lease_id"],
+                credential_id=row["credential_id"],
+                operator_id=row["operator_id"],
+                pid=row["pid"],
+                host_fingerprint=row["host_fingerprint"],
+                tier_cap=row["tier_cap"],
+                max_daily_loss_pct=row["max_daily_loss_pct"],
+                issued_at_ms=row["issued_at_ms"],
+                expires_at_ms=row["expires_at_ms"],
+                is_revoked=bool(row["is_revoked"]),
+                revocation_reason=row["revocation_reason"],
+                signature_digest=row["signature_digest"],
+            )
+
+    def get_latest_daemon_lease(
+        self,
+        pid: int | None = None,
+        host_fingerprint: str | None = None,
+        lease_id: str | None = None,
+    ) -> DaemonLease | None:
+        query = "SELECT * FROM daemon_leases WHERE 1=1"
+        params: list[Any] = []
+
+        if lease_id:
+            query += " AND lease_id = ?"
+            params.append(lease_id)
+        if pid is not None:
+            query += " AND pid = ?"
+            params.append(pid)
+        if host_fingerprint:
+            query += " AND host_fingerprint = ?"
+            params.append(host_fingerprint)
+
+        query += " ORDER BY issued_at_ms DESC LIMIT 1"
+
+        with self.get_connection() as conn:
+            cur = conn.execute(query, params)
+            row = cur.fetchone()
+            if not row:
+                return None
+
+            return DaemonLease(
+                lease_id=row["lease_id"],
+                credential_id=row["credential_id"],
+                operator_id=row["operator_id"],
+                pid=row["pid"],
+                host_fingerprint=row["host_fingerprint"],
+                tier_cap=row["tier_cap"],
+                max_daily_loss_pct=row["max_daily_loss_pct"],
+                issued_at_ms=row["issued_at_ms"],
+                expires_at_ms=row["expires_at_ms"],
+                is_revoked=bool(row["is_revoked"]),
+                revocation_reason=row["revocation_reason"],
+                signature_digest=row["signature_digest"],
+            )
+
+    def revoke_daemon_lease(self, lease_id: str, reason: str = "OPERATOR_REVOKED") -> int:
+        with self.get_connection() as conn:
+            cur = conn.execute(
+                "UPDATE daemon_leases SET is_revoked = 1, revocation_reason = ? WHERE lease_id = ? AND is_revoked = 0",
+                (reason, lease_id),
+            )
+            conn.commit()
+            return cur.rowcount
+
+    def revoke_all_daemon_leases(self, reason: str = "EMERGENCY_KILL_SWITCH") -> int:
+        with self.get_connection() as conn:
+            cur = conn.execute(
+                "UPDATE daemon_leases SET is_revoked = 1, revocation_reason = ? WHERE is_revoked = 0",
                 (reason,),
             )
             conn.commit()

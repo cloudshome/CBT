@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 import pandas as pd
 import fastparquet
 
-ROOT_DIR = Path("C:/Users/azims/CBT")
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 PARQUET_STORE = ROOT_DIR / "data" / "store" / "parquet" / "candles"
 
 def hash_file(path: Path) -> str:

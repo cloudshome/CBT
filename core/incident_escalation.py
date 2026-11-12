@@ -278,6 +278,16 @@ class IncidentEscalationEngine:
                 f"Executing Tier 4 EMERGENCY AUTO-HALT: {reason} [Incident: {incident_id}]"
             )
 
+            # Revoke all active FIDO2 daemon leases immediately and irrevocably
+            try:
+                from core.auth.hardware_key import hardware_key_manager
+
+                hardware_key_manager.revoke_all_daemon_leases(
+                    reason=f"INCIDENT_AUTO_HALT: {reason} [Incident: {incident_id}]"
+                )
+            except Exception as e:
+                logger.debug(f"Failed to revoke daemon leases on incident halt: {e}")
+
             # 1. Stop Autonomous Trader Loop
             autonomous_trader.stop()
 

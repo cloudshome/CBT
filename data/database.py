@@ -383,6 +383,7 @@ class SignalDB:
                 self.conn.execute("PRAGMA journal_mode=WAL")
                 self.conn.execute("PRAGMA busy_timeout=30000")
                 self.conn.execute("PRAGMA synchronous=NORMAL")
+                self.conn.execute("PRAGMA foreign_keys=ON")
                 self.conn.executescript(SCHEMA)
                 self._migrate()
                 self.conn.commit()
@@ -632,7 +633,7 @@ class SignalDB:
         prov = dict(
             zip(
                 ("exchange", "market", "price_type", "source_key"),
-                _provenance_values(fields),
+                _provenance_values(fields), strict=False,
             )
         )
         values = tuple(prov.get(c, fields.get(c)) for c in cols)
@@ -1368,7 +1369,7 @@ class SignalDB:
             dict(r)
             for r in self.conn.execute(
                 f"SELECT * FROM paper_trades{where} ORDER BY COALESCE(closed_ts, opened_ts, created_ts) DESC LIMIT ?",
-                args + (max(1, min(int(limit), 50)),),
+                (*args, max(1, min(int(limit), 50))),
             ).fetchall()
         ]
         overall["live_open"] = len(self.live_open_rows(symbol=symbol))
@@ -1571,7 +1572,7 @@ class SignalDB:
             q += " WHERE symbol = ?"
             args = (symbol,)
         q += " ORDER BY ts DESC LIMIT ?"
-        rows = self.conn.execute(q, args + (limit,)).fetchall()
+        rows = self.conn.execute(q, (*args, limit)).fetchall()
         return [dict(r) for r in rows]
 
     def plan_stats(self) -> list[dict]:
@@ -1874,3 +1875,12 @@ class SignalDB:
 
     def __exit__(self, *exc):
         self.close()
+
+
+# Backward-compatibility re-export shim: Unify split namespace with core.database
+from core.database import (  # noqa: E402, F401
+    DatabaseManager,
+    db_manager,
+    get_db_connection,
+)
+

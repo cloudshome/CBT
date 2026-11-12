@@ -134,3 +134,11 @@ class CausalFirewall:
 
 # Singleton instance
 causal_firewall = CausalFirewall(strict_mode=True)
+
+# Backward-compatibility re-export shim: Unify split namespace with core.intelligence.causal_firewall
+from core.intelligence.causal_firewall import (  # noqa: E402, F401
+    CausalFirewallDecision,
+    CausalFirewallValidator,
+    ConstitutionalViolationError,
+    global_causal_firewall,
+)

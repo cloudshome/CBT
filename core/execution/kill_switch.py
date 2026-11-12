@@ -197,6 +197,15 @@ class LiveKillSwitch:
         except Exception as e:
             logger.error(f"Error persisting kill switch activation to DB: {e}")
 
+        # Irrevocably revoke all active FIDO2 daemon leases and clearances
+        try:
+            from core.auth.hardware_key import hardware_key_manager
+
+            hardware_key_manager.revoke_all_daemon_leases(reason=f"KILL_SWITCH_ACTIVATED: {reason}")
+            hardware_key_manager.revoke_clearance(reason=f"KILL_SWITCH_ACTIVATED: {reason}")
+        except Exception as e:
+            logger.debug(f"Failed to revoke hardware key clearances: {e}")
+
         audit_bus.emit_event(
             event_type="KILL_SWITCH_ENGAGED",
             symbol="ALL",

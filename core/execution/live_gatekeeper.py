@@ -208,14 +208,26 @@ class LiveExecutionGatekeeper:
             if not cap_clearance.passed:
                 reasons.extend(cap_clearance.rejection_reasons)
 
-        # 8. Human Live Clearance (WebAuthn / FIDO2 physical key possession)
+        # 8. Human Live Clearance (WebAuthn / FIDO2 physical key possession or Daemon Lease)
         if environment.upper() == "TESTNET":
             checks["hardware_clearance_active"] = True
         else:
             from core.auth.hardware_key import hardware_key_manager
 
+            # Determine capital tier bounds for autonomous daemon execution
+            active_tier = (
+                "TIER_1_CANARY"
+                if order_notional_usd <= 25.0
+                else ("TIER_2_MICRO_LIVE" if order_notional_usd <= 100.0 else "TIER_3_SCALED_LIVE")
+            )
+            is_autonomous = (
+                session_id is None or session_id.startswith("AUTONOMOUS_") or session_id == "DAEMON"
+            )
+
             is_cleared, _clearance, reason_code = hardware_key_manager.check_live_clearance(
-                session_id=session_id
+                session_id=session_id,
+                tier=active_tier,
+                is_autonomous=is_autonomous,
             )
             checks["hardware_clearance_active"] = is_cleared
             if not is_cleared:

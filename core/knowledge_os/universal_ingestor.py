@@ -162,6 +162,18 @@ class UniversalIngestor:
         self.db_path = db_path
         self._ensure_tables()
 
+    async def ingest(self, *args, **kwargs):
+        """Delegates general ingestion to core.universal_ingestor."""
+        from core.universal_ingestor import universal_ingestor as canonical_ingestor
+
+        return await canonical_ingestor.ingest(*args, **kwargs)
+
+    def extract_text_from_file(self, *args, **kwargs):
+        """Delegates file text extraction to core.universal_ingestor."""
+        from core.universal_ingestor import universal_ingestor as canonical_ingestor
+
+        return canonical_ingestor.extract_text_from_file(*args, **kwargs)
+
     def _get_connection(self):
         return research_wikipedia_engine._get_connection()
 
@@ -1214,3 +1226,8 @@ class UniversalIngestor:
 
 # Singleton instance
 universal_ingestor = UniversalIngestor()
+
+# Backward-compatibility re-export shim: Unify split namespace with core.universal_ingestor
+from core.universal_ingestor import (  # noqa: E402, F401
+    universal_ingestor as canonical_universal_ingestor,
+)

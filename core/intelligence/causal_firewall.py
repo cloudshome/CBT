@@ -289,3 +289,11 @@ class CausalFirewallValidator:
 
 # Global singleton validator
 global_causal_firewall = CausalFirewallValidator()
+
+# Backward-compatibility re-export shim: Unify split namespace with core.causal_firewall
+from core.causal_firewall import (  # noqa: E402, F401
+    CausalFirewall,
+    CausalLeakageException,
+    CausalTimestampRecord,
+    causal_firewall,
+)

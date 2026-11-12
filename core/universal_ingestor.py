@@ -39,6 +39,12 @@ class UniversalIngestor:
         self.upload_dir = upload_dir or Path(os.getenv("DATA_DIR", "data")) / "uploads"
         self.upload_dir.mkdir(parents=True, exist_ok=True)
 
+    def ingest_url(self, *args, **kwargs):
+        """Delegates URL ingestion to canonical knowledge_os.universal_ingestor."""
+        from core.knowledge_os.universal_ingestor import universal_ingestor as kos_ingestor
+
+        return kos_ingestor.ingest_url(*args, **kwargs)
+
     def detect_source_type(self, input_str: str, file_name: str | None = None) -> str:
         """Determines the source medium based on string pattern or file extension."""
         if file_name:
@@ -1201,3 +1207,13 @@ class UniversalIngestor:
 
 # Singleton
 universal_ingestor = UniversalIngestor()
+
+# Backward-compatibility re-export shim: Unify split namespace with core.knowledge_os.universal_ingestor
+from core.knowledge_os.universal_ingestor import (  # noqa: E402, F401
+    AccessStatus,
+    ExtractionStatus,
+    RealLifeSummary,
+    ResearchSourceRecord,
+    SourceType,
+    UniversalIngestionResult,
+)

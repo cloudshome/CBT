@@ -334,3 +334,14 @@ def create_kms_enclave(
     raise KMSEnclaveConfigurationError(
         f"Unsupported KMS provider: '{prov}'. Supported: mock, aws, gcp, disabled."
     )
+
+
+# Backward-compatibility re-export shim: Unify split namespace with core.execution.kms_enclave
+from core.execution.kms_enclave import (  # noqa: E402, F401
+    EnclaveSealedError,
+    EnclaveTamperError,
+    KmsEnclaveManager,
+    KmsProviderType,
+    VolatileKeyBuffer,
+    kms_enclave,
+)

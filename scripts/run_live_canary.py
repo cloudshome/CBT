@@ -16,6 +16,7 @@ Safety & Governance Controls:
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import random
 import sys
@@ -38,44 +39,95 @@ def print_banner():
 
 
 async def run_canary_cli():
+    parser = argparse.ArgumentParser(description="CBT Live Canary Operator Desk")
+    parser.add_argument(
+        "--exchange", choices=["BINANCE", "BYBIT"], default=None, help="Exchange venue"
+    )
+    parser.add_argument(
+        "--environment", choices=["TESTNET", "PRODUCTION"], default=None, help="Environment"
+    )
+    parser.add_argument(
+        "--symbol", choices=["BTC/USDT", "ETH/USDT", "SOL/USDT"], default=None, help="Symbol"
+    )
+    parser.add_argument("--notional", type=float, default=None, help="Notional in USD")
+    parser.add_argument(
+        "--dry-run", action="store_true", default=False, help="Force safe dry-run mode"
+    )
+    parser.add_argument(
+        "--non-interactive",
+        action="store_true",
+        default=False,
+        help="Run without interactive prompts",
+    )
+    args = parser.parse_args()
+
     print_banner()
 
+    is_interactive = not args.non_interactive and not args.dry_run and sys.stdin.isatty()
+
     # 1. Exchange Selection
-    print("\n[Step 1] Select Exchange Venue:")
-    print("  [1] BINANCE (Spot)")
-    print("  [2] BYBIT (Spot / Unified)")
-    exch_choice = input("Enter choice [1/2, default: 1]: ").strip()
-    exchange = "BYBIT" if exch_choice == "2" else "BINANCE"
+    if args.exchange:
+        exchange = args.exchange.upper()
+    elif is_interactive:
+        print("\n[Step 1] Select Exchange Venue:")
+        print("  [1] BINANCE (Spot)")
+        print("  [2] BYBIT (Spot / Unified)")
+        exch_choice = input("Enter choice [1/2, default: 1]: ").strip()
+        exchange = "BYBIT" if exch_choice == "2" else "BINANCE"
+    else:
+        exchange = "BINANCE"
 
     # 2. Environment Selection
-    print("\n[Step 2] Select Execution Environment:")
-    print("  [1] TESTNET (Simulated Network Exchange — Zero Real Capital)")
-    print("  [2] PRODUCTION (REAL-MONEY EXCHANGE MATCHING ENGINE)")
-    env_choice = input("Enter choice [1/2, default: 1]: ").strip()
-    environment = "PRODUCTION" if env_choice == "2" else "TESTNET"
+    if args.environment:
+        environment = args.environment.upper()
+    elif is_interactive:
+        print("\n[Step 2] Select Execution Environment:")
+        print("  [1] TESTNET (Simulated Network Exchange — Zero Real Capital)")
+        print("  [2] PRODUCTION (REAL-MONEY EXCHANGE MATCHING ENGINE)")
+        env_choice = input("Enter choice [1/2, default: 1]: ").strip()
+        environment = "PRODUCTION" if env_choice == "2" else "TESTNET"
+    else:
+        environment = "TESTNET"
 
     # 3. Symbol Selection
-    print("\n[Step 3] Select Instrument:")
-    print("  [1] BTC/USDT")
-    print("  [2] ETH/USDT")
-    print("  [3] SOL/USDT")
-    sym_choice = input("Enter choice [1-3, default: 1]: ").strip()
-    if sym_choice == "2":
-        symbol = "ETH/USDT"
-        ref_price = 3500.0
-    elif sym_choice == "3":
-        symbol = "SOL/USDT"
-        ref_price = 150.0
+    if args.symbol:
+        symbol = args.symbol.upper()
+        if symbol == "ETH/USDT":
+            ref_price = 3500.0
+        elif symbol == "SOL/USDT":
+            ref_price = 150.0
+        else:
+            ref_price = 65000.0
+    elif is_interactive:
+        print("\n[Step 3] Select Instrument:")
+        print("  [1] BTC/USDT")
+        print("  [2] ETH/USDT")
+        print("  [3] SOL/USDT")
+        sym_choice = input("Enter choice [1-3, default: 1]: ").strip()
+        if sym_choice == "2":
+            symbol = "ETH/USDT"
+            ref_price = 3500.0
+        elif sym_choice == "3":
+            symbol = "SOL/USDT"
+            ref_price = 150.0
+        else:
+            symbol = "BTC/USDT"
+            ref_price = 65000.0
     else:
         symbol = "BTC/USDT"
         ref_price = 65000.0
 
     # 4. Order Parameters
     side = "BUY"
-    print("\n[Step 4] Micro-Notional Size:")
-    print("  Permitted Canary Envelope: $5.00 – $25.00 USD (Target: $10.00)")
-    notional_str = input("Enter notional USD [default: 10.0]: ").strip()
-    notional = float(notional_str) if notional_str else 10.0
+    if args.notional is not None:
+        notional = float(args.notional)
+    elif is_interactive:
+        print("\n[Step 4] Micro-Notional Size:")
+        print("  Permitted Canary Envelope: $5.00 – $25.00 USD (Target: $10.00)")
+        notional_str = input("Enter notional USD [default: 10.0]: ").strip()
+        notional = float(notional_str) if notional_str else 10.0
+    else:
+        notional = 10.0
 
     # 5. Feasibility Evaluation
     feasibility = symbol_constraint_engine.evaluate_order_feasibility(
@@ -117,14 +169,17 @@ async def run_canary_cli():
             return
 
     # 7. Execution Mode (Dry-Run vs Real-Money)
-    print("\n[Step 5] Execution Mode:")
-    print("  [1] SAFE DRY-RUN (Simulates execution, tests timing, zero exchange orders)")
-    if environment == "PRODUCTION" and verdict.passed:
+    if args.dry_run or not is_interactive:
+        is_dry_run = True
+        print("\n[Step 5] Execution Mode: SAFE DRY-RUN (Forced via Flag/Non-Interactive)")
+    elif environment == "PRODUCTION" and verdict.passed:
+        print("\n[Step 5] Execution Mode:")
+        print("  [1] SAFE DRY-RUN (Simulates execution, tests timing, zero exchange orders)")
         print("  [2] LIVE REAL-MONEY EXECUTION (TRANSMITS ORDER TO MATCHING ENGINE)")
         mode_choice = input("Enter choice [1/2, default: 1]: ").strip()
         is_dry_run = mode_choice != "2"
     else:
-        print("  (Live execution requires all 7 gates passed in PRODUCTION mode)")
+        print("\n[Step 5] Execution Mode: SAFE DRY-RUN")
         is_dry_run = True
 
     # 8. Hardened 2-Phase Confirmation for Real-Money Orders

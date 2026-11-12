@@ -1504,7 +1504,7 @@ class PortfolioShadowManager:
             starting_capital = 2000.0 if book_id == "RADAR_ALPHA" else 10000.0
 
         open_positions = self.get_open_positions(book_id=book_id)
-        all_positions = self.get_all_positions(limit=500, book_id=book_id)
+        all_positions = self.get_all_positions(limit=10000, book_id=book_id)
         closed_positions = [p for p in all_positions if p.get("status") == "CLOSED"]
 
         total_realized_pnl = sum(float(p.get("realized_pnl", 0.0)) for p in all_positions)

@@ -172,6 +172,8 @@ def test_walk_forward_promotion_to_eligible(gov):
             "trials_count": 5,
             "max_drawdown": 0.03,
             "slippage_bps": 5.0,
+            "checkpoint_2_certified": True,
+            "checkpoint_3_certified": True,
         }
     )
     assert res_canary["action"] == "PROMOTED_TO_ELIGIBLE"

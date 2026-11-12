@@ -49,6 +49,7 @@ from webauthn.helpers.structs import (
 from core.audit_bus import audit_bus
 from core.auth.security_store import (
     ClearanceSession,
+    DaemonLease,
     SecurityStore,
     StoredCredential,
     security_store,
@@ -95,6 +96,16 @@ class HardwareKeyCounterAnomalyError(HardwareKeyError):
 
 class HardwareKeyRevokedError(HardwareKeyError):
     """Raised when an operation targets a revoked credential."""
+
+
+def get_host_fingerprint() -> str:
+    """Computes deterministic host machine fingerprint for daemon lease binding."""
+    import hashlib
+    import platform
+    import socket
+
+    raw = f"{socket.gethostname()}_{platform.node()}_{platform.machine()}"
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
 class HardwareKeyManager:
@@ -417,15 +428,29 @@ class HardwareKeyManager:
     # Verification & Querying
     # -----------------------------------------------------------------------
     def check_live_clearance(
-        self, session_id: str | None = None
-    ) -> tuple[bool, ClearanceSession | None, str | None]:
+        self,
+        session_id: str | None = None,
+        tier: str | None = None,
+        is_autonomous: bool = False,
+    ) -> tuple[bool, ClearanceSession | DaemonLease | None, str | None]:
         """
-        Checks if an active, valid Live Clearance Session exists.
-        Returns: (is_cleared, clearance_session, error_reason_code)
+        Checks if an active, valid Live Clearance Session or Daemon Lease exists.
+        For unattended daemon runs in Tier 1 (Canary) or Tier 2 (Micro Live),
+        allows validation via cryptographic Daemon Lease.
+        Returns: (is_cleared, clearance_or_lease, error_reason_code)
         """
+        # 1. Autonomous execution under Tier 1/2 can use active Daemon Lease
+        if is_autonomous and tier in ("TIER_1_CANARY", "TIER_2_MICRO_LIVE"):
+            is_leased, lease, reason = self.check_daemon_lease(tier=tier)
+            if is_leased and lease is not None:
+                return True, lease, None
+            # If daemon lease not found/invalid and session_id not provided, return lease reason
+            if not session_id:
+                return False, None, reason or "DAEMON_LEASE_REQUIRED"
+
+        # 2. Interactive session or Tier 3/4 requires physical clearance session
         clearance = self.store.get_active_clearance(session_id=session_id)
         if not clearance:
-            # Check if any credentials exist at all
             active_creds = self.store.list_credentials(active_only=True)
             if not active_creds:
                 return False, None, "HARDWARE_KEY_NO_CREDENTIALS"
@@ -444,6 +469,99 @@ class HardwareKeyManager:
             return False, clearance, f"HARDWARE_KEY_PURPOSE_MISMATCH: {clearance.purpose}"
 
         return True, clearance, None
+
+    def create_daemon_lease(
+        self,
+        credential_id: str,
+        operator_id: str = "default_operator",
+        tier_cap: str = "TIER_1_CANARY",
+        max_daily_loss_pct: float = 0.03,
+        ttl_seconds: int = 86400,
+        pid: int | None = None,
+        host_fingerprint: str | None = None,
+    ) -> DaemonLease:
+        """Issues a cryptographic Operator Daemon Lease bound to PID, host, and tier cap."""
+        import hashlib
+
+        target_pid = pid or os.getpid()
+        target_fp = host_fingerprint or get_host_fingerprint()
+
+        stored_cred = self.store.get_credential(credential_id)
+        if not stored_cred or not stored_cred.is_active:
+            raise HardwareKeyRevokedError(
+                "HARDWARE_KEY_CREDENTIAL_REVOKED: Cannot lease revoked credential"
+            )
+
+        sig_payload = f"{credential_id}:{operator_id}:{target_pid}:{target_fp}:{tier_cap}:{max_daily_loss_pct}"
+        sig_digest = hashlib.sha256(sig_payload.encode()).hexdigest()
+
+        lease = self.store.create_daemon_lease(
+            credential_id=credential_id,
+            operator_id=operator_id,
+            pid=target_pid,
+            host_fingerprint=target_fp,
+            tier_cap=tier_cap,
+            max_daily_loss_pct=max_daily_loss_pct,
+            ttl_seconds=ttl_seconds,
+            signature_digest=sig_digest,
+        )
+        try:
+            audit_bus.emit_event(
+                event_type="FIDO2_DAEMON_LEASE_ISSUED",
+                symbol="SECURITY",
+                reason=f"Cryptographic Daemon Lease issued for PID {target_pid} at tier {tier_cap}",
+                severity="INFO",
+                details=lease.to_dict(),
+            )
+        except Exception as exc:
+            logger.debug(f"Audit bus logging error: {exc}")
+        return lease
+
+    def check_daemon_lease(
+        self,
+        tier: str = "TIER_1_CANARY",
+        pid: int | None = None,
+        host_fingerprint: str | None = None,
+    ) -> tuple[bool, DaemonLease | None, str | None]:
+        """Validates whether an active cryptographic Daemon Lease is valid for current process and tier."""
+        target_pid = pid or os.getpid()
+        target_fp = host_fingerprint or get_host_fingerprint()
+        lease = self.store.get_latest_daemon_lease(pid=target_pid, host_fingerprint=target_fp)
+        if not lease:
+            return False, None, "DAEMON_LEASE_NOT_FOUND"
+
+        if not lease.is_valid():
+            if lease.is_revoked:
+                return False, lease, f"DAEMON_LEASE_REVOKED: {lease.revocation_reason}"
+            return False, lease, "DAEMON_LEASE_EXPIRED"
+
+        allowed_tiers = ["TIER_1_CANARY", "TIER_2_MICRO_LIVE"]
+        if tier not in allowed_tiers:
+            return (
+                False,
+                lease,
+                f"DAEMON_LEASE_TIER_EXCEEDED: Tier {tier} requires physical FIDO2 tap",
+            )
+
+        if lease.tier_cap == "TIER_1_CANARY" and tier == "TIER_2_MICRO_LIVE":
+            return False, lease, "DAEMON_LEASE_TIER_CAP_EXCEEDED: Lease capped at TIER_1_CANARY"
+
+        return True, lease, None
+
+    def revoke_all_daemon_leases(self, reason: str = "EMERGENCY_KILL_SWITCH") -> int:
+        """Irrevocably revokes all active daemon leases in memory and durable storage."""
+        count = self.store.revoke_all_daemon_leases(reason=reason)
+        try:
+            audit_bus.emit_event(
+                event_type="FIDO2_DAEMON_LEASES_REVOKED",
+                symbol="SECURITY",
+                reason=f"All active daemon leases revoked: {reason}",
+                severity="WARNING",
+                details={"reason": reason, "revoked_count": count},
+            )
+        except Exception as exc:
+            logger.debug(f"Audit bus logging error: {exc}")
+        return count
 
     def revoke_clearance(
         self, session_id: str | None = None, reason: str = "OPERATOR_REVOKED"

@@ -20,7 +20,7 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
-ROOT_DIR = Path("C:/Users/azims/CBT")
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("m37_audit")
 
@@ -229,8 +229,8 @@ def main():
 **Date of Audit:** {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")}  
 **Auditor:** Institutional Quantitative Research Director & Data Integrity Engineer  
 **Lakehouse Storage:** `data/store/derivatives/` & `data/store/parquet/candles/`  
-**Manifest:** [`research/m37_derivatives_manifest.json`](file:///c:/Users/azims/CBT/research/m37_derivatives_manifest.json)  
-**Quality Report:** [`research/m37_data_quality_report.json`](file:///c:/Users/azims/CBT/research/m37_data_quality_report.json)  
+**Manifest:** [`research/m37_derivatives_manifest.json`]({(ROOT_DIR / "research" / "m37_derivatives_manifest.json").as_uri()})
+**Quality Report:** [`research/m37_data_quality_report.json`]({(ROOT_DIR / "research" / "m37_data_quality_report.json").as_uri()})
 
 ---
 

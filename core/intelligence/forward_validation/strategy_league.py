@@ -631,3 +631,12 @@ class StrategyLeagueRegistry:
                 f"for admission {admission_id}. Modifying parameters requires a new strategy admission."
             )
         return True
+
+
+# Backward-compatibility re-export shim: Unify split namespace with core.strategy_league
+from core.strategy_league import (  # noqa: E402, F401
+    QuarantineTier,
+    StrategyGenome,
+    StrategyLeagueManager,
+    strategy_league_manager,
+)

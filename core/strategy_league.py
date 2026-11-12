@@ -269,3 +269,10 @@ class StrategyLeagueManager:
 
 # Singleton
 strategy_league_manager = StrategyLeagueManager()
+
+# Backward-compatibility re-export shim: Unify split namespace with core.intelligence.forward_validation.strategy_league
+from core.intelligence.forward_validation.strategy_league import (  # noqa: E402, F401
+    DuplicateAdmissionError,
+    StrategyLeagueRegistry,
+    StrategyNotFoundError,
+)

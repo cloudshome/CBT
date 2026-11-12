@@ -1,0 +1,103 @@
+{
+  "audit_version": "M39-EDGE-TRIAGE-AND-ABLATION-V1",
+  "timestamp_utc": "2026-11-11T20:15:05.387768+00:00",
+  "friction_schedules": {
+    "BASE": 7.5,
+    "CONSERVATIVE": 15.0,
+    "STRESS": 33.0
+  },
+  "candidates": {
+    "CANDIDATE_A_SMC_ORDER_BLOCK": {
+      "name": "Candidate A: SMC Liquidity Sweep & Order Block Mitigation",
+      "family": "Smart Money Concepts (SMC)",
+      "symbols": [
+        "BTCUSDT",
+        "ETHUSDT",
+        "SOLUSDT"
+      ],
+      "total_trades": 257,
+      "oos_trades": 96,
+      "hurdle_1_sample_size_passed": false,
+      "hurdle_2_causality_guard_passed": true,
+      "cpcv_median_oos_sharpe": -0.18,
+      "hurdle_3_cpcv_passed": false,
+      "observed_sharpe": 0.42,
+      "deflated_sharpe_ratio": 0.0,
+      "hurdle_4_dsr_passed": false,
+      "expectancy_base_r": 0.007,
+      "expectancy_conservative_r": -0.039,
+      "expectancy_stress_r": -0.132,
+      "hurdle_5_conservative_friction_passed": false,
+      "verdict": "REJECTED_NO_OOS_EDGE",
+      "failure_reasons": [
+        "Hurdle 1 Failed: Total OOS trades (96) below mandatory N>=100 threshold.",
+        "Hurdle 3 Failed: CPCV median OOS Sharpe is negative (-0.18) due to severe regime degradation in Bear/Chop.",
+        "Hurdle 4 Failed: Deflated Sharpe Ratio (0.000) fails the 0.95 multi-testing significance threshold.",
+        "Hurdle 5 Failed: Net expectancy in conservative friction tier is negative (-0.039R)."
+      ],
+      "autopsy_summary": "SMC Order Block retest signals exhibit substantial positive performance in Bull regimes (+0.402R), but decay into severe negative expectancy in Choppy (-0.105R) and Bearish (-1.023R) regimes. When evaluated under Tier 2 Conservative maker/taker friction, the net expectancy is negative. Cannot be promoted to Tier 1 Live Canary."
+    },
+    "CANDIDATE_B_DERIVATIVES_OI_SQUEEZE": {
+      "name": "Candidate B: Volatility Regime + Funding/OI Squeeze (H3/H5)",
+      "family": "Derivatives & Liquidation Mechanics",
+      "symbols": [
+        "BTCUSDT",
+        "ETHUSDT"
+      ],
+      "total_trades": 98,
+      "oos_trades": 8,
+      "hurdle_1_sample_size_passed": false,
+      "hurdle_2_causality_guard_passed": true,
+      "cpcv_median_oos_sharpe": 0.32,
+      "hurdle_3_cpcv_passed": true,
+      "observed_sharpe": 1.78,
+      "deflated_sharpe_ratio": 0.2404,
+      "hurdle_4_dsr_passed": false,
+      "expectancy_base_r": 0.385,
+      "expectancy_conservative_r": 0.34,
+      "expectancy_stress_r": 0.268,
+      "hurdle_5_conservative_friction_passed": true,
+      "verdict": "RESEARCH_CANDIDATE_INSUFFICIENT_OOS_SAMPLE",
+      "failure_reasons": [
+        "Hurdle 1 Failed: OOS sample size (N=8) is severely below N>=100 statistical validity threshold.",
+        "Hurdle 4 Failed: Deflated Sharpe Ratio (0.2404) fails the 0.95 multi-testing hurdle."
+      ],
+      "autopsy_summary": "Derivatives OI Squeeze demonstrates strong empirical expectancy (+0.340R conservative) and survives friction, but historical occurrences of extreme OI flushes are rare, generating only 8 sealed OOS trades. Statistically underpowered. Requires extended paper shadow accumulation before any capital clearance."
+    },
+    "CANDIDATE_C_DELTA_NEUTRAL_CARRY": {
+      "name": "Candidate C: Delta-Neutral Basis Carry & Rebalancing",
+      "family": "Cross-Market Arbitrage & Basis",
+      "symbols": [
+        "BTCUSDT",
+        "ETHUSDT",
+        "SOLUSDT"
+      ],
+      "total_trades": 74,
+      "oos_trades": 42,
+      "hurdle_1_sample_size_passed": false,
+      "hurdle_2_causality_guard_passed": true,
+      "cpcv_median_oos_sharpe": 0.15,
+      "hurdle_3_cpcv_passed": true,
+      "observed_sharpe": 0.95,
+      "deflated_sharpe_ratio": 0.12,
+      "hurdle_4_dsr_passed": false,
+      "expectancy_base_r": 0.082,
+      "expectancy_conservative_r": -0.015,
+      "expectancy_stress_r": -0.095,
+      "hurdle_5_conservative_friction_passed": false,
+      "verdict": "REJECTED_FRICTION_EROSION",
+      "failure_reasons": [
+        "Hurdle 1 Failed: OOS events (42) below N>=100 threshold.",
+        "Hurdle 4 Failed: DSR (0.1200) below 0.95.",
+        "Hurdle 5 Failed: Net carry yield is eroded by rebalancing gas/taker fees in volatile regimes (-0.015R)."
+      ],
+      "autopsy_summary": "Analytical LP delta hedging provides steady fee yield during calm regimes, but frequent rebalancing during high-velocity directional market moves incurs taker fees and borrow drag that exceed gross carry yield. Fails Tier 2 Conservative friction stress."
+    }
+  },
+  "summary": {
+    "total_candidates_triaged": 3,
+    "candidates_clearing_all_5_hurdles": 0,
+    "production_promotion_status": "LOCKED_ZERO_EDGE_PROVEN",
+    "tier_0_paper_status": "MANDATORY_FORWARD_PAPER_ACCUMULATION_REQUIRED"
+  }
+}

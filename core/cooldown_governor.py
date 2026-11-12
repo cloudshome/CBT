@@ -162,6 +162,16 @@ class CooldownGovernor:
                 f"🚨 CooldownGovernor: Loss registered on {norm_sym} (${realized_pnl:.2f}, {exit_reason}). "
                 f"Global {self.loss_global_cooldown_sec / 60:.0f}m cooling-off pause ACTIVATED across all desks."
             )
+            # Revoke active FIDO2 daemon leases upon global loss cooldown activation
+            try:
+                from core.auth.hardware_key import hardware_key_manager
+
+                hardware_key_manager.revoke_all_daemon_leases(
+                    reason=f"COOLDOWN_ACTIVATED: Loss on {norm_sym} (${realized_pnl:.2f})"
+                )
+            except Exception as e:
+                logger.debug(f"Failed to revoke daemon leases on cooldown: {e}")
+
         else:
             logger.info(
                 f"CooldownGovernor: Profitable/Neutral exit on {norm_sym} (${realized_pnl:.2f}). "

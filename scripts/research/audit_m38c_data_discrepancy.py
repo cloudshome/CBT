@@ -4,7 +4,7 @@ import hashlib
 from pathlib import Path
 import pandas as pd
 
-ROOT = Path("C:/Users/azims/CBT")
+ROOT = Path(__file__).resolve().parent.parent.parent
 
 def sha256_file(filepath):
     h = hashlib.sha256()

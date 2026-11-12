@@ -4,7 +4,7 @@ from scipy import stats
 import json
 from pathlib import Path
 
-ROOT = Path("C:/Users/azims/CBT")
+ROOT = Path(__file__).resolve().parent.parent.parent
 
 with open(ROOT / "research/m38_experiment_ledger.jsonl", "r", encoding="utf-8") as f:
     trades_all = [json.loads(line) for line in f]
