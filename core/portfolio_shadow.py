@@ -556,10 +556,18 @@ class PortfolioShadowManager:
         Updates live position PnL, triggers breakeven (+1.5R), and handles SL/TP hits.
         """
         events = []
+        clean_sym = symbol.strip().upper()
+        sym_slash = (
+            f"{clean_sym[:-4]}/{clean_sym[-4:]}"
+            if clean_sym.endswith("USDT") and "/" not in clean_sym
+            else clean_sym
+        )
+        sym_flat = clean_sym.replace("/", "").replace("-", "")
+
         with db_manager.get_trading_conn() as conn:
             cursor = conn.execute(
-                "SELECT * FROM shadow_positions WHERE symbol = ? AND status = 'OPEN';",
-                (symbol,),
+                "SELECT * FROM shadow_positions WHERE (symbol = ? OR symbol = ? OR symbol = ?) AND status = 'OPEN';",
+                (clean_sym, sym_slash, sym_flat),
             )
             rows = cursor.fetchall()
 
@@ -576,7 +584,12 @@ class PortfolioShadowManager:
             trailing_stop = r["trailing_stop"]
 
             is_long = direction == "LONG"
-            risk_dist = abs(entry_p - sl_p)
+            init_sl = (
+                float(r["initial_stop_loss"])
+                if ("initial_stop_loss" in r.keys() and r["initial_stop_loss"] is not None)
+                else sl_p
+            )
+            risk_dist = abs(entry_p - init_sl) if init_sl is not None else abs(entry_p - sl_p)
 
             # 1. Calculate Unrealized PnL
             pnl_usd = (

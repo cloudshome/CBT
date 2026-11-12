@@ -1,7 +1,7 @@
 # SKY — Project Status & Agent Handoff Document
 
 > **Last Updated:** 2026-11-12  
-> **Release Tag:** `v4.6.0-m43-pre-live-hardened` (Milestones 41-43 Bidirectional Entry, MTF Confluence & Pre-Live Hardening Complete 🚀)  
+> **Release Tag:** `v4.7.0-m44-unified-cp2-audit` (Milestones 41-44 Unified CP-2 Audit & Shadow Position Ratchet Complete 🚀)  
 > **Branch:** `main`  
 > **Remote:** `https://github.com/cloudshome/CBT.git`  
 > **Lead Agent:** Antigravity  
@@ -11,6 +11,7 @@
 > **Milestone 41 Status:** COMPLETED & CERTIFIED (Bidirectional Entry Engine, SMC Structure Zones, Orderflow Triggers — 8/8 Tests Green 🟢)  
 > **Milestone 42 Status:** COMPLETED & CERTIFIED (MTF Confluence Alignment, K9 Parity Benchmarking, Actionable Radar UI — 8/8 Tests Green 🟢)  
 > **Milestone 43 Status:** COMPLETED & CERTIFIED (Pre-Live Hardening, Strict A+ Positive-EV Lock, 1500ms Stop-Loss SLA & Core Isolation — 5/5 Tests Green 🟢)  
+> **Milestone 44 (Edge & Ratchet Wiring) Status:** COMPLETED & CERTIFIED (CP-2 5-Hurdle Audit Across 749 OOS Trades, TP1 +1.5R Shadow Ratchet Wired, TRADING_CORE_ONLY Profile Documented — 7/7 Tests Green 🟢)  
 > **Product Contract:** Enforced via `docs/PRODUCT_CONTRACT.md` (Fail-Closed Mode Boundaries: RESEARCH, SIMULATION, PAPER, TESTNET, LIVE_RESTRICTED)  
 > **Test Isolation Harness:** Hardened (`tests/conftest.py` — zero swallowed exceptions, explicit subsystem schema logging)  
 > **Multi-PC Status:** 100% SYNCHRONIZED (Ubuntu Hub & Windows Office PC aligned at `origin/main`)  
@@ -76,13 +77,13 @@ DATA QUALITY > RISK > EXECUTION SAFETY > STATISTICAL VALIDITY > SIGNAL QUALITY >
 
 ## Real-World Trading Readiness Scorecard (Checkpoints 1–14)
 
-Audited under Milestones 39 & 40 with Zero-Trust Empirical Verification:
+Audited under Milestones 39, 40 & 44 with Zero-Trust Empirical Verification:
 
 | Checkpoint | Scope | Operational State | Governance Action |
 |:---|:---|:---:|:---|
 | **CP-1** | Current Operating Mode | `BLOCKED_BY_POLICY` | Fail-closed in `.env` (`TRADING_MODE=PAPER_TRADING`, `real_capital_enabled=False`). |
-| **CP-2** | Proving a Trading Edge | `BLOCKED_BY_POLICY` | Candidate B power expanded across BTC, ETH, SOL (N=300 OOS trades, clearing N>=100 hurdle). Multi-asset DSR compressed to 0.0009 (< 0.95 hurdle) with net conservative expectancy -0.1379R. Candidate C maker simulation confirmed 9 bps fee savings but 51.8 bps unfilled queue risk. Candidate A ablation confirmed SMC sweeps cannot be rescued by regime-gating (-0.2326R). All unvalidated strategies permanently quarantined. Fail-closed lock at Tier 0 maintained. |
-| **CP-3** | Decided Forward Paper Trades | `BLOCKED_BY_POLICY` | 4/20 decided forward trades completed (deficit: 16 trades). Audited: 3 losses originated from unvalidated PRE_BREAKOUT_COMPRESSION setups (-1.21R avg); sole surviving setup achieved +3.29R. PRE_BREAKOUT_COMPRESSION quarantined across CentralTradingMind, Arbiter, and Screener. Shadow ledger zero-drift verified ($0.000000 across 507 lifetime shadow trades). |
+| **CP-2** | Proving a Trading Edge | `BLOCKED_BY_POLICY` | M44 unified M41–M43 engine (`evaluate_ladder_tick` knife-catch protection + `AWAITING_RECLAIM` + MTF Confluence + Strict A+ Filter + +1.5R breakeven ratchet) benchmarked against 125,820 bars (`derivatives_expanded_2022_2026.parquet`). Turned naive SMC negative bleed (-0.4032R) into positive net expectancy (**`+0.1573R`** net of Tier-2 friction, PF 1.24, N=749 OOS trades across BTC, ETH, SOL). Deflated Sharpe Ratio surged from 0.0000 to **`0.9110`**. Because DSR (0.9110 < 0.9500) and net expectancy (+0.1573R < +0.2500R) are shy of institutional thresholds, CP-2 is strictly maintained at `BLOCKED_BY_POLICY`. |
+| **CP-3** | Decided Forward Paper Trades | `BLOCKED_BY_POLICY` | 4/20 decided forward trades completed (deficit: 16 trades). Audited: 3 losses originated from unvalidated PRE_BREAKOUT_COMPRESSION setups (-1.21R avg); sole surviving setup achieved +3.29R. PRE_BREAKOUT_COMPRESSION quarantined across CentralTradingMind, Arbiter, and Screener. In M44, the 2 open shadow positions (ETH $2,023.49 and BTC $73,156.81) were wired with TP1 (+1.5R) breakeven ratchets ($2,114.54 and $76,448.86) in `portfolio_shadow.py` and `bracket_manager.py`. Shadow ledger zero-drift verified ($0.000000 across 507 lifetime shadow trades). |
 | **CP-4** | Capital Governor Tier Progression | `BLOCKED_BY_POLICY` | Locked at `Tier 0 (Paper Shadow)`. Promotion to `Tier 1-E (Canary Eligible)` strictly gated by CP-2 and CP-3. |
 
 | **CP-5** | Production Exchange API Keys | `BLOCKED_BY_POLICY` | No live production keys configured; only testnet simulated keys installed. |
@@ -485,6 +486,33 @@ Milestone 45 and 45-R implement institutional decentralized MEV mitigation, Prop
    - Comprehensive test suite in `tests/execution/test_milestone45_mev_mitigation.py` (11 tests) and `tests/execution/test_milestone45_r_evidence_hardening.py` (1 test covering all 8 obligations).
 3. **Milestone 18 Protection:** Certified surface area untouched; 149/149 tests green and verified via `scripts/verify_m18_certification.py`.
 4. **Total Milestone 45 & 45-R Test Suite:** 12 / 12 tests green (100% PASS).
+
+---
+
+## Milestone 44: Unified CP-2 Certification of M41-M43 Engine & Open Position Ratchet Wiring — COMPLETED & CERTIFIED 🟢
+
+Milestone 44 unified the M41–M43 engine innovations (`evaluate_ladder_tick` knife-catch protection, `AWAITING_RECLAIM` -> `IN_ZONE_CONFIRMED`, MTF Confluence, Strict A+ Filter, and +1.5R breakeven ratchet) into the multi-year derivatives dataset (`derivatives_expanded_2022_2026.parquet`, 125,820 bars across `BTCUSDT`, `ETHUSDT`, `SOLUSDT`) and wired the active shadow position +1.5R ratchets.
+
+### Completed & Hardened Deliverables:
+1. **WP-1: Unified CP-2 Benchmark Audit:**
+   - Implemented `scripts/research/run_m44_unified_cp2_audit.py` evaluating the 5 mandatory CP-2 hurdles.
+   - Evaluated 9 frozen K9 historical datasets: $N = 154$ trades, Win Rate $37.0\%$, Net Expectancy $+0.047R$, $\text{PF} = 1.07$, $\text{Sharpe} = 0.032$, $\text{DSR} = 0.1194$.
+   - Evaluated multi-year out-of-sample data (`SEALED_OOS` across BTC, ETH, SOL):
+     - Naive SMC Baseline: $N = 5,566$, Win Rate $22.8\%$, Expectancy **`-0.4032R`**, $\text{PF} = 0.55$, $\text{Sharpe} = -0.290$, $\text{DSR} = 0.0000$.
+     - M44 Unified Engine: $N = 749$, Win Rate $43.9\%$, Net Expectancy **`+0.1573R`**, $\text{PF} = 1.24$, $\text{Sharpe} = +0.105$, $\text{DSR} = 0.9110$.
+     - Result: Turned massive negative bleed into positive net expectancy across 749 OOS trades with DSR surging to 0.9110.
+   - CP-2 Decision: Because DSR ($0.9110 < 0.9500$) and net expectancy ($+0.1573R < +0.2500R$) are below strict thresholds, CP-2 honestly remains `BLOCKED_BY_POLICY`.
+   - Recorded failure memory autopsy in `core/autonomous_research/failure_memory.py` (`HYP_M44_UNIFIED_CP2_AUDIT`).
+2. **WP-2: Open Shadow Position Ratchet Wiring & Runtime Isolation Profile:**
+   - Audited the 2 active open paper positions in `data/trading_logs.db:shadow_positions` (`POS_BTC_...` and `POS_ETH_...`), confirming origin `PRE_BREAKOUT_COMPRESSION` quarantined in M40.
+   - Enhanced `core/portfolio_shadow.py` (`update_live_price`) with robust symbol normalization (`BTC/USDT`, `BTCUSDT`, `BTC-USDT`) and grounded risk distance preservation via `initial_stop_loss`.
+   - Enhanced `core/execution/bracket_manager.py` (`move_to_breakeven`) to fall back to `PortfolioShadowManager` when no live exchange bracket is tracked.
+   - Configured `TRADING_CORE_ONLY=true` in `.env.example` to suppress web searchers, background scrapers, and research scrapers during unattended forward qualification burn-in.
+3. **Mandatory Quality Gates:**
+   - Unit test suite: `tests/test_m44_open_position_ratchet.py` (7/7 tests green).
+   - Milestone 18 execution integrity: Re-validated 149/149 green tests (`scripts/verify_m18_certification.py`).
+   - Shadow ledger accounting: Reconciled with $0.000000 drift across 507 lifetime trades (`scripts/reconcile_shadow_ledger.py`).
+   - Ruff linting & formatting: 100% compliant across all modified and test files.
 
 ---
 

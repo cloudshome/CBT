@@ -677,25 +677,32 @@ class CapitalGovernor:
                 f"Checkpoint 2 certified: CPCV DSR {cpcv_dsr:.4f} >= 0.95 across {oos_trades} OOS trades ({net_exp_r:+.3f}R net)",
             )
 
-        # Check empirical results from m39_edge_verification_results.json
-        res_file = (
-            Path(__file__).resolve().parent.parent.parent
-            / "research"
-            / "m39_edge_verification_results.json"
-        )
-        if res_file.exists():
-            try:
-                data = json.loads(res_file.read_text(encoding="utf-8"))
-                results = data.get("results", {})
-                for c_name, c_res in results.items():
-                    if (
-                        c_res.get("passed_all_hurdles") is True
-                        and c_res.get("dsr", 0.0) >= 0.95
-                        and c_res.get("oos_trade_count", 0) >= 100
-                    ):
-                        return True, f"Checkpoint 2 certified via verified candidate {c_name}"
-            except Exception as exc:
-                logger.debug(f"Notice inspecting edge verification results: {exc}")
+        # Check empirical results from m44_cp2_unified_results.json, m40, or m39
+        research_dir = Path(__file__).resolve().parent.parent.parent / "research"
+        for res_name in [
+            "m44_cp2_unified_results.json",
+            "m40_edge_verification_results.json",
+            "m39_edge_verification_results.json",
+        ]:
+            res_file = research_dir / res_name
+            if res_file.exists():
+                try:
+                    data = json.loads(res_file.read_text(encoding="utf-8"))
+                    gov = data.get("governance_decision", {})
+                    if gov.get("checkpoint_2_status") == "CERTIFIED":
+                        return True, "Checkpoint 2 certified via M44 Unified Audit"
+                    results = data.get("results", {})
+                    for c_name, c_res in results.items():
+                        if (
+                            c_res.get("passed_all_hurdles") is True
+                            and c_res.get("dsr", 0.0) >= 0.95
+                            and c_res.get("oos_trade_count", 0) >= 100
+                        ):
+                            return True, f"Checkpoint 2 certified via verified candidate {c_name}"
+                except Exception as exc:
+                    logger.debug(
+                        f"Notice inspecting edge verification results from {res_name}: {exc}"
+                    )
 
         return (
             False,

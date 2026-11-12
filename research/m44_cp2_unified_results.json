@@ -1,0 +1,351 @@
+{
+  "audit_version": "M44-UNIFIED-CP2-CERTIFICATION-V1",
+  "timestamp_utc": "2026-11-12T16:45:01.989121+00:00",
+  "hurdles_scorecard": {
+    "hurdle_2a_sample_size_met": true,
+    "hurdle_2b_causality_met": true,
+    "hurdle_2c_cpcv_sharpe_met": true,
+    "hurdle_2d_dsr_met": false,
+    "hurdle_2e_tier2_friction_met": false,
+    "all_hurdles_passed": false
+  },
+  "metrics_summary": {
+    "sample_size_oos": 749,
+    "net_expectancy_r": 0.1573,
+    "profit_factor": 1.24,
+    "annualized_sharpe": 0.1054,
+    "deflated_sharpe_ratio": 0.911,
+    "cpcv": {
+      "folds_count": 15,
+      "fold_sharpes": [
+        0.1569,
+        0.2247,
+        0.2181,
+        0.1355,
+        0.207,
+        0.0694,
+        0.0619,
+        -0.021,
+        0.052,
+        0.1293,
+        0.0467,
+        0.1189,
+        0.0389,
+        0.1117,
+        0.0289
+      ],
+      "median_oos_sharpe": 0.1117,
+      "annualized_median_sharpe": 5.2336,
+      "cpcv_passed": true
+    }
+  },
+  "k9_datasets_audit": {
+    "datasets": {
+      "BTCUSDT_15m": {
+        "symbol": "BTCUSDT",
+        "timeframe": "15m",
+        "bars": 9008,
+        "naive": {
+          "trades": 205,
+          "win_rate_pct": 25.4,
+          "expectancy_r": -0.424,
+          "profit_factor": 0.55
+        },
+        "unified": {
+          "trades": 27,
+          "win_rate_pct": 48.1,
+          "expectancy_r": 0.38,
+          "profit_factor": 1.56
+        },
+        "expectancy_delta_r": 0.804
+      },
+      "BTCUSDT_1h": {
+        "symbol": "BTCUSDT",
+        "timeframe": "1h",
+        "bars": 658,
+        "naive": {
+          "trades": 122,
+          "win_rate_pct": 18.9,
+          "expectancy_r": -0.54,
+          "profit_factor": 0.42
+        },
+        "unified": {
+          "trades": 15,
+          "win_rate_pct": 40.0,
+          "expectancy_r": 0.035,
+          "profit_factor": 1.05
+        },
+        "expectancy_delta_r": 0.575
+      },
+      "BTCUSDT_4h": {
+        "symbol": "BTCUSDT",
+        "timeframe": "4h",
+        "bars": 165,
+        "naive": {
+          "trades": 14,
+          "win_rate_pct": 14.3,
+          "expectancy_r": -0.653,
+          "profit_factor": 0.3
+        },
+        "unified": {
+          "trades": 0,
+          "win_rate_pct": 0.0,
+          "expectancy_r": 0.0,
+          "profit_factor": 99.0
+        },
+        "expectancy_delta_r": 0.653
+      },
+      "ETHUSDT_15m": {
+        "symbol": "ETHUSDT",
+        "timeframe": "15m",
+        "bars": 7179,
+        "naive": {
+          "trades": 70,
+          "win_rate_pct": 22.9,
+          "expectancy_r": -0.566,
+          "profit_factor": 0.44
+        },
+        "unified": {
+          "trades": 15,
+          "win_rate_pct": 33.3,
+          "expectancy_r": -0.352,
+          "profit_factor": 0.61
+        },
+        "expectancy_delta_r": 0.214
+      },
+      "ETHUSDT_1h": {
+        "symbol": "ETHUSDT",
+        "timeframe": "1h",
+        "bars": 267,
+        "naive": {
+          "trades": 37,
+          "win_rate_pct": 13.5,
+          "expectancy_r": -0.657,
+          "profit_factor": 0.34
+        },
+        "unified": {
+          "trades": 8,
+          "win_rate_pct": 50.0,
+          "expectancy_r": 0.388,
+          "profit_factor": 1.7
+        },
+        "expectancy_delta_r": 1.045
+      },
+      "ETHUSDT_4h": {
+        "symbol": "ETHUSDT",
+        "timeframe": "4h",
+        "bars": 74,
+        "naive": {
+          "trades": 8,
+          "win_rate_pct": 50.0,
+          "expectancy_r": 0.688,
+          "profit_factor": 2.29
+        },
+        "unified": {
+          "trades": 0,
+          "win_rate_pct": 0.0,
+          "expectancy_r": 0.0,
+          "profit_factor": 99.0
+        },
+        "expectancy_delta_r": -0.688
+      },
+      "SOLUSDT_15m": {
+        "symbol": "SOLUSDT",
+        "timeframe": "15m",
+        "bars": 9008,
+        "naive": {
+          "trades": 687,
+          "win_rate_pct": 18.2,
+          "expectancy_r": -0.532,
+          "profit_factor": 0.45
+        },
+        "unified": {
+          "trades": 84,
+          "win_rate_pct": 31.0,
+          "expectancy_r": -0.058,
+          "profit_factor": 0.91
+        },
+        "expectancy_delta_r": 0.474
+      },
+      "SOLUSDT_1h": {
+        "symbol": "SOLUSDT",
+        "timeframe": "1h",
+        "bars": 658,
+        "naive": {
+          "trades": 60,
+          "win_rate_pct": 11.7,
+          "expectancy_r": -0.702,
+          "profit_factor": 0.27
+        },
+        "unified": {
+          "trades": 5,
+          "win_rate_pct": 60.0,
+          "expectancy_r": 0.715,
+          "profit_factor": 2.65
+        },
+        "expectancy_delta_r": 1.417
+      },
+      "SOLUSDT_4h": {
+        "symbol": "SOLUSDT",
+        "timeframe": "4h",
+        "bars": 165,
+        "naive": {
+          "trades": 3,
+          "win_rate_pct": 0.0,
+          "expectancy_r": -1.045,
+          "profit_factor": 0.0
+        },
+        "unified": {
+          "trades": 0,
+          "win_rate_pct": 0.0,
+          "expectancy_r": 0.0,
+          "profit_factor": 99.0
+        },
+        "expectancy_delta_r": 1.045
+      }
+    },
+    "pooled_naive": {
+      "trades": 1206,
+      "win_rate_pct": 19.4,
+      "expectancy_r": -0.523,
+      "profit_factor": 0.46
+    },
+    "pooled_unified": {
+      "trades": 154,
+      "win_rate_pct": 37.0,
+      "expectancy_r": 0.047,
+      "profit_factor": 1.07,
+      "sharpe": 0.0318,
+      "dsr": 0.1194,
+      "p_value": 0.8806
+    }
+  },
+  "derivatives_expanded_audit": {
+    "symbols": {
+      "BTCUSDT": {
+        "symbol": "BTCUSDT",
+        "bars": 11292,
+        "naive": {
+          "trades": 1870,
+          "win_rate_pct": 23.5,
+          "expectancy_r": -0.3891,
+          "profit_factor": 0.56,
+          "sharpe": -0.2764,
+          "dsr": 0.0
+        },
+        "unified": {
+          "trades": 270,
+          "win_rate_pct": 45.6,
+          "expectancy_r": 0.2043,
+          "profit_factor": 1.32,
+          "sharpe": 0.1346,
+          "dsr": 0.7465,
+          "p_value": 0.2535
+        },
+        "delta": {
+          "expectancy_improvement_r": 0.5935,
+          "sharpe_improvement": 0.411,
+          "dsr_improvement": 0.7465
+        }
+      },
+      "ETHUSDT": {
+        "symbol": "ETHUSDT",
+        "bars": 11292,
+        "naive": {
+          "trades": 1884,
+          "win_rate_pct": 23.3,
+          "expectancy_r": -0.3724,
+          "profit_factor": 0.57,
+          "sharpe": -0.2657,
+          "dsr": 0.0
+        },
+        "unified": {
+          "trades": 256,
+          "win_rate_pct": 44.5,
+          "expectancy_r": 0.183,
+          "profit_factor": 1.29,
+          "sharpe": 0.1236,
+          "dsr": 0.6649,
+          "p_value": 0.3351
+        },
+        "delta": {
+          "expectancy_improvement_r": 0.5554,
+          "sharpe_improvement": 0.389,
+          "dsr_improvement": 0.6649
+        }
+      },
+      "SOLUSDT": {
+        "symbol": "SOLUSDT",
+        "bars": 11292,
+        "naive": {
+          "trades": 1812,
+          "win_rate_pct": 21.6,
+          "expectancy_r": -0.4496,
+          "profit_factor": 0.5,
+          "sharpe": -0.3302,
+          "dsr": 0.0
+        },
+        "unified": {
+          "trades": 223,
+          "win_rate_pct": 41.3,
+          "expectancy_r": 0.0709,
+          "profit_factor": 1.1,
+          "sharpe": 0.048,
+          "dsr": 0.1967,
+          "p_value": 0.8033
+        },
+        "delta": {
+          "expectancy_improvement_r": 0.5205,
+          "sharpe_improvement": 0.378,
+          "dsr_improvement": 0.1967
+        }
+      }
+    },
+    "combined_naive": {
+      "oos_trades": 5566,
+      "win_rate_pct": 22.8,
+      "expectancy_r": -0.4032,
+      "profit_factor": 0.55,
+      "sharpe": -0.2898,
+      "dsr": 0.0
+    },
+    "combined_unified": {
+      "oos_trades": 749,
+      "win_rate_pct": 43.9,
+      "expectancy_r": 0.1573,
+      "profit_factor": 1.24,
+      "sharpe": 0.1054,
+      "dsr": 0.911,
+      "p_value": 0.089,
+      "cpcv": {
+        "folds_count": 15,
+        "fold_sharpes": [
+          0.1569,
+          0.2247,
+          0.2181,
+          0.1355,
+          0.207,
+          0.0694,
+          0.0619,
+          -0.021,
+          0.052,
+          0.1293,
+          0.0467,
+          0.1189,
+          0.0389,
+          0.1117,
+          0.0289
+        ],
+        "median_oos_sharpe": 0.1117,
+        "annualized_median_sharpe": 5.2336,
+        "cpcv_passed": true
+      }
+    }
+  },
+  "governance_decision": {
+    "checkpoint_2_status": "BLOCKED_BY_POLICY",
+    "capital_governor_tier": "TIER_0_PAPER",
+    "real_capital_enabled": false,
+    "rationale": "M41-M43 unified engine proved positive net expectancy (+0.1573R) across 749 OOS trades, reversing M40 naive losses (-0.2065R). However, DSR (0.9110 < 0.9500) and net expectancy (+0.1573R < +0.25R) remain below the strict Tier 1-E hurdle. Fail-closed lock at TIER_0_PAPER maintained."
+  }
+}

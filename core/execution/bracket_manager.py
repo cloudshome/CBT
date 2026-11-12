@@ -176,6 +176,61 @@ class LiveBracketManager:
         bracket = canonical_reconciler.get_bracket(clean_symbol)
 
         if not bracket:
+            # Fallback: Check if there is an active shadow position to move to breakeven
+            try:
+                from core.portfolio_shadow import PortfolioShadowManager
+
+                shadow_mgr = PortfolioShadowManager()
+                open_positions = shadow_mgr.get_open_positions()
+                shadow_pos = next(
+                    (
+                        p
+                        for p in open_positions
+                        if (p.get("symbol") if isinstance(p, dict) else getattr(p, "symbol", ""))
+                        .upper()
+                        .replace("/", "")
+                        .replace("-", "")
+                        .strip()
+                        == clean_symbol
+                    ),
+                    None,
+                )
+                if shadow_pos:
+                    be_price = float(
+                        shadow_pos.get("entry_price")
+                        if isinstance(shadow_pos, dict)
+                        else shadow_pos.entry_price
+                    )
+                    pos_id = str(
+                        shadow_pos.get("position_id")
+                        if isinstance(shadow_pos, dict)
+                        else shadow_pos.position_id
+                    )
+                    updated = shadow_mgr.update_stop_loss(pos_id, be_price)
+                    if updated:
+                        logger.info(
+                            f"[BracketManager] Moving Shadow SL to Break-Even ({be_price}) for {clean_symbol} position {pos_id}"
+                        )
+                        audit_bus.emit_event(
+                            event_type="SL_MOVED_TO_BREAKEVEN",
+                            symbol=clean_symbol,
+                            severity="INFO",
+                            reason=f"Shadow stop loss amended to break-even price {be_price}",
+                            details={
+                                "position_id": pos_id,
+                                "entry_price": be_price,
+                                "mode": "SHADOW_PAPER",
+                            },
+                        )
+                        return ProtectionResult(
+                            success=True,
+                            bracket_id=pos_id,
+                            status=ProtectionStatus.BREAKEVEN_ACTIVE,
+                            sl_order_id=f"SHADOW_SL_{pos_id}",
+                        )
+            except Exception as shadow_err:
+                logger.debug(f"[BracketManager] Shadow BE check error: {shadow_err}")
+
             logger.error(
                 f"[BracketManager] Cannot move to BE: No active tracked bracket for {clean_symbol}"
             )
