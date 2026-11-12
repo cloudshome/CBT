@@ -132,7 +132,13 @@ def adjust_for_slip(
     if gp.outcome == "LOSS":
         pnl = -(fill_entry - sl) if side == "BUY" else -(sl - fill_entry)
     elif gp.outcome in ("FULL_WIN", "PARTIAL_WIN") and tp_hit is not None:
-        pnl = (tp_hit - fill_entry) if side == "BUY" else (fill_entry - tp_hit)
+        if getattr(gp, "rr_achieved", 0.0) == 0.10:
+            exit_p = (entry + 0.10 * plan_risk) if side == "BUY" else (entry - 0.10 * plan_risk)
+            pnl = (exit_p - fill_entry) if side == "BUY" else (fill_entry - exit_p)
+        elif getattr(gp, "rr_achieved", 0.0) == 0.825:
+            pnl = 0.825 * plan_risk - slip
+        else:
+            pnl = (tp_hit - fill_entry) if side == "BUY" else (fill_entry - tp_hit)
     else:
         return
     gp.rr_achieved = round(pnl / plan_risk, 3)

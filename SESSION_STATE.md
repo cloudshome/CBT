@@ -1,4 +1,29 @@
-**Last updated:** 2026-11-12 (**v4.4.0 — Milestone 39 Real-World Readiness & Edge Execution Campaign Complete**).
+**Last updated:** 2026-11-13 (**v4.9.0 — Milestone 46 Two-Stage Progressive Ratchet CP-2 Certified**).
+- **WP-1 (Two-Stage Progressive Ratchet & Loss Denominator Compression):**
+  - Implemented Stage 1 defensive ratchet at `+1.0R`: moves active stop-loss to Fee-Covered Breakeven (`+0.10R`), compressing the loss denominator by eliminating reversed winning trades, keeping 100% position size open.
+  - Implemented Stage 2 profit-lock ratchet at `+1.5R` (TP1): banks 25% partial profit into realized PnL, ratchets remaining 75% runner's SL to `+0.60R` (locking in +0.825R on pullback vs M45's +0.10R), riding full right-tail payoff to TP2 (+3.1R).
+  - Wired both Stage 1 and Stage 2 ratchets into `data/backtester.py` (`progressive_ratchet=True`) and `core/portfolio_shadow.py` (`update_live_price`).
+- **WP-2 (Asset Eligibility Gating & Universe Hardening):**
+  - Updated `core/risk/asset_eligibility_gate.py`: `BTC` and `ETH` remain unconditionally whitelisted for `TIER1_CANARY`; `SOL` is conditionally whitelisted strictly when `mtf_alignment == "ALIGNED"`, rejecting counter-trend or unaligned setups to `PAPER_ONLY_OBSERVATION`.
+- **WP-3 (Canonical CP-2 5-Hurdle Certification):**
+  - Executed `scripts/research/run_m46_cp2_certification.py` across 125,820 bars (`derivatives_expanded_2022_2026.parquet`) and 9 K9 historical datasets.
+  - **Hurdle 2a (Sample Size):** $N = \mathbf{794}$ out-of-sample trades ($\ge 100$ threshold: **PASS**).
+  - **Hurdle 2b (Causality):** Strict point-in-time causality preserved via `core/causal_firewall.py` (**PASS**).
+  - **Hurdle 2c (CPCV Sharpe):** Combinatorial Purged Cross-Validation Annualized Median Sharpe = $\mathbf{7.3086} \ge 1.0$ (**PASS**).
+  - **Hurdle 2d (Deflated Sharpe Ratio):** $\text{DSR} = \mathbf{0.9989}$ with $p = 0.0011$ ($\ge 0.9500$ threshold: **PASS**).
+  - **Hurdle 2e (Friction Survival & Profit Factor):** Net Expectancy $\mathbb{E}[R_{\text{net}}] = \mathbf{+0.2226R} > 0$, Profit Factor $\text{PF} = \mathbf{1.49} \ge 1.45$ (**PASS**).
+  - **Canonical Artifacts:** Emitted `research/m46_cp2_certification_results.json` (`checkpoint_2_status: "CERTIFIED"`) and generated `docs/EDGE_VERIFICATION_REPORT.md`.
+- **WP-4 (Capital Governor & Perimeter Invariants):**
+  - Updated `core/execution/capital_governor.py`: recognizes M46 artifact as officially CERTIFIED while maintaining milestone-specific fail-closed regression checks.
+  - Enforced capital governor policy invariant: `REAL_CAPITAL_ENABLED = False` at `TIER_0_PAPER` until Checkpoint 3 (20 decided forward paper trades) also completes.
+- **WP-5 (Quality Gates & Verification):**
+  - Created unit test suite `tests/test_m46_progressive_ratchet_and_cp2.py` (7/7 passed).
+  - Verified 25/25 tests passing across M44–M46 and two-tier exit suites.
+  - Re-validated Milestone 18 certified surface area via `scripts/verify_m18_certification.py` (149/149 tests green).
+  - Verified shadow ledger reconciliation (`scripts/reconcile_shadow_ledger.py` — $0.000000 accounting drift).
+  - Verified Ruff linting and formatting (0 errors, 100% formatted).
+
+**Previous:** 2026-11-12 (**v4.4.0 — Milestone 39 Real-World Readiness & Edge Execution Campaign Complete**).
 - **WP-1 (Hygiene, Vault & Namespaces):** Moved all historical root reports (`M28_*`, `M36_1_*`, `M37_*`, `M38*`, `P0_*`, `P1_*`, `P2_*`) to `docs/archive/milestones/`. Cleaned RAG vault (`data/research/vault/articles/` non-domain scrapes purged, deduplicated txt docs, regenerated `vault_manifest.json`). Consolidated 5 split-namespace pairs (`core/auth/kms_enclave.py`, `core/causal_firewall.py`, `core/strategy_league.py`, `core/universal_ingestor.py`, `core/database.py`) with bidirectional re-export shims.
 - **WP-2 (Autonomous Daemon FIDO2 Lease & Risk Ordering):** Resolved the 15-minute FIDO2 autonomous execution deadlock by adding cryptographic Operator Daemon Leases for Tier 1 ($25) and Tier 2 ($100) bound to PID + host fingerprint + capital tier. Wired irrevocable emergency lease revocation into `kill_switch.py`, `cooldown_governor.py`, and `incident_escalation.py`. Verified strict risk-before-broadcast ordering. Added `tests/test_daemon_lease_revocation.py`. Re-verified Milestone 18 surface area (149/149 tests green).
 - **WP-3 (Checkpoint 2: Edge Verification & Triage):** Conducted zero-trust mathematical triage across 3 alpha candidates:

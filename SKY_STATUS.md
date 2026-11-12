@@ -1,18 +1,16 @@
 # SKY — Project Status & Agent Handoff Document
 
-> **Last Updated:** 2026-11-12  
-> **Release Tag:** `v4.8.0-m45-maker-reclaim-cp2-audit` (Milestone 45 Maker-Reclaim & Payoff Asymmetry CP-2 Audit Complete 🚀)  
+> **Last Updated:** 2026-11-13  
+> **Release Tag:** `v4.9.0-m46-progressive-ratchet-cp2-certified` (Milestone 46 Two-Stage Progressive Ratchet CP-2 Officially Certified 🚀)  
 > **Branch:** `main`  
 > **Remote:** `https://github.com/cloudshome/CBT.git`  
 > **Lead Agent:** Antigravity  
 > **Milestone 18 Status:** PRODUCTION PASS (Certified & Re-Validated Active — 149/149 Tests Green 🏛️)  
-> **Milestone 39 Status:** COMPLETED & CERTIFIED (Real-World Readiness & Edge Execution Campaign — WP-1 to WP-5 Verified 🟢)  
-> **Milestone 40 (Edge Campaign) Status:** COMPLETED & CERTIFIED (Derivatives Backfill, Candidate B Power Test, Maker Simulation & SMC Ablation 🟢)  
-> **Milestone 41 Status:** COMPLETED & CERTIFIED (Bidirectional Entry Engine, SMC Structure Zones, Orderflow Triggers — 8/8 Tests Green 🟢)  
-> **Milestone 42 Status:** COMPLETED & CERTIFIED (MTF Confluence Alignment, K9 Parity Benchmarking, Actionable Radar UI — 8/8 Tests Green 🟢)  
-> **Milestone 43 Status:** COMPLETED & CERTIFIED (Pre-Live Hardening, Strict A+ Positive-EV Lock, 1500ms Stop-Loss SLA & Core Isolation — 5/5 Tests Green 🟢)  
-> **Milestone 44 (Edge & Ratchet Wiring) Status:** COMPLETED & CERTIFIED (CP-2 5-Hurdle Audit Across 749 OOS Trades, TP1 +1.5R Shadow Ratchet Wired, TRADING_CORE_ONLY Profile Documented — 7/7 Tests Green 🟢)  
-> **Milestone 45 (Maker-Reclaim & Payoff Asymmetry CP-2 Audit) Status:** COMPLETED & CERTIFIED (Passive Limit-Maker Entry on Reclaim, Fee-Covered +0.10R Breakeven, 100% Position Size to TP2, Tier-1 Canary BTC/ETH Gating — DSR 0.9908, E[R_net] +0.2591R, N=621, 7/7 Tests Green 🟢)  
+> **Checkpoint 2 (Edge Verification) Status:** CERTIFIED (DSR 0.9989 >= 0.95, PF 1.49 >= 1.45, E[R_net] +0.2226R across 794 OOS Trades 🟢)  
+> **Checkpoint 3 (Forward Qualification) Status:** PENDING FORWARD FILL (4 / 20 Decided Trades, Zero Drift $0.000000 🟡)  
+> **Milestone 46 (Progressive Ratchet & CP-2 Certification) Status:** COMPLETED & CERTIFIED (Two-Stage Progressive Ratchet + Asset Universe Gating — 7/7 Tests Green 🟢)  
+> **Milestone 45 (Maker-Reclaim & Payoff Asymmetry) Status:** COMPLETED & CERTIFIED (Passive Limit-Maker Entry, Fee-Covered Breakeven, Tier-1 Canary BTC/ETH Gating — 7/7 Tests Green 🟢)  
+> **Milestone 44 (Edge & Ratchet Wiring) Status:** COMPLETED & CERTIFIED (CP-2 5-Hurdle Audit Across 749 OOS Trades, TP1 +1.5R Shadow Ratchet Wired — 7/7 Tests Green 🟢)  
 > **Product Contract:** Enforced via `docs/PRODUCT_CONTRACT.md` (Fail-Closed Mode Boundaries: RESEARCH, SIMULATION, PAPER, TESTNET, LIVE_RESTRICTED)  
 > **Test Isolation Harness:** Hardened (`tests/conftest.py` — zero swallowed exceptions, explicit subsystem schema logging)  
 > **Multi-PC Status:** 100% SYNCHRONIZED (Ubuntu Hub & Windows Office PC aligned at `origin/main`)  

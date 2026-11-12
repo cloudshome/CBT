@@ -126,6 +126,8 @@ def _evaluate(
     strict_a_plus_only: bool = False,
     payoff_asymmetry: bool = False,
     maker_reclaim: bool = False,
+    progressive_ratchet: bool = False,
+    enable_stage1: bool = True,
 ) -> GradedPlan:
     """Grade one plan produced at bar i over `horizon_bars` future bars."""
     entry = plan.get("entry")
@@ -269,6 +271,7 @@ def _evaluate(
         e_low = min(ladder_entry_zone[0], ladder_entry_zone[1])
         e_high = max(ladder_entry_zone[0], ladder_entry_zone[1])
 
+        target_1r = round(entry + risk * 1.0, 2) if is_buy else round(entry - risk * 1.0, 2)
         target_tp1 = (
             tp1
             if tp1 is not None
@@ -350,6 +353,8 @@ def _evaluate(
 
         current_stop = sl
         breakeven_active = False
+        stage1_hit = False
+        stage2_hit = False
         tp1_hit = False
         tp2_hit = False
         tp3_hit = False
@@ -360,6 +365,7 @@ def _evaluate(
             b_l = float(lows[bar_k])
 
             sl_touched = (b_l <= current_stop) if is_buy else (b_h >= current_stop)
+            r1_touched = (b_h >= target_1r) if is_buy else (b_l <= target_1r)
             tp1_touched = (b_h >= target_tp1) if is_buy else (b_l <= target_tp1)
             tp2_touched = (
                 ((b_h >= target_tp2) if is_buy else (b_l <= target_tp2))
@@ -367,69 +373,148 @@ def _evaluate(
                 else False
             )
 
-            if sl_touched and tp1_touched and not tp1_hit:
-                gp.outcome = "LOSS"
-                gp.rr_achieved = -1.0
-                gp.ambiguous_bar = True
-                set_holding(bar_k)
-                return gp
-
-            if payoff_asymmetry and tp2_touched and (tp1_hit or tp1_touched):
-                gp.outcome = "FULL_WIN"
-                gp.rr_achieved = realized_r(target_tp2)
-                set_holding(bar_k)
-                decided_bar = bar_k
-                break
-
-            if sl_touched:
-                if breakeven_active:
-                    gp.outcome = "PARTIAL_WIN"
-                    gp.rr_achieved = 0.10 if payoff_asymmetry else realized_r(target_tp1)
-                else:
+            if progressive_ratchet:
+                # 1. Ambiguity check: if both initial SL and TP1 touched on same bar before any ratchet
+                if sl_touched and tp1_touched and not stage1_hit and not stage2_hit:
                     gp.outcome = "LOSS"
                     gp.rr_achieved = -1.0
-                set_holding(bar_k)
-                decided_bar = bar_k
-                break
-
-            if tp1_touched and not tp1_hit:
-                tp1_hit = True
-                breakeven_active = True
-                current_stop = (
-                    ((entry + 0.10 * risk) if is_buy else (entry - 0.10 * risk))
-                    if payoff_asymmetry
-                    else entry
-                )
-                decided_bar = bar_k
-
-            if not payoff_asymmetry and target_tp2 is not None:
-                if tp2_touched:
-                    tp2_hit = True
-                    decided_bar = bar_k
-
-            if target_tp3 is not None:
-                tp3_touched = (b_h >= target_tp3) if is_buy else (b_l <= target_tp3)
-                if tp3_touched:
-                    tp3_hit = True
-                    decided_bar = bar_k
-                    gp.outcome = "FULL_WIN"
-                    gp.rr_achieved = realized_r(target_tp3)
+                    gp.ambiguous_bar = True
                     set_holding(bar_k)
+                    return gp
+
+                # 2. TP2 full runner exit
+                if tp2_touched and (stage2_hit or tp1_touched):
+                    gp.outcome = "FULL_WIN"
+                    gp.rr_achieved = realized_r(target_tp2)
+                    set_holding(bar_k)
+                    decided_bar = bar_k
                     break
 
+                # 3. Stop loss touched
+                if sl_touched:
+                    if stage2_hit:
+                        # Price hit +1.5R (TP1) then pulled back to +0.60R stop:
+                        # 25% banked @ 1.5R + 75% stopped @ 0.60R = 0.25*1.5 + 0.75*0.6 = +0.825R
+                        gp.outcome = "PARTIAL_WIN"
+                        gp.rr_achieved = 0.825
+                    elif stage1_hit:
+                        # Price hit +1.0R then pulled back to fee-covered breakeven (+0.10R):
+                        # 100% stopped @ +0.10R
+                        gp.outcome = "PARTIAL_WIN"
+                        gp.rr_achieved = 0.10
+                    else:
+                        gp.outcome = "LOSS"
+                        gp.rr_achieved = -1.0
+                    set_holding(bar_k)
+                    decided_bar = bar_k
+                    break
+
+                # 4. Stage 2 Ratchet (+1.5R / TP1): Bank 25%, move stop to +0.60R
+                if tp1_touched and not stage2_hit:
+                    stage2_hit = True
+                    stage1_hit = True
+                    tp1_hit = True
+                    breakeven_active = True
+                    current_stop = (entry + 0.60 * risk) if is_buy else (entry - 0.60 * risk)
+                    decided_bar = bar_k
+
+                # 5. Stage 1 Ratchet (+1.0R): Move stop to fee-covered breakeven (+0.10R)
+                elif enable_stage1 and r1_touched and not stage1_hit and not stage2_hit:
+                    stage1_hit = True
+                    breakeven_active = True
+                    current_stop = (entry + 0.10 * risk) if is_buy else (entry - 0.10 * risk)
+                    decided_bar = bar_k
+
+                # 6. TP3 extension (if applicable)
+                if target_tp3 is not None:
+                    tp3_touched = (b_h >= target_tp3) if is_buy else (b_l <= target_tp3)
+                    if tp3_touched:
+                        gp.outcome = "FULL_WIN"
+                        gp.rr_achieved = realized_r(target_tp3)
+                        set_holding(bar_k)
+                        decided_bar = bar_k
+                        break
+
+            else:
+                if sl_touched and tp1_touched and not tp1_hit:
+                    gp.outcome = "LOSS"
+                    gp.rr_achieved = -1.0
+                    gp.ambiguous_bar = True
+                    set_holding(bar_k)
+                    return gp
+
+                if payoff_asymmetry and tp2_touched and (tp1_hit or tp1_touched):
+                    gp.outcome = "FULL_WIN"
+                    gp.rr_achieved = realized_r(target_tp2)
+                    set_holding(bar_k)
+                    decided_bar = bar_k
+                    break
+
+                if sl_touched:
+                    if breakeven_active:
+                        gp.outcome = "PARTIAL_WIN"
+                        gp.rr_achieved = 0.10 if payoff_asymmetry else realized_r(target_tp1)
+                    else:
+                        gp.outcome = "LOSS"
+                        gp.rr_achieved = -1.0
+                    set_holding(bar_k)
+                    decided_bar = bar_k
+                    break
+
+                if tp1_touched and not tp1_hit:
+                    tp1_hit = True
+                    breakeven_active = True
+                    current_stop = (
+                        ((entry + 0.10 * risk) if is_buy else (entry - 0.10 * risk))
+                        if payoff_asymmetry
+                        else entry
+                    )
+                    decided_bar = bar_k
+
+                if not payoff_asymmetry and target_tp2 is not None:
+                    if tp2_touched:
+                        tp2_hit = True
+                        decided_bar = bar_k
+
+                if target_tp3 is not None:
+                    tp3_touched = (b_h >= target_tp3) if is_buy else (b_l <= target_tp3)
+                    if tp3_touched:
+                        tp3_hit = True
+                        decided_bar = bar_k
+                        gp.outcome = "FULL_WIN"
+                        gp.rr_achieved = realized_r(target_tp3)
+                        set_holding(bar_k)
+                        break
+
         if gp.outcome == "OPEN":
-            if tp3_hit:
-                gp.outcome = "FULL_WIN"
-                gp.rr_achieved = realized_r(target_tp3)
-                set_holding(decided_bar)
-            elif tp2_hit:
-                gp.outcome = "PARTIAL_WIN"
-                gp.rr_achieved = realized_r(target_tp2)
-                set_holding(decided_bar)
-            elif tp1_hit:
-                gp.outcome = "PARTIAL_WIN"
-                gp.rr_achieved = realized_r(target_tp1)
-                set_holding(decided_bar)
+            if progressive_ratchet:
+                if tp3_hit:
+                    gp.outcome = "FULL_WIN"
+                    tp3_r = realized_r(target_tp3)
+                    gp.rr_achieved = round(0.25 * 1.50 + 0.75 * tp3_r, 4)
+                    set_holding(decided_bar)
+                elif tp2_hit:
+                    gp.outcome = "FULL_WIN"
+                    tp2_r = realized_r(target_tp2)
+                    gp.rr_achieved = round(0.25 * 1.50 + 0.75 * tp2_r, 4)
+                    set_holding(decided_bar)
+                elif stage2_hit or tp1_hit:
+                    gp.outcome = "PARTIAL_WIN"
+                    gp.rr_achieved = realized_r(target_tp1)
+                    set_holding(decided_bar)
+            else:
+                if tp3_hit:
+                    gp.outcome = "FULL_WIN"
+                    gp.rr_achieved = realized_r(target_tp3)
+                    set_holding(decided_bar)
+                elif tp2_hit:
+                    gp.outcome = "PARTIAL_WIN"
+                    gp.rr_achieved = realized_r(target_tp2)
+                    set_holding(decided_bar)
+                elif tp1_hit:
+                    gp.outcome = "PARTIAL_WIN"
+                    gp.rr_achieved = realized_r(target_tp1)
+                    set_holding(decided_bar)
 
     else:
         touched_entry = True
@@ -517,7 +602,10 @@ def _evaluate(
             )
             exec_type = None
             if maker_reclaim:
-                exec_type = "maker_in_taker_out" if gp.outcome == "LOSS" else "maker"
+                if progressive_ratchet:
+                    exec_type = "maker" if gp.outcome == "FULL_WIN" else "maker_in_taker_out"
+                else:
+                    exec_type = "maker_in_taker_out" if gp.outcome == "LOSS" else "maker"
 
             cost = calculate_trade_cost(
                 entry=entry,
@@ -644,6 +732,8 @@ def run_backtest(
     strict_a_plus_only: bool = False,
     payoff_asymmetry: bool = False,
     maker_reclaim: bool = False,
+    progressive_ratchet: bool = False,
+    enable_stage1: bool = True,
 ) -> dict:
     """Walk the engine over history and grade every plan at every horizon."""
     symbol = normalize_symbol(symbol)
@@ -718,6 +808,8 @@ def run_backtest(
                         strict_a_plus_only=strict_a_plus_only,
                         payoff_asymmetry=payoff_asymmetry,
                         maker_reclaim=maker_reclaim,
+                        progressive_ratchet=progressive_ratchet,
+                        enable_stage1=enable_stage1,
                     )
                 )
 

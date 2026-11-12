@@ -105,6 +105,7 @@ class DeterministicAssetEligibilityGate:
         liquidity: AssetLiquidityMetrics | None = None,
         desk: str = "MAIN_SOVEREIGN",
         ai_opportunity_score: float | None = None,
+        mtf_alignment: str | None = None,
     ) -> AssetEligibilityDecision:
         clean_sym = symbol.replace("/", "").replace("_", "").upper()
         raw_sym = symbol.upper()
@@ -121,19 +122,36 @@ class DeterministicAssetEligibilityGate:
                 ai_override_attempted=bool(ai_opportunity_score is not None),
             )
 
-        # Tier-1 Canary Live Whitelist Check (BTC and ETH only)
+        # Tier-1 Canary Live Whitelist Check (BTC, ETH, and conditional ALIGNED-only SOL)
         if desk in ("TIER1_CANARY", "CANARY"):
-            is_canary = any(
+            is_canary_core = any(
                 clean_sym == t.replace("/", "").replace("_", "") for t in TIER1_CANARY_WHITELIST
             )
-            if not is_canary:
+            is_sol = clean_sym in ("SOLUSDT", "SOLUSD")
+            mtf_clean = (mtf_alignment or "").strip().upper()
+
+            if is_sol:
+                if mtf_clean != "ALIGNED":
+                    return AssetEligibilityDecision(
+                        symbol=symbol,
+                        status=AssetEligibilityStatus.REJECTED_TIER1_CANARY_RESTRICTED,
+                        is_eligible=False,
+                        rationale=(
+                            f"Asset '{symbol}' is restricted to PAPER_ONLY_OBSERVATION: "
+                            f"requires mtf_alignment == 'ALIGNED' for Tier-1 Canary execution "
+                            f"(currently '{mtf_alignment or 'NONE'}'). Only ALIGNED setups permitted."
+                        ),
+                        desk=desk,
+                        ai_override_attempted=bool(ai_opportunity_score is not None),
+                    )
+            elif not is_canary_core:
                 return AssetEligibilityDecision(
                     symbol=symbol,
                     status=AssetEligibilityStatus.REJECTED_TIER1_CANARY_RESTRICTED,
                     is_eligible=False,
                     rationale=(
                         f"Asset '{symbol}' is restricted to PAPER_ONLY_OBSERVATION. "
-                        f"Only BTC and ETH are approved for Tier-1 Canary Execution."
+                        f"Only BTC, ETH, and ALIGNED SOL are approved for Tier-1 Canary Execution."
                     ),
                     desk=desk,
                     ai_override_attempted=bool(ai_opportunity_score is not None),
@@ -207,7 +225,15 @@ class DeterministicAssetEligibilityGate:
             ai_override_attempted=False,
         )
 
-    def is_tier1_canary_eligible(self, symbol: str) -> bool:
-        """Returns True only if symbol is on the restricted Tier-1 Canary Whitelist (BTC, ETH)."""
+    def is_tier1_canary_eligible(self, symbol: str, mtf_alignment: str | None = None) -> bool:
+        """
+        Returns True if symbol is on Tier-1 Canary Whitelist.
+        BTC and ETH are unconditionally whitelisted.
+        SOL is whitelisted strictly when mtf_alignment == 'ALIGNED'.
+        """
         clean_sym = symbol.replace("/", "").replace("_", "").upper()
-        return any(clean_sym == t.replace("/", "").replace("_", "") for t in TIER1_CANARY_WHITELIST)
+        if any(clean_sym == t.replace("/", "").replace("_", "") for t in TIER1_CANARY_WHITELIST):
+            return True
+        if clean_sym in ("SOLUSDT", "SOLUSD"):
+            return (mtf_alignment or "").strip().upper() == "ALIGNED"
+        return False

@@ -677,14 +677,27 @@ class CapitalGovernor:
                 f"Checkpoint 2 certified: CPCV DSR {cpcv_dsr:.4f} >= 0.95 across {oos_trades} OOS trades ({net_exp_r:+.3f}R net)",
             )
 
-        # Check empirical results from m45_cp2_certification_results.json, m44, m40, or m39
+        # Check empirical results from m46_cp2_certification_results.json, m45, m44, m40, or m39
         research_dir = Path(__file__).resolve().parent.parent.parent / "research"
-        for res_name in [
-            "m45_cp2_certification_results.json",
-            "m44_cp2_unified_results.json",
-            "m40_edge_verification_results.json",
-            "m39_edge_verification_results.json",
-        ]:
+        if "M45" in strategy_id.upper():
+            res_names = ["m45_cp2_certification_results.json"]
+        elif "M44" in strategy_id.upper():
+            res_names = ["m44_cp2_unified_results.json"]
+        elif "M40" in strategy_id.upper():
+            res_names = ["m40_edge_verification_results.json"]
+        elif "M39" in strategy_id.upper():
+            res_names = ["m39_edge_verification_results.json"]
+        elif "M46" in strategy_id.upper():
+            res_names = ["m46_cp2_certification_results.json"]
+        else:
+            res_names = [
+                "m46_cp2_certification_results.json",
+                "m45_cp2_certification_results.json",
+                "m44_cp2_unified_results.json",
+                "m40_edge_verification_results.json",
+                "m39_edge_verification_results.json",
+            ]
+        for res_name in res_names:
             res_file = research_dir / res_name
             if res_file.exists():
                 try:
