@@ -37,6 +37,7 @@ export const InstitutionalMasterTerminal: React.FC<InstitutionalMasterTerminalPr
   const [timeframe, setTimeframe] = useState<SupportedTimeframe>(initialTimeframe);
   const [densityMode, setDensityMode] = useState<TerminalDensityMode>('COMMAND');
   const [selectedStyle, setSelectedStyle] = useState<StyleSignalPlan['style']>('SWING');
+  const [directionFilter, setDirectionFilter] = useState<'AUTO' | 'LONG' | 'SHORT'>('AUTO');
 
   // Synchronize internal symbol state with parent initialSymbol prop changes
   useEffect(() => {
@@ -151,7 +152,17 @@ export const InstitutionalMasterTerminal: React.FC<InstitutionalMasterTerminalPr
     }
   };
 
-  const selectedSignal = telemetry?.styleSignals?.find((s) => s.style === selectedStyle) || telemetry?.styleSignals?.[0];
+  const baseSignal = telemetry?.styleSignals?.find((s) => s.style === selectedStyle) || telemetry?.styleSignals?.[0] || null;
+  const selectedSignal = React.useMemo(() => {
+    if (!baseSignal) return null;
+    if (directionFilter === 'LONG') {
+      return baseSignal.longPlan || baseSignal;
+    }
+    if (directionFilter === 'SHORT') {
+      return baseSignal.shortPlan || baseSignal;
+    }
+    return baseSignal;
+  }, [baseSignal, directionFilter]);
 
   return (
     <div className="w-full min-h-screen bg-[#060912] text-slate-200 font-mono flex flex-col select-none">
@@ -200,6 +211,8 @@ export const InstitutionalMasterTerminal: React.FC<InstitutionalMasterTerminalPr
                   currentZone={telemetry.market.premiumDiscount.currentZone}
                   onTimeframeChange={(newTf) => setTimeframe(newTf)}
                   loading={loading}
+                  directionFilter={directionFilter}
+                  onDirectionFilterChange={setDirectionFilter}
                 />
 
                 {/* Order Flow & CVD Sub-Center */}
@@ -221,6 +234,8 @@ export const InstitutionalMasterTerminal: React.FC<InstitutionalMasterTerminalPr
                   currentPrice={telemetry.currentPrice}
                   onSelectStyle={setSelectedStyle}
                   onSubmitToApproval={handleSubmitToApproval}
+                  directionFilter={directionFilter}
+                  onDirectionFilterChange={setDirectionFilter}
                 />
               </div>
             </div>
@@ -262,6 +277,8 @@ export const InstitutionalMasterTerminal: React.FC<InstitutionalMasterTerminalPr
                 currentZone={telemetry.market.premiumDiscount.currentZone}
                 onTimeframeChange={(newTf) => setTimeframe(newTf)}
                 loading={loading}
+                directionFilter={directionFilter}
+                onDirectionFilterChange={setDirectionFilter}
               />
             </div>
 

@@ -1626,13 +1626,23 @@ export interface InstitutionalConfluenceData {
 
 export type SignalExecutionState =
   | 'IN_ZONE'
+  | 'IN_ZONE_AWAITING_ABSORPTION'
+  | 'IN_ZONE_CONFIRMED'
   | 'WAITING_PULLBACK'
   | 'AWAITING_RECLAIM'
   | 'INVALIDATED';
 
+export type ZoneOrigin =
+  | 'BULLISH_OB_FVG'
+  | 'BEARISH_OB_FVG'
+  | 'LIQUIDITY_SWEEP_RECLAIM'
+  | 'VWAP_VAL_CONFLUENCE'
+  | string;
+
 export interface StyleSignalPlan {
   style: 'SCALP' | 'DAY' | 'SWING' | 'MOMENTUM' | 'POSITION';
   side: 'LONG' | 'SHORT';
+  recommendedSide?: 'LONG' | 'SHORT';
   timeframe: string;
   entryZone: [number, number];
   invalidationPrice: number;
@@ -1650,9 +1660,13 @@ export interface StyleSignalPlan {
   reaffirmsCount: number;
   cooldownRemainingSecs: number;
   thesis: string;
+  zoneOrigin?: ZoneOrigin;
   executionState?: SignalExecutionState;
+  entryTriggerState?: string;
   executionStateNote?: string;
   distanceToEntryPct?: number;
+  longPlan?: StyleSignalPlan;
+  shortPlan?: StyleSignalPlan;
 }
 
 export interface SignalBlotterRecord {

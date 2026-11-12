@@ -21,6 +21,8 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
+from core.prediction_ladder import compute_bidirectional_style_signals
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -609,13 +611,15 @@ def compute_service_readiness_and_alerts() -> dict[str, Any]:
 
 
 # ==============================================================================
-# ROUTE: GET /api/terminal/telemetry
+# ROUTE: GET /api/terminal/telemetry & GET /api/terminal/master-telemetry
 # ==============================================================================
 @terminal_router.get("/api/terminal/telemetry")
+@terminal_router.get("/api/terminal/master-telemetry")
 async def get_master_terminal_telemetry(
     symbol: str = Query("BTCUSDT"),
     timeframe: str = Query("15m"),
     limit: int = Query(200),
+    force_side: str | None = Query(None),
 ):
     """Unified master telemetry cockpit aggregator serving all 8 visual tiers."""
     norm_sym = symbol.replace("USDT", "/USDT") if "/" not in symbol else symbol
@@ -1072,257 +1076,20 @@ async def get_master_terminal_telemetry(
         86,
     ]
 
-    # 5. Level 4: 5-Style Signal Plans (Anchored to Real SMC Patterns & Candle Structures)
-    scalp_fvg = (
-        next(
-            (
-                f
-                for f in reversed(real_fvgs)
-                if f.pattern_type == SMCPatternType.BULLISH_FVG and f.top_price <= cur_p * 1.01
-            ),
-            None,
-        )
-        if (SMCPatternType and is_bull)
-        else None
+    # 5. Level 4: 5-Style Signal Plans (Bidirectional SMC-Anchored Engine)
+    cvd_score = float(cvd_data.get("cvdDeltaPct", 0.0))
+    style_signals = compute_bidirectional_style_signals(
+        symbol=clean_sym,
+        cur_p=cur_p,
+        high_50=high_50,
+        low_50=low_50,
+        real_obs=real_obs,
+        real_fvgs=real_fvgs,
+        cvd_score=cvd_score,
+        obi_score=0.0,
+        force_side=force_side,
+        is_bull_regime=is_bull,
     )
-
-    if scalp_fvg:
-        s_entry = [round(scalp_fvg.bottom_price, 2), round(scalp_fvg.top_price, 2)]
-        s_sl = round(scalp_fvg.invalidation_level, 2)
-        s_inv = round(scalp_fvg.invalidation_level, 2)
-        s_risk = max(scalp_fvg.top_price - scalp_fvg.invalidation_level, range_50 * 0.04)
-        s_tp1 = round(scalp_fvg.top_price + s_risk * 2.2, 2)
-        s_tp2 = round(scalp_fvg.top_price + s_risk * 3.8, 2)
-        s_tp3 = round(scalp_fvg.top_price + s_risk * 5.5, 2)
-        s_thesis = f"5m Bullish FVG retest anchored at ${scalp_fvg.bottom_price:,.2f}-${scalp_fvg.top_price:,.2f} with CVD absorption confirmation."
-    else:
-        s_bottom = round(low_50 + range_50 * 0.42, 2)
-        s_top = round(low_50 + range_50 * 0.49, 2)
-        s_sl = round(low_50 + range_50 * 0.36, 2)
-        s_inv = round(s_sl * 0.999, 2)
-        s_entry = [s_bottom, s_top]
-        s_risk = max(s_top - s_sl, range_50 * 0.04)
-        s_tp1 = round(s_top + s_risk * 2.2, 2)
-        s_tp2 = round(s_top + s_risk * 3.8, 2)
-        s_tp3 = round(s_top + s_risk * 5.5, 2)
-        s_thesis = "5m Discount equilibrium retest with CVD absorption confirmation."
-
-    day_ob = (
-        next(
-            (
-                ob
-                for ob in reversed(real_obs)
-                if ob.pattern_type == SMCPatternType.BULLISH_OB and ob.top_price <= cur_p * 1.015
-            ),
-            None,
-        )
-        if (SMCPatternType and is_bull)
-        else None
-    )
-
-    if day_ob:
-        d_entry = [round(day_ob.bottom_price, 2), round(day_ob.top_price, 2)]
-        d_sl = round(day_ob.invalidation_level, 2)
-        d_inv = round(day_ob.invalidation_level, 2)
-        d_risk = max(day_ob.top_price - day_ob.invalidation_level, range_50 * 0.06)
-        d_tp1 = round(day_ob.top_price + d_risk * 2.5, 2)
-        d_tp2 = round(day_ob.top_price + d_risk * 4.0, 2)
-        d_tp3 = round(day_ob.top_price + d_risk * 6.0, 2)
-        d_thesis = f"15m Order Block anchored at ${day_ob.bottom_price:,.2f}-${day_ob.top_price:,.2f} aligning with session discount liquidity."
-    else:
-        d_bottom = round(low_50 + range_50 * 0.28, 2)
-        d_top = round(low_50 + range_50 * 0.38, 2)
-        d_sl = round(low_50 + range_50 * 0.20, 2)
-        d_inv = round(d_sl * 0.998, 2)
-        d_entry = [d_bottom, d_top]
-        d_risk = max(d_top - d_sl, range_50 * 0.06)
-        d_tp1 = round(d_top + d_risk * 2.6, 2)
-        d_tp2 = round(d_top + d_risk * 4.2, 2)
-        d_tp3 = round(d_top + d_risk * 6.5, 2)
-        d_thesis = "Session VWAP discount retest aligning with London liquidity sweep."
-
-    sw_bottom = round(low_50 + range_50 * 0.12, 2)
-    sw_top = round(low_50 + range_50 * 0.24, 2)
-    sw_sl = round(low_50 * 0.995, 2)
-    sw_inv = round(sw_sl * 0.998, 2)
-
-    m_bottom = round(fib_05, 2)
-    m_top = round(fib_05 + range_50 * 0.08, 2)
-    m_sl = round(fib_05 - range_50 * 0.10, 2)
-    m_inv = round(m_sl * 0.998, 2)
-
-    pos_bottom = round(low_50 * 0.985, 2)
-    pos_top = round(low_50 * 1.01, 2)
-    pos_sl = round(low_50 * 0.965, 2)
-    pos_inv = round(pos_sl * 0.998, 2)
-
-    def _eval_signal_state(
-        s_side: str, s_entry: list[float], s_sl_p: float, s_inv_p: float
-    ) -> dict[str, Any]:
-        e_l = min(s_entry[0], s_entry[1])
-        e_h = max(s_entry[0], s_entry[1])
-        is_l = s_side.upper() == "LONG"
-        if is_l:
-            if cur_p <= s_sl_p or cur_p <= s_inv_p:
-                st = "INVALIDATED"
-                nt = f"Price breached stop loss (${s_sl_p:,.2f}). Setup invalidated."
-                dst = round(((cur_p - e_l) / cur_p) * 100, 2)
-            elif cur_p < e_l:
-                st = "AWAITING_RECLAIM"
-                diff = e_l - cur_p
-                diff_pct = (diff / cur_p) * 100
-                nt = f"Market is ${diff:,.2f} (-{diff_pct:.1f}%) below entry. Do NOT market-buy. Awaiting candle close above ${e_l:,.2f}."
-                dst = -round(diff_pct, 2)
-            elif cur_p > e_h:
-                st = "WAITING_PULLBACK"
-                diff = cur_p - e_h
-                diff_pct = (diff / cur_p) * 100
-                nt = f"Market is ${diff:,.2f} (+{diff_pct:.1f}%) above entry. Awaiting pullback into discount demand zone."
-                dst = round(diff_pct, 2)
-            else:
-                st = "IN_ZONE"
-                nt = f"Price is inside optimal entry zone (${e_l:,.2f} – ${e_h:,.2f}). Ready for execution."
-                dst = 0.0
-        else:
-            if cur_p >= s_sl_p or cur_p >= s_inv_p:
-                st = "INVALIDATED"
-                nt = f"Price breached stop loss (${s_sl_p:,.2f}). Setup invalidated."
-                dst = round(((cur_p - e_h) / cur_p) * 100, 2)
-            elif cur_p > e_h:
-                st = "AWAITING_RECLAIM"
-                diff = cur_p - e_h
-                diff_pct = (diff / cur_p) * 100
-                nt = f"Market is ${diff:,.2f} (+{diff_pct:.1f}%) above entry. Do NOT market-sell. Awaiting rejection below ${e_h:,.2f}."
-                dst = round(diff_pct, 2)
-            elif cur_p < e_l:
-                st = "WAITING_PULLBACK"
-                diff = e_l - cur_p
-                diff_pct = (diff / cur_p) * 100
-                nt = f"Market is ${diff:,.2f} (-{diff_pct:.1f}%) below entry. Awaiting pullback into premium supply zone."
-                dst = -round(diff_pct, 2)
-            else:
-                st = "IN_ZONE"
-                nt = f"Price is inside optimal entry zone (${e_l:,.2f} – ${e_h:,.2f}). Ready for execution."
-                dst = 0.0
-        return {"executionState": st, "executionStateNote": nt, "distanceToEntryPct": dst}
-
-    raw_style_signals = [
-        {
-            "style": "SCALP",
-            "side": "LONG" if is_bull else "SHORT",
-            "timeframe": "5m",
-            "entryZone": s_entry,
-            "invalidationPrice": s_inv,
-            "stopLoss": s_sl,
-            "tp1": s_tp1,
-            "tp2": s_tp2,
-            "tp3": s_tp3,
-            "riskRewardRatio": 2.8,
-            "suggestedRiskPct": 0.5,
-            "notionalUsd": 3800.0,
-            "halfKellyMultiplier": 0.5,
-            "score": 78,
-            "confidence": 82,
-            "stableDurationSecs": 940,
-            "reaffirmsCount": 4,
-            "cooldownRemainingSecs": 0,
-            "thesis": s_thesis,
-        },
-        {
-            "style": "DAY",
-            "side": "LONG" if is_bull else "SHORT",
-            "timeframe": "15m",
-            "entryZone": d_entry,
-            "invalidationPrice": d_inv,
-            "stopLoss": d_sl,
-            "tp1": d_tp1,
-            "tp2": d_tp2,
-            "tp3": d_tp3,
-            "riskRewardRatio": 3.6,
-            "suggestedRiskPct": 1.0,
-            "notionalUsd": 6800.0,
-            "halfKellyMultiplier": 0.75,
-            "score": 85,
-            "confidence": 88,
-            "stableDurationSecs": 1840,
-            "reaffirmsCount": 8,
-            "cooldownRemainingSecs": 0,
-            "thesis": d_thesis,
-        },
-        {
-            "style": "SWING",
-            "side": "LONG" if is_bull else "SHORT",
-            "timeframe": "4H",
-            "entryZone": [sw_bottom, sw_top],
-            "invalidationPrice": sw_inv,
-            "stopLoss": sw_sl,
-            "tp1": round(high_50, 2),
-            "tp2": round(high_50 + range_50 * 0.5, 2),
-            "tp3": round(high_50 + range_50 * 1.2, 2),
-            "riskRewardRatio": 5.4,
-            "suggestedRiskPct": 1.25,
-            "notionalUsd": 8400.0,
-            "halfKellyMultiplier": 0.62,
-            "score": 86,
-            "confidence": 90,
-            "stableDurationSecs": 3600,
-            "reaffirmsCount": 14,
-            "cooldownRemainingSecs": 0,
-            "thesis": "HTF continuation anchored to 4H demand order block.",
-        },
-        {
-            "style": "MOMENTUM",
-            "side": "LONG" if is_bull else "SHORT",
-            "timeframe": "1H",
-            "entryZone": [m_bottom, m_top],
-            "invalidationPrice": m_inv,
-            "stopLoss": m_sl,
-            "tp1": round(high_50, 2),
-            "tp2": round(high_50 + range_50 * 0.35, 2),
-            "tp3": round(high_50 + range_50 * 0.75, 2),
-            "riskRewardRatio": 3.8,
-            "suggestedRiskPct": 0.75,
-            "notionalUsd": 5200.0,
-            "halfKellyMultiplier": 0.55,
-            "score": 81,
-            "confidence": 84,
-            "stableDurationSecs": 1200,
-            "reaffirmsCount": 6,
-            "cooldownRemainingSecs": 0,
-            "thesis": "Volatility expansion coil release breaking above Asian high.",
-        },
-        {
-            "style": "POSITION",
-            "side": "LONG" if is_bull else "SHORT",
-            "timeframe": "1D",
-            "entryZone": [pos_bottom, pos_top],
-            "invalidationPrice": pos_inv,
-            "stopLoss": pos_sl,
-            "tp1": round(high_50 * 1.05, 2),
-            "tp2": round(high_50 * 1.15, 2),
-            "tp3": round(high_50 * 1.30, 2),
-            "riskRewardRatio": 6.8,
-            "suggestedRiskPct": 1.5,
-            "notionalUsd": 12000.0,
-            "halfKellyMultiplier": 0.7,
-            "score": 91,
-            "confidence": 94,
-            "stableDurationSecs": 86400,
-            "reaffirmsCount": 42,
-            "cooldownRemainingSecs": 0,
-            "thesis": "Macro post-halving parabolic expansion supported by ETF inflows.",
-        },
-    ]
-
-    style_signals = [
-        {
-            **sig,
-            **_eval_signal_state(
-                sig["side"], sig["entryZone"], sig["stopLoss"], sig["invalidationPrice"]
-            ),
-        }
-        for sig in raw_style_signals
-    ]
 
     # 6. Level 5: Authoritative Execution Blotter, Real Portfolio & Performance
     accounting: dict[str, Any] = {}

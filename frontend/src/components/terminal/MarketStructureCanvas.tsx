@@ -25,6 +25,7 @@ import {
   VolumeProfileData,
   LiquidationMapData,
   StyleSignalPlan,
+  SignalExecutionState,
 } from '../../types';
 
 interface MarketStructureCanvasProps {
@@ -41,6 +42,8 @@ interface MarketStructureCanvasProps {
   currentZone: 'PREMIUM' | 'DISCOUNT';
   onTimeframeChange: (tf: SupportedTimeframe) => void;
   loading: boolean;
+  directionFilter?: 'AUTO' | 'LONG' | 'SHORT';
+  onDirectionFilterChange?: (dir: 'AUTO' | 'LONG' | 'SHORT') => void;
 }
 
 export const MarketStructureCanvas: React.FC<MarketStructureCanvasProps> = ({
@@ -57,6 +60,8 @@ export const MarketStructureCanvas: React.FC<MarketStructureCanvasProps> = ({
   currentZone,
   onTimeframeChange,
   loading,
+  directionFilter = 'AUTO',
+  onDirectionFilterChange,
 }) => {
   // Layer visibility toggles
   const [showSMC, setShowSMC] = useState(true);
@@ -83,7 +88,7 @@ export const MarketStructureCanvas: React.FC<MarketStructureCanvasProps> = ({
   const eLow = selectedSignalPlan ? Math.min(selectedSignalPlan.entryZone[0], selectedSignalPlan.entryZone[1]) : 0;
   const eHigh = selectedSignalPlan ? Math.max(selectedSignalPlan.entryZone[0], selectedSignalPlan.entryZone[1]) : 0;
 
-  let liveExecutionState: 'IN_ZONE' | 'WAITING_PULLBACK' | 'AWAITING_RECLAIM' | 'INVALIDATED' =
+  let liveExecutionState: SignalExecutionState =
     selectedSignalPlan?.executionState || 'IN_ZONE';
 
   if (selectedSignalPlan) {
@@ -95,7 +100,7 @@ export const MarketStructureCanvas: React.FC<MarketStructureCanvasProps> = ({
       } else if (currentPrice > eHigh) {
         liveExecutionState = 'WAITING_PULLBACK';
       } else {
-        liveExecutionState = 'IN_ZONE';
+        liveExecutionState = selectedSignalPlan.executionState || 'IN_ZONE';
       }
     } else {
       if (currentPrice >= selectedSignalPlan.stopLoss || currentPrice >= selectedSignalPlan.invalidationPrice) {
@@ -105,10 +110,12 @@ export const MarketStructureCanvas: React.FC<MarketStructureCanvasProps> = ({
       } else if (currentPrice < eLow) {
         liveExecutionState = 'WAITING_PULLBACK';
       } else {
-        liveExecutionState = 'IN_ZONE';
+        liveExecutionState = selectedSignalPlan.executionState || 'IN_ZONE';
       }
     }
   }
+
+  const isInZone = liveExecutionState === 'IN_ZONE' || liveExecutionState === 'IN_ZONE_CONFIRMED' || liveExecutionState === 'IN_ZONE_AWAITING_ABSORPTION';
 
   // Shared Execution Ladder Component (used in both floating HUD and docked sidebar)
   const renderLadderContent = (docked: boolean) => {
@@ -126,15 +133,50 @@ export const MarketStructureCanvas: React.FC<MarketStructureCanvasProps> = ({
               {selectedSignalPlan.style} {effectiveSide}
             </span>
 
-            {/* Execution State Badge */}
-            {liveExecutionState === 'IN_ZONE' && (
+            {/* 3-State Direction Pill Toggle (AUTO | LONG | SHORT) */}
+            <div className="flex items-center bg-[#070b14] p-0.5 rounded border border-indigo-500/40 ml-1">
+              {(['AUTO', 'LONG', 'SHORT'] as const).map((dir) => (
+                <button
+                  key={dir}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDirectionFilterChange?.(dir);
+                  }}
+                  className={`px-1.5 py-0.2 rounded text-[8px] font-bold tracking-wider transition-all ${
+                    (directionFilter || 'AUTO') === dir
+                      ? dir === 'LONG'
+                        ? 'bg-emerald-500 text-slate-950 font-black'
+                        : dir === 'SHORT'
+                        ? 'bg-rose-500 text-white font-black'
+                        : 'bg-cyan-500 text-slate-950 font-black'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title={`Filter setups by ${dir}`}
+                >
+                  {dir}
+                </button>
+              ))}
+            </div>
+
+            {/* Execution State & Orderflow Trigger Badge */}
+            {selectedSignalPlan.entryTriggerState === 'IN_ZONE_CONFIRMED' && (
+              <span className="px-1.5 py-0.2 rounded text-[8px] font-bold bg-emerald-950/90 text-emerald-300 border border-emerald-500/60 flex items-center gap-0.5 animate-pulse">
+                ⚡ CONFIRMED
+              </span>
+            )}
+            {selectedSignalPlan.entryTriggerState === 'IN_ZONE_AWAITING_ABSORPTION' && (
+              <span className="px-1.5 py-0.2 rounded text-[8px] font-bold bg-cyan-950/90 text-cyan-300 border border-cyan-500/50 flex items-center gap-0.5">
+                ⏳ CVD PENDING
+              </span>
+            )}
+            {isInZone && !selectedSignalPlan.entryTriggerState && (
               <span className="px-1.5 py-0.2 rounded text-[8px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/50 flex items-center gap-0.5">
                 <CheckCircle2 size={8} /> IN ZONE
               </span>
             )}
             {liveExecutionState === 'AWAITING_RECLAIM' && (
               <span className="px-1.5 py-0.2 rounded text-[8px] font-bold bg-amber-950/90 text-amber-300 border border-amber-500/60 animate-pulse flex items-center gap-0.5">
-                <AlertTriangle size={8} /> BELOW ENTRY
+                <AlertTriangle size={8} /> {isPlanLong ? 'BELOW ENTRY' : 'ABOVE ENTRY'}
               </span>
             )}
             {liveExecutionState === 'WAITING_PULLBACK' && (
@@ -209,20 +251,27 @@ export const MarketStructureCanvas: React.FC<MarketStructureCanvasProps> = ({
 
               {/* Entry Zone */}
               <div className={`my-1 py-1 px-1.5 rounded flex flex-col gap-0.5 ${
-                liveExecutionState === 'IN_ZONE'
+                isInZone
                   ? 'bg-emerald-950/70 border border-emerald-500/70 shadow-sm shadow-emerald-500/20 text-white font-bold'
                   : 'bg-indigo-950/80 border border-indigo-500/50 text-white font-bold'
               }`}>
                 <div className="flex justify-between items-center">
                   <span className="flex items-center gap-1">
-                    <Target size={11} className={liveExecutionState === 'IN_ZONE' ? 'text-emerald-400' : 'text-cyan-400'} />
+                    <Target size={11} className={isInZone ? 'text-emerald-400' : 'text-cyan-400'} />
                     ENTRY:
                   </span>
-                  <span className="text-[9px] text-cyan-300">
-                    ${selectedSignalPlan.entryZone[0].toLocaleString()} – ${selectedSignalPlan.entryZone[1].toLocaleString()}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {selectedSignalPlan.zoneOrigin && (
+                      <span className="text-[7.5px] uppercase tracking-wider px-1 py-0.2 rounded bg-indigo-900/60 border border-indigo-500/40 text-cyan-300 font-mono">
+                        {selectedSignalPlan.zoneOrigin}
+                      </span>
+                    )}
+                    <span className="text-[9px] text-cyan-300">
+                      ${selectedSignalPlan.entryZone[0].toLocaleString()} – ${selectedSignalPlan.entryZone[1].toLocaleString()}
+                    </span>
+                  </div>
                 </div>
-                {liveExecutionState === 'IN_ZONE' && (
+                {isInZone && (
                   <div className="flex justify-between items-center text-[8px] text-emerald-300 font-normal pt-0.5 border-t border-emerald-500/30">
                     <span className="flex items-center gap-0.5">
                       <span className="inline-block w-1 h-1 rounded-full bg-emerald-400 animate-ping"></span>
@@ -314,20 +363,27 @@ export const MarketStructureCanvas: React.FC<MarketStructureCanvasProps> = ({
 
               {/* Entry Zone */}
               <div className={`my-1 py-1 px-1.5 rounded flex flex-col gap-0.5 ${
-                liveExecutionState === 'IN_ZONE'
+                isInZone
                   ? 'bg-emerald-950/70 border border-emerald-500/70 shadow-sm shadow-emerald-500/20 text-white font-bold'
                   : 'bg-indigo-950/80 border border-indigo-500/50 text-white font-bold'
               }`}>
                 <div className="flex justify-between items-center">
                   <span className="flex items-center gap-1">
-                    <Target size={11} className={liveExecutionState === 'IN_ZONE' ? 'text-emerald-400' : 'text-cyan-400'} />
+                    <Target size={11} className={isInZone ? 'text-emerald-400' : 'text-cyan-400'} />
                     ENTRY:
                   </span>
-                  <span className="text-[9px] text-cyan-300">
-                    ${selectedSignalPlan.entryZone[0].toLocaleString()} – ${selectedSignalPlan.entryZone[1].toLocaleString()}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {selectedSignalPlan.zoneOrigin && (
+                      <span className="text-[7.5px] uppercase tracking-wider px-1 py-0.2 rounded bg-indigo-900/60 border border-indigo-500/40 text-cyan-300 font-mono">
+                        {selectedSignalPlan.zoneOrigin}
+                      </span>
+                    )}
+                    <span className="text-[9px] text-cyan-300">
+                      ${selectedSignalPlan.entryZone[0].toLocaleString()} – ${selectedSignalPlan.entryZone[1].toLocaleString()}
+                    </span>
+                  </div>
                 </div>
-                {liveExecutionState === 'IN_ZONE' && (
+                {isInZone && (
                   <div className="flex justify-between items-center text-[8px] text-emerald-300 font-normal pt-0.5 border-t border-emerald-500/30">
                     <span className="flex items-center gap-0.5">
                       <span className="inline-block w-1 h-1 rounded-full bg-emerald-400 animate-ping"></span>

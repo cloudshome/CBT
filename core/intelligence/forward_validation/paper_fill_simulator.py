@@ -21,7 +21,7 @@ import math
 import time
 import uuid
 from enum import StrEnum
-from typing import Final, Literal
+from typing import Any, Final, Literal
 
 from pydantic import BaseModel, Field
 
@@ -116,6 +116,7 @@ class RestingLimitOrder:
         queue_ahead_size: float,
         placement_utc: float,
         fee_bps: float = 2.0,
+        plan: dict[str, Any] | None = None,
     ) -> None:
         self.order_id = order_id
         self.admission_id = admission_id
@@ -128,6 +129,7 @@ class RestingLimitOrder:
         self.remaining_quantity = quantity
         self.placement_utc = placement_utc
         self.fee_bps = fee_bps
+        self.plan = plan
         self.cumulative_volume_traded_at_level: float = 0.0
 
     @property
@@ -321,6 +323,7 @@ class RealisticPaperFillSimulator:
         price: float,
         quantity: float,
         placement_utc: float | None = None,
+        plan: dict[str, Any] | None = None,
     ) -> str:
         """
         Places a resting limit order and records its position behind existing queue depth.
@@ -354,6 +357,7 @@ class RealisticPaperFillSimulator:
             queue_ahead_size=queue_ahead,
             placement_utc=now,
             fee_bps=self.maker_fee_bps,
+            plan=plan,
         )
         logger.debug(
             "Placed limit order %s (%s %.4f @ %.2f, queue ahead: %.2f)",
@@ -391,6 +395,21 @@ class RealisticPaperFillSimulator:
             )
             if not eligible:
                 continue
+
+            # Knife-catch prevention if strategy ladder plan is attached
+            if order.plan:
+                from core.prediction_ladder import evaluate_ladder_tick
+
+                eval_res = evaluate_ladder_tick(
+                    order.plan,
+                    bar_open=trade_price,
+                    bar_high=trade_price,
+                    bar_low=trade_price,
+                    bar_close=trade_price,
+                )
+                if eval_res.state == "AWAITING_RECLAIM":
+                    # Knife-catch prevented: price flushed through zone without reclaim
+                    continue
 
             order.cumulative_volume_traded_at_level += trade_size
 
@@ -460,3 +479,17 @@ class RealisticPaperFillSimulator:
                 admission_id,
             )
         return cancelled_ids
+
+    def evaluate_ladder_tick(
+        self,
+        plan: dict[str, Any],
+        bar_open: float,
+        bar_high: float,
+        bar_low: float,
+        bar_close: float,
+        cvd_score: float = 0.0,
+    ) -> Any:
+        """Evaluates prediction ladder state transitions for paper execution parity."""
+        from core.prediction_ladder import evaluate_ladder_tick
+
+        return evaluate_ladder_tick(plan, bar_open, bar_high, bar_low, bar_close, cvd_score)

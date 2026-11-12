@@ -4,6 +4,7 @@ core/screener/screener_routes.py
 Modular FastAPI router for Dynamic Market Universe Discovery & Opportunity Hunter.
 """
 
+import time
 from typing import Any
 
 from fastapi import APIRouter
@@ -11,6 +12,28 @@ from fastapi import APIRouter
 from core.screener.opportunity_hunter import opportunity_hunter
 
 screener_router = APIRouter(prefix="/api/screener", tags=["Dynamic Universe Opportunity Hunter"])
+
+
+@screener_router.get("/actionable-entries")
+async def get_actionable_entries(
+    min_score: float = 0.0,
+    include_quarantined: bool = False,
+) -> dict[str, Any]:
+    """
+    Returns ranked actionable trade entries across tracked instruments.
+    Ranked by composite entryReadinessScore combining entry zone distance,
+    structural R:R (>= 2.5:1), CVD + L2 orderbook alignment, and OOS validation status.
+    """
+    entries = await opportunity_hunter.get_actionable_entries(
+        min_score=min_score,
+        include_quarantined=include_quarantined,
+    )
+    return {
+        "status": "SUCCESS",
+        "total_actionable": len(entries),
+        "timestamp_utc": time.time(),
+        "entries": entries,
+    }
 
 
 @screener_router.get("/opportunities")

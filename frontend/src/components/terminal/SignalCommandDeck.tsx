@@ -9,7 +9,7 @@ import {
   CheckCircle2,
   Clock,
 } from 'lucide-react';
-import { StyleSignalPlan } from '../../types';
+import { StyleSignalPlan, SignalExecutionState } from '../../types';
 
 interface SignalCommandDeckProps {
   signals: StyleSignalPlan[];
@@ -17,6 +17,8 @@ interface SignalCommandDeckProps {
   currentPrice?: number;
   onSelectStyle: (style: StyleSignalPlan['style']) => void;
   onSubmitToApproval: (signal: StyleSignalPlan) => void;
+  directionFilter?: 'AUTO' | 'LONG' | 'SHORT';
+  onDirectionFilterChange?: (dir: 'AUTO' | 'LONG' | 'SHORT') => void;
 }
 
 export const SignalCommandDeck: React.FC<SignalCommandDeckProps> = ({
@@ -25,8 +27,20 @@ export const SignalCommandDeck: React.FC<SignalCommandDeckProps> = ({
   currentPrice,
   onSelectStyle,
   onSubmitToApproval,
+  directionFilter = 'AUTO',
+  onDirectionFilterChange,
 }) => {
-  const currentSignal = signals.find((s) => s.style === selectedStyle) || signals[0];
+  const baseSignal = signals.find((s) => s.style === selectedStyle) || signals[0];
+  const currentSignal = React.useMemo(() => {
+    if (!baseSignal) return baseSignal;
+    if (directionFilter === 'LONG') {
+      return baseSignal.longPlan || baseSignal;
+    }
+    if (directionFilter === 'SHORT') {
+      return baseSignal.shortPlan || baseSignal;
+    }
+    return baseSignal;
+  }, [baseSignal, directionFilter]);
 
   const formatDuration = (secs: number) => {
     const mins = Math.floor(secs / 60);
@@ -40,7 +54,7 @@ export const SignalCommandDeck: React.FC<SignalCommandDeckProps> = ({
   const eLow = currentSignal ? Math.min(currentSignal.entryZone[0], currentSignal.entryZone[1]) : 0;
   const eHigh = currentSignal ? Math.max(currentSignal.entryZone[0], currentSignal.entryZone[1]) : 0;
 
-  let liveState: 'IN_ZONE' | 'WAITING_PULLBACK' | 'AWAITING_RECLAIM' | 'INVALIDATED' =
+  let liveState: SignalExecutionState =
     currentSignal?.executionState || 'IN_ZONE';
 
   if (currentSignal && currentPrice !== undefined) {
@@ -52,7 +66,7 @@ export const SignalCommandDeck: React.FC<SignalCommandDeckProps> = ({
       } else if (curP > eHigh) {
         liveState = 'WAITING_PULLBACK';
       } else {
-        liveState = 'IN_ZONE';
+        liveState = currentSignal.executionState || 'IN_ZONE';
       }
     } else {
       if (curP >= currentSignal.stopLoss || curP >= currentSignal.invalidationPrice) {
@@ -62,10 +76,12 @@ export const SignalCommandDeck: React.FC<SignalCommandDeckProps> = ({
       } else if (curP < eLow) {
         liveState = 'WAITING_PULLBACK';
       } else {
-        liveState = 'IN_ZONE';
+        liveState = currentSignal.executionState || 'IN_ZONE';
       }
     }
   }
+
+  const isInZone = liveState === 'IN_ZONE' || liveState === 'IN_ZONE_CONFIRMED' || liveState === 'IN_ZONE_AWAITING_ABSORPTION';
 
   const diffFromEntryLow = Number((eLow - curP).toFixed(2));
   const diffFromEntryHigh = Number((curP - eHigh).toFixed(2));
@@ -81,26 +97,54 @@ export const SignalCommandDeck: React.FC<SignalCommandDeckProps> = ({
           </span>
         </div>
 
-        {/* 5-Style Tabs */}
-        <div className="flex items-center bg-[#0d1322] border border-[#1e293b] rounded p-0.5 text-[10px]">
-          {signals.map((sig) => (
-            <button
-              key={sig.style}
-              onClick={() => onSelectStyle(sig.style)}
-              className={`px-3 py-1 rounded font-semibold transition-all flex items-center gap-1.5 ${
-                selectedStyle === sig.style
-                  ? 'bg-cyan-500 text-slate-950 font-bold shadow-sm shadow-cyan-500/20'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <span>{sig.style}</span>
-              <span className={`text-[8px] px-1 py-0.2 rounded font-bold ${
-                sig.side === 'LONG' ? 'bg-emerald-950 text-emerald-400' : 'bg-rose-950 text-rose-400'
-              }`}>
-                {sig.side}
-              </span>
-            </button>
-          ))}
+        {/* Direction Toggle & 5-Style Tabs */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* 3-State Direction Pill Toggle (AUTO | LONG | SHORT) */}
+          <div className="flex items-center bg-[#0d1322] border border-[#1e293b] rounded p-0.5 text-[10px]">
+            {(['AUTO', 'LONG', 'SHORT'] as const).map((dir) => (
+              <button
+                key={dir}
+                onClick={() => onDirectionFilterChange?.(dir)}
+                className={`px-2 py-0.5 rounded font-bold tracking-wider transition-all ${
+                  (directionFilter || 'AUTO') === dir
+                    ? dir === 'LONG'
+                      ? 'bg-emerald-500 text-slate-950 font-black shadow-sm'
+                      : dir === 'SHORT'
+                      ? 'bg-rose-500 text-white font-black shadow-sm'
+                      : 'bg-cyan-500 text-slate-950 font-black shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title={`Filter setup direction by ${dir}`}
+              >
+                {dir}
+              </button>
+            ))}
+          </div>
+
+          {/* 5-Style Tabs */}
+          <div className="flex items-center bg-[#0d1322] border border-[#1e293b] rounded p-0.5 text-[10px]">
+            {signals.map((sig) => {
+              const activePlan = directionFilter === 'LONG' ? (sig.longPlan || sig) : (directionFilter === 'SHORT' ? (sig.shortPlan || sig) : sig);
+              return (
+                <button
+                  key={sig.style}
+                  onClick={() => onSelectStyle(sig.style)}
+                  className={`px-3 py-1 rounded font-semibold transition-all flex items-center gap-1.5 ${
+                    selectedStyle === sig.style
+                      ? 'bg-cyan-500 text-slate-950 font-bold shadow-sm shadow-cyan-500/20'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <span>{sig.style}</span>
+                  <span className={`text-[8px] px-1 py-0.2 rounded font-bold ${
+                    activePlan.side === 'LONG' ? 'bg-emerald-950 text-emerald-400' : 'bg-rose-950 text-rose-400'
+                  }`}>
+                    {activePlan.side}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -120,12 +164,22 @@ export const SignalCommandDeck: React.FC<SignalCommandDeckProps> = ({
                   }`}>
                     {currentSignal.style} {currentSignal.side}
                   </span>
-                  {liveState === 'AWAITING_RECLAIM' && (
-                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-950 text-amber-300 border border-amber-500/50 flex items-center gap-1 animate-pulse">
-                      <AlertTriangle size={9} /> BELOW ENTRY
+                  {currentSignal.entryTriggerState === 'IN_ZONE_CONFIRMED' && (
+                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/60 flex items-center gap-1 animate-pulse">
+                      ⚡ ORDERFLOW CONFIRMED
                     </span>
                   )}
-                  {liveState === 'IN_ZONE' && (
+                  {currentSignal.entryTriggerState === 'IN_ZONE_AWAITING_ABSORPTION' && (
+                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-cyan-950 text-cyan-300 border border-cyan-500/50 flex items-center gap-1">
+                      ⏳ CVD PENDING
+                    </span>
+                  )}
+                  {liveState === 'AWAITING_RECLAIM' && (
+                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-950 text-amber-300 border border-amber-500/50 flex items-center gap-1 animate-pulse">
+                      <AlertTriangle size={9} /> {isSignalLong ? 'BELOW ENTRY' : 'ABOVE ENTRY'}
+                    </span>
+                  )}
+                  {liveState === 'IN_ZONE' && !currentSignal.entryTriggerState && (
                     <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/50 flex items-center gap-1">
                       <CheckCircle2 size={9} /> IN ZONE
                     </span>
@@ -163,89 +217,193 @@ export const SignalCommandDeck: React.FC<SignalCommandDeckProps> = ({
 
               {/* Vertical Execution Ladder */}
               <div className="space-y-1.5 text-[10px]">
-                {/* Take Profit Ladder */}
-                <div className="flex justify-between items-center p-1.5 rounded bg-emerald-950/20 border border-emerald-500/30 text-emerald-300">
-                  <span className="font-semibold">TP3 (Moonbag Target):</span>
-                  <span className="font-bold text-white">${currentSignal.tp3.toLocaleString()}</span>
-                  <span className="text-emerald-400 font-mono">+6.2R</span>
-                </div>
-                <div className="flex justify-between items-center p-1.5 rounded bg-emerald-950/20 border border-emerald-500/30 text-emerald-300">
-                  <span className="font-semibold">TP2 (Macro Resistance):</span>
-                  <span className="font-bold text-white">${currentSignal.tp2.toLocaleString()}</span>
-                  <span className="text-emerald-400 font-mono">+3.1R</span>
-                </div>
-                <div className="flex justify-between items-center p-1.5 rounded bg-emerald-950/20 border border-emerald-500/30 text-emerald-300">
-                  <span className="font-semibold">TP1 (Local Structure Pivot):</span>
-                  <span className="font-bold text-white">${currentSignal.tp1.toLocaleString()}</span>
-                  <span className="text-emerald-400 font-mono">+1.5R</span>
-                </div>
+                {isSignalLong ? (
+                  <>
+                    {/* Take Profit Ladder */}
+                    <div className="flex justify-between items-center p-1.5 rounded bg-emerald-950/20 border border-emerald-500/30 text-emerald-300">
+                      <span className="font-semibold">TP3 (Moonbag Target):</span>
+                      <span className="font-bold text-white">${currentSignal.tp3.toLocaleString()}</span>
+                      <span className="text-emerald-400 font-mono">+6.2R</span>
+                    </div>
+                    <div className="flex justify-between items-center p-1.5 rounded bg-emerald-950/20 border border-emerald-500/30 text-emerald-300">
+                      <span className="font-semibold">TP2 (Macro Resistance):</span>
+                      <span className="font-bold text-white">${currentSignal.tp2.toLocaleString()}</span>
+                      <span className="text-emerald-400 font-mono">+3.1R</span>
+                    </div>
+                    <div className="flex justify-between items-center p-1.5 rounded bg-emerald-950/20 border border-emerald-500/30 text-emerald-300">
+                      <span className="font-semibold">TP1 (Local Structure Pivot):</span>
+                      <span className="font-bold text-white">${currentSignal.tp1.toLocaleString()}</span>
+                      <span className="text-emerald-400 font-mono">+1.5R</span>
+                    </div>
 
-                {/* Live Market Price if Above Entry Zone (Waiting for Pullback) */}
-                {liveState === 'WAITING_PULLBACK' && currentPrice !== undefined && (
-                  <div className="p-1.5 rounded bg-cyan-950/40 border border-cyan-500/50 flex justify-between items-center text-cyan-300 font-bold text-[9px]">
-                    <span className="flex items-center gap-1">
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
-                      LIVE MARKET PRICE:
-                    </span>
-                    <span>${curP.toLocaleString()} (+${diffFromEntryHigh.toLocaleString()} above entry zone)</span>
-                  </div>
+                    {/* Live Market Price if Above Entry Zone (Waiting for Pullback) */}
+                    {liveState === 'WAITING_PULLBACK' && currentPrice !== undefined && (
+                      <div className="p-1.5 rounded bg-cyan-950/40 border border-cyan-500/50 flex justify-between items-center text-cyan-300 font-bold text-[9px]">
+                        <span className="flex items-center gap-1">
+                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                          LIVE MARKET PRICE:
+                        </span>
+                        <span>${curP.toLocaleString()} (+${diffFromEntryHigh.toLocaleString()} above entry zone)</span>
+                      </div>
+                    )}
+
+                    {/* Entry Zone */}
+                    <div className={`p-2 rounded border text-white font-bold my-1 ${
+                      isInZone
+                        ? 'bg-emerald-950/70 border-emerald-500 shadow-sm shadow-emerald-500/30'
+                        : 'bg-indigo-950/40 border-indigo-500/50'
+                    }`}>
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-1.5">
+                          <Target size={13} className={isInZone ? 'text-emerald-400' : 'text-cyan-400'} />
+                          <span>OPTIMAL ENTRY ZONE:</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {currentSignal.zoneOrigin && (
+                            <span className="text-[7.5px] uppercase tracking-wider px-1 py-0.2 rounded bg-indigo-900/60 border border-indigo-500/40 text-cyan-300 font-mono">
+                              {currentSignal.zoneOrigin}
+                            </span>
+                          )}
+                          <span className="text-cyan-300 font-mono">
+                            ${currentSignal.entryZone[0].toLocaleString()} – ${currentSignal.entryZone[1].toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                      {isInZone && currentPrice !== undefined && (
+                        <div className="text-[9px] text-emerald-300 font-normal pt-1 mt-1 border-t border-emerald-500/30 flex justify-between items-center">
+                          <span>● LIVE TICK IN ZONE:</span>
+                          <span className="font-bold text-white">${curP.toLocaleString()}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Live Market Price if Below Entry Zone (Awaiting Reclaim Warning) */}
+                    {liveState === 'AWAITING_RECLAIM' && currentPrice !== undefined && (
+                      <div className="p-2 rounded bg-amber-950/70 border border-amber-500/70 text-amber-300 shadow-md">
+                        <div className="flex justify-between items-center font-bold">
+                          <span className="flex items-center gap-1 text-white">
+                            <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                            LIVE MARKET PRICE:
+                          </span>
+                          <span className="text-white font-extrabold text-[11px]">${curP.toLocaleString()}</span>
+                          <span className="text-amber-400 font-mono">
+                            (-${diffFromEntryLow.toLocaleString()} below entry)
+                          </span>
+                        </div>
+                        <div className="text-[9px] text-amber-200 mt-1.5 pt-1.5 border-t border-amber-500/30 flex items-center gap-1.5">
+                          <AlertTriangle size={12} className="text-amber-400 shrink-0" />
+                          <span>
+                            Market price has broken below optimal entry. Do NOT market buy into drawdown. Awaiting candle close above ${eLow.toLocaleString()} to confirm reclaim.
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Stop Loss & Invalidation */}
+                    <div className="flex justify-between items-center p-1.5 rounded bg-rose-950/20 border border-rose-500/30 text-rose-300">
+                      <span className="font-semibold">STOP LOSS:</span>
+                      <span className="font-bold text-white">${currentSignal.stopLoss.toLocaleString()}</span>
+                      <span className="text-rose-400 font-mono">-1.0R</span>
+                    </div>
+                    <div className="flex justify-between items-center p-1 rounded bg-slate-900/60 border border-slate-800 text-slate-400 text-[9px]">
+                      <span>STRUCTURAL INVALIDATION:</span>
+                      <span className="font-bold text-rose-400">${currentSignal.invalidationPrice.toLocaleString()}</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Short Setup Ladder */}
+                    <div className="flex justify-between items-center p-1 rounded bg-slate-900/60 border border-slate-800 text-slate-400 text-[9px]">
+                      <span>STRUCTURAL INVALIDATION:</span>
+                      <span className="font-bold text-rose-400">${currentSignal.invalidationPrice.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-1.5 rounded bg-rose-950/20 border border-rose-500/30 text-rose-300">
+                      <span className="font-semibold">STOP LOSS:</span>
+                      <span className="font-bold text-white">${currentSignal.stopLoss.toLocaleString()}</span>
+                      <span className="text-rose-400 font-mono">-1.0R</span>
+                    </div>
+
+                    {/* Live Market Price if Above Entry Zone (Short Awaiting Rejection Warning) */}
+                    {liveState === 'AWAITING_RECLAIM' && currentPrice !== undefined && (
+                      <div className="p-2 rounded bg-amber-950/70 border border-amber-500/70 text-amber-300 shadow-md">
+                        <div className="flex justify-between items-center font-bold">
+                          <span className="flex items-center gap-1 text-white">
+                            <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                            LIVE MARKET PRICE:
+                          </span>
+                          <span className="text-white font-extrabold text-[11px]">${curP.toLocaleString()}</span>
+                          <span className="text-amber-400 font-mono">
+                            (+${diffFromEntryHigh.toLocaleString()} above entry)
+                          </span>
+                        </div>
+                        <div className="text-[9px] text-amber-200 mt-1.5 pt-1.5 border-t border-amber-500/30 flex items-center gap-1.5">
+                          <AlertTriangle size={12} className="text-amber-400 shrink-0" />
+                          <span>
+                            Market price has expanded above short entry. Do NOT market-sell into rally. Awaiting rejection below ${eHigh.toLocaleString()} before entry.
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Entry Zone */}
+                    <div className={`p-2 rounded border text-white font-bold my-1 ${
+                      isInZone
+                        ? 'bg-emerald-950/70 border-emerald-500 shadow-sm shadow-emerald-500/30'
+                        : 'bg-indigo-950/40 border-indigo-500/50'
+                    }`}>
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-1.5">
+                          <Target size={13} className={isInZone ? 'text-emerald-400' : 'text-cyan-400'} />
+                          <span>OPTIMAL ENTRY ZONE:</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {currentSignal.zoneOrigin && (
+                            <span className="text-[7.5px] uppercase tracking-wider px-1 py-0.2 rounded bg-indigo-900/60 border border-indigo-500/40 text-rose-300 font-mono">
+                              {currentSignal.zoneOrigin}
+                            </span>
+                          )}
+                          <span className="text-cyan-300 font-mono">
+                            ${currentSignal.entryZone[0].toLocaleString()} – ${currentSignal.entryZone[1].toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                      {isInZone && currentPrice !== undefined && (
+                        <div className="text-[9px] text-emerald-300 font-normal pt-1 mt-1 border-t border-emerald-500/30 flex justify-between items-center">
+                          <span>● LIVE TICK IN ZONE:</span>
+                          <span className="font-bold text-white">${curP.toLocaleString()}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Live Market Price if Below Entry Zone (Short Waiting for Pullback Up) */}
+                    {liveState === 'WAITING_PULLBACK' && currentPrice !== undefined && (
+                      <div className="p-1.5 rounded bg-cyan-950/40 border border-cyan-500/50 flex justify-between items-center text-cyan-300 font-bold text-[9px]">
+                        <span className="flex items-center gap-1">
+                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                          LIVE MARKET PRICE:
+                        </span>
+                        <span>${curP.toLocaleString()} (-${diffFromEntryLow.toLocaleString()} below entry zone)</span>
+                      </div>
+                    )}
+
+                    {/* Take Profits */}
+                    <div className="flex justify-between items-center p-1.5 rounded bg-emerald-950/20 border border-emerald-500/30 text-emerald-300">
+                      <span className="font-semibold">TP1 (Local Structure Pivot):</span>
+                      <span className="font-bold text-white">${currentSignal.tp1.toLocaleString()}</span>
+                      <span className="text-emerald-400 font-mono">+1.5R</span>
+                    </div>
+                    <div className="flex justify-between items-center p-1.5 rounded bg-emerald-950/20 border border-emerald-500/30 text-emerald-300">
+                      <span className="font-semibold">TP2 (Macro Liquidity Pool):</span>
+                      <span className="font-bold text-white">${currentSignal.tp2.toLocaleString()}</span>
+                      <span className="text-emerald-400 font-mono">+3.1R</span>
+                    </div>
+                    <div className="flex justify-between items-center p-1.5 rounded bg-emerald-950/20 border border-emerald-500/30 text-emerald-300">
+                      <span className="font-semibold">TP3 (Moonbag Target):</span>
+                      <span className="font-bold text-white">${currentSignal.tp3.toLocaleString()}</span>
+                      <span className="text-emerald-400 font-mono">+6.2R</span>
+                    </div>
+                  </>
                 )}
-
-                {/* Entry Zone */}
-                <div className={`p-2 rounded border text-white font-bold my-1 ${
-                  liveState === 'IN_ZONE'
-                    ? 'bg-emerald-950/70 border-emerald-500 shadow-sm shadow-emerald-500/30'
-                    : 'bg-indigo-950/40 border-indigo-500/50'
-                }`}>
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-1.5">
-                      <Target size={13} className={liveState === 'IN_ZONE' ? 'text-emerald-400' : 'text-cyan-400'} />
-                      <span>OPTIMAL ENTRY ZONE:</span>
-                    </div>
-                    <span className="text-cyan-300 font-mono">
-                      ${currentSignal.entryZone[0].toLocaleString()} – ${currentSignal.entryZone[1].toLocaleString()}
-                    </span>
-                  </div>
-                  {liveState === 'IN_ZONE' && currentPrice !== undefined && (
-                    <div className="text-[9px] text-emerald-300 font-normal pt-1 mt-1 border-t border-emerald-500/30 flex justify-between items-center">
-                      <span>● LIVE TICK IN ZONE:</span>
-                      <span className="font-bold text-white">${curP.toLocaleString()}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Live Market Price if Below Entry Zone (Awaiting Reclaim Warning) */}
-                {liveState === 'AWAITING_RECLAIM' && currentPrice !== undefined && (
-                  <div className="p-2 rounded bg-amber-950/70 border border-amber-500/70 text-amber-300 shadow-md">
-                    <div className="flex justify-between items-center font-bold">
-                      <span className="flex items-center gap-1 text-white">
-                        <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-                        LIVE MARKET PRICE:
-                      </span>
-                      <span className="text-white font-extrabold text-[11px]">${curP.toLocaleString()}</span>
-                      <span className="text-amber-400 font-mono">
-                        (-${diffFromEntryLow.toLocaleString()} below entry)
-                      </span>
-                    </div>
-                    <div className="text-[9px] text-amber-200 mt-1.5 pt-1.5 border-t border-amber-500/30 flex items-center gap-1.5">
-                      <AlertTriangle size={12} className="text-amber-400 shrink-0" />
-                      <span>
-                        Market price has broken below optimal entry. Do NOT market buy into drawdown. Awaiting candle close above ${eLow.toLocaleString()} to confirm reclaim.
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Stop Loss & Invalidation */}
-                <div className="flex justify-between items-center p-1.5 rounded bg-rose-950/20 border border-rose-500/30 text-rose-300">
-                  <span className="font-semibold">STOP LOSS:</span>
-                  <span className="font-bold text-white">${currentSignal.stopLoss.toLocaleString()}</span>
-                  <span className="text-rose-400 font-mono">-1.0R</span>
-                </div>
-                <div className="flex justify-between items-center p-1 rounded bg-slate-900/60 border border-slate-800 text-slate-400 text-[9px]">
-                  <span>STRUCTURAL INVALIDATION:</span>
-                  <span className="font-bold text-rose-400">${currentSignal.invalidationPrice.toLocaleString()}</span>
-                </div>
               </div>
             </div>
           </div>

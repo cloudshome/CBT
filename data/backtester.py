@@ -124,6 +124,7 @@ def _evaluate(
     horizon_bars: int,
     regime: str = "",
     sentiment: dict | None = None,
+    ladder_parity: bool = False,
 ) -> GradedPlan:
     """Grade one plan produced at bar i over `horizon_bars` future bars."""
     entry = plan.get("entry")
@@ -167,29 +168,25 @@ def _evaluate(
 
     highs = window["high"].to_numpy()
     lows = window["low"].to_numpy()
+    opens = window["open"].to_numpy() if "open" in window.columns else highs
+    closes = window["close"].to_numpy() if "close" in window.columns else highs
+    cvd_vals = window["cvd"].to_numpy() if "cvd" in window.columns else np.zeros(len(window))
 
     # Did price ever trade at the entry level? Only conditional (waiting) plans
     # need the trigger — immediate plans execute at the current bar.
     conditional = (
-        plan.get("status") == "waiting" or plan.get("trigger_level") is not None
+        plan.get("status") == "waiting"
+        or plan.get("trigger_level") is not None
+        or "entryZone" in plan
+        or "entry_zone" in plan
     )
-    touched_entry = True
-    if conditional:
-        touched_entry = ((lows <= entry) & (highs >= entry)).any()
-    if not touched_entry:
-        gp.outcome = "NOT_TRIGGERED"
-        return gp
-
-    # Order of SL vs TP1 touches
-    sl_mask = (lows <= sl) if is_buy else (highs >= sl)
-    tp1_mask = (highs >= tp1) if is_buy else (lows <= tp1)
-
-    def first(idx_arr) -> int | None:
-        idx = int(idx_arr[0]) if idx_arr.size else None
-        return idx if idx is not None and 0 <= idx < len(window) else None
-
-    first_sl = first(np.flatnonzero(sl_mask))
-    first_tp1 = first(np.flatnonzero(tp1_mask))
+    use_ladder = bool(
+        ladder_parity
+        or plan.get("ladder_parity")
+        or plan.get("use_ladder_parity")
+        or "entryZone" in plan
+        or "entry_zone" in plan
+    )
 
     # Realized R is always measured from the entry toward the exit price:
     # BUY  → (exit - entry) / risk   (exit above entry = positive R)
@@ -217,44 +214,166 @@ def _evaluate(
         gp.holding_bars = int(bars_held) + 1  # entry bar → deciding bar
         gp.holding_hours = round(gp.holding_bars * bar_ms / 3_600_000, 3)
 
-    # Conservative same-bar rule (<=, not <): when the stop and the target are
-    # both touched inside ONE candle, bar data cannot tell us which came first,
-    # so we grade the STOP. This is the rule `data/paper_trading.py::exit_event`
-    # already applies ("ambiguous ... conservative stop-first") and the rule
-    # docs/BACKTRADER_REVIEW.md §7.1 cites as written-down-and-tested.
-    #
-    # Fix (2026-08-14): this comparison used a strict `<`, so on a tie
-    # (first_sl == first_tp1) control fell through to the TP branch and the
-    # ambiguous candle was graded +2R instead of -1R — a 3R optimism, and a
-    # silent disagreement with the paper trader on identical input. It stayed
-    # invisible because synthetic random-walk candles are too small to span a
-    # 1R stop and a 2R target in one bar (0 ties measured over 876 decided
-    # trades); real wick/liquidation candles hit it routinely.
-    if first_sl is not None and (first_tp1 is None or first_sl <= first_tp1):
-        gp.outcome = "LOSS"
-        gp.rr_achieved = -1.0
-        gp.ambiguous_bar = first_tp1 is not None and first_sl == first_tp1
-        set_holding(first_sl)
-    elif first_tp1 is not None:
-        if tp2 is not None:
-            if is_buy:
-                tp2_idx = np.flatnonzero(highs[first_tp1:] >= tp2)
-            else:
-                tp2_idx = np.flatnonzero(lows[first_tp1:] <= tp2)
-            if tp2_idx.size:
+    if use_ladder:
+        from core.prediction_ladder import evaluate_ladder_tick
+
+        ladder_entry_zone = plan.get("entryZone") or plan.get("entry_zone") or [round(entry - 0.001 * entry, 2), round(entry + 0.001 * entry, 2)]
+        e_low = min(ladder_entry_zone[0], ladder_entry_zone[1])
+        e_high = max(ladder_entry_zone[0], ladder_entry_zone[1])
+
+        target_tp1 = tp1 if tp1 is not None else (round(entry + risk * 1.5, 2) if is_buy else round(entry - risk * 1.5, 2))
+        target_tp2 = tp2 if tp2 is not None else (round(entry + risk * 3.1, 2) if is_buy else round(entry - risk * 3.1, 2))
+        target_tp3 = (tps[2] if len(tps) > 2 else None) or (round(entry + risk * 6.2, 2) if is_buy else round(entry - risk * 6.2, 2))
+
+        ladder_plan = {
+            "side": "LONG" if is_buy else "SHORT",
+            "entryZone": [e_low, e_high],
+            "stopLoss": sl,
+            "invalidationPrice": plan.get("invalidationPrice") or plan.get("invalidation_level") or sl,
+            "tp1": target_tp1,
+            "tp2": target_tp2,
+            "tp3": target_tp3,
+        }
+
+        is_filled = not conditional
+        fill_bar_idx = 0 if not conditional else None
+
+        if conditional:
+            for bar_k in range(len(window)):
+                b_o = float(opens[bar_k])
+                b_h = float(highs[bar_k])
+                b_l = float(lows[bar_k])
+                b_c = float(closes[bar_k])
+                cvd_v = float(cvd_vals[bar_k])
+
+                tick_eval = evaluate_ladder_tick(ladder_plan, b_o, b_h, b_l, b_c, cvd_score=cvd_v)
+                if tick_eval.state == "INVALIDATED":
+                    # Knife catch avoided: price plunged to stop before confirming entry
+                    break
+                if tick_eval.fill_allowed:
+                    is_filled = True
+                    fill_bar_idx = bar_k
+                    break
+
+        if not is_filled or fill_bar_idx is None:
+            gp.outcome = "NOT_TRIGGERED"
+            return gp
+
+        current_stop = sl
+        breakeven_active = False
+        tp1_hit = False
+        tp2_hit = False
+        tp3_hit = False
+        decided_bar = None
+
+        for bar_k in range(fill_bar_idx, len(window)):
+            b_h = float(highs[bar_k])
+            b_l = float(lows[bar_k])
+
+            sl_touched = (b_l <= current_stop) if is_buy else (b_h >= current_stop)
+            tp1_touched = (b_h >= target_tp1) if is_buy else (b_l <= target_tp1)
+
+            if sl_touched and tp1_touched and not tp1_hit:
+                gp.outcome = "LOSS"
+                gp.rr_achieved = -1.0
+                gp.ambiguous_bar = True
+                set_holding(bar_k)
+                return gp
+
+            if sl_touched:
+                if breakeven_active:
+                    gp.outcome = "PARTIAL_WIN"
+                    gp.rr_achieved = realized_r(target_tp1)
+                else:
+                    gp.outcome = "LOSS"
+                    gp.rr_achieved = -1.0
+                set_holding(bar_k)
+                decided_bar = bar_k
+                break
+
+            if tp1_touched and not tp1_hit:
+                tp1_hit = True
+                breakeven_active = True
+                current_stop = entry  # Stop-to-breakeven after TP1!
+                decided_bar = bar_k
+
+            if target_tp2 is not None:
+                tp2_touched = (b_h >= target_tp2) if is_buy else (b_l <= target_tp2)
+                if tp2_touched:
+                    tp2_hit = True
+                    decided_bar = bar_k
+
+            if target_tp3 is not None:
+                tp3_touched = (b_h >= target_tp3) if is_buy else (b_l <= target_tp3)
+                if tp3_touched:
+                    tp3_hit = True
+                    decided_bar = bar_k
+                    gp.outcome = "FULL_WIN"
+                    gp.rr_achieved = realized_r(target_tp3)
+                    set_holding(bar_k)
+                    break
+
+        if gp.outcome == "OPEN":
+            if tp3_hit:
                 gp.outcome = "FULL_WIN"
-                gp.rr_achieved = realized_r(tp2)
-                set_holding(first_tp1 + int(tp2_idx[0]))
+                gp.rr_achieved = realized_r(target_tp3)
+                set_holding(decided_bar)
+            elif tp2_hit:
+                gp.outcome = "PARTIAL_WIN"
+                gp.rr_achieved = realized_r(target_tp2)
+                set_holding(decided_bar)
+            elif tp1_hit:
+                gp.outcome = "PARTIAL_WIN"
+                gp.rr_achieved = realized_r(target_tp1)
+                set_holding(decided_bar)
+
+    else:
+        touched_entry = True
+        if conditional:
+            touched_entry = ((lows <= entry) & (highs >= entry)).any()
+        if not touched_entry:
+            gp.outcome = "NOT_TRIGGERED"
+            return gp
+
+        # Order of SL vs TP1 touches
+        sl_mask = (lows <= sl) if is_buy else (highs >= sl)
+        tp1_mask = (highs >= tp1) if is_buy else (lows <= tp1)
+
+        def first(idx_arr) -> int | None:
+            idx = int(idx_arr[0]) if idx_arr.size else None
+            return idx if idx is not None and 0 <= idx < len(window) else None
+
+        first_sl = first(np.flatnonzero(sl_mask))
+        first_tp1 = first(np.flatnonzero(tp1_mask))
+
+        # Conservative same-bar rule (<=, not <): when the stop and the target are
+        # both touched inside ONE candle, bar data cannot tell us which came first,
+        # so we grade the STOP.
+        if first_sl is not None and (first_tp1 is None or first_sl <= first_tp1):
+            gp.outcome = "LOSS"
+            gp.rr_achieved = -1.0
+            gp.ambiguous_bar = first_tp1 is not None and first_sl == first_tp1
+            set_holding(first_sl)
+        elif first_tp1 is not None:
+            if tp2 is not None:
+                if is_buy:
+                    tp2_idx = np.flatnonzero(highs[first_tp1:] >= tp2)
+                else:
+                    tp2_idx = np.flatnonzero(lows[first_tp1:] <= tp2)
+                if tp2_idx.size:
+                    gp.outcome = "FULL_WIN"
+                    gp.rr_achieved = realized_r(tp2)
+                    set_holding(first_tp1 + int(tp2_idx[0]))
+                else:
+                    gp.outcome = "PARTIAL_WIN"
+                    gp.rr_achieved = realized_r(tp1)
+                    set_holding(first_tp1)
             else:
                 gp.outcome = "PARTIAL_WIN"
                 gp.rr_achieved = realized_r(tp1)
                 set_holding(first_tp1)
         else:
-            gp.outcome = "PARTIAL_WIN"
-            gp.rr_achieved = realized_r(tp1)
-            set_holding(first_tp1)
-    else:
-        gp.outcome = "OPEN"
+            gp.outcome = "OPEN"
 
     if is_buy:
         gp.max_favorable = round(float(highs.max() - entry), 2)

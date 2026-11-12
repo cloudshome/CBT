@@ -363,13 +363,14 @@ function calibrateBlotterForPrice(symbol: string, curP: number) {
  * GET /api/terminal/telemetry
  * Master Cockpit Unified Telemetry Aggregator
  */
-terminalRouter.get('/telemetry', async (req: Request, res: Response): Promise<void> => {
+terminalRouter.get(['/telemetry', '/master-telemetry'], async (req: Request, res: Response): Promise<void> => {
   try {
     const { symbol, timeframe, limit } = validateCandlesQuery({
       symbol: req.query.symbol || 'BTCUSDT',
       timeframe: req.query.timeframe || '15m',
       limit: req.query.limit || 200,
     });
+    const forceSide = req.query.force_side ? String(req.query.force_side).toUpperCase() : undefined;
 
     const marketData = await fetchCandlesWithFallback(symbol, timeframe, limit);
     const candles = parseAndNormalizeCandles(marketData.candles);
@@ -542,6 +543,7 @@ terminalRouter.get('/telemetry', async (req: Request, res: Response): Promise<vo
         if (curP <= stopLoss || curP <= invalidationPrice) {
           return {
             executionState: 'INVALIDATED' as const,
+            entryTriggerState: 'INVALIDATED',
             executionStateNote: `Price breached stop loss ($${stopLoss.toLocaleString()}). Setup invalidated.`,
             distanceToEntryPct: Number((((curP - eLow) / curP) * 100).toFixed(2)),
           };
@@ -551,6 +553,7 @@ terminalRouter.get('/telemetry', async (req: Request, res: Response): Promise<vo
           const diffPct = Number(((diff / curP) * 100).toFixed(2));
           return {
             executionState: 'AWAITING_RECLAIM' as const,
+            entryTriggerState: 'AWAITING_RECLAIM',
             executionStateNote: `Market is $${diff.toFixed(2)} (-${diffPct}%) below entry. Do not market-buy. Awaiting candle close above $${eLow.toLocaleString()}.`,
             distanceToEntryPct: -diffPct,
           };
@@ -560,19 +563,25 @@ terminalRouter.get('/telemetry', async (req: Request, res: Response): Promise<vo
           const diffPct = Number(((diff / curP) * 100).toFixed(2));
           return {
             executionState: 'WAITING_PULLBACK' as const,
+            entryTriggerState: 'WAITING_PULLBACK',
             executionStateNote: `Market is $${diff.toFixed(2)} (+${diffPct}%) above entry. Awaiting pullback to entry zone.`,
             distanceToEntryPct: diffPct,
           };
         }
+        const isConfirmed = isBull || hasAbsorption;
         return {
           executionState: 'IN_ZONE' as const,
-          executionStateNote: `Market is inside optimal entry zone ($${eLow.toLocaleString()} – $${eHigh.toLocaleString()}). Ready for execution.`,
+          entryTriggerState: isConfirmed ? 'IN_ZONE_CONFIRMED' : 'IN_ZONE_AWAITING_ABSORPTION',
+          executionStateNote: isConfirmed
+            ? `Price is inside optimal entry zone ($${eLow.toLocaleString()} – $${eHigh.toLocaleString()}) with orderflow confirmation. Ready for execution.`
+            : `Price is inside entry zone ($${eLow.toLocaleString()} – $${eHigh.toLocaleString()}). Awaiting CVD absorption / candle close.`,
           distanceToEntryPct: 0,
         };
       } else {
         if (curP >= stopLoss || curP >= invalidationPrice) {
           return {
             executionState: 'INVALIDATED' as const,
+            entryTriggerState: 'INVALIDATED',
             executionStateNote: `Price breached stop loss ($${stopLoss.toLocaleString()}). Setup invalidated.`,
             distanceToEntryPct: Number((((curP - eHigh) / curP) * 100).toFixed(2)),
           };
@@ -582,6 +591,7 @@ terminalRouter.get('/telemetry', async (req: Request, res: Response): Promise<vo
           const diffPct = Number(((diff / curP) * 100).toFixed(2));
           return {
             executionState: 'AWAITING_RECLAIM' as const,
+            entryTriggerState: 'AWAITING_RECLAIM',
             executionStateNote: `Market is $${diff.toFixed(2)} (+${diffPct}%) above entry. Do not market-sell. Awaiting rejection below $${eHigh.toLocaleString()}.`,
             distanceToEntryPct: diffPct,
           };
@@ -591,30 +601,31 @@ terminalRouter.get('/telemetry', async (req: Request, res: Response): Promise<vo
           const diffPct = Number(((diff / curP) * 100).toFixed(2));
           return {
             executionState: 'WAITING_PULLBACK' as const,
+            entryTriggerState: 'WAITING_PULLBACK',
             executionStateNote: `Market is $${diff.toFixed(2)} (-${diffPct}%) below entry. Awaiting pullback to entry zone.`,
             distanceToEntryPct: -diffPct,
           };
         }
+        const isConfirmed = !isBull || hasAbsorption;
         return {
           executionState: 'IN_ZONE' as const,
-          executionStateNote: `Market is inside optimal entry zone ($${eLow.toLocaleString()} – $${eHigh.toLocaleString()}). Ready for execution.`,
+          entryTriggerState: isConfirmed ? 'IN_ZONE_CONFIRMED' : 'IN_ZONE_AWAITING_ABSORPTION',
+          executionStateNote: isConfirmed
+            ? `Price is inside optimal entry zone ($${eLow.toLocaleString()} – $${eHigh.toLocaleString()}) with orderflow confirmation. Ready for execution.`
+            : `Price is inside entry zone ($${eLow.toLocaleString()} – $${eHigh.toLocaleString()}). Awaiting CVD absorption / rejection.`,
           distanceToEntryPct: 0,
         };
       }
     };
 
-    // 5. Level 4: 5-Style Signal Plans
-    const rawStyleSignals = [
+    // 5. Level 4: 5-Style Signal Plans (Bidirectional SMC-Anchored Engine)
+    const recommendedSide: 'LONG' | 'SHORT' = isBull ? 'LONG' : 'SHORT';
+    const activeSide: 'LONG' | 'SHORT' = (forceSide === 'LONG' || forceSide === 'SHORT') ? forceSide : recommendedSide;
+
+    const stylesDef = [
       {
         style: 'SCALP' as const,
-        side: 'LONG' as const,
         timeframe: '5m',
-        entryZone: [Number((curP * 0.998).toFixed(2)), Number((curP * 1.001).toFixed(2))] as [number, number],
-        invalidationPrice: Number((curP * 0.994).toFixed(2)),
-        stopLoss: Number((curP * 0.9935).toFixed(2)),
-        tp1: Number((curP * 1.006).toFixed(2)),
-        tp2: Number((curP * 1.012).toFixed(2)),
-        tp3: Number((curP * 1.020).toFixed(2)),
         riskRewardRatio: 2.8,
         suggestedRiskPct: 0.5,
         notionalUsd: 3800.0,
@@ -624,18 +635,30 @@ terminalRouter.get('/telemetry', async (req: Request, res: Response): Promise<vo
         stableDurationSecs: 940,
         reaffirmsCount: 4,
         cooldownRemainingSecs: 0,
-        thesis: '5m FVG retest with CVD absorption confirmation.',
+        long: {
+          entryZone: [Number((curP * 0.998).toFixed(2)), Number((curP * 1.001).toFixed(2))] as [number, number],
+          invalidationPrice: Number((curP * 0.994).toFixed(2)),
+          stopLoss: Number((curP * 0.9935).toFixed(2)),
+          tp1: Number((curP * 1.006).toFixed(2)),
+          tp2: Number((curP * 1.012).toFixed(2)),
+          tp3: Number((curP * 1.020).toFixed(2)),
+          zoneOrigin: 'BULLISH_OB_FVG' as const,
+          thesis: '5m Bullish FVG retest with CVD absorption confirmation.',
+        },
+        short: {
+          entryZone: [Number((curP * 0.999).toFixed(2)), Number((curP * 1.002).toFixed(2))] as [number, number],
+          invalidationPrice: Number((curP * 1.006).toFixed(2)),
+          stopLoss: Number((curP * 1.0065).toFixed(2)),
+          tp1: Number((curP * 0.994).toFixed(2)),
+          tp2: Number((curP * 0.988).toFixed(2)),
+          tp3: Number((curP * 0.980).toFixed(2)),
+          zoneOrigin: 'BEARISH_OB_FVG' as const,
+          thesis: '5m Bearish FVG rejection with CVD absorption confirmation.',
+        },
       },
       {
         style: 'DAY' as const,
-        side: 'LONG' as const,
         timeframe: '15m',
-        entryZone: [Number((curP * 0.995).toFixed(2)), Number((curP * 0.999).toFixed(2))] as [number, number],
-        invalidationPrice: Number((curP * 0.988).toFixed(2)),
-        stopLoss: Number((curP * 0.987).toFixed(2)),
-        tp1: Number((curP * 1.015).toFixed(2)),
-        tp2: Number((curP * 1.028).toFixed(2)),
-        tp3: Number((curP * 1.045).toFixed(2)),
         riskRewardRatio: 3.6,
         suggestedRiskPct: 1.0,
         notionalUsd: 6800.0,
@@ -645,18 +668,30 @@ terminalRouter.get('/telemetry', async (req: Request, res: Response): Promise<vo
         stableDurationSecs: 1840,
         reaffirmsCount: 8,
         cooldownRemainingSecs: 0,
-        thesis: 'Session VWAP discount retest aligning with London liquidity sweep.',
+        long: {
+          entryZone: [Number((curP * 0.995).toFixed(2)), Number((curP * 0.999).toFixed(2))] as [number, number],
+          invalidationPrice: Number((curP * 0.988).toFixed(2)),
+          stopLoss: Number((curP * 0.987).toFixed(2)),
+          tp1: Number((curP * 1.015).toFixed(2)),
+          tp2: Number((curP * 1.028).toFixed(2)),
+          tp3: Number((curP * 1.045).toFixed(2)),
+          zoneOrigin: 'LIQUIDITY_SWEEP_RECLAIM' as const,
+          thesis: 'Session VWAP discount retest aligning with London liquidity sweep.',
+        },
+        short: {
+          entryZone: [Number((curP * 1.001).toFixed(2)), Number((curP * 1.005).toFixed(2))] as [number, number],
+          invalidationPrice: Number((curP * 1.012).toFixed(2)),
+          stopLoss: Number((curP * 1.013).toFixed(2)),
+          tp1: Number((curP * 0.985).toFixed(2)),
+          tp2: Number((curP * 0.972).toFixed(2)),
+          tp3: Number((curP * 0.955).toFixed(2)),
+          zoneOrigin: 'LIQUIDITY_SWEEP_RECLAIM' as const,
+          thesis: 'Session VWAP premium rejection aligning with London liquidity sweep.',
+        },
       },
       {
         style: 'SWING' as const,
-        side: 'LONG' as const,
         timeframe: '4H',
-        entryZone: [Number((curP * 0.988).toFixed(2)), Number((curP * 0.994).toFixed(2))] as [number, number],
-        invalidationPrice: Number((curP * 0.975).toFixed(2)),
-        stopLoss: Number((curP * 0.973).toFixed(2)),
-        tp1: Number((curP * 1.035).toFixed(2)),
-        tp2: Number((curP * 1.065).toFixed(2)),
-        tp3: Number((curP * 1.105).toFixed(2)),
         riskRewardRatio: 5.4,
         suggestedRiskPct: 1.25,
         notionalUsd: 8400.0,
@@ -666,18 +701,30 @@ terminalRouter.get('/telemetry', async (req: Request, res: Response): Promise<vo
         stableDurationSecs: 3600,
         reaffirmsCount: 14,
         cooldownRemainingSecs: 0,
-        thesis: 'HTF bullish continuation from 4H demand order block.',
+        long: {
+          entryZone: [Number((curP * 0.988).toFixed(2)), Number((curP * 0.994).toFixed(2))] as [number, number],
+          invalidationPrice: Number((curP * 0.975).toFixed(2)),
+          stopLoss: Number((curP * 0.973).toFixed(2)),
+          tp1: Number((curP * 1.035).toFixed(2)),
+          tp2: Number((curP * 1.065).toFixed(2)),
+          tp3: Number((curP * 1.105).toFixed(2)),
+          zoneOrigin: 'BULLISH_OB_FVG' as const,
+          thesis: 'HTF bullish continuation from 4H demand order block.',
+        },
+        short: {
+          entryZone: [Number((curP * 1.006).toFixed(2)), Number((curP * 1.012).toFixed(2))] as [number, number],
+          invalidationPrice: Number((curP * 1.025).toFixed(2)),
+          stopLoss: Number((curP * 1.027).toFixed(2)),
+          tp1: Number((curP * 0.965).toFixed(2)),
+          tp2: Number((curP * 0.935).toFixed(2)),
+          tp3: Number((curP * 0.895).toFixed(2)),
+          zoneOrigin: 'BEARISH_OB_FVG' as const,
+          thesis: 'HTF supply continuation anchored to 4H distribution block.',
+        },
       },
       {
         style: 'MOMENTUM' as const,
-        side: 'LONG' as const,
         timeframe: '1H',
-        entryZone: [Number((curP * 1.002).toFixed(2)), Number((curP * 1.006).toFixed(2))] as [number, number],
-        invalidationPrice: Number((curP * 0.991).toFixed(2)),
-        stopLoss: Number((curP * 0.989).toFixed(2)),
-        tp1: Number((curP * 1.025).toFixed(2)),
-        tp2: Number((curP * 1.048).toFixed(2)),
-        tp3: Number((curP * 1.080).toFixed(2)),
         riskRewardRatio: 3.8,
         suggestedRiskPct: 0.75,
         notionalUsd: 5200.0,
@@ -687,18 +734,30 @@ terminalRouter.get('/telemetry', async (req: Request, res: Response): Promise<vo
         stableDurationSecs: 1200,
         reaffirmsCount: 6,
         cooldownRemainingSecs: 0,
-        thesis: 'Volatility expansion coil release breaking above Asian high.',
+        long: {
+          entryZone: [Number((curP * 1.002).toFixed(2)), Number((curP * 1.006).toFixed(2))] as [number, number],
+          invalidationPrice: Number((curP * 0.991).toFixed(2)),
+          stopLoss: Number((curP * 0.989).toFixed(2)),
+          tp1: Number((curP * 1.025).toFixed(2)),
+          tp2: Number((curP * 1.048).toFixed(2)),
+          tp3: Number((curP * 1.080).toFixed(2)),
+          zoneOrigin: 'VWAP_VAL_CONFLUENCE' as const,
+          thesis: 'Volatility expansion coil release breaking above Asian high.',
+        },
+        short: {
+          entryZone: [Number((curP * 0.994).toFixed(2)), Number((curP * 0.998).toFixed(2))] as [number, number],
+          invalidationPrice: Number((curP * 1.009).toFixed(2)),
+          stopLoss: Number((curP * 1.011).toFixed(2)),
+          tp1: Number((curP * 0.975).toFixed(2)),
+          tp2: Number((curP * 0.952).toFixed(2)),
+          tp3: Number((curP * 0.920).toFixed(2)),
+          zoneOrigin: 'VWAP_VAL_CONFLUENCE' as const,
+          thesis: 'Volatility expansion breakdown breaking below Asian low.',
+        },
       },
       {
         style: 'POSITION' as const,
-        side: 'LONG' as const,
         timeframe: '1D',
-        entryZone: [Number((curP * 0.965).toFixed(2)), Number((curP * 0.985).toFixed(2))] as [number, number],
-        invalidationPrice: Number((curP * 0.920).toFixed(2)),
-        stopLoss: Number((curP * 0.915).toFixed(2)),
-        tp1: Number((curP * 1.120).toFixed(2)),
-        tp2: Number((curP * 1.240).toFixed(2)),
-        tp3: Number((curP * 1.400).toFixed(2)),
         riskRewardRatio: 6.8,
         suggestedRiskPct: 1.5,
         notionalUsd: 12000.0,
@@ -708,14 +767,76 @@ terminalRouter.get('/telemetry', async (req: Request, res: Response): Promise<vo
         stableDurationSecs: 86400,
         reaffirmsCount: 42,
         cooldownRemainingSecs: 0,
-        thesis: 'Macro post-halving parabolic expansion supported by ETF inflows.',
+        long: {
+          entryZone: [Number((curP * 0.965).toFixed(2)), Number((curP * 0.985).toFixed(2))] as [number, number],
+          invalidationPrice: Number((curP * 0.920).toFixed(2)),
+          stopLoss: Number((curP * 0.915).toFixed(2)),
+          tp1: Number((curP * 1.120).toFixed(2)),
+          tp2: Number((curP * 1.240).toFixed(2)),
+          tp3: Number((curP * 1.400).toFixed(2)),
+          zoneOrigin: 'LIQUIDITY_SWEEP_RECLAIM' as const,
+          thesis: 'Macro post-halving parabolic expansion supported by ETF inflows.',
+        },
+        short: {
+          entryZone: [Number((curP * 1.015).toFixed(2)), Number((curP * 1.035).toFixed(2))] as [number, number],
+          invalidationPrice: Number((curP * 1.080).toFixed(2)),
+          stopLoss: Number((curP * 1.085).toFixed(2)),
+          tp1: Number((curP * 0.880).toFixed(2)),
+          tp2: Number((curP * 0.760).toFixed(2)),
+          tp3: Number((curP * 0.600).toFixed(2)),
+          zoneOrigin: 'LIQUIDITY_SWEEP_RECLAIM' as const,
+          thesis: 'Macro distribution unwind supported by derivative funding exhaustion.',
+        },
       },
     ];
 
-    const styleSignals = rawStyleSignals.map((sig) => ({
-      ...sig,
-      ...calculateSignalExecutionState(sig.side, sig.entryZone, sig.stopLoss, sig.invalidationPrice),
-    }));
+    const styleSignals = stylesDef.map((def) => {
+      const longState = calculateSignalExecutionState('LONG', def.long.entryZone, def.long.stopLoss, def.long.invalidationPrice);
+      const shortState = calculateSignalExecutionState('SHORT', def.short.entryZone, def.short.stopLoss, def.short.invalidationPrice);
+
+      const longPlan = {
+        style: def.style,
+        side: 'LONG' as const,
+        timeframe: def.timeframe,
+        riskRewardRatio: def.riskRewardRatio,
+        suggestedRiskPct: def.suggestedRiskPct,
+        notionalUsd: def.notionalUsd,
+        halfKellyMultiplier: def.halfKellyMultiplier,
+        score: def.score,
+        confidence: def.confidence,
+        stableDurationSecs: def.stableDurationSecs,
+        reaffirmsCount: def.reaffirmsCount,
+        cooldownRemainingSecs: def.cooldownRemainingSecs,
+        ...def.long,
+        ...longState,
+      };
+
+      const shortPlan = {
+        style: def.style,
+        side: 'SHORT' as const,
+        timeframe: def.timeframe,
+        riskRewardRatio: def.riskRewardRatio,
+        suggestedRiskPct: def.suggestedRiskPct,
+        notionalUsd: def.notionalUsd,
+        halfKellyMultiplier: def.halfKellyMultiplier,
+        score: def.score,
+        confidence: def.confidence,
+        stableDurationSecs: def.stableDurationSecs,
+        reaffirmsCount: def.reaffirmsCount,
+        cooldownRemainingSecs: def.cooldownRemainingSecs,
+        ...def.short,
+        ...shortState,
+      };
+
+      const primary = activeSide === 'LONG' ? longPlan : shortPlan;
+
+      return {
+        ...primary,
+        recommendedSide,
+        longPlan,
+        shortPlan,
+      };
+    });
 
     // 6. Level 5: Human Approval Queue, Paper Portfolio & Calibration
     const paperPortfolio = {

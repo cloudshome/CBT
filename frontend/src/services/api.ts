@@ -2506,11 +2506,14 @@ export const api = {
    */
   async getMasterTerminalTelemetry(
     symbol: string = 'BTCUSDT',
-    timeframe: SupportedTimeframe = '15m'
+    timeframe: SupportedTimeframe = '15m',
+    forceSide?: 'LONG' | 'SHORT'
   ): Promise<MasterTerminalTelemetry> {
-    const res = await authFetch(
-      `${BASE_URL}/api/terminal/telemetry?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`
-    );
+    let url = `${BASE_URL}/api/terminal/telemetry?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`;
+    if (forceSide) {
+      url += `&force_side=${forceSide}`;
+    }
+    const res = await authFetch(url);
     return handleResponse<MasterTerminalTelemetry>(res);
   },
 
