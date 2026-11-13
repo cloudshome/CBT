@@ -852,9 +852,9 @@ class ResearchAutomationOrchestrator:
         Updates active Macro Regime Thesis and Knowledge Graph causal edges.
         """
         logger.info("ResearchAutomationOrchestrator: Executing macro_vitals_sync pipeline.")
-        from core.macro_live_collector import macro_live_collector
-        from core.knowledge_os.thesis_engine import thesis_engine
         from core.knowledge_os.knowledge_graph import knowledge_graph_engine
+        from core.knowledge_os.thesis_engine import thesis_engine
+        from core.macro_live_collector import macro_live_collector
 
         # 1. Refresh all macro vitals
         vitals = await macro_live_collector.refresh_all()

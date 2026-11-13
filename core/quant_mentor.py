@@ -224,6 +224,7 @@ class QuantMentor:
         try:
             import asyncio
             import concurrent.futures
+
             from core.native_desk_bridge import native_desk_bridge
 
             try:
@@ -234,7 +235,9 @@ class QuantMentor:
             if loop and loop.is_running():
                 with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
                     dossier = ex.submit(
-                        lambda: asyncio.run(native_desk_bridge.compile_asset_dossier(target_sym, "15m"))
+                        lambda: asyncio.run(
+                            native_desk_bridge.compile_asset_dossier(target_sym, "15m")
+                        )
                     ).result(timeout=4.0)
             else:
                 dossier = asyncio.run(native_desk_bridge.compile_asset_dossier(target_sym, "15m"))
@@ -319,7 +322,9 @@ class QuantMentor:
                     "",
                     msg_lower,
                 ).strip()
-                query_term = re.sub(r"(\s+কি\??|\s+কাকে\s+বলে\??|\s+বলতে\s+কি\s+বুঝায়\??)$", "", query_term).strip()
+                query_term = re.sub(
+                    r"(\s+কি\??|\s+কাকে\s+বলে\??|\s+বলতে\s+কি\s+বুঝায়\??)$", "", query_term
+                ).strip()
 
                 dict_match = trading_dictionary.lookup(
                     query_term or user_message,
@@ -552,6 +557,8 @@ class QuantMentor:
                 )
             else:
                 # Default BTC Dossier
+                fvg_low = round(low_24h + (high_24h - low_24h) * 0.382, 2)
+                fvg_high = round(low_24h + (high_24h - low_24h) * 0.5, 2)
                 return (
                     f"⚡ **BITCOIN (BTC/USDT) LIVE DOSSIER**\n"
                     f"━━━━━━━━━━━━━━━━━━━━━━\n"

@@ -44,6 +44,71 @@ class TelegramAgentPlanner:
     def __init__(self):
         self._url_regex = re.compile(r"https?://[^\s]+")
 
+    async def parse_intent_with_llm(self, text: str, user_id: int | str) -> PlannerDecision:
+        """Parses natural language query into structured PlannerDecision using LLMBrain when enabled,
+
+        falling back gracefully to deterministic rule-based resolve_intent.
+        """
+        import json
+
+        from ai.llm_brain import LLMBrain
+
+        brain = LLMBrain()
+        if brain.enabled:
+            system_prompt = (
+                "You are the intent parsing engine for Crypto Brain Terminal (CBT) Telegram Bot. "
+                "Classify user input into one of the following tools and return ONLY valid JSON: "
+                "{\n"
+                '  "intent": "GET_POSITIONS" | "PLAN_CLOSE" | "PLAN_SIGNAL" | "GET_PRICE_OR_DOSSIER" | "GET_CONCEPTS" | "GET_LEARNED" | "QUERY_THESES" | "GET_TIMELINE" | "DIRECT_REPLY",\n'
+                '  "tool_name": string | null,\n'
+                '  "tool_args": object | null,\n'
+                '  "requires_confirmation": boolean,\n'
+                '  "direct_reply": string | null\n'
+                "}\n"
+                "Available tools:\n"
+                "- get_open_positions: for viewing portfolio, open trades, pnl\n"
+                "- plan_close_position(symbol): for closing a trade/position\n"
+                "- plan_trade_signal(symbol): for signal requests or setups\n"
+                "- get_live_ticker_dossier(symbol, language): for price/trend queries on BTC, ETH, SOL, GOLD\n"
+                "- get_concept_intelligence: for active concepts, strategies, M32\n"
+                "- get_ai_learned_today: for what AI learned today / research\n"
+                "- query_theses: for macroeconomic or asset theses\n"
+                "- get_evidence_timeline(topic): for historical narrative or evidence timelines\n"
+            )
+            try:
+                raw_json = brain.complete(prompt=f"User query: {text}", system=system_prompt)
+                if raw_json:
+                    clean_json = raw_json.strip()
+                    if clean_json.startswith("```"):
+                        clean_json = clean_json.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+                    parsed = json.loads(clean_json)
+                    return PlannerDecision(
+                        intent=parsed.get("intent", "UNKNOWN"),
+                        tool_name=parsed.get("tool_name"),
+                        tool_args=parsed.get("tool_args") or {},
+                        direct_reply=parsed.get("direct_reply"),
+                        requires_confirmation=bool(parsed.get("requires_confirmation", False)),
+                    )
+            except Exception as exc:
+                logger.debug("LLM intent parsing error, falling back to sovereign parser: %s", exc)
+
+        return self.resolve_intent(text, user_id)
+
+    async def execute_plan(self, decision: PlannerDecision, identity: TelegramUserIdentity) -> str:
+        """Executes a PlannerDecision through TelegramToolGateway."""
+        if decision.direct_reply:
+            return decision.direct_reply
+
+        if decision.tool_name:
+            res = await telegram_tool_gateway.execute_tool(
+                tool_name=decision.tool_name,
+                arguments=decision.tool_args or {},
+                identity=identity,
+            )
+            return res.output_text
+
+        return await self.answer_general_query(decision.intent or "status")
+
     def resolve_intent(self, text: str, user_id: int | str) -> PlannerDecision:
         """
         Classifies incoming natural language into actionable intent.
@@ -545,32 +610,90 @@ class TelegramAgentPlanner:
 
         # 16b. Trading Dictionary & Quantitative Terminology
         dict_terms = (
-            "fvg", "fair value gap", "consequent encroachment", "ce",
-            "order block", "ob", "breaker block", "breaker", "mitigation block",
-            "bos", "break of structure", "choch", "change of character",
-            "liquidity sweep", "stop raid", "bsl", "ssl", "buy side liquidity", "sell side liquidity",
-            "inducement", "idm", "judas swing", "judas", "power of 3", "amd",
-            "cvd", "cumulative volume delta", "cvd absorption", "absorption",
-            "orderbook imbalance", "obi", "vpin", "toxicity",
-            "funding rate", "funding squeeze", "open interest", "oi", "liquidation cascade",
-            "dxy", "dollar smile", "yield curve", "10y-2y", "real yield",
-            "half kelly", "kelly", "net ev", "expected value", "ratchet", "progressive ratchet",
-            "dsr", "deflated sharpe", "cpcv", "cross validation"
+            "fvg",
+            "fair value gap",
+            "consequent encroachment",
+            "ce",
+            "order block",
+            "ob",
+            "breaker block",
+            "breaker",
+            "mitigation block",
+            "bos",
+            "break of structure",
+            "choch",
+            "change of character",
+            "liquidity sweep",
+            "stop raid",
+            "bsl",
+            "ssl",
+            "buy side liquidity",
+            "sell side liquidity",
+            "inducement",
+            "idm",
+            "judas swing",
+            "judas",
+            "power of 3",
+            "amd",
+            "cvd",
+            "cumulative volume delta",
+            "cvd absorption",
+            "absorption",
+            "orderbook imbalance",
+            "obi",
+            "vpin",
+            "toxicity",
+            "funding rate",
+            "funding squeeze",
+            "open interest",
+            "oi",
+            "liquidation cascade",
+            "dxy",
+            "dollar smile",
+            "yield curve",
+            "10y-2y",
+            "real yield",
+            "half kelly",
+            "kelly",
+            "net ev",
+            "expected value",
+            "ratchet",
+            "progressive ratchet",
+            "dsr",
+            "deflated sharpe",
+            "cpcv",
+            "cross validation",
         )
         is_definition_question = (
-            lower.startswith("what is ") or lower.startswith("define ") or lower.startswith("explain ")
-            or " কাকে বলে" in lower or " কি" in lower or " কি?" in lower or "বলতে কি" in lower
-            or " ki" in lower or " ki?" in lower or " kake bole" in lower or lower.endswith(" ki") or lower.endswith(" ki?")
+            lower.startswith("what is ")
+            or lower.startswith("define ")
+            or lower.startswith("explain ")
+            or " কাকে বলে" in lower
+            or " কি" in lower
+            or " কি?" in lower
+            or "বলতে কি" in lower
+            or " ki" in lower
+            or " ki?" in lower
+            or " kake bole" in lower
+            or lower.endswith(" ki")
+            or lower.endswith(" ki?")
             or any(lower.strip(" ?.") == dt for dt in dict_terms)
-            or (any(dt in lower for dt in dict_terms) and any(kw in lower for kw in ("ki", "কি", "what", "explain", "define", "meaning")))
+            or (
+                any(dt in lower for dt in dict_terms)
+                and any(kw in lower for kw in ("ki", "কি", "what", "explain", "define", "meaning"))
+            )
         )
-        if is_definition_question and not any(w in lower for w in ("সিগন্যাল", "signal", "ট্রেড দাও", "buy", "sell")):
+        if is_definition_question and not any(
+            w in lower for w in ("সিগন্যাল", "signal", "ট্রেড দাও", "buy", "sell")
+        ):
             matched = ""
             for dt in dict_terms:
                 if dt in lower:
                     matched = dt
                     break
-            target_term = matched or clean.replace("what is", "").replace("define", "").replace("explain", "").replace("কাকে বলে", "").replace("কি", "").strip(" ?.")
+            target_term = matched or clean.replace("what is", "").replace("define", "").replace(
+                "explain", ""
+            ).replace("কাকে বলে", "").replace("কি", "").strip(" ?.")
             target_sym, _ = _extract_sym(lower)
             return PlannerDecision(
                 intent="LOOKUP_DICTIONARY",
@@ -582,9 +705,16 @@ class TelegramAgentPlanner:
         if any(
             w in lower
             for w in (
-                "macromicro", "macro micro", "ম্যাক্রোমাইক্রো", "recession probability",
-                "yield curve spread", "manufacturing cycle", "fomc hawkish", "fear and greed",
-                "stablecoin mcap", "stablecoin market cap"
+                "macromicro",
+                "macro micro",
+                "ম্যাক্রোমাইক্রো",
+                "recession probability",
+                "yield curve spread",
+                "manufacturing cycle",
+                "fomc hawkish",
+                "fear and greed",
+                "stablecoin mcap",
+                "stablecoin market cap",
             )
         ):
             return PlannerDecision(

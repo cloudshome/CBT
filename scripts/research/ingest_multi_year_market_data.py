@@ -52,7 +52,8 @@ from data.store import CandleStore, normalise_klines
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("m32_ingest_eval")
 
-START_TS_2022 = 1640995200000  # 2022-01-01 00:00:00 UTC
+START_TS_2020 = 1577836800000  # 2020-01-01 00:00:00 UTC
+START_TS_2022 = START_TS_2020  # backward-compat alias
 MARKET_DATA_DB = REPO_ROOT / "data" / "market_data.db"
 
 
@@ -61,7 +62,7 @@ def ingest_series(
     store: CandleStore,
     symbol: str,
     timeframe: str,
-    start_ts: int = START_TS_2022,
+    start_ts: int = START_TS_2020,
     market: str = "perp",
 ) -> pd.DataFrame:
     """
@@ -338,12 +339,22 @@ def main():
     store = CandleStore()
 
     series_configs = [
+        ("BTCUSDT", "15m"),
         ("BTCUSDT", "1h"),
         ("BTCUSDT", "4h"),
+        ("BTCUSDT", "1d"),
+        ("ETHUSDT", "15m"),
         ("ETHUSDT", "1h"),
         ("ETHUSDT", "4h"),
+        ("ETHUSDT", "1d"),
+        ("SOLUSDT", "15m"),
         ("SOLUSDT", "1h"),
         ("SOLUSDT", "4h"),
+        ("SOLUSDT", "1d"),
+        ("XAUUSD", "15m"),
+        ("XAUUSD", "1h"),
+        ("XAUUSD", "4h"),
+        ("XAUUSD", "1d"),
     ]
 
     dfs: dict[str, pd.DataFrame] = {}
@@ -351,7 +362,9 @@ def main():
     if not args.skip_ingest:
         for symbol, tf in series_configs:
             key = f"{symbol}_{tf}"
-            df = ingest_series(client, store, symbol, tf, start_ts=START_TS_2022, market="perp")
+            df = ingest_series(
+                client, store, symbol, tf, start_ts=START_TS_2020, market="perp"
+            )
             dfs[key] = df
     else:
         logger.info("Skipping network ingestion; loading existing candles from market_data.db...")

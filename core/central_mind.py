@@ -856,8 +856,8 @@ class CentralTradingMind:
                     "SELECT * FROM central_mind_decisions ORDER BY timestamp_ms DESC LIMIT 15;"
                 ).fetchall()
                 decisions = [dict(r) for r in rows]
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to fetch recent central_mind_decisions: {e}", exc_info=True)
 
         current_heat_usd = sum(
             float(p.get("size", 0.0))

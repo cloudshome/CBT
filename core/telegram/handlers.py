@@ -723,7 +723,9 @@ async def handle_dictionary(
     is_bn = any(ord(c) >= 0x0980 and ord(c) <= 0x09FF for c in clean_args)
     lang = "bn" if is_bn else "en"
 
-    res = trading_dictionary.lookup(clean_args, language=lang, symbol="BTC/USDT", with_live_example=True)
+    res = trading_dictionary.lookup(
+        clean_args, language=lang, symbol="BTC/USDT", with_live_example=True
+    )
     if res and res.get("formatted_markdown"):
         msg = res["formatted_markdown"]
         if chat_id:
@@ -738,7 +740,9 @@ async def handle_dictionary(
             "━━━━━━━━━━━━━━━━━━━━━━",
         ]
         for m in search_matches:
-            lines.append(f"• **{m['canonical_name']}** (`{m['term_id']}`): {m['definition_en'][:120]}...")
+            lines.append(
+                f"• **{m['canonical_name']}** (`{m['term_id']}`): {m['definition_en'][:120]}..."
+            )
         lines.append("\nType `/dict <term_id>` to view full definition and live market state.")
         msg = "\n".join(lines)
     else:

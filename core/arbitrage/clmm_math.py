@@ -174,9 +174,36 @@ def compute_swap_step(
             den = sqrt_ratio_current_x96 * sqrt_ratio_next_x96
             amount_out = num // den if den > 0 else 0
     else:
-        raise NotImplementedError(
-            "Exact Out CLMM simulation is not supported for arbitrage routing."
-        )
+        amount_out_remaining = -amount_remaining
+        if zero_for_one:
+            amount_out_max = (liquidity * (sqrt_ratio_current_x96 - sqrt_ratio_target_x96)) >> 96
+        else:
+            num = (liquidity << 96) * (sqrt_ratio_target_x96 - sqrt_ratio_current_x96)
+            den = sqrt_ratio_current_x96 * sqrt_ratio_target_x96
+            amount_out_max = num // den if den > 0 else 0
+
+        if amount_out_remaining >= amount_out_max:
+            sqrt_ratio_next_x96 = sqrt_ratio_target_x96
+            amount_out = amount_out_max
+        else:
+            amount_out = amount_out_remaining
+            if zero_for_one:
+                quotient = ((amount_out << 96) + liquidity - 1) // liquidity if liquidity > 0 else 0
+                sqrt_ratio_next_x96 = max(1, sqrt_ratio_current_x96 - quotient)
+            else:
+                num = (liquidity << 96) * sqrt_ratio_current_x96
+                den = (liquidity << 96) - (amount_out * sqrt_ratio_current_x96)
+                sqrt_ratio_next_x96 = (num + den - 1) // den if den > 0 else sqrt_ratio_target_x96
+
+        if zero_for_one:
+            num = (liquidity << 96) * (sqrt_ratio_current_x96 - sqrt_ratio_next_x96)
+            den = sqrt_ratio_current_x96 * sqrt_ratio_next_x96
+            amount_in = (num + den - 1) // den if den > 0 else 0
+        else:
+            num = liquidity * (sqrt_ratio_next_x96 - sqrt_ratio_current_x96)
+            amount_in = (num + (1 << 96) - 1) >> 96
+
+        fee_amount = (amount_in * fee_pips + (fee_multiplier - 1)) // fee_multiplier
 
     return SwapStepResult(
         sqrt_price_next_x96=int(sqrt_ratio_next_x96),

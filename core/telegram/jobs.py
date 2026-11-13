@@ -277,3 +277,74 @@ class TelegramJobManager:
 
 # Global Job Manager Singleton
 job_manager = TelegramJobManager()
+
+
+class ScheduledAlertDigestManager:
+    """Consolidated master scheduler for Telegram market briefings and desk digests.
+
+    Prevents multiple disparate loops across legacy telegram_live_desk.py and
+    telegram_bot.py.
+    """
+
+    def __init__(self):
+        self._last_morning_date: str = ""
+        self._last_evening_date: str = ""
+        self._last_learning_date: str = ""
+
+    async def check_and_dispatch_scheduled_digests(self, bot_instance: Any) -> dict[str, bool]:
+        """Checks current Bangladesh Standard Time (UTC+6) and triggers scheduled digests."""
+        import datetime
+
+        bd_tz = datetime.timezone(datetime.timedelta(hours=6))
+        now_bd = datetime.datetime.now(bd_tz)
+        today_str = now_bd.strftime("%Y-%m-%d")
+        hour = now_bd.hour
+
+        dispatched = {"morning": False, "evening": False, "learning": False}
+
+        # 1. Morning Market Briefing (08:00 BST)
+        if hour == 8 and self._last_morning_date != today_str:
+            self._last_morning_date = today_str
+            try:
+                msg = await bot_instance.generate_morning_briefing()
+                await bot_instance.broadcast_to_subscribers(msg)
+                dispatched["morning"] = True
+                logger.info(
+                    "Consolidated morning briefing dispatched at %s",
+                    now_bd.strftime("%H:%M BST"),
+                )
+            except Exception as e:
+                logger.warning("Morning briefing dispatch error: %s", e)
+
+        # 2. Evening Strategy Review (20:00 BST)
+        if hour == 20 and self._last_evening_date != today_str:
+            self._last_evening_date = today_str
+            try:
+                msg = await bot_instance.generate_evening_review()
+                await bot_instance.broadcast_to_subscribers(msg)
+                dispatched["evening"] = True
+                logger.info(
+                    "Consolidated evening review dispatched at %s",
+                    now_bd.strftime("%H:%M BST"),
+                )
+            except Exception as e:
+                logger.warning("Evening review dispatch error: %s", e)
+
+        # 3. Daily AI Learning Synthesis (22:00 BST)
+        if hour == 22 and self._last_learning_date != today_str:
+            self._last_learning_date = today_str
+            try:
+                msg = await bot_instance.generate_ai_learned_synthesis()
+                await bot_instance.broadcast_to_subscribers(msg)
+                dispatched["learning"] = True
+                logger.info(
+                    "Consolidated daily AI learning synthesis dispatched at %s",
+                    now_bd.strftime("%H:%M BST"),
+                )
+            except Exception as e:
+                logger.warning("Daily AI learning synthesis dispatch error: %s", e)
+
+        return dispatched
+
+
+scheduled_digest_manager = ScheduledAlertDigestManager()

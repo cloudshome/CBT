@@ -134,7 +134,6 @@ MODULE_LAYER_RULES: Final[list[tuple[str, ArchitectureLayer]]] = [
     ("core.telegram", ArchitectureLayer.LAYER_3_GATEWAY_API),
     ("core.telegram_bot", ArchitectureLayer.LAYER_3_GATEWAY_API),
     ("core.telegram_live_desk", ArchitectureLayer.LAYER_3_GATEWAY_API),
-    ("core.whatsapp_bot", ArchitectureLayer.LAYER_3_GATEWAY_API),
     # Layer 4: Presentation & UI
     ("frontend", ArchitectureLayer.LAYER_4_PRESENTATION_UI),
     ("electron", ArchitectureLayer.LAYER_4_PRESENTATION_UI),

@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 SKY / CTB — Historical Market Data Seed Script.
 

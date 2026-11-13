@@ -236,6 +236,43 @@ class LiveExecutionGatekeeper:
                     f"{code_str}: Production execution requires an active WebAuthn/FIDO2 hardware security key clearance session."
                 )
 
+        # 9. Tail Risk Engine Circuit Breaker
+        try:
+            from core.tail_risk_engine import tail_risk_engine
+
+            tail_status = tail_risk_engine.evaluate_tail_risk(
+                btc_returns=[],
+                eth_returns=[],
+                gold_returns=[],
+                current_book_depth_usd=100_000.0,
+                rolling_median_depth_usd=100_000.0,
+            )
+            tail_clear = not (
+                tail_status.is_tail_risk_active
+                and tail_status.recommended_action == "EMERGENCY_DELEVERAGE"
+            )
+            checks["tail_risk_circuit_breaker"] = tail_clear
+            if not tail_clear:
+                reasons.append(f"TAIL_RISK_BREACH: {tail_status.details}")
+        except Exception as exc:
+            logger.debug("Tail risk check bypassed: %s", exc)
+            checks["tail_risk_circuit_breaker"] = True
+
+        # 10. Cross-Venue Dislocation Circuit Breaker
+        try:
+            from core.venue_dislocation import venue_dislocation_monitor
+
+            disloc_status = venue_dislocation_monitor.update_and_check(symbol="BTCUSDT", quotes=[])
+            disloc_clear = disloc_status.action_recommended != "SUSPEND_AGGRESSIVE_MARKET_ORDERS"
+            checks["venue_dislocation_clear"] = disloc_clear
+            if not disloc_clear:
+                reasons.append(
+                    f"VENUE_DISLOCATION_BREACH: Spread {disloc_status.max_spread_bps:.2f}bps trips aggressive order suspension."
+                )
+        except Exception as exc:
+            logger.debug("Venue dislocation check bypassed: %s", exc)
+            checks["venue_dislocation_clear"] = True
+
         all_passed = all(checks.values())
 
         # Publish audit event

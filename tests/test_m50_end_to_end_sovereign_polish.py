@@ -11,9 +11,9 @@ Milestone M50 Acceptance Test Suite:
 """
 
 import os
-import pytest
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 
 @pytest.mark.asyncio
@@ -35,7 +35,11 @@ async def test_generate_market_update_zero_hardcode():
     assert "sentiment" in update
 
     # Ensure dynamic CVD order flow formatting
-    assert "Order Flow Aligned" in update["cvd_delta"] or "CVD" in update["cvd_delta"] or "NEUTRAL" in update["cvd_delta"]
+    assert (
+        "Order Flow Aligned" in update["cvd_delta"]
+        or "CVD" in update["cvd_delta"]
+        or "NEUTRAL" in update["cvd_delta"]
+    )
 
 
 @pytest.mark.asyncio
@@ -53,7 +57,10 @@ async def test_generate_news_digest_grounded_in_db():
         assert "headline" in item
         assert "sentiment" in item
         # Ensure fake BlackRock IBIT string is eliminated
-        assert "Institutional Bitcoin Spot ETFs record net daily inflows led by BlackRock IBIT" not in item["headline"]
+        assert (
+            "Institutional Bitcoin Spot ETFs record net daily inflows led by BlackRock IBIT"
+            not in item["headline"]
+        )
 
 
 def test_pdf_book_extractor_zero_gemini_native():
@@ -61,10 +68,14 @@ def test_pdf_book_extractor_zero_gemini_native():
     from core.pdf_extractor import PDFBookExtractor
 
     extractor = PDFBookExtractor(api_key="mock_key")
-    fake_png = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x01\x00\x00\x00\x01\x00\x08\x06\x00\x00\x00"
+    fake_png = (
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x01\x00\x00\x00\x01\x00\x08\x06\x00\x00\x00"
+    )
 
     with patch.dict(os.environ, {"USE_NATIVE_QUANT_ENGINE": "true"}):
-        with patch("google.genai.Client", side_effect=AssertionError("google.genai MUST NOT be called!")):
+        with patch(
+            "google.genai.Client", side_effect=AssertionError("google.genai MUST NOT be called!")
+        ):
             text, provider = extractor.extract_page_with_vision(fake_png, mime_type="image/png")
             assert provider in ("LOCAL_TESSERACT_OCR", "NATIVE_LOCAL_EXTRACTOR")
             assert "[NATIVE_IMAGE_PAGE" in text or len(text) > 0
@@ -101,9 +112,9 @@ def test_telegram_media_inspect_chart_image():
 @pytest.mark.asyncio
 async def test_bidirectional_tool_plan_trade_signal():
     """Verify _tool_plan_trade_signal honors direction (LONG and SHORT) and CP-2 risk rules."""
-    from core.telegram.tool_gateway import telegram_tool_gateway
-    from core.telegram.rbac import TelegramUserIdentity, TelegramRole
     from core.native_desk_bridge import LiveAssetIntelligenceDossier, TradeSetupPlan
+    from core.telegram.rbac import TelegramRole, TelegramUserIdentity
+    from core.telegram.tool_gateway import telegram_tool_gateway
 
     identity = TelegramUserIdentity(
         user_id="test_trader",
@@ -131,7 +142,10 @@ async def test_bidirectional_tool_plan_trade_signal():
     mock_dossier.current_price = 80000.0
     mock_dossier.primary_setup = mock_short_setup
 
-    with patch("core.native_desk_bridge.native_desk_bridge.compile_asset_dossier", new=AsyncMock(return_value=mock_dossier)):
+    with patch(
+        "core.native_desk_bridge.native_desk_bridge.compile_asset_dossier",
+        new=AsyncMock(return_value=mock_dossier),
+    ):
         res = await telegram_tool_gateway._tool_plan_trade_signal("BTC/USDT", identity)
         assert res.success is True
         assert res.requires_confirmation is True

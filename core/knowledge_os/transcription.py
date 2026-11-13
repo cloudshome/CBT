@@ -93,7 +93,11 @@ class SubtitlesExtractorProvider(BaseTranscriptionProvider):
                     )
                 subs = info.get("subtitles") or info.get("automatic_captions") or {}
                 if subs:
-                    lang = "en" if "en" in subs else ("bn" if "bn" in subs else next(iter(subs.keys())))
+                    lang = (
+                        "en"
+                        if "en" in subs
+                        else ("bn" if "bn" in subs else next(iter(subs.keys())))
+                    )
                     title = info.get("title", "Video")
                     desc = info.get("description", "")[:400]
                     return TranscriptResult(

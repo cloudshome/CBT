@@ -14,11 +14,9 @@ from internal CBT engines:
 from __future__ import annotations
 
 import logging
-import time
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-import numpy as np
 import pandas as pd
 
 from brain.trading_intelligence import build_intelligence
@@ -37,6 +35,7 @@ logger = logging.getLogger("cbt.native_desk_bridge")
 @dataclass
 class TradeSetupPlan:
     """Quantitative trade setup plan grounded in verified market structure."""
+
     direction: str  # "LONG" or "SHORT"
     entry_price: float
     entry_trigger: str
@@ -119,7 +118,11 @@ class LiveAssetIntelligenceDossier:
 
     @property
     def primary_setup(self) -> TradeSetupPlan:
-        direction = "LONG" if self.trend_bias == "BULLISH" else ("SHORT" if self.trend_bias == "BEARISH" else "LONG")
+        direction = (
+            "LONG"
+            if self.trend_bias == "BULLISH"
+            else ("SHORT" if self.trend_bias == "BEARISH" else "LONG")
+        )
         entry = self.entry_price if self.entry_price > 0 else self.current_price
         sl = self.stop_loss
         tp1 = self.take_profit_1
@@ -150,7 +153,11 @@ class LiveAssetIntelligenceDossier:
     def alternative_setup(self) -> TradeSetupPlan:
         alt_dir = "SHORT" if self.trend_bias == "BULLISH" else "LONG"
         entry = self.current_price
-        risk = abs(self.current_price - self.stop_loss) if self.stop_loss > 0 else max(1.0, (self.high_24h - self.low_24h) * 0.5)
+        risk = (
+            abs(self.current_price - self.stop_loss)
+            if self.stop_loss > 0
+            else max(1.0, (self.high_24h - self.low_24h) * 0.5)
+        )
         risk = max(1.0, risk)
         if alt_dir == "SHORT":
             sl = entry + risk
@@ -269,7 +276,9 @@ class NativeDeskIntelligenceBridge:
             volume_24h = float(sum(c.get("volume", 0.0) for c in candles[-min(len(candles), 96) :]))
         else:
             if cur_price <= 0:
-                cur_price = data_streamer._last_known_prices.get(clean_sym, 78500.0 if "BTC" in clean_sym else 2500.0)
+                cur_price = data_streamer._last_known_prices.get(
+                    clean_sym, 78500.0 if "BTC" in clean_sym else 2500.0
+                )
             high_24h = round(cur_price * 1.025, 2)
             low_24h = round(cur_price * 0.978, 2)
             volume_24h = 1000.0
@@ -286,7 +295,9 @@ class NativeDeskIntelligenceBridge:
         intel = {}
         if len(df) >= 20:
             try:
-                brain_output = analyze_frame(df, symbol=clean_sym.replace("/", ""), timeframe=norm_tf, min_confidence=0)
+                brain_output = analyze_frame(
+                    df, symbol=clean_sym.replace("/", ""), timeframe=norm_tf, min_confidence=0
+                )
                 payload = brain_output.as_json()
                 intel = build_intelligence(payload, df=df)
             except Exception as e:
@@ -314,7 +325,9 @@ class NativeDeskIntelligenceBridge:
         primary_fvg = None
         primary_ob = None
         fvg_list = [p for p in smc_patterns if "FVG" in p.pattern_type]
-        ob_list = [p for p in smc_patterns if "OB" in p.pattern_type or "ORDER_BLOCK" in p.pattern_type]
+        ob_list = [
+            p for p in smc_patterns if "OB" in p.pattern_type or "ORDER_BLOCK" in p.pattern_type
+        ]
 
         if fvg_list:
             primary_fvg = asdict(fvg_list[-1])
@@ -355,7 +368,11 @@ class NativeDeskIntelligenceBridge:
             cvd_res = cvd_absorption_engine.analyze_orderflow(clean_sym, norm_tf, candles)
             deriv_telemetry["cvd_delta"] = float(cvd_res.cvd_delta)
             deriv_telemetry["cvd_divergence"] = bool(cvd_res.divergence_detected)
-            deriv_telemetry["absorption_state"] = str(cvd_res.absorption_state.value if hasattr(cvd_res.absorption_state, "value") else cvd_res.absorption_state)
+            deriv_telemetry["absorption_state"] = str(
+                cvd_res.absorption_state.value
+                if hasattr(cvd_res.absorption_state, "value")
+                else cvd_res.absorption_state
+            )
         except Exception as e:
             logger.debug(f"CVD order flow evaluation fallback: {e}")
             deriv_telemetry["absorption_state"] = "NEUTRAL"
@@ -367,7 +384,7 @@ class NativeDeskIntelligenceBridge:
             obi_res = orderbook_imbalance_engine.compute_imbalance(bids, asks)
             deriv_telemetry["l2_imbalance_ratio"] = float(obi_res.imbalance_ratio)
             deriv_telemetry["micro_bias"] = str(obi_res.micro_bias)
-        except Exception as e:
+        except Exception:
             deriv_telemetry["l2_imbalance_ratio"] = 0.52
             deriv_telemetry["micro_bias"] = "BALANCED"
 
@@ -379,7 +396,11 @@ class NativeDeskIntelligenceBridge:
                 oi_delta_pct=1.5,
                 price_delta_pct=change_24h,
             )
-            deriv_telemetry["squeeze_risk"] = str(ois_res.squeeze_risk.value if hasattr(ois_res.squeeze_risk, "value") else ois_res.squeeze_risk)
+            deriv_telemetry["squeeze_risk"] = str(
+                ois_res.squeeze_risk.value
+                if hasattr(ois_res.squeeze_risk, "value")
+                else ois_res.squeeze_risk
+            )
         except Exception:
             deriv_telemetry["squeeze_risk"] = "NORMAL"
 
@@ -387,6 +408,7 @@ class NativeDeskIntelligenceBridge:
         macro_vitals: dict[str, Any] = {}
         try:
             from core.macro_sentinel import macro_sentinel
+
             snap = macro_sentinel.get_macro_snapshot()
             macro_vitals = {
                 "dxy": snap.dxy,
@@ -402,7 +424,9 @@ class NativeDeskIntelligenceBridge:
         # 7. Shadow Paper Positions
         open_pos: list[dict[str, Any]] = []
         try:
-            open_pos = [p for p in portfolio_shadow.get_open_positions() if p.get("symbol") == clean_sym]
+            open_pos = [
+                p for p in portfolio_shadow.get_open_positions() if p.get("symbol") == clean_sym
+            ]
         except Exception:
             pass
 
@@ -436,7 +460,11 @@ class NativeDeskIntelligenceBridge:
 
         # Determine actionable setup
         sig_card = intel.get("signal_card", {}) if intel else {}
-        signal_action = intel.get("signal", "WAIT") if intel else ("BUY" if trend_bias == "BULLISH" and change_24h > 0 else "WAIT")
+        signal_action = (
+            intel.get("signal", "WAIT")
+            if intel
+            else ("BUY" if trend_bias == "BULLISH" and change_24h > 0 else "WAIT")
+        )
 
         if signal_action in ("BUY", "LONG"):
             decision = "BUY"

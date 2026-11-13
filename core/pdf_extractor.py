@@ -254,8 +254,9 @@ class PDFBookExtractor:
             # 1. Attempt local OCR via pytesseract if available
             try:
                 import io
-                from PIL import Image
+
                 import pytesseract
+                from PIL import Image
 
                 img = Image.open(io.BytesIO(image_bytes))
                 text = pytesseract.image_to_string(img).strip()

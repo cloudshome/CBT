@@ -16,6 +16,7 @@ portfolio exposure, risk limits, or a behavioral flag all produce NO TRADE.
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 
 from config import DESK_DEFAULT
@@ -24,6 +25,8 @@ from data.database import SignalDB
 from . import playbooks as playbooks_mod
 from . import portfolio as portfolio_mod
 from . import risk_gate as risk_gate_mod
+
+logger = logging.getLogger("brain.decision")
 
 
 def _top_plan_type(payload: dict) -> str:
@@ -169,8 +172,8 @@ def _build_decision_inner(
                     reason=reason_str,
                     veto_type=vtype,
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Failed to record risk veto in db: %s", e, exc_info=True)
 
     final = "NO TRADE" if blocked_by or desk_action == "NO TRADE" else desk_action
     return {

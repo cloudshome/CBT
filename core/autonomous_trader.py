@@ -617,6 +617,46 @@ class AutonomousTrader:
                             f"Net-EV: {decision_out.net_ev_r:.2f}R | Kelly: {decision_out.kelly_fraction:.1%}"
                         )
 
+                        # Pre-Trade Circuit Breaker: Tail Risk & Venue Dislocation
+                        try:
+                            from core.tail_risk_engine import tail_risk_engine
+
+                            tail_st = tail_risk_engine.evaluate_tail_risk(
+                                btc_returns=[],
+                                eth_returns=[],
+                                gold_returns=[],
+                                current_book_depth_usd=100_000.0,
+                                rolling_median_depth_usd=100_000.0,
+                            )
+                            if (
+                                tail_st.is_tail_risk_active
+                                and tail_st.recommended_action == "EMERGENCY_DELEVERAGE"
+                            ):
+                                logger.warning(
+                                    f"AutonomousTrader skipping {sym}: Systemic tail risk active ({tail_st.details})"
+                                )
+                                continue
+                        except Exception as exc:
+                            logger.debug("Tail risk check bypassed: %s", exc)
+
+                        try:
+                            from core.venue_dislocation import venue_dislocation_monitor
+
+                            disloc_st = venue_dislocation_monitor.update_and_check(
+                                symbol=sym, quotes=[]
+                            )
+                            if (
+                                disloc_st.has_dislocation
+                                and disloc_st.action_recommended
+                                == "SUSPEND_AGGRESSIVE_MARKET_ORDERS"
+                            ):
+                                logger.warning(
+                                    f"AutonomousTrader skipping {sym}: Cross-venue dislocation active ({disloc_st.max_spread_bps:.2f}bps)"
+                                )
+                                continue
+                        except Exception as exc:
+                            logger.debug("Venue dislocation check bypassed: %s", exc)
+
                         from core.central_mind import CentralTradingMind, TradeProposal
 
                         data_streamer._last_known_prices[sym] = entry_price
@@ -644,6 +684,37 @@ class AutonomousTrader:
                         pos_id = (
                             verdict.executed_position_id or f"POS_{sym}_{int(time.time() * 1000)}"
                         )
+
+                        # Production Real Execution Routing via live_router
+                        if os.getenv("EXECUTION_MODE", "PAPER").strip().upper() == "PRODUCTION":
+                            from core.execution.live_router import (
+                                LiveOrderRequest,
+                                live_execution_router,
+                            )
+
+                            live_side = "BUY" if direction_str.upper() == "LONG" else "SELL"
+                            live_req = LiveOrderRequest(
+                                exchange="BINANCE_FUTURES",
+                                environment="PRODUCTION",
+                                symbol=sym,
+                                side=live_side,
+                                order_type="MARKET",
+                                quantity=units,
+                                price=entry_price,
+                                client_order_id=pos_id,
+                            )
+                            try:
+                                receipt = await live_execution_router.execute_live_order(live_req)
+                                logger.info(
+                                    f"AutonomousTrader executed LIVE PRODUCTION order {pos_id} via live_router: "
+                                    f"status={receipt.order_status} executed_qty={receipt.executed_quantity}"
+                                )
+                            except Exception as live_err:
+                                logger.error(
+                                    f"AutonomousTrader LIVE PRODUCTION execution failed: {live_err}"
+                                )
+                                continue
+
                         self.total_trades_executed += 1
                         self._last_traded_candle_ts[tf_key] = closed_candle_ts
                         self._last_traded_candle_ts[sym] = closed_candle_ts
@@ -851,12 +922,40 @@ class AutonomousTrader:
             if lock_fd is not None:
                 lock_fd.close()
             return
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(
+                f"Error acquiring supervisor lock for AutonomousTrader: {e}", exc_info=True
+            )
+            if lock_fd is not None:
+                lock_fd.close()
+            return
 
         logger.info(
             f"AutonomousTrader background loop online in PID {os.getpid()} (Interval: {self.scan_interval_sec}s)."
         )
+
+        # Boot-time execution state reconciliation across live exchange vs local ledger
+        try:
+            from core.execution.order_reconciliation import canonical_reconciler
+
+            recon_env = (
+                "PRODUCTION"
+                if os.getenv("EXECUTION_MODE", "PAPER").upper() == "PRODUCTION"
+                else "TESTNET"
+            )
+            recon_snapshot = await canonical_reconciler.reconcile_live_state(
+                exchange="BINANCE",
+                environment=recon_env,
+            )
+            logger.info(
+                f"Boot-time order reconciliation complete ({recon_env}): {recon_snapshot.overall_protection_status} "
+                f"({len(recon_snapshot.positions)} positions, {len(recon_snapshot.orders)} working orders)."
+            )
+        except Exception as recon_err:
+            logger.warning(
+                "Boot-time order reconciliation encountered non-fatal note: %s",
+                recon_err,
+            )
         while True:
             try:
                 if self.is_running:

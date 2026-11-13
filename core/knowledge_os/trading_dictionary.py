@@ -18,7 +18,6 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from core.database import db_manager
 from core.knowledge_os.research_wikipedia import WIKI_DB_PATH
 
 logger = logging.getLogger("sky.knowledge_os.trading_dictionary")
@@ -191,7 +190,7 @@ class TradingDictionaryManager:
             if not row:
                 rows = conn.execute(
                     "SELECT * FROM trading_dictionary_terms WHERE lower(canonical_name) = ? OR aliases_json LIKE ? OR aliases_json LIKE ?",
-                    (clean_q, f'%"{clean_q}"%', f'%{clean_q}%'),
+                    (clean_q, f'%"{clean_q}"%', f"%{clean_q}%"),
                 ).fetchall()
                 if rows:
                     row = rows[0]
@@ -201,18 +200,57 @@ class TradingDictionaryManager:
                 all_terms = conn.execute("SELECT * FROM trading_dictionary_terms").fetchall()
                 for r in all_terms:
                     aliases = json.loads(r["aliases_json"]) if r["aliases_json"] else []
-                    if any(clean_q == a.lower().strip() or clean_q in a.lower().strip() for a in aliases):
+                    if any(
+                        clean_q == a.lower().strip() or clean_q in a.lower().strip()
+                        for a in aliases
+                    ):
                         row = r
                         break
 
             # 3. FTS5 Search for concept terms
             if not row:
                 STOP_WORDS = {
-                    "where", "what", "is", "are", "the", "a", "an", "going", "to", "it",
-                    "how", "for", "in", "on", "of", "and", "or", "tell", "me", "about",
-                    "show", "can", "you", "does", "do", "market", "price", "btc", "eth",
-                    "sol", "gold", "current", "trend", "direction", "কি", "কাকে", "বলে",
-                    "বলতে", "বুঝায়", "যাবে", "কোথায়"
+                    "where",
+                    "what",
+                    "is",
+                    "are",
+                    "the",
+                    "a",
+                    "an",
+                    "going",
+                    "to",
+                    "it",
+                    "how",
+                    "for",
+                    "in",
+                    "on",
+                    "of",
+                    "and",
+                    "or",
+                    "tell",
+                    "me",
+                    "about",
+                    "show",
+                    "can",
+                    "you",
+                    "does",
+                    "do",
+                    "market",
+                    "price",
+                    "btc",
+                    "eth",
+                    "sol",
+                    "gold",
+                    "current",
+                    "trend",
+                    "direction",
+                    "কি",
+                    "কাকে",
+                    "বলে",
+                    "বলতে",
+                    "বুঝায়",
+                    "যাবে",
+                    "কোথায়",
                 }
                 sanitized = re.sub(r"[^\w\s]", " ", clean_q).strip()
                 tokens = [t for t in sanitized.split() if len(t) > 1 and t not in STOP_WORDS]
@@ -280,7 +318,9 @@ class TradingDictionaryManager:
             if loop and loop.is_running():
                 with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
                     return executor.submit(
-                        lambda: asyncio.run(self.enrich_with_live_example_async(term_id, symbol=symbol))
+                        lambda: asyncio.run(
+                            self.enrich_with_live_example_async(term_id, symbol=symbol)
+                        )
                     ).result(timeout=5.0)
             else:
                 return asyncio.run(self.enrich_with_live_example_async(term_id, symbol=symbol))
@@ -291,6 +331,7 @@ class TradingDictionaryManager:
     def _sync_fallback_example(self, term_id: str, symbol: str = "BTC/USDT") -> str:
         """Instant synchronous fallback for live example."""
         from core.macro_sentinel import macro_sentinel
+
         try:
             snap = macro_sentinel.get_macro_snapshot()
             if term_id in ("dxy_dollar_smile", "yield_curve_inversion", "us10y_real_yield"):
@@ -312,6 +353,7 @@ class TradingDictionaryManager:
         t_id = term_id.lower()
         try:
             from core.native_desk_bridge import native_desk_bridge
+
             dossier = await native_desk_bridge.compile_asset_dossier(symbol, "15m")
             price = dossier.current_price
 
@@ -352,8 +394,8 @@ class TradingDictionaryManager:
                 return (
                     f"⚡ **{symbol} Live Liquidity Pools Right Now:**\n"
                     f"• Current Price: `${price:,.2f}`\n"
-                    f"• Buy-Side Liquidity (BSL / Prior High): **`${bsl:,.2f}`** (+{((bsl - price)/price)*100:.2f}%)\n"
-                    f"• Sell-Side Liquidity (SSL / Prior Low): **`${ssl:,.2f}`** ({((ssl - price)/price)*100:.2f}%)\n"
+                    f"• Buy-Side Liquidity (BSL / Prior High): **`${bsl:,.2f}`** (+{((bsl - price) / price) * 100:.2f}%)\n"
+                    f"• Sell-Side Liquidity (SSL / Prior Low): **`${ssl:,.2f}`** ({((ssl - price) / price) * 100:.2f}%)\n"
                     f"• Tactical Roadmap: Market makers targeting BSL expansion after defending discount liquidity."
                 )
 
@@ -380,6 +422,7 @@ class TradingDictionaryManager:
 
             elif t_id in ("half_kelly_criterion", "net_expected_value", "progressive_ratchet"):
                 from core.portfolio_shadow import portfolio_shadow
+
                 acc = portfolio_shadow.get_portfolio_accounting()
                 eq = acc["virtual_equity"]
                 max_alloc = eq * 0.015
@@ -393,6 +436,7 @@ class TradingDictionaryManager:
 
             elif t_id in ("dxy_dollar_smile", "yield_curve_inversion", "us10y_real_yield"):
                 from core.macro_sentinel import macro_sentinel
+
                 snap = macro_sentinel.get_macro_snapshot()
                 return (
                     f"⚡ **Macro Sentinel Live Reading Right Now:**\n"
@@ -405,7 +449,9 @@ class TradingDictionaryManager:
         except Exception as e:
             logger.debug(f"[TradingDictionary] Live enrichment error: {e}")
 
-        return f"⚡ **{symbol} Live Context:** Verified against CBT Institutional Quantitative Core."
+        return (
+            f"⚡ **{symbol} Live Context:** Verified against CBT Institutional Quantitative Core."
+        )
 
     def _format_response(
         self, term: dict[str, Any], language: str = "en", symbol: str = "BTC/USDT"
@@ -494,14 +540,30 @@ class TradingDictionaryManager:
     def _ensure_seed_terms(self, force: bool = False) -> None:
         """Seeds comprehensive institutional quantitative trading terms if table is empty or has legacy encoding."""
         with self._get_connection() as conn:
-            count = conn.execute("SELECT count(*) as c FROM trading_dictionary_terms").fetchone()["c"]
-            sample = conn.execute("SELECT aliases_json FROM trading_dictionary_terms WHERE term_id='half_kelly_criterion'").fetchone()
-            sample_fvg = conn.execute("SELECT definition_en FROM trading_dictionary_terms WHERE term_id='fvg'").fetchone()
-            sample_cp2 = conn.execute("SELECT term_id FROM trading_dictionary_terms WHERE term_id='checkpoint_2'").fetchone()
+            count = conn.execute("SELECT count(*) as c FROM trading_dictionary_terms").fetchone()[
+                "c"
+            ]
+            sample = conn.execute(
+                "SELECT aliases_json FROM trading_dictionary_terms WHERE term_id='half_kelly_criterion'"
+            ).fetchone()
+            sample_fvg = conn.execute(
+                "SELECT definition_en FROM trading_dictionary_terms WHERE term_id='fvg'"
+            ).fetchone()
+            sample_cp2 = conn.execute(
+                "SELECT term_id FROM trading_dictionary_terms WHERE term_id='checkpoint_2'"
+            ).fetchone()
             has_escaped = sample and "\\u" in sample["aliases_json"]
-            needs_fvg_update = not sample_fvg or "imbalance sequence" not in sample_fvg["definition_en"]
+            needs_fvg_update = (
+                not sample_fvg or "imbalance sequence" not in sample_fvg["definition_en"]
+            )
             needs_cp2_update = not sample_cp2
-            if count >= 50 and not has_escaped and not needs_fvg_update and not needs_cp2_update and not force:
+            if (
+                count >= 50
+                and not has_escaped
+                and not needs_fvg_update
+                and not needs_cp2_update
+                and not force
+            ):
                 return
 
         logger.info("[TradingDictionary] Seeding 60+ institutional terms into SQLite...")
@@ -601,7 +663,14 @@ class TradingDictionaryManager:
             DictionaryTerm(
                 term_id="bsl_ssl",
                 canonical_name="Buy-Side & Sell-Side Liquidity (BSL / SSL)",
-                aliases=["bsl", "ssl", "buy side liquidity", "sell side liquidity", "বাই সাইড লিকুইডিটি", "সেল সাইড লিকুইডিটি"],
+                aliases=[
+                    "bsl",
+                    "ssl",
+                    "buy side liquidity",
+                    "sell side liquidity",
+                    "বাই সাইড লিকুইডিটি",
+                    "সেল সাইড লিকুইডিটি",
+                ],
                 category="SMC_PRICE_ACTION",
                 definition_en="BSL represents clusters of buy stop orders resting above swing highs. SSL represents clusters of sell stop orders resting below swing lows.",
                 definition_bn="BSL হলো সুইং হাই-এর ওপরে জমা থাকা রিটেইল স্টপ-লস এবং ব্রেকআউট বাই অর্ডার। SSL হলো সুইং লো-এর নিচে জমা থাকা স্টপ-লস সেল অর্ডার।",
@@ -650,7 +719,6 @@ class TradingDictionaryManager:
                 cbt_code_implementation="brain/trading_intelligence.py, core/smc_engine.py",
                 related_terms=["judas_swing", "liquidity_sweep"],
             ),
-
             # 2. Order Flow & Microstructure
             DictionaryTerm(
                 term_id="cvd",
@@ -704,12 +772,18 @@ class TradingDictionaryManager:
                 cbt_code_implementation="core/indicators.py, core/native_desk_bridge.py",
                 related_terms=["orderbook_imbalance", "cvd"],
             ),
-
             # 3. Derivatives & Liquidity
             DictionaryTerm(
                 term_id="funding_rate_squeeze",
                 canonical_name="Perpetual Funding Rate Squeeze",
-                aliases=["funding", "funding rate", "funding squeeze", "ফান্ডিং রেট", "শর্ট স্কুইজ", "লং স্কুইজ"],
+                aliases=[
+                    "funding",
+                    "funding rate",
+                    "funding squeeze",
+                    "ফান্ডিং রেট",
+                    "শর্ট স্কুইজ",
+                    "লং স্কুইজ",
+                ],
                 category="DERIVATIVES_LIQUIDITY",
                 definition_en="The periodic payment mechanism anchoring perpetual futures prices to spot. Severe positive funding signals over-leveraged longs vulnerable to long squeeze; negative signals short squeeze risk.",
                 definition_bn="পার্পেচুয়াল ফিউচার ও স্পট প্রাইস সমান রাখার ফি। অতিরিক্ত নেগেটিভ ফান্ডিং শর্ট স্কুইজের এবং অতিরিক্ত পজিটিভ ফান্ডিং লং স্কুইজের সংকেত দেয়।",
@@ -745,7 +819,6 @@ class TradingDictionaryManager:
                 cbt_code_implementation="core/oi_funding_squeeze.py, core/native_desk_bridge.py",
                 related_terms=["funding_rate_squeeze", "cvd_absorption"],
             ),
-
             # 4. Macro & Central Banking
             DictionaryTerm(
                 term_id="dxy_dollar_smile",
@@ -786,7 +859,6 @@ class TradingDictionaryManager:
                 cbt_code_implementation="core/macro_live_collector.py, core/macro_sentinel.py",
                 related_terms=["dxy_dollar_smile", "yield_curve_inversion"],
             ),
-
             # 5. Quantitative Risk & Execution
             DictionaryTerm(
                 term_id="half_kelly_criterion",

@@ -692,8 +692,10 @@ async def place_paper_trade(order: PaperTradeRequest):
                 timestamp_ms=now_ms,
             )
             central_mind._persist_verdict(v)
-        except Exception:
-            pass
+        except Exception as cm_err:
+            logger.warning(
+                "Failed to persist rejected CentralMindVerdict: %s", cm_err, exc_info=True
+            )
         raise HTTPException(status_code=422, detail=str(e))
     return {
         "message": "Simulated order filled successfully",

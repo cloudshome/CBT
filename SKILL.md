@@ -1,189 +1,146 @@
 ---
-name: cryptobrain
-description: "AI trading brain for BTC, ETH, and XAUUSD/GOLD. Read-only signal engine, multi-source market context, and a strict human-approval gate. NEVER places exchange orders — machine proposes, human approves, paper-runner executes."
+name: cbt-active-trader
+description: "Active Trader Skill for Crypto Brain Terminal (CBT) / SKY. Autonomous market scanning, risk-governed paper & live execution, dynamic M47 trailing ratchets, and fail-closed panic close workflows across BTC, ETH, SOL, and Gold."
 ---
 
-# CryptoBrain — AI Trading Brain
+# CBT Active Trader Skill & Operational Governance
 
-You are reading this because an operator wants you to **use** CryptoBrain
-to assist their BTC/ETH/GOLD trading decisions. CryptoBrain is a
-quant-grade signal engine plus a Model Context Protocol (MCP) server
-plus a web dashboard. This file tells you what you can call, what you
-**must not** call, and how to behave.
+The **Active Trader Skill** equips autonomous agents and quantitative operators with the definitive workflows required to operate, monitor, and trade using the Crypto Brain Terminal (CBT / SKY).
 
-> **One rule above all:** you never place a real exchange order. You
-> read data, run scans, ask grounded questions, request briefings, and
-> hand any action back to the human. If the operator asks you to trade
-> autonomously, refuse and explain that CryptoBrain is
-> research + decision-support, never execution.
+- **Official Repository Target:** `https://github.com/cloudshome/CBT.git`
+- **Execution Architecture:** Fail-closed dual-mode (`PAPER` simulation default vs. `PRODUCTION` live exchange routing).
+- **Core Assets:** `BTC/USDT`, `ETH/USDT`, `SOL/USDT`, `XAU/USD` (Gold).
+- **Primary Timeframes:** `15m` execution horizon, `1h` structural trend, `4h` macro regime.
 
-## When to use this
+---
 
-| Operator says | You do |
-|---|---|
-| "Is BTC bullish right now?" | `python main.py brief --symbols BTCUSDT` (or `agent morning`) |
-| "What setups have positive expectancy in ranging markets?" | `python main.py ask "which setups have positive expectancy in ranging markets?"` |
-| "Run a 15-minute scan on ETH" | `python main.py scan --symbol ETHUSDT --tf 15m --json` |
-| "Give me the desk report" | `python main.py intelligence --symbol BTCUSDT --tf 15m` |
-| "Is the risk gate open? Am I cleared to trade?" | `python main.py risk` and `python main.py health` |
-| "What should I do right now?" | `python main.py desk` (or MCP `desk_status`) |
-| "Is the desk healthy? Can I trust it?" | `python main.py doctor --strip` (or MCP `readiness`) |
-| "Read the latest crypto news" | `python main.py sources` |
-| "Review this closed trade" | `python main.py postreview <scan_id>` |
-| "Am I ready for live micro-trading?" | `python main.py agent ask "am i ready for micro?"` |
-| "Why did the engine say BUY?" | `python main.py coach <scan_id>` |
+## 1. ARCHITECTURAL OPERATIONAL WORKFLOWS
 
-## Install (one-time)
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 1. LIVE MARKET SCANNING (Multi-timeframe SMC, CVD, Liquidity Sweeps)        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 2. CONSTITUTIONAL RISK CLEARANCE (Half-Kelly, 1.5% Cap, Clock Drift <=500ms)│
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 3. DUAL-MODE EXECUTION ROUTER (Paper Shadow vs. Live Production Gateway)     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 4. DYNAMIC TRAILING RATCHETS (M47: Stage 1 @ +1.20R, Stage 2 @ +1.50R)      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 5. RECONCILIATION & PANIC CLOSE (Canonical State Reconciler, Kill Switch)   │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
 
-> Current releases are source-installed. Signed Ubuntu `.deb`, Windows `.exe`,
-> and Android `.apk` artifacts are planned in [`ROADMAP.md`](ROADMAP.md),
-> P18–P22, but do not exist yet. Never direct an operator to an unofficial
-> binary. The target is one Ubuntu Hub plus Windows/Android companion clients.
+---
 
-Tell the operator to run:
+## 2. WORKFLOW 1: LIVE MARKET SCANNING
+
+The scanning engine analyzes closed candles across configured timeframes (`15m`, `1h`) to detect valid institutional SMC structures without lookahead bias:
+
+### CLI / Autonomous Scan:
+```bash
+# Run one-shot multi-asset scan across 15m and 1h
+python scripts/sync_forward_paper_book.py --scan
+
+# Run standalone asset intelligence scan
+python main.py scan --symbol BTCUSDT --tf 15m --json
+
+# Query complete 8-Pillar institutional desk dossier
+python main.py intelligence --symbol BTCUSDT --tf 15m
+```
+
+### Scan Evaluation Criteria:
+1. **Zero-Lookahead Invariant:** Scans evaluate strictly closed bars (`-1`), never open intrabar ticks.
+2. **Directional Wick Absorption:**
+   - **LONG:** Last closed bar must be bullish, or exhibit $\ge 35\%$ lower absorption wick.
+   - **SHORT:** Last closed bar must be bearish, or exhibit $\ge 35\%$ upper absorption wick.
+3. **Multi-Timeframe Confluence:** Minimum confluence score $\ge 65.0$ (Grade A+ setup threshold $\ge 86.0$ when rolling asset PF $< 0.85$).
+
+---
+
+## 3. WORKFLOW 2: RISK-GOVERNED EXECUTION & DUAL-MODE ROUTING
+
+CBT enforces fail-closed execution isolation (`core/risk/execution_isolation.py`). Real money orders can never be dispatched unless all 5 constitutional gates pass simultaneously.
+
+### Execution Modes:
+- **`EXECUTION_MODE=PAPER` (Default):** Routes trades to sovereign shadow ledger (`core/portfolio_shadow.py`). Zero exchange credentials required.
+- **`EXECUTION_MODE=PRODUCTION`:** Routes orders to `core/execution/live_router.py` and real exchange sockets (`BinanceFuturesConnector`, `BybitV5Connector`).
+
+### Mandatory Live Production Gatekeeper Invariants:
+1. `LIVE_EXECUTION_ENABLED="true"` environment flag.
+2. Valid, non-mock API credentials registered in `core/auth/credential_vault.py`.
+3. System clock drift $\le 500\text{ms}$ with active exchange heartbeat.
+4. Cumulative daily drawdown $\le 3.0\%$ circuit breaker.
+5. Single-trade notional sizing $\le 1.5\%$ of total portfolio equity (Half-Kelly capped).
+6. Hardware Security Key (WebAuthn / FIDO2) physical clearance or active autonomous daemon lease.
+7. Master Live Kill Switch disengaged (`live_kill_switch.is_active() == False`).
+
+---
+
+## 4. WORKFLOW 3: DYNAMIC M47 TRAILING RATCHETS
+
+Once a position is entered, CBT actively manages stops and scale-outs via the **M47 Certified Ratchet Geometry**:
+
+1. **Initial Risk Perimeter:** Stop loss anchored to swing structure; position sized so loss at SL equals exactly $-1.0R$ ($\le 1.5\%$ equity).
+2. **Stage 1 Risk Reduction (`+1.20R` Intrabar Touch):**
+   - Trigger: Intrabar high/low reaches $+1.20R$ profit from entry.
+   - Action: Tighten stop loss from $-1.00R$ to $-0.20R$ (cutting $80\%$ of baseline downside risk).
+   - *Preserves continuation runners while protecting downside.*
+3. **Stage 2 Profit-Lock (`+1.50R` Touch / TP1):**
+   - Trigger: Intrabar touch at $+1.50R$.
+   - Action: Scale out $15\%$ of position notional; raise stop loss to $+0.35R$ net profit lock.
+4. **Final Target (`+3.00R` to `+4.00R` / TP2):**
+   - Remaining $85\%$ continues running toward liquidity pool sweeps or structural reversal.
+
+---
+
+## 5. WORKFLOW 4: PANIC CLOSE & EMERGENCY CIRCUIT BREAKERS
+
+In the event of black-swan volatility, exchange outage, or anomalous venue dislocation:
+
+### CLI / Script Panic Close:
+```bash
+# Emergency Flatten all paper and live open positions immediately
+python -c "from core.portfolio_shadow import portfolio_shadow; print(portfolio_shadow.close_all_positions(reason='PANIC_CLOSE'))"
+
+# Activate Master Live Kill Switch (Halts all order transmission instantly)
+python -c "from core.execution.kill_switch import live_kill_switch; live_kill_switch.engage(operator='ADMIN_PANIC')"
+```
+
+### Telegram Bot Emergency Directives:
+- `/panic_close` — Closes all active open positions at market across all desks.
+- `/kill_switch on` — Engages emergency master kill switch.
+- `/live_preflight <venue> <size>` — Validates preflight clearance before manual orders.
+
+---
+
+## 6. TELEGRAM AI 2-STEP ADMIN CONFIRMATION
+
+Class D live orders requested via Telegram AI require strict 2-step button confirmation:
+1. Operator submits trade request via text or button.
+2. Gateway verifies caller possesses `TelegramRole.ADMIN`.
+3. Prompt displays: Symbol, Direction, Notional USD, Stop Loss, and Risk % of Equity.
+4. Action buttons: `[ 🚨 CONFIRM LIVE EXECUTION ]` vs `[ ❌ CANCEL LIVE ]`.
+5. Cryptographic token expires in 60 seconds.
+
+---
+
+## 7. INSTALLATION & BOOT-TIME INTEGRITY
 
 ```bash
-git clone https://github.com/Azimshawon/SKY.git
-cd SKY
+# Clone official repository
+git clone https://github.com/cloudshome/CBT.git
+cd CBT
+
+# Initialize virtual environment
 python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-cp .env.example .env   # then edit — everything is optional, the engine works offline with DEMO_MODE=1
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# Run system preflight & test battery
+python scripts/system_preflight.py
+pytest tests/test_milestone18_final_certification.py -v
+pytest tests/test_binance_futures_production_readiness.py -v
+
+# Launch CBT backend daemon
+python cbt_backend.py
 ```
-
-For deeper setup (LLM, Discord, CryptoDada credentials) see
-`docs/agent_install.md`.
-
-## Readiness check
-
-Before doing anything else:
-
-```bash
-python main.py doctor --strip   # ONE combined verdict — start here
-python main.py doctor           # strip + full per-channel detail
-python main.py doctor --json    # machine-readable (includes `readiness`)
-python main.py health           # legacy alias for doctor
-```
-
-`doctor --strip` rolls four pillars up **worst-first** into a single
-level:
-
-| Pillar | Question it answers |
-|---|---|
-| `channels` | Can the engine still see the world? (cryptodada / discord / news / llm) |
-| `immune` | Is the machine itself sane? (DB, data freshness, risk system, calibration) |
-| `risk_gate` | Am I allowed to trade at all? |
-| `data` | Can I trust my own stored market history? (P10.5: staleness, gaps, price/volume sanity — corrupt data quarantines the desk) |
-
-Levels, worst wins: `ok` → `degraded` → `blocked` → `down`. Only `ok`
-sets `ready: true`. `blocked` specifically means the risk gate is
-closed — the engine is healthy but the operator must not trade.
-
-A healthy engine reports OK on: data feeds, database, risk gate, MCP
-ready, no behavioral flags, no calibration drift.
-
-## The full tool surface
-
-Every tool below is **read-only / research-only**. There is no tool
-that places an order, approves a signal on the operator's behalf, or
-bypasses the risk gate. The deny list is enforced at the top of
-`mcp_server.py` — the engine physically cannot be asked to trade.
-
-| Tool | CLI command | MCP name | What you get |
-|---|---|---|---|
-| Scan | `python main.py scan --symbol BTCUSDT --tf 15m` | (use `intelligence` for the desk variant) | Raw signal + plans (JSON) |
-| **Desk report** | `python main.py intelligence --symbol BTCUSDT` | `intelligence` | Institutional desk view: strict NO-TRADE filter, scenarios, risk, IF/THEN logic |
-| Watch | `python main.py watch --symbol BTC --interval 120` | — | Continuous loop (operator runs in their terminal) |
-| **Brief** | `python main.py brief` | `brief` | Cross-asset morning brief: BTC, ETH, GOLD |
-| **Ask** | `python main.py ask "..."` | `ask` | Grounded RAG answer with **required citations** (you must keep `[cited: ...]` in any reply that paraphrases the engine) |
-| Post-review | `python main.py postreview <scan_id>` | `postreview` | Closed-trade post-mortem: R, MAE/MFE, rule compliance |
-| Health | `python main.py health` / `python main.py doctor` | `health` | Immune-system diagnostic: stale data, DB integrity, risk limits, behavioral flags |
-| **Desk status** | `python main.py desk` | `desk_status` | One-call advisory: gate + today's P&L + graduation + next agent + "what would a professional do right now?" |
-| **Daily ritual** | `python main.py daily` | `loop_health` | The 10-minute loop: readiness → real paper n / net expectancy / graduation bar → gate → journal prompt. Alias: `loop-health`. |
-| **Weekly review** | `python main.py weekly [--days N] [--export PATH]` | `weekly_review` | W3 Sunday mirror: week vs all-time (net), R-distribution, violations + mistakes, per-setup graduation tracker, next practice task, advisory grade. |
-| **Practice calibration** | `python main.py practice [--days N]` | `practice_scorecard` | W3.4+W3.6 your reads vs the desk plus a sibling tape block of replay outcomes. Study metric only — feeds no gate. |
-| **Readiness** | `python main.py doctor --strip` | `readiness` | One combined verdict across channels + immune system + risk gate + stored-data quality. Ask this first. |
-| Risk gate | `python main.py risk` | `risk` | Open/closed status, daily/weekly P&L, progression ladder |
-| Trader state | `python main.py tradestate` | `tradestate` | Behavioral flags: angry/tired/revenge/chasing — operator-controlled |
-| Paper watch | `python main.py paper --watch` | — | Live-market paper-trade monitor (does **not** touch any exchange) |
-| Sources | `python main.py sources` | — | CryptoDada + Discord + RSS news snapshot |
-| Stats | `python main.py stats` | — | What the engine has learned from graded backtests + paper trades |
-| **Validation** | `python main.py validate` / `python main.py validate lookahead` | — | P12.1 locked train/val/OOS/recent protocol; P12.2 offline guard fails on future-peeking `shift(-n)` feature code |
-| Learn | `python main.py learn` | — | Recompute self-improvement calibration (advisory) |
-| Coach | `python main.py coach <scan_id>` | — | Why the engine said what it said; teaching mode |
-| Agent ask | `python main.py agent ask "am i ready for micro?"` | — | Natural-language desk query (graduation gate) |
-| Agent all | `python main.py agent all` | — | One desk run: health + brief + graduation |
-| Channels | `python main.py channels` | `channels` | Ordered-backend registry (cryptodada / discord / news / llm) — same data the dashboard "CHANNELS" card shows |
-| Correlation | `python main.py correlation` | `correlation` | BTC/ETH/GOLD correlation matrix + ETH/BTC beta |
-| Hidden | `python main.py hidden chart_read BTCUSDT` | `hidden_chart_read` | HMM regime + CVD order flow + Kelly (advisory) |
-| Hidden | `python main.py hidden analytics mae` | `hidden_analytics_mae` | MAE/MFE summary per setup |
-| Hidden | `python main.py hidden analytics mc --samples 2000` | `hidden_analytics_mc` | Monte Carlo equity / drawdown distribution |
-| Cross | `python main.py cross collect --symbol BTCUSDT` | — | P10.7: persist KuCoin/OKX/Bybit premium + funding spread (`cross status` to inspect) |
-
-## How to answer with CryptoBrain
-
-1. **Prefer the desk report over the raw scan.** The desk report
-   (`intelligence`) is the only output the operator should act on
-   directly. Raw scans are research.
-2. **Always carry the citation.** When you paraphrase an `ask`
-   answer, keep the `[cited: backtest_results]` style marker so the
-   operator can verify the grounding.
-3. **State the confidence and the time horizon.** Every signal carries
-   `confidence` (0–100) and `timeframe`. Don't drop these.
-4. **Respect the risk gate.** If `python main.py risk` reports
-   `closed: daily loss limit reached` or `weekly stop reached`, you
-   must NOT propose any new entry. The engine's gate is the gate.
-5. **Respect behavioral flags.** If `tradestate` shows
-   `angry: true` or `tired: true` or `revenge: true` or `chasing: true`,
-   recommend NO TRADE regardless of what the scan says.
-6. **Honour the progression ladder.** `PROGRESSION=student` /
-   `researcher` blocks any approval (no live trading). `simulator` is
-   paper-only. `micro` is the first real-money tier (0.5% risk per
-   trade). Promotion requires the graduation gate: PF ≥ 1.5,
-   expectancy ≥ +0.50R, win rate > 55%, rule compliance ≥ 90%, ≥ 100
-   backtest + ≥ 20 paper per primary setup.
-
-## How **not** to behave
-
-- ❌ Do not try to call any `approve | reject | execute | close` tool —
-  they are not exposed via MCP by design. The human owns those.
-- ❌ Do not invent a "place_order" tool. There is none, and there
-  never will be one in this engine.
-- ❌ Do not add Freqtrade, Hyperopt, FreqAI, Backtrader, or any
-  exchange-order bot or second backtest engine. SKY is the brain; the
-  human-approval gate is the runtime; the grader is
-  `data/backtester.py`.
-- ❌ Do not bypass the risk gate by reading the DB and writing to it
-  directly. The gate is not in the DB; it is in `brain/risk_gate.py`
-  and is consulted on every approval.
-- ❌ Do not present a raw scan as a recommendation. Use
-  `intelligence` (desk report) instead, or use `ask` to get a
-  grounded narrative.
-- ❌ Do not change `PROGRESSION` to `micro`/`consistent`/`scale` on
-  the operator's behalf. It is a human-promotion decision gated on
-  the graduation statistics.
-
-## Behavioural example
-
-Operator: *"ETH looks weak — should I short it?"*
-
-```bash
-python main.py intelligence --symbol ETHUSDT --tf 15m --json
-python main.py risk
-python main.py tradestate
-python main.py agent ask "is shorting ETH aligned with the current BTC regime and the risk gate?"
-```
-
-Then **summarise** the desk report (not the raw scan), include
-`[cited: …]` for any `ask` paraphrase, and state the action exactly as
-the engine stated it: `BUY` / `SELL` / `NO TRADE` / `PENDING_REVIEW`
-(awaiting human approval).
-
-## Reference
-
-- README: <https://github.com/Azimshawon/SKY>
-- Install one-pager: `docs/agent_install.md` in this repo
-- Architecture: `AI_ANATOMY_ROADMAP.md`
-- Roadmap: `ROADMAP_AGENT_REACH_UPGRADE.md`
-- Inspired by: [`Panniantong/Agent-Reach`](https://github.com/Panniantong/Agent-Reach) —
-  the operational patterns (SKILL / doctor / install) are adopted;
-  the web-scraping surface is not.

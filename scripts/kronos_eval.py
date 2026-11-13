@@ -1,4 +1,4 @@
-﻿"""
+"""
 Research Evaluation CLI for Kronos Foundation Model in SKY.
 Supports single predictions, multi-sample path simulations, forecast freezing,
 history queries, and 3-way ablation benchmarks (SKY Baseline vs Kronos vs Fusion).

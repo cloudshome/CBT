@@ -42,6 +42,9 @@ from core.execution.connectors.base import (
     NormalizedOrderResult,
 )
 from core.execution.connectors.binance_connector import BinanceSpotConnector
+from core.execution.connectors.binance_futures_connector import (
+    BinanceFuturesConnector,
+)
 from core.execution.connectors.bybit_connector import BybitV5Connector
 from core.execution.idempotency import (
     DuplicateOrderError,
@@ -231,22 +234,35 @@ class LiveExecutionRouter:
         exchange: str,
         environment: str,
     ) -> BaseExchangeConnector:
-        """
-        Instantiates connector using securely decrypted vault credentials.
-        """
+        """Instantiates connector using securely decrypted vault credentials."""
+        return self.get_connector(exchange, environment)
+
+    def get_connector(
+        self,
+        exchange: str,
+        environment: str,
+    ) -> BaseExchangeConnector:
+        """Instantiates connector using securely decrypted vault credentials."""
         cred = credential_vault.get_credential(exchange, environment)
         if not cred or not cred.is_active:
             raise LiveCredentialUnavailableError(
                 f"No active credential found in vault for {exchange} [{environment}]."
             )
 
-        if exchange.upper() == "BINANCE":
+        ex_upper = exchange.upper().strip()
+        if ex_upper in ("BINANCE_FUTURES", "BINANCE_USDTM", "BINANCE_PERP"):
+            return BinanceFuturesConnector(
+                environment=environment,
+                api_key=cred.api_key,
+                api_secret=cred.api_secret,
+            )
+        elif ex_upper in ("BINANCE", "BINANCE_SPOT"):
             return BinanceSpotConnector(
                 environment=environment,
                 api_key=cred.api_key,
                 api_secret=cred.api_secret,
             )
-        elif exchange.upper() == "BYBIT":
+        elif ex_upper == "BYBIT":
             return BybitV5Connector(
                 environment=environment,
                 api_key=cred.api_key,

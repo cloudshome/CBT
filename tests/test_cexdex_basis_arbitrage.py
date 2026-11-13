@@ -132,6 +132,29 @@ def test_compute_swap_step_exact_in():
     assert step.sqrt_price_next_x96 <= p_target
 
 
+def test_compute_swap_step_exact_out():
+    """Verifies integer step calculation with exact-out (-amount_remaining)."""
+    p_curr = tick_to_sqrt_price_q96(0)
+    p_target = tick_to_sqrt_price_q96(100)
+    liquidity = 10_000_000_000_000_000_000  # 10e18
+    amount_out = 500_000_000_000_000_000  # 0.5e18 desired out
+    fee_pips = 500  # 0.05%
+
+    step = compute_swap_step(
+        sqrt_ratio_current_x96=p_curr,
+        sqrt_ratio_target_x96=p_target,
+        liquidity=liquidity,
+        amount_remaining=-amount_out,  # Negative denotes exact-out
+        fee_pips=fee_pips,
+    )
+
+    assert step.amount_in > 0
+    assert step.amount_out > 0
+    assert step.fee_amount > 0
+    assert step.sqrt_price_next_x96 > p_curr
+    assert step.sqrt_price_next_x96 <= p_target
+
+
 def test_simulate_tick_traversal_multi_boundary():
     """Verifies multi-tick boundary crossing with discrete liquidity changes."""
     tick_0 = 0

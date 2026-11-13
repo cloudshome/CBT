@@ -54,7 +54,9 @@ class DeskStateMind:
 
     def __init__(self, virtual_equity_usd: float = 100_000.0):
         self.virtual_equity_usd = virtual_equity_usd
-        self.max_portfolio_risk_pct = 1.50  # Hard circuit breaker limit (CP-2 Certified Half-Kelly Cap)
+        self.max_portfolio_risk_pct = (
+            1.50  # Hard circuit breaker limit (CP-2 Certified Half-Kelly Cap)
+        )
 
     def auto_execute_paper_trade(self, signal: dict[str, Any]) -> dict[str, Any]:
         """
@@ -1820,6 +1822,7 @@ class TelegramBotDispatcher:
         Eliminates all hardcoded numbers.
         """
         import asyncio
+
         from core.macro_live_collector import macro_live_collector
         from core.macro_sentinel import macro_sentinel
         from core.market_providers import market_gateway
@@ -1910,6 +1913,7 @@ class TelegramBotDispatcher:
 
         return {
             "symbol": symbol,
+            "current_price": cur_price,
             "bias": bias,
             "pdh": pdh,
             "pdl": pdl,
@@ -1968,13 +1972,17 @@ class TelegramBotDispatcher:
 
             for a in articles:
                 score = a.get("verification_score", 50.0)
-                sentiment = "BULLISH" if score >= 70.0 else ("BEARISH" if score <= 30.0 else "NEUTRAL")
+                sentiment = (
+                    "BULLISH" if score >= 70.0 else ("BEARISH" if score <= 30.0 else "NEUTRAL")
+                )
                 cat = a.get("category", "RESEARCH").replace("_", " ").upper()
-                items.append({
-                    "tag": cat[:14],
-                    "headline": f"{a['title']} — Verified in CBT Research Journal.",
-                    "sentiment": sentiment,
-                })
+                items.append(
+                    {
+                        "tag": cat[:14],
+                        "headline": f"{a['title']} — Verified in CBT Research Journal.",
+                        "sentiment": sentiment,
+                    }
+                )
 
             # If fewer than 5 items, supplement with live MacroMicro cycle indicators
             if len(items) < 5:
@@ -1993,12 +2001,18 @@ class TelegramBotDispatcher:
                         val = v.get("value", 0.0)
                         unit = v.get("unit", "")
                         sig = v.get("regime_signal", "NEUTRAL")
-                        sentiment = "BULLISH" if "EXPANSION" in sig or "INFLOW" in sig or "LOW" in sig else "NEUTRAL"
-                        items.append({
-                            "tag": tag,
-                            "headline": f"{name} stands at {val:,.2f} {unit} ({sig}).",
-                            "sentiment": sentiment,
-                        })
+                        sentiment = (
+                            "BULLISH"
+                            if "EXPANSION" in sig or "INFLOW" in sig or "LOW" in sig
+                            else "NEUTRAL"
+                        )
+                        items.append(
+                            {
+                                "tag": tag,
+                                "headline": f"{name} stands at {val:,.2f} {unit} ({sig}).",
+                                "sentiment": sentiment,
+                            }
+                        )
         except Exception as e:
             logger.debug(f"[TelegramBot] Ingested news retrieval failed: {e}")
 
@@ -2306,7 +2320,11 @@ class TelegramBotDispatcher:
                     mime_type="image/jpeg",
                     custom_prompt=trade_prompt,
                 )
-                if analysis_text and len(analysis_text.strip()) > 60 and not analysis_text.startswith("[NATIVE_IMAGE_PAGE"):
+                if (
+                    analysis_text
+                    and len(analysis_text.strip()) > 60
+                    and not analysis_text.startswith("[NATIVE_IMAGE_PAGE")
+                ):
                     reply = (
                         "🎯 *SKY INSTITUTIONAL CHART ANALYSIS*\n"
                         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -2354,22 +2372,19 @@ class TelegramBotDispatcher:
                     tp2_p = setup.tp2
                     rr_ratio = f"1:{setup.risk_reward_ratio:.1f}R"
 
-                    plan = await self.generate_trading_plan(target_sym)
-                    signal = await self.generate_live_signal(target_sym)
-
                     # 3. Fetch real closed candles or market klines
                     candles = []
                     try:
                         candles = await data_streamer.get_candles(target_sym, target_tf, limit=40)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.debug("Candle fetch error for %s: %s", target_sym, exc)
                     if not candles:
                         try:
                             candles = await market_gateway.get_historical_klines(
                                 target_sym, target_tf, limit=40
                             )
-                        except Exception:
-                            pass
+                        except Exception as exc:
+                            logger.debug("Historical klines error for %s: %s", target_sym, exc)
 
                     chart_png = None
                     if candles:
@@ -2721,6 +2736,83 @@ class TelegramBotDispatcher:
                 await self.send_message(be_msg, chat_id=chat_id)
                 await self.answer_callback_query(cb_id, "Position not found.")
                 return {"status": "NOT_FOUND", "position_id": pos_id}
+
+        # Class D Live Execution 2-Step Confirmation Callbacks
+        if data.startswith("CONFIRM_LIVE_EXEC_"):
+            pending_id = data.replace("CONFIRM_LIVE_EXEC_", "")
+            from core.telegram.rbac import telegram_rbac
+
+            user_identity = telegram_rbac.authenticate_user(user_id)
+            if user_identity.role != TelegramRole.ADMIN:
+                await self.answer_callback_query(
+                    cb_id,
+                    "⛔ Denied: Only Telegram ADMIN can execute live orders.",
+                    show_alert=True,
+                )
+                return {"status": "ROLE_DENIED"}
+
+            from core.telegram.tool_gateway import telegram_tool_gateway
+
+            pending = telegram_tool_gateway.pop_pending_action(f"CONFIRM_LIVE_EXEC_{pending_id}")
+            if not pending:
+                await self.answer_callback_query(
+                    cb_id,
+                    "⚠️ Live execution token expired or already consumed.",
+                    show_alert=True,
+                )
+                return {"status": "EXPIRED"}
+
+            from core.execution.live_router import (
+                LiveOrderRequest,
+                live_execution_router,
+            )
+
+            args = pending.args
+            req = LiveOrderRequest(
+                exchange="BINANCE_FUTURES",
+                environment="PRODUCTION",
+                symbol=args.get("symbol", "BTC/USDT"),
+                side=("BUY" if args.get("direction", "LONG").upper() == "LONG" else "SELL"),
+                order_type="MARKET",
+                quantity=max(
+                    0.001,
+                    round(float(args.get("notional_usd", 10.0)) / 70000.0, 4),
+                ),
+                client_order_id=f"TG_LIVE_{pending_id}",
+            )
+            try:
+                receipt = await live_execution_router.execute_live_order(
+                    req, operator_id=f"TG_ADMIN_{user_id}"
+                )
+                exec_msg = (
+                    f"✅ **LIVE PRODUCTION ORDER DISPATCHED**\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"• **Client Order ID:** `{receipt.client_order_id}`\n"
+                    f"• **Status:** `{receipt.order_status}`\n"
+                    f"• **Venue:** `{receipt.exchange} [{receipt.environment}]`\n"
+                    f"• **Executed Qty:** `{receipt.executed_quantity}`\n"
+                    f"• **Latency:** `{receipt.total_latency_ms:.1f}ms`"
+                )
+                await self.send_message(exec_msg, chat_id=chat_id)
+                await self.answer_callback_query(cb_id, "Live order executed!")
+                return {"status": "LIVE_ORDER_EXECUTED", "receipt": receipt}
+            except Exception as exc:
+                err_msg = f"❌ **LIVE ORDER REJECTED BY ROUTER:**\n`{exc}`"
+                await self.send_message(err_msg, chat_id=chat_id)
+                await self.answer_callback_query(cb_id, "Execution rejected.", show_alert=True)
+                return {"status": "LIVE_ORDER_REJECTED", "error": str(exc)}
+
+        elif data.startswith("CANCEL_LIVE_EXEC_"):
+            pending_id = data.replace("CANCEL_LIVE_EXEC_", "")
+            from core.telegram.tool_gateway import telegram_tool_gateway
+
+            telegram_tool_gateway.pop_pending_action(f"CONFIRM_LIVE_EXEC_{pending_id}")
+            await self.send_message(
+                "❌ **LIVE EXECUTION CANCELLED.** No orders dispatched.",
+                chat_id=chat_id,
+            )
+            await self.answer_callback_query(cb_id, "Cancelled.")
+            return {"status": "CANCELLED"}
 
         if not data.startswith("act:"):
             await self.answer_callback_query(cb_id, "Unknown callback action.")
@@ -3302,8 +3394,8 @@ class TelegramBotDispatcher:
             if lock_fd is not None:
                 lock_fd.close()
             return
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Telegram polling lock check error: %s", exc)
 
         self._is_polling = True
         logger.info("Starting Telegram Bot long-polling listener...")
@@ -3358,10 +3450,21 @@ class TelegramBotDispatcher:
                 await asyncio.sleep(10)
 
     async def start_continuous_broadcaster(self, interval_seconds: int = 30) -> None:
-        """
-        Runs the SmartBrainNotificationEngine to monitor risk gates, milestones, and briefings.
+        """Runs the SmartBrainNotificationEngine and consolidated scheduled alert digests.
+
         Enforces ZERO spam, deduplication, and synchronization with live desk state.
         """
+        from core.telegram.jobs import scheduled_digest_manager
+
+        async def _scheduled_check_loop():
+            while True:
+                try:
+                    await scheduled_digest_manager.check_and_dispatch_scheduled_digests(self)
+                except Exception as exc:
+                    logger.debug("Scheduled digest check error: %s", exc)
+                await asyncio.sleep(interval_seconds)
+
+        self._scheduled_task = asyncio.create_task(_scheduled_check_loop())
         await self.smart_notifier.start_smart_brain_monitor(check_interval_seconds=interval_seconds)
 
 

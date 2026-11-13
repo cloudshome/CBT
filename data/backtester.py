@@ -865,12 +865,41 @@ def save_report(report: dict, path: str = "data_samples/backtest_report.json") -
     Path(path).write_text(json.dumps(report, indent=2, default=str))
 
 
+def query_conditioned_expectancy(
+    symbol: str = "BTCUSDT",
+    timeframe: str = "15m",
+    factor_column: str = "regime",
+    graded: list[GradedPlan] | None = None,
+) -> dict[str, dict]:
+    """Connects data/feature_store.py to backtest grading to answer multi-factor
+
+    conditioned-expectancy queries (e.g. regime, funding, OI, CVD).
+    """
+    from data.feature_store import read_feature_table
+
+    feat_df = read_feature_table(symbol, timeframe)
+    if feat_df.empty or not graded:
+        return {}
+
+    lookup = {}
+    if "ts" in feat_df.columns and factor_column in feat_df.columns:
+        lookup = dict(zip(feat_df["ts"], feat_df[factor_column], strict=False))
+
+    conditioned_groups: dict[str, list[GradedPlan]] = {}
+    for g in graded:
+        bar_ts = getattr(g, "timestamp", None) or getattr(g, "ts", None)
+        factor_val = str(lookup.get(bar_ts, "UNKNOWN"))
+        conditioned_groups.setdefault(factor_val, []).append(g)
+
+    return {factor: _aggregate(plans) for factor, plans in conditioned_groups.items()}
+
+
 def run_backtest_on_store(
     exchange: str = "binance",
     market: str = "perp",
     symbol: str = "BTCUSDT",
     timeframe: str = "15m",
-    bars: int = 300,
+    bars: int | None = None,
     horizons: list[float] | None = None,
     min_bars: int = BACKTEST_MIN_BARS,
     step: int = BACKTEST_STEP,
@@ -927,9 +956,16 @@ def run_backtest_on_store(
     prov_exchange, prov_market, prov_price_type = provenance_of_frame(
         df, exchange=exchange, market=market
     )
+    conditioned_exp = query_conditioned_expectancy(
+        symbol=symbol,
+        timeframe=timeframe,
+        factor_column="regime",
+        graded=result.get("graded", []),
+    )
     return {
         "ok": True,
         **result,
+        "conditioned_expectancy": conditioned_exp,
         "store_source": True,
         "store_path": store._series_dir(exchange, market, symbol, timeframe).as_posix(),
         "bars_read": len(df),

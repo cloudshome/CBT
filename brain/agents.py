@@ -21,7 +21,14 @@ class BaseAgent:
         self.db = db
 
     def run(self) -> dict:
-        raise NotImplementedError
+        """Base runner fallback when subclass has not implemented custom logic."""
+        return {
+            "agent": self.name,
+            "status": "NOT_IMPLEMENTED",
+            "summary": f"BaseAgent default runner executed for {self.name}",
+            "data": {},
+            "ts": int(time.time()),
+        }
 
 
 class MorningBriefAgent(BaseAgent):

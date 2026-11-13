@@ -90,7 +90,7 @@ describe('Desk Intelligence Endpoints (/api/desk)', () => {
       expect(res.body.metrics).toHaveProperty('trend');
     });
 
-    it('should return 503 if GEMINI_API_KEY is missing in environment', async () => {
+    it('should return 200 with deterministic fallback if GEMINI_API_KEY is missing in environment', async () => {
       process.env.GEMINI_API_KEY = '';
       resetGeminiClient();
 
@@ -98,19 +98,20 @@ describe('Desk Intelligence Endpoints (/api/desk)', () => {
         .post('/api/desk/ai-brief')
         .send({ symbol: 'ETHUSDT' });
 
-      expect(res.status).toBe(503);
-      expect(res.body.error).toContain('GEMINI_API_KEY is not configured');
+      expect(res.status).toBe(200);
+      expect(res.body.source).toBe('DETERMINISTIC_FALLBACK');
+      expect(res.body).toHaveProperty('executiveSummary');
     });
 
-    it('should return 503 if Gemini SDK throws an unhandled error', async () => {
+    it('should return 200 with deterministic fallback if Gemini SDK throws an unhandled error', async () => {
       mockGenerateContent.mockRejectedValueOnce(new Error('Network timeout'));
 
       const res = await request(app)
         .post('/api/desk/ai-brief')
         .send({ symbol: 'BTCUSDT' });
 
-      expect(res.status).toBe(503);
-      expect(res.body.error).toContain('Failed to generate market brief from Gemini');
+      expect(res.status).toBe(200);
+      expect(res.body.source).toBe('DETERMINISTIC_FALLBACK');
     });
   });
 
@@ -139,15 +140,15 @@ describe('Desk Intelligence Endpoints (/api/desk)', () => {
       expect(res.body).toHaveProperty('timestamp');
     });
 
-    it('should return 503 if Gemini API fails during Q&A', async () => {
+    it('should return 200 with sovereign fallback if Gemini API fails during Q&A', async () => {
       mockGenerateContent.mockRejectedValueOnce(new Error('API quota reached'));
 
       const res = await request(app)
         .post('/api/desk/ask')
         .send({ query: 'Explain the current Order Block.' });
 
-      expect(res.status).toBe(503);
-      expect(res.body.error).toContain('Desk query failed');
+      expect(res.status).toBe(200);
+      expect(res.body.answer).toContain('Sovereign Quantitative Desk');
     });
   });
 });

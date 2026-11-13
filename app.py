@@ -238,6 +238,29 @@ async def lifespan_ctx(_app: FastAPI) -> AsyncIterator[None]:
     db_manager.init_all_schemas()
     # Reconcile any orphaned running jobs on boot
     job_manager.reconcile_orphaned_jobs()
+
+    # Historical Gap Recovery & Candle Backfill
+    try:
+        from core.gap_recovery import gap_recovery_manager
+
+        repaired_stats = gap_recovery_manager.scan_and_repair_all(
+            symbols=["BTC/USDT", "ETH/USDT", "SOL/USDT"],
+            timeframes=["15m", "1h"],
+        )
+        logger.info("Boot-time gap recovery complete: %s", repaired_stats)
+    except Exception as exc:
+        logger.warning("Boot-time gap recovery encountered non-fatal error: %s", exc)
+
+    # Live WebSocket client (Binance kline + liquidation streams hot)
+    try:
+        from data.ws_client import get_client as get_ws_client
+
+        ws_client = get_ws_client()
+        ws_client.start()
+        logger.info("Public market WebSocket client online (klines & liquidations hot).")
+    except Exception as exc:
+        logger.warning("Could not initialize WebSocket client on startup: %s", exc)
+
     # Check host disk capacity
     disk_vitals = api_health_guard.check_disk_space()
     if not disk_vitals.get("is_safe", True):
@@ -298,6 +321,12 @@ async def lifespan_ctx(_app: FastAPI) -> AsyncIterator[None]:
             if not trading_core_only:
                 research_automation_orchestrator.stop()
         hf_telemetry_pipeline.flush_to_sqlite()
+        try:
+            from data.ws_client import get_client as get_ws_client
+
+            get_ws_client().stop(graceful=True)
+        except Exception as exc:
+            logger.debug("Error shutting down WebSocket client: %s", exc)
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
@@ -535,8 +564,8 @@ class ConnectionManager:
         for ws in stale:
             try:
                 await ws.close(code=1000)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Error closing stale WebSocket: {e}", exc_info=True)
             self.disconnect(ws)
         if stale:
             logger.info(f"Pruned {len(stale)} dead WebSocket connections.")

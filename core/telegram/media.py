@@ -93,7 +93,6 @@ class TelegramMediaHandler:
             await bot_dispatcher.send_message(f"⚠️ Research ingestion failed: {e}", chat_id=chat_id)
             return {"status": "FAILED", "error": str(e)}
 
-
     @staticmethod
     def inspect_chart_image(
         image_bytes: bytes,
@@ -147,6 +146,7 @@ class TelegramMediaHandler:
         # 2. Local OCR / header analysis via PIL and pytesseract (if available)
         try:
             import io
+
             from PIL import Image
 
             img = Image.open(io.BytesIO(image_bytes))
@@ -171,7 +171,9 @@ class TelegramMediaHandler:
                 pass
 
             # 3. Candlestick visual color distribution (RGB sampling in chart body)
-            body_crop = img.crop((int(w * 0.1), int(h * 0.2), int(w * 0.9), int(h * 0.8))).convert("RGB")
+            body_crop = img.crop((int(w * 0.1), int(h * 0.2), int(w * 0.9), int(h * 0.8))).convert(
+                "RGB"
+            )
             thumb = body_crop.resize((64, 64))
             pixels = thumb.getdata()
             green_count = 0

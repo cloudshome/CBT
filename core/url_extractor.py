@@ -255,7 +255,9 @@ class URLExtractor:
         try:
             html = self._fetch_html(url)
         except Exception as e:
-            logger.debug(f"Direct HTML fetch for MacroMicro ({url}) failed: {e}. Using cached indicator data.")
+            logger.debug(
+                f"Direct HTML fetch for MacroMicro ({url}) failed: {e}. Using cached indicator data."
+            )
         indicators = []
 
         if html:
@@ -317,7 +319,7 @@ class URLExtractor:
                 table_rows.append(f"| {name} | `{val}` | MacroMicro Live |")
                 claim_bullets.append(f"• `[FACT]` {name}: Current reading `{val}`.")
         else:
-            for ind_id, d in mm_cached.items():
+            for d in mm_cached.values():
                 table_rows.append(
                     f"| {d['name']} | `{d['value']} {d['unit']}` | {d['regime_signal']} |"
                 )

@@ -15,11 +15,9 @@ Collects, parses, and caches live fundamental & cross-asset indicators:
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import re
 import time
-from dataclasses import asdict, dataclass
 from typing import Any
 
 import aiohttp
@@ -250,8 +248,12 @@ class MacroLiveCollector:
                         "name": r["name"],
                         "category": r["category"],
                         "value": float(r["value"]),
-                        "previous_value": float(r["previous_value"]) if r["previous_value"] is not None else None,
-                        "change_pct": float(r["change_pct"]) if r["change_pct"] is not None else 0.0,
+                        "previous_value": float(r["previous_value"])
+                        if r["previous_value"] is not None
+                        else None,
+                        "change_pct": float(r["change_pct"])
+                        if r["change_pct"] is not None
+                        else 0.0,
                         "unit": r["unit"],
                         "source_url": r["source_url"],
                         "regime_signal": r["regime_signal"],
@@ -287,7 +289,9 @@ class MacroLiveCollector:
                     entry["indicator_id"] = ind_id
                     entry["updated_at_ms"] = now_ms
                     self._cache[ind_id] = entry
-                logger.info(f"Seeded {len(self._cache)} default macro indicators into SQLite cache.")
+                logger.info(
+                    f"Seeded {len(self._cache)} default macro indicators into SQLite cache."
+                )
         except Exception as e:
             logger.warning(f"Error seeding macro cache: {e}")
             for ind_id, data in DEFAULT_MACRO_VITALS.items():
@@ -375,7 +379,9 @@ class MacroLiveCollector:
         """Fetches quote from Yahoo Finance v8 chart API."""
         url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range=5d"
         try:
-            headers = {"User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:130.0) Gecko/20100101 Firefox/130.0"}
+            headers = {
+                "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:130.0) Gecko/20100101 Firefox/130.0"
+            }
             async with aiohttp.ClientSession(headers=headers) as session:
                 async with session.get(url, timeout=aiohttp.ClientTimeout(total=6)) as resp:
                     if resp.status == 200:
@@ -384,8 +390,14 @@ class MacroLiveCollector:
                         if chart and "meta" in chart:
                             meta = chart["meta"]
                             price = float(meta.get("regularMarketPrice", 0.0))
-                            prev_close = float(meta.get("chartPreviousClose", meta.get("previousClose", price)))
-                            chg_pct = round(((price - prev_close) / prev_close) * 100.0, 2) if prev_close > 0 else 0.0
+                            prev_close = float(
+                                meta.get("chartPreviousClose", meta.get("previousClose", price))
+                            )
+                            chg_pct = (
+                                round(((price - prev_close) / prev_close) * 100.0, 2)
+                                if prev_close > 0
+                                else 0.0
+                            )
                             return {
                                 "price": price,
                                 "previous_close": prev_close,
@@ -406,8 +418,14 @@ class MacroLiveCollector:
                         items = data.get("data", [])
                         if items:
                             cur_val = float(items[0].get("value", 50))
-                            prev_val = float(items[1].get("value", cur_val)) if len(items) > 1 else cur_val
-                            chg = round(((cur_val - prev_val) / prev_val) * 100.0, 2) if prev_val > 0 else 0.0
+                            prev_val = (
+                                float(items[1].get("value", cur_val)) if len(items) > 1 else cur_val
+                            )
+                            chg = (
+                                round(((cur_val - prev_val) / prev_val) * 100.0, 2)
+                                if prev_val > 0
+                                else 0.0
+                            )
                             classification = items[0].get("value_classification", "Neutral")
                             return {
                                 "value": cur_val,
@@ -432,13 +450,19 @@ class MacroLiveCollector:
                         prev_mcap = 0.0
                         for asset in pegged:
                             circulating = asset.get("circulating", {}).get("peggedUSD", 0.0)
-                            prev_circulating = asset.get("circulatingPrevDay", {}).get("peggedUSD", circulating)
+                            prev_circulating = asset.get("circulatingPrevDay", {}).get(
+                                "peggedUSD", circulating
+                            )
                             total_mcap += circulating
                             prev_mcap += prev_circulating
                         if total_mcap > 0:
                             mcap_billions = round(total_mcap / 1e9, 2)
                             prev_billions = round(prev_mcap / 1e9, 2)
-                            chg = round(((mcap_billions - prev_billions) / prev_billions) * 100.0, 2) if prev_billions > 0 else 0.0
+                            chg = (
+                                round(((mcap_billions - prev_billions) / prev_billions) * 100.0, 2)
+                                if prev_billions > 0
+                                else 0.0
+                            )
                             return {
                                 "value": mcap_billions,
                                 "previous_value": prev_billions,
@@ -463,7 +487,9 @@ class MacroLiveCollector:
         for target_url, source_label in urls:
             try:
                 async with aiohttp.ClientSession(headers=headers) as session:
-                    async with session.get(target_url, timeout=aiohttp.ClientTimeout(total=8)) as resp:
+                    async with session.get(
+                        target_url, timeout=aiohttp.ClientTimeout(total=8)
+                    ) as resp:
                         if resp.status == 200:
                             html = await resp.text()
                             # Extract chart card items using regex
@@ -475,20 +501,26 @@ class MacroLiveCollector:
                             )
                             for title_raw, val_raw in card_matches:
                                 title = re.sub(r"<[^>]+>", "", title_raw).strip()
-                                val_clean = re.sub(r"[^\d.-]", "", re.sub(r"<[^>]+>", "", val_raw)).strip()
+                                val_clean = re.sub(
+                                    r"[^\d.-]", "", re.sub(r"<[^>]+>", "", val_raw)
+                                ).strip()
                                 if title and val_clean:
                                     try:
                                         num_val = float(val_clean)
-                                        ind_id = "MM_" + re.sub(r"[^A-Z0-9_]", "_", title.upper())[:20]
-                                        extracted_indicators.append({
-                                            "indicator_id": ind_id,
-                                            "name": f"MacroMicro {title}",
-                                            "category": source_label,
-                                            "value": num_val,
-                                            "unit": "%" if "%" in val_raw else "Index",
-                                            "source_url": target_url,
-                                            "regime_signal": "CYCLE_MONITOR",
-                                        })
+                                        ind_id = (
+                                            "MM_" + re.sub(r"[^A-Z0-9_]", "_", title.upper())[:20]
+                                        )
+                                        extracted_indicators.append(
+                                            {
+                                                "indicator_id": ind_id,
+                                                "name": f"MacroMicro {title}",
+                                                "category": source_label,
+                                                "value": num_val,
+                                                "unit": "%" if "%" in val_raw else "Index",
+                                                "source_url": target_url,
+                                                "regime_signal": "CYCLE_MONITOR",
+                                            }
+                                        )
                                     except ValueError:
                                         pass
             except Exception as e:
@@ -523,14 +555,62 @@ class MacroLiveCollector:
 
         # 1. Process Yahoo Quotes
         symbols_map = [
-            ("DXY", "US Dollar Index", "Currencies & Hegemony", "Index", "https://query1.finance.yahoo.com/v8/finance/chart/DX-Y.NYB"),
-            ("US10Y", "US 10-Year Treasury Yield", "Sovereign Debt & Rates", "%", "https://query1.finance.yahoo.com/v8/finance/chart/^TNX"),
-            ("US2Y_PROXY", "US Short-Term Yield Proxy", "Sovereign Debt & Rates", "%", "https://query1.finance.yahoo.com/v8/finance/chart/^IRX"),
-            ("VIX", "CBOE Volatility Index (VIX)", "Risk & Volatility", "Index", "https://query1.finance.yahoo.com/v8/finance/chart/^VIX"),
-            ("WTI_CRUDE", "WTI Crude Oil Futures", "Energy & Inflation", "USD/bbl", "https://query1.finance.yahoo.com/v8/finance/chart/CL=F"),
-            ("GOLD", "Gold Futures (GC=F / XAU)", "Commodities & Monetary Reserves", "USD/oz", "https://query1.finance.yahoo.com/v8/finance/chart/GC=F"),
-            ("SP500", "S&P 500 Index (^GSPC)", "Equities & Risk Assets", "Index", "https://query1.finance.yahoo.com/v8/finance/chart/^GSPC"),
-            ("NASDAQ", "Nasdaq 100 Index (^NDX)", "Equities & Risk Assets", "Index", "https://query1.finance.yahoo.com/v8/finance/chart/^NDX"),
+            (
+                "DXY",
+                "US Dollar Index",
+                "Currencies & Hegemony",
+                "Index",
+                "https://query1.finance.yahoo.com/v8/finance/chart/DX-Y.NYB",
+            ),
+            (
+                "US10Y",
+                "US 10-Year Treasury Yield",
+                "Sovereign Debt & Rates",
+                "%",
+                "https://query1.finance.yahoo.com/v8/finance/chart/^TNX",
+            ),
+            (
+                "US2Y_PROXY",
+                "US Short-Term Yield Proxy",
+                "Sovereign Debt & Rates",
+                "%",
+                "https://query1.finance.yahoo.com/v8/finance/chart/^IRX",
+            ),
+            (
+                "VIX",
+                "CBOE Volatility Index (VIX)",
+                "Risk & Volatility",
+                "Index",
+                "https://query1.finance.yahoo.com/v8/finance/chart/^VIX",
+            ),
+            (
+                "WTI_CRUDE",
+                "WTI Crude Oil Futures",
+                "Energy & Inflation",
+                "USD/bbl",
+                "https://query1.finance.yahoo.com/v8/finance/chart/CL=F",
+            ),
+            (
+                "GOLD",
+                "Gold Futures (GC=F / XAU)",
+                "Commodities & Monetary Reserves",
+                "USD/oz",
+                "https://query1.finance.yahoo.com/v8/finance/chart/GC=F",
+            ),
+            (
+                "SP500",
+                "S&P 500 Index (^GSPC)",
+                "Equities & Risk Assets",
+                "Index",
+                "https://query1.finance.yahoo.com/v8/finance/chart/^GSPC",
+            ),
+            (
+                "NASDAQ",
+                "Nasdaq 100 Index (^NDX)",
+                "Equities & Risk Assets",
+                "Index",
+                "https://query1.finance.yahoo.com/v8/finance/chart/^NDX",
+            ),
         ]
 
         for i, (ind_id, name, cat, unit, src_url) in enumerate(symbols_map):
@@ -541,7 +621,11 @@ class MacroLiveCollector:
                 chg = res.get("change_pct", 0.0)
                 signal = "EXPANSION" if chg >= 0 else "CONTRACTION"
                 if ind_id == "DXY":
-                    signal = "DOLLAR_STRENGTHENING" if chg > 0.2 else ("DOLLAR_SOFTENING" if chg < -0.2 else "DOLLAR_NEUTRAL")
+                    signal = (
+                        "DOLLAR_STRENGTHENING"
+                        if chg > 0.2
+                        else ("DOLLAR_SOFTENING" if chg < -0.2 else "DOLLAR_NEUTRAL")
+                    )
                 elif ind_id == "VIX":
                     signal = "VOLATILITY_EXPANSION" if p > 20.0 else "VOLATILITY_COMPRESSION"
                 self.save_indicator(ind_id, name, cat, p, prev_p, chg, unit, src_url, signal)
@@ -589,7 +673,9 @@ class MacroLiveCollector:
                 stables_res.get("change_pct"),
                 unit="Billion USD",
                 source_url="https://stablecoins.llama.fi/stablecoins",
-                regime_signal="CAPITAL_INFLOW" if stables_res.get("change_pct", 0) >= 0 else "CAPITAL_OUTFLOW",
+                regime_signal="CAPITAL_INFLOW"
+                if stables_res.get("change_pct", 0) >= 0
+                else "CAPITAL_OUTFLOW",
             )
 
         # 5. MacroMicro Scraped indicators
@@ -607,7 +693,9 @@ class MacroLiveCollector:
                 )
 
         self._last_refresh_ts = now
-        logger.info(f"Macro live collection complete. Cache contains {len(self._cache)} indicators.")
+        logger.info(
+            f"Macro live collection complete. Cache contains {len(self._cache)} indicators."
+        )
         return self._cache
 
 

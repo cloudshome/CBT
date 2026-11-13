@@ -31,7 +31,8 @@ class ToolClass(enum.StrEnum):
     CLASS_A_READONLY = "CLASS_A_READONLY"
     CLASS_B_ANALYSIS = "CLASS_B_ANALYSIS"
     CLASS_C_ACTION = "CLASS_C_ACTION"
-    CLASS_D_LIVE_BLOCKED = "CLASS_D_LIVE_BLOCKED"
+    CLASS_D_LIVE_CONFIRM_REQUIRED = "CLASS_D_LIVE_CONFIRM_REQUIRED"
+    CLASS_D_LIVE_BLOCKED = "CLASS_D_LIVE_CONFIRM_REQUIRED"  # backward-compat alias
 
 
 @dataclass
@@ -153,35 +154,91 @@ class TelegramToolGateway:
         )
 
         # ---------------------------------------------------------------------
-        # CLASS D: PERMANENTLY BLOCKED LIVE CAPITAL
+        # CLASS D: LIVE CAPITAL / REAL EXECUTION (2-Step ADMIN Confirmation)
         # -------------------------------------------------------------------------
         if (
             tool_name.startswith("live_")
             or "real_money" in tool_name
-            or tool_name == "execute_live_order"
+            or tool_name in ("execute_live_order", "plan_live_order")
         ):
-            TelegramAuditLogger.log_command_execution(
-                identity=identity,
-                command=tool_name,
-                args=json.dumps(arguments),
-                risk_result="BLOCKED",
-                execution_result="BLOCKED",
-                details={
-                    "reason": "Constitutional Rule: REAL_CAPITAL_ENABLED = False permanently locked."
+            from core.telegram.rbac import TelegramRole
+
+            if identity.role != TelegramRole.ADMIN:
+                TelegramAuditLogger.log_command_execution(
+                    identity=identity,
+                    command=tool_name,
+                    args=json.dumps(arguments),
+                    risk_result="ROLE_REJECTED",
+                    execution_result="BLOCKED",
+                    details={"reason": "Only Telegram ADMINs can request live execution."},
+                )
+                return ToolResult(
+                    success=False,
+                    tool_name=tool_name,
+                    tool_class=ToolClass.CLASS_D_LIVE_CONFIRM_REQUIRED,
+                    output_text="⛔ **PERMISSION DENIED:** Only authorized Telegram ADMINs may initiate live exchange orders.",
+                    error="UNAUTHORIZED_ROLE: Requires TelegramRole.ADMIN",
+                )
+
+            # Two-step confirmation for live execution
+            symbol = arguments.get("symbol", "BTC/USDT")
+            direction = arguments.get("direction", "LONG").upper()
+            notional_usd = float(arguments.get("notional_usd", 10.0))
+            stop_loss = float(arguments.get("stop_loss", 0.0))
+            equity_risk_pct = float(arguments.get("risk_pct", 1.5))
+
+            pending_id = uuid.uuid4().hex[:10]
+            confirm_token = f"CONFIRM_LIVE_EXEC_{pending_id}"
+            cancel_token = f"CANCEL_LIVE_EXEC_{pending_id}"
+
+            self._pending_actions[confirm_token] = PendingAction(
+                token=confirm_token,
+                tool_name="execute_live_order",
+                args={
+                    "symbol": symbol,
+                    "direction": direction,
+                    "notional_usd": notional_usd,
+                    "stop_loss": stop_loss,
+                    "risk_pct": equity_risk_pct,
+                    "cancel_token": cancel_token,
                 },
+                user_id=identity.user_id,
+                chat_id=identity.chat_id,
+                description=f"Live {direction} on {symbol} (${notional_usd:.2f})",
+                created_at=time.time(),
+                expires_at=time.time() + 300,
             )
+
+            prompt_msg = (
+                "🚨 **LIVE PRODUCTION EXECUTION CONFIRMATION REQUIRED**\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"• **Symbol:** `{symbol}`\n"
+                f"• **Direction:** `{direction}`\n"
+                f"• **Notional Size:** `${notional_usd:,.2f} USD`\n"
+                f"• **Stop Loss:** `${stop_loss:,.2f}`\n"
+                f"• **Portfolio Risk:** `{equity_risk_pct:.2f}%` of Total Equity\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "⚠️ *Warning: This will dispatch real capital to live exchange sockets.*\n"
+                "Press the button below to confirm or cancel."
+            )
+
             return ToolResult(
-                success=False,
+                success=True,
                 tool_name=tool_name,
-                tool_class=ToolClass.CLASS_D_LIVE_BLOCKED,
-                output_text=(
-                    "🚨 **CONSTITUTIONAL VIOLATION / LIVE CAPITAL GATE BLOCKED**\n"
-                    "━━━━━━━━━━━━━━━━━━━━━━\n"
-                    "• **Invariant:** `REAL_CAPITAL_ENABLED = False` is hardcoded & locked.\n"
-                    "• **Policy:** Live capital trading is disabled across all Telegram interfaces.\n"
-                    "• **Safety:** Capital preservation guaranteed. Only simulated paper desks are authorized."
-                ),
-                error="Live trading permanently locked.",
+                tool_class=ToolClass.CLASS_D_LIVE_CONFIRM_REQUIRED,
+                output_text=prompt_msg,
+                requires_confirmation=True,
+                confirmation_token=confirm_token,
+                data={
+                    "pending_id": pending_id,
+                    "confirm_token": confirm_token,
+                    "cancel_token": cancel_token,
+                    "symbol": symbol,
+                    "direction": direction,
+                    "notional_usd": notional_usd,
+                    "stop_loss": stop_loss,
+                    "risk_pct": equity_risk_pct,
+                },
             )
 
         # ---------------------------------------------------------------------
@@ -581,12 +638,18 @@ class TelegramToolGateway:
         )
 
     async def _tool_lookup_trading_dictionary(
-        self, term: str, language: str = "en", symbol: str = "BTC/USDT", identity: TelegramUserIdentity | None = None
+        self,
+        term: str,
+        language: str = "en",
+        symbol: str = "BTC/USDT",
+        identity: TelegramUserIdentity | None = None,
     ) -> ToolResult:
         from core.knowledge_os.trading_dictionary import trading_dictionary
 
         clean_term = (term or "").strip()
-        res = trading_dictionary.lookup(clean_term, language=language, symbol=symbol, with_live_example=True)
+        res = trading_dictionary.lookup(
+            clean_term, language=language, symbol=symbol, with_live_example=True
+        )
         if res and res.get("formatted_markdown"):
             return ToolResult(
                 success=True,
@@ -599,7 +662,9 @@ class TelegramToolGateway:
         if matches:
             lines = [f"🔍 **Search results for '{clean_term}':**", "━━━━━━━━━━━━━━━━━━━━━━"]
             for m in matches:
-                lines.append(f"• **{m['canonical_name']}** (`{m['term_id']}`): {m['definition_en'][:120]}...")
+                lines.append(
+                    f"• **{m['canonical_name']}** (`{m['term_id']}`): {m['definition_en'][:120]}..."
+                )
             return ToolResult(
                 success=True,
                 tool_name="lookup_trading_dictionary",
@@ -615,7 +680,10 @@ class TelegramToolGateway:
         )
 
     async def _tool_get_macromicro_insights(
-        self, category: str = "ALL", language: str = "en", identity: TelegramUserIdentity | None = None
+        self,
+        category: str = "ALL",
+        language: str = "en",
+        identity: TelegramUserIdentity | None = None,
     ) -> ToolResult:
         from core.macro_live_collector import macro_live_collector
         from core.macro_sentinel import macro_sentinel
@@ -633,14 +701,27 @@ class TelegramToolGateway:
             "━━━━━━━━━━━━━━━━━━━━━━",
             "📡 **MacroMicro Leading Cycle Indicators:**",
         ]
-        cycle_keys = ("RECESSION_PROB", "MFG_CYCLE", "FOMC_HAWKISH", "STABLECOIN_MCAP", "GOLD", "WTI_CRUDE")
+        cycle_keys = (
+            "RECESSION_PROB",
+            "MFG_CYCLE",
+            "FOMC_HAWKISH",
+            "STABLECOIN_MCAP",
+            "GOLD",
+            "WTI_CRUDE",
+        )
         for k in cycle_keys:
             if k in all_vitals:
                 v = all_vitals[k]
                 v_name = v.get("name") if isinstance(v, dict) else getattr(v, "name", str(k))
-                v_val = float(v.get("value", 0.0) if isinstance(v, dict) else getattr(v, "value", 0.0))
+                v_val = float(
+                    v.get("value", 0.0) if isinstance(v, dict) else getattr(v, "value", 0.0)
+                )
                 v_unit = v.get("unit", "") if isinstance(v, dict) else getattr(v, "unit", "")
-                v_reg = v.get("regime_signal", "") if isinstance(v, dict) else getattr(v, "regime_signal", "")
+                v_reg = (
+                    v.get("regime_signal", "")
+                    if isinstance(v, dict)
+                    else getattr(v, "regime_signal", "")
+                )
                 lines.append(f"• **{v_name}:** `{v_val:,.2f} {v_unit}` (`{v_reg}`)")
         lines.append("━━━━━━━━━━━━━━━━━━━━━━")
         lines.append("💡 _Aggregated live via MacroMicro & Sovereign Macro Collectors._")
@@ -767,13 +848,14 @@ class TelegramToolGateway:
     async def _tool_get_concept_intelligence(self, identity: TelegramUserIdentity) -> ToolResult:
         import json
         from pathlib import Path
+
         cp2_path = Path("research/m47_cp2_joint_certification_results.json")
         cp2_data = {}
         if cp2_path.exists():
             try:
                 cp2_data = json.loads(cp2_path.read_text(encoding="utf-8"))
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Failed loading cp2 json: %s", exc)
 
         meta = cp2_data.get("meta", {})
         k9 = cp2_data.get("k9_frozen_datasets", {}).get("datasets", {})

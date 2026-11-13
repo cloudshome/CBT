@@ -10,7 +10,7 @@ Milestone M49 Verification Suite:
 """
 
 import os
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -41,15 +41,22 @@ async def test_zero_gemini_dependency():
         assert len(resp) > 30
 
         # 2. Agent planner
-        identity = TelegramUserIdentity(user_id=123, chat_id="123", username="trader", role=TelegramRole.ANALYST)
-        plan_resp = await telegram_agent_planner.handle_user_message("how is the market", 123, identity)
+        identity = TelegramUserIdentity(
+            user_id=123, chat_id="123", username="trader", role=TelegramRole.ANALYST
+        )
+        plan_resp = await telegram_agent_planner.handle_user_message(
+            "how is the market", 123, identity
+        )
         assert plan_resp is not None
         assert len(plan_resp) > 20
 
         # 3. Macro cognitive engine
         from core.macro_cognitive_engine import MacroCognitiveEngine
+
         macro_engine = MacroCognitiveEngine()
-        cog_res = macro_engine.analyze_macro_content("Federal Reserve balance sheet contraction and yield curve steepening.")
+        cog_res = macro_engine.analyze_macro_content(
+            "Federal Reserve balance sheet contraction and yield curve steepening."
+        )
         assert cog_res is not None
         assert cog_res.regime is not None
 
@@ -61,7 +68,9 @@ async def test_no_fake_price_multipliers_in_telegram():
     and quant_mentor use real SMCEngine / signal_engine structural outputs
     rather than static multipliers like price * 0.992 or price * 0.985.
     """
-    identity = TelegramUserIdentity(user_id=123, chat_id="123", username="trader", role=TelegramRole.ANALYST)
+    identity = TelegramUserIdentity(
+        user_id=123, chat_id="123", username="trader", role=TelegramRole.ANALYST
+    )
 
     # 1. Tool Gateway live ticker dossier
     dossier_res = await telegram_tool_gateway.execute_tool(
@@ -85,7 +94,9 @@ async def test_no_fake_price_multipliers_in_telegram():
     assert dossier.primary_setup.kelly_allocation_pct <= 1.50
 
     # 3. Quant Mentor direction response
-    mentor_resp = await quant_mentor.generate_response("where is btc going?", language_preference="en")
+    mentor_resp = await quant_mentor.generate_response(
+        "where is btc going?", language_preference="en"
+    )
     assert "STRUCTURAL MARKET DIRECTION" in mentor_resp
     assert "Dominant Directional Bias:" in mentor_resp
     assert "Thesis Invalidation Level:" in mentor_resp
@@ -174,7 +185,9 @@ async def test_trading_dictionary_bilingual_and_live_example():
     assert "CBT" in kelly_bn["formatted_markdown"]
 
     # 3. Agent Planner natural language query for dictionary definition
-    identity = TelegramUserIdentity(user_id=123, chat_id="123", username="trader", role=TelegramRole.ANALYST)
+    identity = TelegramUserIdentity(
+        user_id=123, chat_id="123", username="trader", role=TelegramRole.ANALYST
+    )
     resp = await telegram_agent_planner.handle_user_message("what is order block", 123, identity)
     assert resp is not None
     assert "ORDER BLOCK" in resp.upper()

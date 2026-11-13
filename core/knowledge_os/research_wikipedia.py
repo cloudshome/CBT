@@ -605,13 +605,19 @@ class ResearchWikipediaEngine:
                     )
 
             # Phase 4: FTS5 Virtual Index Synchronization
-            tags_str = " ".join(article.tags) if isinstance(article.tags, list) else str(article.tags or "")
+            tags_str = (
+                " ".join(article.tags)
+                if isinstance(article.tags, list)
+                else str(article.tags or "")
+            )
             claims_str = " ".join(
                 c.speaker_claim if isinstance(c, EpistemicClaim) else c.get("speaker_claim", "")
                 for c in (article.key_claims or [])
             )
             try:
-                conn.execute("DELETE FROM wiki_articles_fts WHERE article_id = ?", (article.article_id,))
+                conn.execute(
+                    "DELETE FROM wiki_articles_fts WHERE article_id = ?", (article.article_id,)
+                )
                 conn.execute(
                     """
                     INSERT INTO wiki_articles_fts (
@@ -691,7 +697,9 @@ class ResearchWikipediaEngine:
             for r in rows:
                 try:
                     tags_list = json.loads(r["tags_json"]) if r["tags_json"] else []
-                    tags_str = " ".join(tags_list) if isinstance(tags_list, list) else str(tags_list)
+                    tags_str = (
+                        " ".join(tags_list) if isinstance(tags_list, list) else str(tags_list)
+                    )
                 except Exception:
                     tags_str = ""
                 try:
@@ -722,7 +730,9 @@ class ResearchWikipediaEngine:
                 )
                 indexed_count += 1
             conn.commit()
-        logger.info(f"[ResearchWikipedia] Successfully indexed {indexed_count} articles into wiki_articles_fts.")
+        logger.info(
+            f"[ResearchWikipedia] Successfully indexed {indexed_count} articles into wiki_articles_fts."
+        )
         return indexed_count
 
     def search_fts(self, query: str, limit: int = 10) -> list[dict[str, Any]]:

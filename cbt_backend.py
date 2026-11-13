@@ -11,6 +11,7 @@ Security & Architectural Invariants:
 
 from __future__ import annotations
 
+import logging
 import os
 import signal
 import socket
@@ -21,6 +22,8 @@ import uvicorn
 from dotenv import load_dotenv
 
 from app import app  # noqa: F401
+
+logger = logging.getLogger("cbt_backend")
 
 
 def _resolve_repo_root() -> Path:
@@ -39,8 +42,8 @@ sys.path.insert(0, str(REPO_ROOT))
 if (REPO_ROOT / ".env").exists():
     try:
         load_dotenv(REPO_ROOT / ".env", override=False)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Failed to load .env file: %s", e, exc_info=True)
 
 DEFAULT_PORT = 8000
 HOST = "127.0.0.1"
@@ -83,8 +86,8 @@ def main() -> None:
     try:
         signal.signal(signal.SIGINT, handle_exit)
         signal.signal(signal.SIGTERM, handle_exit)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Failed to register signal handlers: %s", e, exc_info=True)
 
     import app as fastapi_app
 

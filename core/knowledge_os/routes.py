@@ -445,7 +445,9 @@ async def get_macro_vitals() -> dict[str, Any]:
         "status": "SUCCESS",
         "timestamp_ms": int(time.time() * 1000),
         "vitals": vitals,
-        "sentinel_snapshot": snap.to_dict() if hasattr(snap, "to_dict") else {
+        "sentinel_snapshot": snap.to_dict()
+        if hasattr(snap, "to_dict")
+        else {
             "dxy": snap.dxy,
             "us10y": snap.us10y,
             "gold": snap.gold,
@@ -1317,7 +1319,9 @@ async def search_trading_dictionary(
     from core.knowledge_os.trading_dictionary import trading_dictionary
 
     # First attempt single term lookup
-    exact_term = trading_dictionary.lookup(q, language=language, symbol=symbol, with_live_example=True)
+    exact_term = trading_dictionary.lookup(
+        q, language=language, symbol=symbol, with_live_example=True
+    )
     if exact_term:
         return {"status": "SUCCESS", "matched_term": exact_term, "results": [exact_term]}
 
@@ -1335,7 +1339,11 @@ async def get_dictionary_term(
     """Retrieves full definition, institutional mechanism, anti-retail pitfall, and live market example for a term."""
     from core.knowledge_os.trading_dictionary import trading_dictionary
 
-    term = trading_dictionary.lookup(term_id, language=language, symbol=symbol, with_live_example=True)
+    term = trading_dictionary.lookup(
+        term_id, language=language, symbol=symbol, with_live_example=True
+    )
     if not term:
-        raise HTTPException(status_code=404, detail=f"Trading term '{term_id}' not found in dictionary.")
+        raise HTTPException(
+            status_code=404, detail=f"Trading term '{term_id}' not found in dictionary."
+        )
     return {"status": "SUCCESS", "term": term}
