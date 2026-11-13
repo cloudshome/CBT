@@ -148,7 +148,40 @@ class UnifiedProjectKnowledgeRAG:
         return tokens - stopwords
 
     def retrieve_wiki_articles(self, query: str, limit: int = 5) -> list[RetrievedWikiItem]:
-        """Searches wiki_articles and research_sources for top matching articles."""
+        """
+        Searches wiki articles across title, executive summary, and full markdown content.
+        Uses SQLite FTS5 (BM25 ranking + snippet extraction) as primary search engine,
+        falling back to tokenized scanning.
+        """
+        # 1. Primary: SQLite FTS5 full-text search with snippet extraction
+        try:
+            fts_matches = research_wikipedia_engine.search_fts(query, limit=limit)
+            if fts_matches:
+                items: list[RetrievedWikiItem] = []
+                for m in fts_matches:
+                    snippet = m.get("snippet_excerpt", "")
+                    base_summary = m.get("summary", "")
+                    clean_snippet = re.sub(r"</?b>", "**", snippet).strip() if snippet else ""
+                    combined_summary = (
+                        f"{base_summary[:200]}...\n🔍 *Excerpt:* {clean_snippet}"
+                        if clean_snippet
+                        else base_summary[:300]
+                    )
+                    items.append(
+                        RetrievedWikiItem(
+                            article_id=m["article_id"],
+                            title=m["title"],
+                            category=m["category"],
+                            summary=combined_summary,
+                            verification_score=float(m["verification_score"]),
+                            relevance_score=abs(float(m.get("rank_score", 1.0))),
+                        )
+                    )
+                return items
+        except Exception as e:
+            logger.debug(f"[ProjectRAG] FTS search exception, falling back to relational scan: {e}")
+
+        # 2. Secondary: Tokenized scan fallback
         tokens = self._tokenize(query)
         try:
             with self._get_wiki_conn() as conn:

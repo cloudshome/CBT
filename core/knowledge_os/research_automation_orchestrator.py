@@ -626,13 +626,36 @@ class ResearchAutomationOrchestrator:
 
         for src in sources:
             src_type = src.get("source_type")
-            if src_type != "RSS_FEED":
-                continue
-
             feed_url = src.get("url", "")
             feed_name = src.get("name", "")
             category = src.get("category", "Macro Geopolitics & Hegemony")
             source_id = src.get("source_id", "")
+
+            if src_type == "WEB_SCRAPE":
+                try:
+                    logger.info("Auto-scraping research web source: %s (%s)", feed_name, feed_url)
+                    from core.macro_live_collector import macro_live_collector
+                    from core.universal_ingestor import universal_ingestor
+
+                    res = await universal_ingestor.ingest(
+                        content=feed_url,
+                        mode="RESEARCH",
+                        title=f"{feed_name}",
+                        author_creator=feed_name,
+                        source_uri=feed_url,
+                    )
+                    await macro_live_collector.refresh_all()
+                    sources_crawled += 1
+                    if res.get("status") in ("INGESTED", "RESEARCH_INGESTED"):
+                        articles_created += 1
+                    research_source_registry.record_crawl(source_id, success=True, items_found=1)
+                except Exception as exc:
+                    logger.error("Web scrape crawler failed for %s: %s", feed_url, exc)
+                    research_source_registry.record_crawl(source_id, success=False, error=str(exc))
+                continue
+
+            if src_type != "RSS_FEED":
+                continue
 
             try:
                 logger.info("Auto-crawling research feed: %s (%s)", feed_name, feed_url)

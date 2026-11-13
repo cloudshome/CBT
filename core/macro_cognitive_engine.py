@@ -98,6 +98,10 @@ class MacroComprehensionResult:
     analyzed_at_ms: int = field(default_factory=lambda: int(time.time() * 1000))
     engine_provider: str = "DETERMINISTIC_MACRO_HEURISTIC"
 
+    @property
+    def regime(self) -> str:
+        return self.macro_regime.regime_name if self.macro_regime else "EXPANSION"
+
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
         d["macro_regime"] = self.macro_regime.to_dict()

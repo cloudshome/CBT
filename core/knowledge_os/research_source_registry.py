@@ -91,6 +91,34 @@ DEFAULT_CURATED_SOURCES: list[ResearchFeedSource] = [
         crawl_interval_hours=48,
         description="Bitcoin protocol changes, mempool telemetry, and soft fork discussions.",
     ),
+    # 2b. MacroMicro Trader's Insight & Crypto Hub
+    ResearchFeedSource(
+        feed_id="src_macromicro_insights",
+        name="MacroMicro Trader's Insight & Indicator Matrix",
+        url="https://en.macromicro.me/trader-insights",
+        source_type="WEB_SCRAPE",
+        category="Monetary & Debt",
+        crawl_interval_hours=6,
+        description="Comprehensive cross-asset fundamental indicator tables, cycle trends, and recession probability.",
+    ),
+    ResearchFeedSource(
+        feed_id="src_macromicro_crypto",
+        name="MacroMicro Crypto Intelligence Hub",
+        url="https://en.macromicro.me/crypto",
+        source_type="WEB_SCRAPE",
+        category="Crypto Liquidity",
+        crawl_interval_hours=6,
+        description="Stablecoin market caps, exchange reserves, NUPL, and Bitcoin on-chain cycle indicators.",
+    ),
+    ResearchFeedSource(
+        feed_id="src_macromicro_macro",
+        name="MacroMicro Global Macro Monitor",
+        url="https://en.macromicro.me/macro",
+        source_type="WEB_SCRAPE",
+        category="Macro Geopolitics & Hegemony",
+        crawl_interval_hours=12,
+        description="Global economic monitors, central bank balance sheets, and real yield metrics.",
+    ),
     # 3. High-Quality YouTube Macro Channels
     ResearchFeedSource(
         feed_id="src_yt_fedwatch",

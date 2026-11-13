@@ -31,6 +31,16 @@ class MacroVitalSnapshot:
         str  # "RISK_ON_EXPANSION", "RISK_OFF_FLIGHT_TO_SAFETY", "DOLLAR_SQUEEZE", "NEUTRAL"
     )
     summary_banner: str
+    vix: float = 15.20
+    fear_and_greed: float = 68.0
+
+    @property
+    def dxy_index(self) -> float:
+        return self.dxy_price
+
+    @property
+    def regime(self) -> str:
+        return self.macro_regime
 
 
 class MacroSentinel:
@@ -39,18 +49,30 @@ class MacroSentinel:
     def get_macro_snapshot(self) -> MacroVitalSnapshot:
         """
         Retrieves real-time or synthetic calibrated snapshot of global macro vitals.
+        Pulls directly from core/macro_live_collector.py SQLite cache with calibrated fallbacks.
         """
         now = int(time.time() * 1000)
 
-        # Baseline representative calibrated prices
-        dxy = 104.18
-        dxy_chg = -0.22
-        us10y = 4.26
-        us10y_chg = -0.04
-        wti = 73.80
-        wti_chg = 0.45
-        gold = 2678.50
-        gold_chg = 0.68
+        # Pull from live macro collector cache
+        from core.macro_live_collector import macro_live_collector
+
+        dxy_rec = macro_live_collector.get_indicator("DXY") or {}
+        us10y_rec = macro_live_collector.get_indicator("US10Y") or {}
+        wti_rec = macro_live_collector.get_indicator("WTI_CRUDE") or {}
+        gold_rec = macro_live_collector.get_indicator("GOLD") or {}
+        vix_rec = macro_live_collector.get_indicator("VIX") or {}
+        fng_rec = macro_live_collector.get_indicator("FEAR_AND_GREED") or {}
+
+        dxy = float(dxy_rec.get("value", 104.18))
+        dxy_chg = float(dxy_rec.get("change_pct", -0.22))
+        us10y = float(us10y_rec.get("value", 4.26))
+        us10y_chg = float(us10y_rec.get("change_pct", -0.04))
+        wti = float(wti_rec.get("value", 73.80))
+        wti_chg = float(wti_rec.get("change_pct", 0.45))
+        gold = float(gold_rec.get("value", 2678.50))
+        gold_chg = float(gold_rec.get("change_pct", 0.68))
+        vix = float(vix_rec.get("value", 15.20))
+        fng = float(fng_rec.get("value", 68.0))
 
         # Calculate Global Risk Index (GRI)
         # Higher Gold + Lower DXY + Lower Yields -> Higher Risk-On sentiment for Crypto
@@ -84,6 +106,8 @@ class MacroSentinel:
             global_risk_index=round(gri, 1),
             macro_regime=regime,
             summary_banner=summary,
+            vix=vix,
+            fear_and_greed=fng,
         )
 
 

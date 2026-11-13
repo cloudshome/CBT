@@ -663,7 +663,7 @@ async def handle_risk(
         f"🛡️ **INSTITUTIONAL RISK DESK STATUS**\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"• **Execution Gate:** `{lockout_status}`\n"
-        f"• **Half-Kelly Capital Cap:** `2.50% Virtual Equity`\n"
+        f"• **Half-Kelly Capital Cap:** `1.50% Virtual Equity`\n"
         f"• **Circuit Breaker:** `ACTIVE` (Max daily drawdown: 2.50%)\n"
         f"• **Macro Hurdle Multiplier:** `{ev_state.ev_hurdle_multiplier:.2f}x`\n"
         f"• **Position Sizing Multiplier:** `{ev_state.position_size_multiplier:.2f}x`\n"
@@ -691,6 +691,62 @@ async def handle_status(
     if chat_id:
         await telegram_bot.send_message(res, chat_id=chat_id)
     return res
+
+
+async def handle_dictionary(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
+    """Queries the CBT Master Quantitative & SMC Trading Dictionary."""
+    from core.knowledge_os.trading_dictionary import trading_dictionary
+    from core.telegram_bot import telegram_bot
+
+    clean_args = (args or "").strip()
+    if not clean_args:
+        msg = (
+            "📖 **CBT MASTER TRADING DICTIONARY**\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "Use `/dict <term>` or `/define <term>` to query any quantitative, SMC, or order flow concept.\n\n"
+            "**Key Term Examples:**\n"
+            "• `/dict fvg` — Fair Value Gap & 50% Consequent Encroachment (with live market example)\n"
+            "• `/dict order block` — Institutional Order Blocks & Invalidation Rules\n"
+            "• `/dict cvd` — Cumulative Volume Delta & Passive Absorption states\n"
+            "• `/dict funding` — Perpetual Funding Rate Squeeze risk\n"
+            "• `/dict half-kelly` — Half-Kelly position sizing formula & risk gates\n"
+            "• `/dict dxy` — Dollar Index, Dollar Smile, and crypto transmission\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "💡 _Bilingual Support: Ask in English, বাংলা, or Banglish!_"
+        )
+        if chat_id:
+            await telegram_bot.send_message(msg, chat_id=chat_id)
+        return msg
+
+    is_bn = any(ord(c) >= 0x0980 and ord(c) <= 0x09FF for c in clean_args)
+    lang = "bn" if is_bn else "en"
+
+    res = trading_dictionary.lookup(clean_args, language=lang, symbol="BTC/USDT", with_live_example=True)
+    if res and res.get("formatted_markdown"):
+        msg = res["formatted_markdown"]
+        if chat_id:
+            await telegram_bot.send_message(msg, chat_id=chat_id)
+        return msg
+
+    # Fallback to search list
+    search_matches = trading_dictionary.search(clean_args, limit=5)
+    if search_matches:
+        lines = [
+            f"🔍 **Search results for '{clean_args}':**",
+            "━━━━━━━━━━━━━━━━━━━━━━",
+        ]
+        for m in search_matches:
+            lines.append(f"• **{m['canonical_name']}** (`{m['term_id']}`): {m['definition_en'][:120]}...")
+        lines.append("\nType `/dict <term_id>` to view full definition and live market state.")
+        msg = "\n".join(lines)
+    else:
+        msg = f"⚠️ Term '{clean_args}' not found in CBT Master Dictionary. Send `/dict` to see available concept categories."
+
+    if chat_id:
+        await telegram_bot.send_message(msg, chat_id=chat_id)
+    return msg
 
 
 async def handle_candidate(
@@ -1508,6 +1564,14 @@ def register_all_v5_commands() -> None:
             required_role=TelegramRole.ANALYST,
             aliases=["/hermes_agent", "/nous"],
             argument_schema="[query]",
+        ),
+        TelegramCommand(
+            name="/dict",
+            description="Query CBT Master Quantitative & SMC Trading Dictionary with live market state",
+            handler=handle_dictionary,
+            required_role=TelegramRole.ANALYST,
+            aliases=["/define", "/glossary", "/term"],
+            argument_schema="<term>",
         ),
     ]
 

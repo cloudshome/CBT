@@ -1263,3 +1263,55 @@ async def trigger_gdrive_sync(
     else:
         rep = heavy_data_sync_manager.sync_all_heavy_data()
     return asdict(rep)
+
+
+# -----------------------------------------------------------------------------
+# TRADING DICTIONARY API (WORKSTREAM 4)
+# -----------------------------------------------------------------------------
+@router.get("/dictionary")
+async def get_trading_dictionary(
+    limit: int = Query(default=50, ge=1, le=200),
+    category: str | None = Query(default=None),
+) -> dict[str, Any]:
+    """Returns indexed quantitative and SMC trading terms from the Master Dictionary."""
+    from core.knowledge_os.trading_dictionary import trading_dictionary
+
+    terms = trading_dictionary.search("", limit=limit)
+    if category:
+        terms = [t for t in terms if t.get("category", "").upper() == category.upper()]
+    return {"status": "SUCCESS", "total": len(terms), "terms": terms}
+
+
+@router.get("/dictionary/search")
+async def search_trading_dictionary(
+    q: str = Query(..., min_length=1),
+    limit: int = Query(default=20, ge=1, le=50),
+    language: str = Query(default="en"),
+    symbol: str = Query(default="BTC/USDT"),
+) -> dict[str, Any]:
+    """Searches the Trading Dictionary using FTS5 and returns enriched explanations."""
+    from core.knowledge_os.trading_dictionary import trading_dictionary
+
+    # First attempt single term lookup
+    exact_term = trading_dictionary.lookup(q, language=language, symbol=symbol, with_live_example=True)
+    if exact_term:
+        return {"status": "SUCCESS", "matched_term": exact_term, "results": [exact_term]}
+
+    # Otherwise return FTS5 ranked list
+    results = trading_dictionary.search(q, limit=limit)
+    return {"status": "SUCCESS", "query": q, "total": len(results), "results": results}
+
+
+@router.get("/dictionary/term/{term_id}")
+async def get_dictionary_term(
+    term_id: str,
+    language: str = Query(default="en"),
+    symbol: str = Query(default="BTC/USDT"),
+) -> dict[str, Any]:
+    """Retrieves full definition, institutional mechanism, anti-retail pitfall, and live market example for a term."""
+    from core.knowledge_os.trading_dictionary import trading_dictionary
+
+    term = trading_dictionary.lookup(term_id, language=language, symbol=symbol, with_live_example=True)
+    if not term:
+        raise HTTPException(status_code=404, detail=f"Trading term '{term_id}' not found in dictionary.")
+    return {"status": "SUCCESS", "term": term}

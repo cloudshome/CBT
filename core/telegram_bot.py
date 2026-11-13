@@ -1785,58 +1785,33 @@ class TelegramBotDispatcher:
 
     async def generate_live_signal(self, symbol: str = "BTC/USDT") -> dict[str, Any]:
         """
-        Synthesizes live market price and SMC structural metrics to create a high-conviction signal.
+        Synthesizes live market price and SMC structural metrics from native desk bridge.
         """
-        try:
-            from core.data_streamer import data_streamer
+        from core.native_desk_bridge import native_desk_bridge
 
-            price = await data_streamer.get_live_ticker(symbol)
-        except Exception:
-            price = data_streamer._last_known_prices.get(
-                symbol, 79000.0 if "BTC" in symbol else 2500.0
-            )
-
-        if "BTC" in symbol:
-            entry = round(price, 2)
-            sl = round(entry * 0.988, 2)
-            tp1 = round(entry * 1.018, 2)
-            tp2 = round(entry * 1.035, 2)
-            tp3 = round(entry * 1.060, 2)
-            setup = "Judas Swing Sweep + 15m Fair Value Gap"
-            regime = "TRENDING_BULL"
-            confluence = 91
-        elif "ETH" in symbol:
-            entry = round(price, 2)
-            sl = round(entry * 0.985, 2)
-            tp1 = round(entry * 1.022, 2)
-            tp2 = round(entry * 1.045, 2)
-            tp3 = round(entry * 1.075, 2)
-            setup = "4H Order Block Rejection + CVD Absorption"
-            regime = "ACCUMULATION_BREAKOUT"
-            confluence = 87
-        else:
-            entry = round(price, 2)
-            sl = round(entry * 0.982, 2)
-            tp1 = round(entry * 1.025, 2)
-            tp2 = round(entry * 1.050, 2)
-            tp3 = round(entry * 1.080, 2)
-            setup = "Multi-Timeframe Structure Alignment"
-            regime = "MOMENTUM_EXPANSION"
-            confluence = 85
+        dossier = await native_desk_bridge.compile_asset_dossier(symbol, "15m")
+        entry = dossier.current_price
+        sl = dossier.primary_setup.stop_loss
+        tp1 = dossier.primary_setup.tp1
+        tp2 = dossier.primary_setup.tp2
+        direction = dossier.primary_setup.direction
+        rr = dossier.primary_setup.risk_reward_ratio
+        confluence = int(dossier.confluence_score)
+        regime = dossier.macro_regime
 
         return {
             "symbol": symbol,
-            "direction": "LONG",
+            "direction": direction,
             "entry_price": entry,
             "stop_loss": sl,
             "tp1": tp1,
             "tp2": tp2,
-            "tp3": tp3,
-            "risk_reward": "1:3.4",
-            "setup": setup,
+            "tp3": round(tp2 * (1.02 if direction == "LONG" else 0.98), 2),
+            "risk_reward": f"1:{rr:.1f}R",
+            "setup": dossier.primary_setup.entry_trigger,
             "regime": regime,
             "confluence_score": confluence,
-            "kelly_allocation_pct": 2.15,
+            "kelly_allocation_pct": 1.50,
         }
 
     async def generate_market_update(self) -> dict[str, Any]:
@@ -1881,36 +1856,26 @@ class TelegramBotDispatcher:
 
     async def generate_trading_plan(self, symbol: str = "BTC/USDT") -> dict[str, Any]:
         """
-        Builds multi-timeframe structural trading roadmap with key levels.
+        Builds multi-timeframe structural trading roadmap with verified SMC levels from native desk bridge.
         """
-        try:
-            from core.data_streamer import data_streamer
+        from core.native_desk_bridge import native_desk_bridge
 
-            cur_price = await data_streamer.get_live_ticker(symbol)
-        except Exception:
-            from core.data_streamer import data_streamer
-
-            cur_price = data_streamer._last_known_prices.get(
-                symbol, 79000.0 if "BTC" in symbol else 2500.0
-            )
-
-        pdh = round(cur_price * 1.025, 2)
-        pdl = round(cur_price * 0.978, 2)
-        fvg_low = round(cur_price * 0.992, 2)
-        fvg_high = round(cur_price * 0.997, 2)
-        ob_low = round(cur_price * 0.985, 2)
-        ob_high = round(cur_price * 0.989, 2)
+        dossier = await native_desk_bridge.compile_asset_dossier(symbol, "15m")
+        cur_price = dossier.current_price
+        pdh = dossier.pdh
+        pdl = dossier.pdl
+        bias = dossier.market_bias
 
         return {
             "symbol": symbol,
-            "bias": "BULLISH",
+            "bias": bias,
             "pdh": pdh,
             "pdl": pdl,
-            "fvg_zone": f"${fvg_low:,.2f} - ${fvg_high:,.2f}",
-            "ob_zone": f"${ob_low:,.2f} - ${ob_high:,.2f}",
-            "bull_scenario": f"Look for 15m sweep below ${fvg_low:,.2f}, wait for displacement close above ${cur_price:,.2f}, and target PDH at ${pdh:,.2f}.",
-            "bear_scenario": f"Loss of H4 Order Block at ${ob_low:,.2f} invalidates bullish thesis and triggers downside mitigation to ${pdl:,.2f}.",
-            "key_note": "Volume profile shows value area expansion. Risk gate enforces maximum 2.50% total portfolio risk.",
+            "fvg_zone": dossier.fvg_zone,
+            "ob_zone": dossier.ob_zone,
+            "bull_scenario": dossier.primary_setup.entry_trigger,
+            "bear_scenario": dossier.alternative_setup.entry_trigger,
+            "key_note": f"Institutional SMC Structure: {bias} bias with {dossier.confluence_score:.0f}/100 confluence. Risk gate enforces maximum 1.50% Half-Kelly equity cap.",
         }
 
     def generate_event_shock_status(self) -> dict[str, Any]:
@@ -3130,8 +3095,17 @@ class TelegramBotDispatcher:
             candles = data_streamer.generate_synthetic_candles(symbol, tf_normalized, count=40)
 
         cur_price = float(candles[-1].get("close", 80000.0))
-        sl_price = round(cur_price * 0.985, 2)
-        tp_price = round(cur_price * 1.035, 2)
+        from core.native_desk_bridge import native_desk_bridge
+
+        try:
+            dossier = await native_desk_bridge.compile_asset_dossier(symbol, tf_normalized)
+            sl_price = dossier.primary_setup.stop_loss
+            tp_price = dossier.primary_setup.tp1
+        except Exception:
+            lows = [float(c.get("low", cur_price)) for c in candles]
+            highs = [float(c.get("high", cur_price)) for c in candles]
+            sl_price = round(min(lows) if lows else cur_price, 2)
+            tp_price = round(max(highs) if highs else cur_price, 2)
 
         chart_bytes = b""
         try:

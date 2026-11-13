@@ -543,6 +543,56 @@ class TelegramAgentPlanner:
                 tool_args={},
             )
 
+        # 16b. Trading Dictionary & Quantitative Terminology
+        dict_terms = (
+            "fvg", "fair value gap", "consequent encroachment", "ce",
+            "order block", "ob", "breaker block", "breaker", "mitigation block",
+            "bos", "break of structure", "choch", "change of character",
+            "liquidity sweep", "stop raid", "bsl", "ssl", "buy side liquidity", "sell side liquidity",
+            "inducement", "idm", "judas swing", "judas", "power of 3", "amd",
+            "cvd", "cumulative volume delta", "cvd absorption", "absorption",
+            "orderbook imbalance", "obi", "vpin", "toxicity",
+            "funding rate", "funding squeeze", "open interest", "oi", "liquidation cascade",
+            "dxy", "dollar smile", "yield curve", "10y-2y", "real yield",
+            "half kelly", "kelly", "net ev", "expected value", "ratchet", "progressive ratchet",
+            "dsr", "deflated sharpe", "cpcv", "cross validation"
+        )
+        is_definition_question = (
+            lower.startswith("what is ") or lower.startswith("define ") or lower.startswith("explain ")
+            or " কাকে বলে" in lower or " কি" in lower or " কি?" in lower or "বলতে কি" in lower
+            or " ki" in lower or " ki?" in lower or " kake bole" in lower or lower.endswith(" ki") or lower.endswith(" ki?")
+            or any(lower.strip(" ?.") == dt for dt in dict_terms)
+            or (any(dt in lower for dt in dict_terms) and any(kw in lower for kw in ("ki", "কি", "what", "explain", "define", "meaning")))
+        )
+        if is_definition_question and not any(w in lower for w in ("সিগন্যাল", "signal", "ট্রেড দাও", "buy", "sell")):
+            matched = ""
+            for dt in dict_terms:
+                if dt in lower:
+                    matched = dt
+                    break
+            target_term = matched or clean.replace("what is", "").replace("define", "").replace("explain", "").replace("কাকে বলে", "").replace("কি", "").strip(" ?.")
+            target_sym, _ = _extract_sym(lower)
+            return PlannerDecision(
+                intent="LOOKUP_DICTIONARY",
+                tool_name="lookup_trading_dictionary",
+                tool_args={"term": target_term or lower, "language": lang, "symbol": target_sym},
+            )
+
+        # 16c. MacroMicro & Leading Macro Cycles
+        if any(
+            w in lower
+            for w in (
+                "macromicro", "macro micro", "ম্যাক্রোমাইক্রো", "recession probability",
+                "yield curve spread", "manufacturing cycle", "fomc hawkish", "fear and greed",
+                "stablecoin mcap", "stablecoin market cap"
+            )
+        ):
+            return PlannerDecision(
+                intent="GET_MACROMICRO_INSIGHTS",
+                tool_name="get_macromicro_insights",
+                tool_args={"category": "ALL", "language": lang},
+            )
+
         # 17. General Conversational / Quantitative Advisory
         return PlannerDecision(
             intent="CONVERSATIONAL",

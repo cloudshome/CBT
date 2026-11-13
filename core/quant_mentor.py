@@ -20,18 +20,12 @@ class QuantMentor:
 
     def __init__(self):
         self.api_key = os.getenv("GEMINI_API_KEY", "")
-        self.model_name = os.getenv("GEMINI_MODEL", "gemini-3.7-flash")
-        # Native Quantitative Engine Primacy: By default prioritize CBT's local engine,
-        # ensuring 100% autonomous operation with zero external cloud API dependency.
-        self.use_native_engine = os.getenv("USE_NATIVE_QUANT_ENGINE", "true").lower() in (
-            "true",
-            "1",
-            "yes",
-        )
-        self._api_disabled = False
+        self.model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+        # Constitutional Zero Gemini Dependency Invariant:
+        # 100% sovereign native operation backed by CBT's internal quantitative engines.
+        self.use_native_engine = True
+        self._api_disabled = True
         self._client = None
-        if not self.use_native_engine:
-            self._init_client()
 
     def _init_client(self) -> None:
         if self.api_key:
@@ -221,12 +215,42 @@ class QuantMentor:
         nearest_event = telemetry.get("nearest_macro_event", "FOMC Rate Decision")
         event_mins = telemetry.get("minutes_until_event", 1080.0)
 
-        # Key levels derived from live price
+        # Real structural levels from CBT NativeDeskIntelligenceBridge
         pdh = high_24h
         pdl = low_24h
-        fvg_low = round(price * 0.992, 2)
-        fvg_high = round(price * 0.997, 2)
+        fvg_str = f"${round(price * 0.992, 2):,.2f} – ${round(price * 0.997, 2):,.2f}"
+        ob_str = f"${round(price * 0.985, 2):,.2f}"
         ob_low = round(price * 0.985, 2)
+        try:
+            import asyncio
+            import concurrent.futures
+            from core.native_desk_bridge import native_desk_bridge
+
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+
+            if loop and loop.is_running():
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+                    dossier = ex.submit(
+                        lambda: asyncio.run(native_desk_bridge.compile_asset_dossier(target_sym, "15m"))
+                    ).result(timeout=4.0)
+            else:
+                dossier = asyncio.run(native_desk_bridge.compile_asset_dossier(target_sym, "15m"))
+
+            if dossier:
+                price = dossier.current_price
+                bias = dossier.market_bias
+                confluence = dossier.confluence_score
+                fvg_str = dossier.fvg_zone
+                ob_str = dossier.ob_zone
+                pdh = dossier.pdh
+                pdl = dossier.pdl
+                ob_low = dossier.primary_setup.stop_loss
+                net_ev = dossier.primary_setup.net_ev_r
+        except Exception as e:
+            logger.debug(f"[QuantMentor] Native desk bridge enrichment skipped: {e}")
 
         # --------------------------------------------------------------------------
         # INTENT -1: RESEARCH / EVIDENCE DOSSIER GROUNDED REQUEST
@@ -239,7 +263,7 @@ class QuantMentor:
                 return telemetry["research_grounding"]
 
         # --------------------------------------------------------------------------
-        # INTENT -0.5: QUANTITATIVE CONCEPT & KNOWLEDGE BASE EXPLANATION
+        # INTENT -0.5: QUANTITATIVE CONCEPT & KNOWLEDGE BASE EXPLANATION / DICTIONARY
         # (e.g. "what is fvg", "what is smc", "what is order block", "what is half kelly", "what is cbt")
         # --------------------------------------------------------------------------
         is_concept_query = any(
@@ -249,6 +273,9 @@ class QuantMentor:
                 "explain ",
                 "definition of ",
                 "meaning of ",
+                "define ",
+                "glossary",
+                "dictionary",
                 "কি ",
                 "বলতে কি বুঝায়",
                 "কাকে বলে",
@@ -272,10 +299,38 @@ class QuantMentor:
                 "cp-3",
                 "cp3",
                 "cbt",
+                "cvd",
+                "vwap",
+                "dsr",
+                "cpcv",
+                "dxy",
+                "us10y",
+                "vix",
             ]
         )
 
         if is_concept_query:
+            # 1. First check first-class bilingual Trading Dictionary
+            try:
+                from core.knowledge_os.trading_dictionary import trading_dictionary
+
+                query_term = re.sub(
+                    r"^(what\s+is\s+|what\'s\s+|explain\s+|define\s+|meaning\s+of\s+|definition\s+of\s+)",
+                    "",
+                    msg_lower,
+                ).strip()
+                query_term = re.sub(r"(\s+কি\??|\s+কাকে\s+বলে\??|\s+বলতে\s+কি\s+বুঝায়\??)$", "", query_term).strip()
+
+                dict_match = trading_dictionary.lookup(
+                    query_term or user_message,
+                    language="bn" if is_bangla or lang == "bn" else "en",
+                    symbol=target_sym,
+                    with_live_example=True,
+                )
+                if dict_match and dict_match.get("formatted_markdown"):
+                    return dict_match["formatted_markdown"]
+            except Exception as e:
+                logger.debug(f"[QuantMentor] Trading dictionary lookup deferred: {e}")
             # 1. Fair Value Gap (FVG)
             if any(k in msg_lower for k in ["fvg", "fair value gap", "ফেয়ার ভ্যালু", "এফভিজি"]):
                 if is_bangla or lang == "bn":
@@ -562,7 +617,9 @@ class QuantMentor:
             "direction",
             "trend",
             "bias",
+            "where is",
             "where is it going",
+            "going",
             "up or down",
             "bull or bear",
             "movement",
@@ -572,6 +629,7 @@ class QuantMentor:
             "up na down",
             "barbe",
             "kombe",
+            "kothay jabe",
         ]
         if any(w in msg_lower for w in direction_triggers):
             target_str = (
@@ -583,7 +641,8 @@ class QuantMentor:
                     f"🧭 **{target_sym} মার্কেট ডিরেকশন ও স্ট্রাকচারাল বায়াস:**\n"
                     f"━━━━━━━━━━━━━━━━━━━━━━\n"
                     f"• বর্তমান বায়াস: **{bias} EXPANSION** (কনফ্লুয়েন্স: {confluence:.0f}/100)\n"
-                    f"• কি সাপোর্ট (FVG): `${fvg_low:,.2f} - ${fvg_high:,.2f}`\n"
+                    f"• কি সাপোর্ট (FVG জোন): `{fvg_str}`\n"
+                    f"• প্রাতিষ্ঠানিক ওবি লেভেল: `{ob_str}`\n"
                     f"• টার্গেট লিকুইডিটি: `{target_str}` at `${target_level:,.2f}`\n"
                     f"• ইনভ্যালিডেশন লেভেল: `${ob_low:,.2f}` এর নিচে ক্লোজ হলে বুলিশ থিসিস বাতিল।\n\n"
                     f"📌 *অ্যাডভাইস:* হাই-ভোলাটিলিটি রেজিস্ট্যান্সের আগে লং চেজ করবেন না; ডিপে ডিসকাউন্টে এন্ট্রি খুঁজুন।"
@@ -595,11 +654,12 @@ class QuantMentor:
                     f"🎯 **Dominant Directional Bias:** **{bias} EXPANSION**\n"
                     f"⚖️ **Adversarial Council State:** `{decision}` (Confluence: `{confluence:.0f}/100`)\n"
                     f"⚡ **Net Expected Value:** `+{net_ev:.2f}R` (Hurdle threshold: +0.25R)\n"
-                    f"🧱 **Fair Value Gap (FVG Support):** `${fvg_low:,.2f} — ${fvg_high:,.2f}`\n"
+                    f"🧱 **Fair Value Gap (FVG Zone):** `{fvg_str}`\n"
+                    f"🏛️ **Institutional Order Block:** `{ob_str}`\n"
                     f"🎯 **Primary Liquidity Target:** `{target_str}` at `${target_level:,.2f}`\n"
                     f"🛑 **Thesis Invalidation Level:** Clean 15m close below H4 Order Block at `${ob_low:,.2f}`\n"
                     f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                    f"💡 *Desk Playbook:* Look for 15m liquidity sweep below `${fvg_low:,.2f}`, followed by displacement candle reclaim targeting `${pdh:,.2f}`."
+                    f"💡 *Desk Playbook:* Look for 15m liquidity sweep below `{fvg_str}`, followed by displacement candle reclaim targeting `${pdh:,.2f}`."
                 )
 
         # --------------------------------------------------------------------------

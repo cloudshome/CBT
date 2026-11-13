@@ -331,7 +331,32 @@ class ResearchWikipediaEngine:
                 );
                 """
             )
+
+            # 8. wiki_articles_fts (SQLite Full-Text Search FTS5 Virtual Table)
+            conn.execute(
+                """
+                CREATE VIRTUAL TABLE IF NOT EXISTS wiki_articles_fts USING fts5(
+                    article_id UNINDEXED,
+                    title,
+                    category,
+                    executive_summary,
+                    full_markdown_content,
+                    tags,
+                    claims_text,
+                    tokenize='porter unicode61'
+                );
+                """
+            )
             conn.commit()
+
+        # Re-index FTS if virtual table was newly created or empty
+        try:
+            with self._get_connection() as conn:
+                count = conn.execute("SELECT count(*) as c FROM wiki_articles_fts").fetchone()["c"]
+                if count == 0:
+                    self.reindex_fts()
+        except Exception as e:
+            logger.debug(f"[ResearchWikipedia] FTS check/reindex deferred: {e}")
 
     def list_articles(
         self,
@@ -579,6 +604,33 @@ class ResearchWikipediaEngine:
                         (cid, article.article_id, c_a, c_b, contra_text, int(time.time() * 1000)),
                     )
 
+            # Phase 4: FTS5 Virtual Index Synchronization
+            tags_str = " ".join(article.tags) if isinstance(article.tags, list) else str(article.tags or "")
+            claims_str = " ".join(
+                c.speaker_claim if isinstance(c, EpistemicClaim) else c.get("speaker_claim", "")
+                for c in (article.key_claims or [])
+            )
+            try:
+                conn.execute("DELETE FROM wiki_articles_fts WHERE article_id = ?", (article.article_id,))
+                conn.execute(
+                    """
+                    INSERT INTO wiki_articles_fts (
+                        article_id, title, category, executive_summary, full_markdown_content, tags, claims_text
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        article.article_id,
+                        article.title,
+                        article.category,
+                        article.executive_summary,
+                        article.full_markdown_content,
+                        tags_str,
+                        claims_str,
+                    ),
+                )
+            except Exception as e:
+                logger.debug(f"[ResearchWikipedia] FTS sync warning for {article.article_id}: {e}")
+
             conn.commit()
 
         # Write permanent Markdown file
@@ -606,6 +658,120 @@ class ResearchWikipediaEngine:
             export_to_git_vault(wiki_db_path=self.db_path, articles_dir=self.articles_dir)
         except Exception as e:
             logger.debug(f"Vault export skipped: {e}")
+
+    def reindex_fts(self) -> int:
+        """
+        Indexes or re-indexes all existing articles into wiki_articles_fts SQLite virtual table.
+        Returns the number of articles indexed.
+        """
+        indexed_count = 0
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                CREATE VIRTUAL TABLE IF NOT EXISTS wiki_articles_fts USING fts5(
+                    article_id UNINDEXED,
+                    title,
+                    category,
+                    executive_summary,
+                    full_markdown_content,
+                    tags,
+                    claims_text,
+                    tokenize='porter unicode61'
+                );
+                """
+            )
+            rows = conn.execute(
+                """
+                SELECT article_id, title, category, executive_summary,
+                       full_markdown_content, tags_json, key_claims_json
+                FROM wiki_articles;
+                """
+            ).fetchall()
+            conn.execute("DELETE FROM wiki_articles_fts;")
+            for r in rows:
+                try:
+                    tags_list = json.loads(r["tags_json"]) if r["tags_json"] else []
+                    tags_str = " ".join(tags_list) if isinstance(tags_list, list) else str(tags_list)
+                except Exception:
+                    tags_str = ""
+                try:
+                    claims_list = json.loads(r["key_claims_json"]) if r["key_claims_json"] else []
+                    claims_str = " ".join(
+                        c.get("speaker_claim", "") if isinstance(c, dict) else str(c)
+                        for c in claims_list
+                    )
+                except Exception:
+                    claims_str = ""
+
+                conn.execute(
+                    """
+                    INSERT INTO wiki_articles_fts (
+                        article_id, title, category, executive_summary,
+                        full_markdown_content, tags, claims_text
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?);
+                    """,
+                    (
+                        r["article_id"],
+                        r["title"],
+                        r["category"],
+                        r["executive_summary"],
+                        r["full_markdown_content"],
+                        tags_str,
+                        claims_str,
+                    ),
+                )
+                indexed_count += 1
+            conn.commit()
+        logger.info(f"[ResearchWikipedia] Successfully indexed {indexed_count} articles into wiki_articles_fts.")
+        return indexed_count
+
+    def search_fts(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
+        """
+        Performs BM25 ranked full-text search across wiki_articles_fts virtual table.
+        Returns matched records with snippet excerpts from full_markdown_content.
+        """
+        clean_q = re.sub(r"[^\w\s\-\.]", " ", query).strip()
+        if not clean_q:
+            return []
+
+        # Construct BM25 FTS5 MATCH expression
+        tokens = [t for t in clean_q.split() if len(t) > 1]
+        if not tokens:
+            return []
+        match_expr = " OR ".join(f'"{t}"*' for t in tokens)
+
+        try:
+            with self._get_connection() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT f.article_id, f.title, f.category, f.executive_summary,
+                           snippet(wiki_articles_fts, 4, '<b>', '</b>', '...', 25) AS snippet_excerpt,
+                           bm25(wiki_articles_fts) AS rank_score,
+                           w.verification_score, w.source_url, w.updated_at
+                    FROM wiki_articles_fts f
+                    JOIN wiki_articles w ON f.article_id = w.article_id
+                    WHERE wiki_articles_fts MATCH ?
+                    ORDER BY rank_score ASC LIMIT ?;
+                    """,
+                    (match_expr, limit),
+                ).fetchall()
+
+                return [
+                    {
+                        "article_id": r["article_id"],
+                        "title": r["title"],
+                        "category": r["category"],
+                        "summary": r["executive_summary"],
+                        "snippet_excerpt": r["snippet_excerpt"],
+                        "verification_score": float(r["verification_score"] or 90.0),
+                        "rank_score": float(r["rank_score"] or 0.0),
+                        "source_url": r["source_url"] or "",
+                    }
+                    for r in rows
+                ]
+        except Exception as e:
+            logger.debug(f"[ResearchWikipedia] search_fts error: {e}")
+            return []
 
     def get_article_versions(self, article_id: str) -> list[dict[str, Any]]:
         """Returns chronological version history for an article."""
@@ -1064,10 +1230,12 @@ class ResearchWikipediaEngine:
 
     def ingest_url_or_content(
         self,
-        url_or_text: str,
+        url_or_text: str = "",
         custom_title: str | None = None,
         custom_category: str | None = None,
         custom_author: str | None = None,
+        source_url: str | None = None,
+        raw_text: str | None = None,
     ) -> WikiArticle:
         """
         Universal Ingestion Pipeline:
@@ -1076,8 +1244,15 @@ class ResearchWikipediaEngine:
         constructs [[WikiLinks]], and compiles a complete Wikipedia article.
         """
         now_ms = int(time.time() * 1000)
-        source_url = url_or_text.strip() if url_or_text.startswith("http") else ""
-        raw_text = url_or_text if not source_url else ""
+        final_url = (source_url or "").strip()
+        final_text = (raw_text or "").strip()
+        if not final_url and url_or_text.strip().startswith("http"):
+            final_url = url_or_text.strip()
+        elif not final_text and not url_or_text.strip().startswith("http"):
+            final_text = url_or_text
+
+        source_url = final_url
+        raw_text = final_text
 
         # Determine source type
         source_type = "RESEARCH_NOTE"
@@ -1099,11 +1274,8 @@ class ResearchWikipediaEngine:
         article_id = f"wiki_{int(time.time())}_{slug or uuid.uuid4().hex[:8]}"
         provenance_id = f"[S-{time.strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}]"
 
-        # Specialized synthesis if it's the US-China economic discussion or general macro
-        is_us_china = (
-            "14rU2inKqPQ" in source_url
-            or "china" in (source_url + raw_text + (custom_title or "")).lower()
-        )
+        # Specialized synthesis strictly for the specific US-China economic reel
+        is_us_china = "14rU2inKqPQ" in (source_url or "")
 
         if is_us_china:
             return self._build_us_china_article(
