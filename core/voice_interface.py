@@ -73,8 +73,9 @@ class VoiceInterface:
                         f"Gemini audio transcription failed ({e} / {ex}), falling back to local extractor."
                     )
 
-        # Fallback local extraction
-        return "Entered Gold Long at 2678, Stop Loss 2670, Take Profit 2695, 0.5 lot"
+        # Honest local fallback (AGENTS.md Section 4 & System Constitution):
+        # Never fabricate trade executions or mock quantities when STT is offline.
+        return "Voice note received (Audio transcription offline; STT model not loaded)."
 
     async def transcribe_audio(self, audio_file_path: Path) -> str:
         """Transcribes an audio file on disk."""

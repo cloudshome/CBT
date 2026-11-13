@@ -268,3 +268,37 @@ async def test_typed_commands_swarm_collector_crawl():
     # 3. /crawl
     crawl_res = await handle_crawl("", identity=identity)
     assert "AUTONOMOUS CRAWL CYCLE COMPLETE" in crawl_res
+
+
+@pytest.mark.asyncio
+async def test_native_quant_mentor_concept_explanations_offline():
+    """
+    Verifies that QuantMentor provides institutional quantitative concept explanations
+    (FVG, SMC, Order Block, Half-Kelly, CP-2) completely offline without external Gemini API.
+    """
+    from core.quant_mentor import quant_mentor
+
+    # 1. English FVG
+    res_fvg_en = await quant_mentor.generate_response("what is fvg")
+    assert "Fair Value Gap (FVG)" in res_fvg_en
+    assert "3-candle structural price imbalance" in res_fvg_en
+
+    # 2. Bengali FVG
+    res_fvg_bn = await quant_mentor.generate_response("এফভিজি বলতে কি বুঝায়")
+    assert "Fair Value Gap" in res_fvg_bn
+    assert "৩-ক্যান্ডেল ইমব্যালেন্স" in res_fvg_bn
+
+    # 3. Half-Kelly Risk
+    res_kelly = await quant_mentor.generate_response("explain half kelly")
+    assert "Half-Kelly Criterion" in res_kelly
+    assert "1.50% equity" in res_kelly or "1.50%" in res_kelly
+
+    # 4. CBT Architecture
+    res_cbt = await quant_mentor.generate_response("how does cbt work")
+    assert "Crypto Brain Terminal" in res_cbt
+    assert "100% Native Architecture" in res_cbt or "Autonomous Execution" in res_cbt
+
+    # 5. Checkpoint 2 / CP-2 Gate
+    res_cp2 = await quant_mentor.generate_response("what is cp-2")
+    assert "Checkpoint 2 (CP-2)" in res_cp2
+    assert "Net Expected Value" in res_cp2 or "E[R_net]" in res_cp2

@@ -21,8 +21,17 @@ class QuantMentor:
     def __init__(self):
         self.api_key = os.getenv("GEMINI_API_KEY", "")
         self.model_name = os.getenv("GEMINI_MODEL", "gemini-3.7-flash")
+        # Native Quantitative Engine Primacy: By default prioritize CBT's local engine,
+        # ensuring 100% autonomous operation with zero external cloud API dependency.
+        self.use_native_engine = os.getenv("USE_NATIVE_QUANT_ENGINE", "true").lower() in (
+            "true",
+            "1",
+            "yes",
+        )
+        self._api_disabled = False
         self._client = None
-        self._init_client()
+        if not self.use_native_engine:
+            self._init_client()
 
     def _init_client(self) -> None:
         if self.api_key:
@@ -43,11 +52,18 @@ class QuantMentor:
     ) -> str:
         """
         Generates grounded quantitative advice in English or Bangla.
+        Prioritizes CBT's native quantitative engine for instant, zero-latency execution.
         """
         telemetry_ctx = market_telemetry or {}
 
-        # If Gemini client is active, generate grounded response
-        if self._client:
+        # 1. Native Quantitative Engine Priority (100% Autonomous & Grounded)
+        if self.use_native_engine or self._api_disabled or not self._client:
+            return self._generate_heuristic_response(
+                user_message, telemetry_ctx, language_preference
+            )
+
+        # 2. If Gemini is explicitly opted in and active
+        if self._client and not self._api_disabled:
             for candidate_model in (
                 self.model_name,
                 "gemini-3.7-flash",
@@ -72,7 +88,15 @@ class QuantMentor:
                     if response and response.text:
                         return response.text.strip()
                 except Exception as e:
+                    err_str = str(e)
                     logger.debug(f"Gemini API generation error with model '{candidate_model}': {e}")
+                    if "403" in err_str or "policy" in err_str or "Forbidden" in err_str:
+                        logger.warning(
+                            "Gemini API rejected request (403 Forbidden / policy block). "
+                            "Permanently routing to CBT Native Quantitative Engine."
+                        )
+                        self._api_disabled = True
+                        break
 
         # Local High-Precision Heuristic Fallback
         return self._generate_heuristic_response(user_message, telemetry_ctx, language_preference)
@@ -213,6 +237,175 @@ class QuantMentor:
         ):
             if telemetry.get("research_grounding"):
                 return telemetry["research_grounding"]
+
+        # --------------------------------------------------------------------------
+        # INTENT -0.5: QUANTITATIVE CONCEPT & KNOWLEDGE BASE EXPLANATION
+        # (e.g. "what is fvg", "what is smc", "what is order block", "what is half kelly", "what is cbt")
+        # --------------------------------------------------------------------------
+        is_concept_query = any(
+            w in msg_lower
+            for w in [
+                "what is ",
+                "explain ",
+                "definition of ",
+                "meaning of ",
+                "কি ",
+                "বলতে কি বুঝায়",
+                "কাকে বলে",
+                "কিভাবে কাজ করে",
+                "how does cbt work",
+                "how does the bot work",
+            ]
+        ) or any(
+            msg_lower.strip() == term
+            for term in [
+                "fvg",
+                "smc",
+                "order block",
+                "ob",
+                "half kelly",
+                "half-kelly",
+                "kelly criterion",
+                "net ev",
+                "cp-2",
+                "cp2",
+                "cp-3",
+                "cp3",
+                "cbt",
+            ]
+        )
+
+        if is_concept_query:
+            # 1. Fair Value Gap (FVG)
+            if any(k in msg_lower for k in ["fvg", "fair value gap", "ফেয়ার ভ্যালু", "এফভিজি"]):
+                if is_bangla or lang == "bn":
+                    return (
+                        "📚 **কোয়ান্ট কনসেপ্ট: Fair Value Gap (FVG / ফেয়ার ভ্যালু গ্যাপ)**\n"
+                        "━━━━━━━━━━━━━━━━━━━━━━\n"
+                        "• **সংজ্ঞা:** FVG হলো একটি ৩-ক্যান্ডেল ইমব্যালেন্স (Imbalance), যেখানে ১ম ক্যান্ডেলের হাই এবং ৩য় ক্যান্ডেলের লো-এর মাঝে ফাঁকা স্থান থাকে।\n"
+                        "• **কেন তৈরি হয়:** বড় প্রাতিষ্ঠানিক ও অ্যালগরিদমিক অর্ডারের কারণে প্রাইস একমুখী তীব্র মুভমেন্ট দিলে এই লিকুইডিটি শূন্যতা তৈরি হয়।\n"
+                        "• **CBT ব্যবহার:** মার্কেট মেকাররা পরবর্তীতে এই শূন্যতা রি-ব্যালেন্স করতে প্রাইস পুলব্যাক করায়। CBT শুধুমাত্র ভলিউম অ্যাবসর্পশন ও CVD কনফার্মেশনে ডিসকাউন্ট FVG-তে রিভার্সাল এন্ট্রি নেয়।\n"
+                        "• **ঝুঁকি নিয়ন্ত্রণ:** FVG-র চরম সীমার নিচে স্ট্রাকচারাল ইনভ্যালিডেশন (SL) বসানো হয়।"
+                    )
+                else:
+                    return (
+                        "📚 **QUANTITATIVE CONCEPT: Fair Value Gap (FVG)**\n"
+                        "━━━━━━━━━━━━━━━━━━━━━━\n"
+                        "• **Definition:** A 3-candle structural price imbalance where the wick of candle 1 does not overlap the wick of candle 3, leaving an unfilled liquidity pocket.\n"
+                        "• **Microstructure Driver:** Created by aggressive institutional displacement consuming all available resting liquidity on one side of the book.\n"
+                        "• **CBT Implementation:** Market makers frequently retrace to re-balance these zones. CBT enters strictly upon discount mitigation confirmed by CVD absorption, avoiding naive knife-catching.\n"
+                        "• **Risk Invariant:** Structural stop loss is placed beyond the origin candle of the displacement."
+                    )
+
+            # 2. Smart Money Concepts (SMC)
+            if any(k in msg_lower for k in ["smc", "smart money", "স্মার্ট মানি"]):
+                if is_bangla or lang == "bn":
+                    return (
+                        "📚 **কোয়ান্ট কনসেপ্ট: Smart Money Concepts (SMC)**\n"
+                        "━━━━━━━━━━━━━━━━━━━━━━\n"
+                        "• **সংজ্ঞা:** রিটেইল ল্যাগিং ইন্ডিকেটর (RSI/MACD) এর বদলে সেন্ট্রাল ব্যাংক ও ইনস্টিটিউশনাল লিকুইডিটি পুল, ফেকআউট ও অর্ডারফ্লো বিশ্লেষণ।\n"
+                        "• **মূল উপাদান:** Liquidity Sweeps (BSL/SSL), Break of Structure (BOS), Change of Character (CHoCH), Order Blocks (OB) ও Fair Value Gaps (FVG)।\n"
+                        "• **CBT পার্থক্য:** সাধারণ রিটেইল ট্রেডাররা অনুমানের ওপর ট্রেড করে; CBT-তে SMC-কে জিরো-লুকঅ্যাহেড কোয়ান্ট কোড এবং ব্যাকটেস্টে কঠোরভাবে ম্যাথমেটাইজ করা হয়েছে।"
+                    )
+                else:
+                    return (
+                        "📚 **QUANTITATIVE CONCEPT: Smart Money Concepts (SMC)**\n"
+                        "━━━━━━━━━━━━━━━━━━━━━━\n"
+                        "• **Core Philosophy:** Analyzes institutional order flow, dealer positioning, and interbank liquidity pools rather than retail lagging indicators.\n"
+                        "• **Key Primitives:** Liquidity Sweeps (BSL/SSL), Structural Breaks (BOS/CHoCH), Order Blocks (OB), and Fair Value Gaps (FVG).\n"
+                        "• **CBT Edge:** Retail traders trade visual patterns subjectively; CBT codifies SMC into causal, zero-lookahead mathematical state machines with verified statistical edge."
+                    )
+
+            # 3. Order Block (OB)
+            if any(k in msg_lower for k in ["order block", "ob", "অর্ডার ব্লক"]):
+                if is_bangla or lang == "bn":
+                    return (
+                        "📚 **কোয়ান্ট কনসেপ্ট: Order Block (OB / অর্ডার ব্লক)**\n"
+                        "━━━━━━━━━━━━━━━━━━━━━━\n"
+                        "• **সংজ্ঞা:** একটি বড় ব্রেক অফ স্ট্রাকচার (BOS) বা ইমপালসিভ মুভের পূর্বের বিপরীতমুখী শেষ ক্যান্ডেল।\n"
+                        "• **মেকানিক্স:** এই জোনে প্রাতিষ্ঠানিক লিমিট অর্ডারগুলো জমা থাকে। প্রাইস যখন পুনরায় এই জোনে আসে, তখন অবশিষ্ট অর্ডার ফিল হওয়ার কারণে বাউন্স দেখা যায়।\n"
+                        "• **রিস্ক রুল:** অর্ডার ব্লকের অপর প্রান্ত ভাঙলে সেটআপ তাত্ক্ষণিকভাবে ইনভ্যালিড ঘোষিত হয়।"
+                    )
+                else:
+                    return (
+                        "📚 **QUANTITATIVE CONCEPT: Order Block (OB)**\n"
+                        "━━━━━━━━━━━━━━━━━━━━━━\n"
+                        "• **Definition:** The last opposing closed candle prior to an aggressive displacement that causes a structural Break of Structure (BOS).\n"
+                        "• **Microstructure Driver:** Represents the accumulation of institutional limit orders. Subsequent retests offer asymmetric reward-to-risk mitigation entries.\n"
+                        "• **CBT Rule:** Valid only when accompanied by positive delta absorption. Strict stop loss sits immediately beyond the block boundary."
+                    )
+
+            # 4. Half-Kelly Criterion
+            if any(
+                k in msg_lower for k in ["kelly", "half kelly", "half-kelly", "কেলি", "হাফ কেলি"]
+            ):
+                if is_bangla or lang == "bn":
+                    return (
+                        "📚 **কোয়ান্ট কনসেপ্ট: Half-Kelly Criterion (হাফ-কেলি রিস্ক মডেল)**\n"
+                        "━━━━━━━━━━━━━━━━━━━━━━\n"
+                        "• **গাণিতিক সূত্র:** f* / 2 = (p * b - q) / (2 * b)\n"
+                        "• **কেন ফুল কেলি নয়:** ফুল কেলি তাত্ত্বিকভাবে সম্পদ দ্রুত বাড়ালেও ভোলাটিলিটি চরম থাকে এবং ড্রডাউন ৫০-৮০% পর্যন্ত হতে পারে।\n"
+                        "• **হাফ-কেলির সুবিধা:** ফুল কেলির ৭৫% গ্রোথ রেট ধরে রেখে ড্রডাউনের ঝুঁকি ৭৫% কমিয়ে দেয়। গাণিতিকভাবে জিরো-রুইন (Zero Ruin) নিশ্চিত করে।\n"
+                        "• **CBT সংবিধান:** প্রতিটি ট্রেডে সর্বোচ্চ ১.৫০% ক্যাপিটাল রিস্ক ক্যাপ নির্ধারিত।"
+                    )
+                else:
+                    return (
+                        "📚 **QUANTITATIVE CONCEPT: Half-Kelly Criterion**\n"
+                        "━━━━━━━━━━━━━━━━━━━━━━\n"
+                        "• **Formula:** f* / 2 = (p * b - q) / (2 * b)\n"
+                        "• **Why Half-Kelly:** Full Kelly maximizes theoretical logarithmic growth but suffers extreme variance and 50%+ drawdowns.\n"
+                        "• **Advantage:** Delivers 75% of full Kelly growth with a 75% reduction in volatility and zero mathematical risk of ruin.\n"
+                        "• **Constitutional Invariant:** In CBT, every trade is strictly bounded to max 1.50% equity allocation."
+                    )
+
+            # 5. Net Expected Value (Net EV) & Checkpoint 2 (CP-2)
+            if any(
+                k in msg_lower
+                for k in ["net ev", "expected value", "cp-2", "cp2", "cp-3", "cp3", "এক্সপেক্টেড ভ্যালু"]
+            ):
+                if is_bangla or lang == "bn":
+                    return (
+                        "📚 **কোয়ান্ট কনসেপ্ট: Net EV (নেট এক্সপেক্টেড ভ্যালু) ও CP-2/CP-3**\n"
+                        "━━━━━━━━━━━━━━━━━━━━━━\n"
+                        "• **Net EV:** প্রতিটি ট্রেডের প্রত্যাশিত লাভ (R-মাল্টিপল), যেখানে মেকার/টেকার ফি, ফান্ডিং রেট এবং স্লিপেজ বাদ দেওয়া হয়েছে।\n"
+                        "• **CBT স্ট্যান্ডার্ড:** শুধুমাত্র যে সেটআপের Net EV >= +0.25R এবং Profit Factor >= 1.45, সেগুলোই এক্সিকিউট করা হয়।\n"
+                        "• **CP-2 (Checkpoint 2):** ঐতিহাসিক ১২৫,০০০+ বারে মাল্টি-ইয়ার আউট-অব-স্যাম্পল ভেরিফিকেশন (M47-এ সার্টিফাইড: +0.2709R Net EV, PF 1.54, DSR 0.9999)।\n"
+                        "• **CP-3 (Checkpoint 3):** রিয়েল-টাইম ফরোয়ার্ড পেপার ট্রেডিংয়ে ২০টি পজিটিভ ট্রেডের লাইভ স্ট্রিমিং ভেরিফিকেশন।"
+                    )
+                else:
+                    return (
+                        "📚 **QUANTITATIVE CONCEPT: Net EV & Governance Gates (CP-2 / CP-3)**\n"
+                        "━━━━━━━━━━━━━━━━━━━━━━\n"
+                        "• **Net Expected Value (Net EV):** Net return per trade in R-multiples after deducting 3-tier frictions (maker/taker fees, funding, and adverse slippage).\n"
+                        "• **CBT Standard:** Only setups with E[R_net] >= +0.25R and Profit Factor >= 1.45 qualify for execution.\n"
+                        "• **Checkpoint 2 (CP-2):** Historical statistical certification across 125,000+ multi-year bars (Certified in M47: +0.2709R, PF 1.54, DSR 0.9999).\n"
+                        "• **Checkpoint 3 (CP-3):** 20 consecutive forward real-time paper qualification trades with positive expectancy and zero ledger drift."
+                    )
+
+            # 6. How CBT / Terminal Works
+            if any(k in msg_lower for k in ["cbt", "terminal", "bot work", "বট কিভাবে", "সিবিটি"]):
+                if is_bangla or lang == "bn":
+                    return (
+                        "🤖 **Crypto Brain Terminal (CBT / SKY) আর্কিটেকচার:**\n"
+                        "━━━━━━━━━━━━━━━━━━━━━━\n"
+                        "CBT একটি প্রাতিষ্ঠানিক ক্রিপ্টো কোয়ান্ট ট্রেডিং প্ল্যাটফর্ম যা ১০০% নিজস্ব অ্যালগরিদমে পরিচালিত হয়:\n"
+                        "1. **লাইভ এক্সচেঞ্জ ডাটা:** Binance ও Bybit থেকে সরাসরি রিয়েল-টাইম L2 অর্ডারবুক ও ক্যান্ডেল ডাটা স্ট্রিমিং।\n"
+                        "2. **SMC মার্কেট স্ট্রাকচার:** FVG, অর্ডার ব্লক, লিকুইডিটি পুল এবং মাল্টি-টাইমফ্রেম কনফ্লুয়েন্স স্ক্যানার।\n"
+                        "3. **ক্যাজুয়াল ফায়ারওয়াল:** কোনো ফিউচার বা আনক্লোজড ডাটা দেখা নিষেধ (Zero Lookahead)।\n"
+                        "4. **হাফ-কেলি রিস্ক ডেস্ক:** সর্বোচ্চ ১.৫০% ক্যাপিটাল রিস্ক এবং +1.2R এ ব্রেক-ইভেন র‍্যাচেট প্রোটেকশন।\n"
+                        "5. **সম্পূর্ণ অটোনোমাস:** বাইরের কোনো কৃত্রিম বুদ্ধিমত্তা বা ক্লাউড API ছাড়াই লোকাল কোয়ান্ট ইঞ্জিনে সিদ্ধান্ত গ্রহণ।"
+                    )
+                else:
+                    return (
+                        "🤖 **Crypto Brain Terminal (CBT / SKY) Architecture:**\n"
+                        "━━━━━━━━━━━━━━━━━━━━━━\n"
+                        "CBT is an institutional cryptocurrency quantitative market-intelligence terminal operating 100% on native internal engines:\n"
+                        "1. **Exchange Telemetry:** Real-time L2 orderbook feeds and closed candle streaming from Binance and Bybit.\n"
+                        "2. **SMC Quantitative Engine:** Mathematical codification of FVGs, Order Blocks, Liquidity Sweeps, and MTF confluence.\n"
+                        "3. **Causal Firewall:** Strict Zero-Lookahead execution on closed historical bars.\n"
+                        "4. **Deterministic Risk Desk:** Half-Kelly position sizing (≤ 1.50% equity cap) and progressive breakeven ratcheting at +1.20R.\n"
+                        "5. **100% Autonomous Execution:** Complete self-sufficiency without reliance on third-party cloud LLMs."
+                    )
 
         # --------------------------------------------------------------------------
         # INTENT 0: STANDALONE ASSET NAME / ASSET DOSSIER REQUEST
