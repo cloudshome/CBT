@@ -347,6 +347,53 @@ class KnowledgeGraphEngine:
             updated_at=int(row["updated_at"]),
         )
 
+    def create_entity(
+        self,
+        entity_id: str,
+        name: str,
+        entity_type: str = "CONCEPT",
+        aliases: list[str] | None = None,
+        description: str = "",
+    ) -> GraphEntity:
+        """Creates or updates a knowledge graph entity."""
+        aliases_list = aliases or []
+        now = int(time.time() * 1000)
+        ent = GraphEntity(
+            entity_id=entity_id,
+            name=name,
+            entity_type=entity_type,
+            aliases=aliases_list,
+            description=description,
+            created_at=now,
+            updated_at=now,
+        )
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO research_entities (
+                    entity_id, name, entity_type, aliases_json, description,
+                    mention_count, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+                ON CONFLICT(entity_id) DO UPDATE SET
+                    name = excluded.name,
+                    entity_type = excluded.entity_type,
+                    aliases_json = excluded.aliases_json,
+                    description = excluded.description,
+                    updated_at = excluded.updated_at;
+                """,
+                (
+                    ent.entity_id,
+                    ent.name,
+                    ent.entity_type,
+                    json.dumps(ent.aliases),
+                    ent.description,
+                    ent.created_at,
+                    ent.updated_at,
+                ),
+            )
+            conn.commit()
+        return ent
+
     def extract_entities_from_text(self, text: str) -> list[GraphEntity]:
         """Identifies recognized entities inside free-form text."""
         text_lower = text.lower()
@@ -384,13 +431,14 @@ class KnowledgeGraphEngine:
     ) -> GraphRelation | None:
         """Creates or strengthens a relation between two entities."""
         src_ent = self.get_entity(source_name_or_id)
-        tgt_ent = self.get_entity(target_name_or_id)
+        if not src_ent:
+            clean_src_id = f"ent_{source_name_or_id.lower().replace(' ', '_').replace('/', '_')}"
+            src_ent = self.create_entity(clean_src_id, source_name_or_id, "CONCEPT")
 
-        if not src_ent or not tgt_ent:
-            logger.warning(
-                f"Cannot link '{source_name_or_id}' and '{target_name_or_id}': Entity not found."
-            )
-            return None
+        tgt_ent = self.get_entity(target_name_or_id)
+        if not tgt_ent:
+            clean_tgt_id = f"ent_{target_name_or_id.lower().replace(' ', '_').replace('/', '_')}"
+            tgt_ent = self.create_entity(clean_tgt_id, target_name_or_id, "CONCEPT")
 
         rel_id = f"rel_{src_ent.entity_id}_{tgt_ent.entity_id}_{relation_type.lower()}"
         now = int(time.time() * 1000)

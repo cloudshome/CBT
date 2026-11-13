@@ -100,7 +100,7 @@ async def handle_signal(
         f"⚖️ **R:R Ratio:** `{sig['risk_reward']}`\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"🛡️ **Two-Phase Confirmation:** Tap `[ ⚡ Enter Paper Trade ]` below to arm.\n"
-        f"_Action token expires in 60s. Maximum risk capped at Half-Kelly (2.50%)._"
+        f"_Action token expires in 60s. Maximum risk capped at Half-Kelly (1.50%)._"
     )
 
     # 4. Dispatch via Photo or Message
@@ -977,7 +977,7 @@ async def handle_resume(
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"• **Authorized By:** `@{operator}` (`{role_str}`)\n"
         f"• **Status:** Execution Desk RESTORED to normal operational mode.\n"
-        f"• **Risk Gate State:** `NORMAL RISK GATING ACTIVE (Half-Kelly ≤ 2.50%)`\n"
+        f"• **Risk Gate State:** `NORMAL RISK GATING ACTIVE (Half-Kelly ≤ 1.50%)`\n"
         f"• **Audit Note:** Lockout release logged to SQLite audit ledger.\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"⚡ _Autonomous Paper Desk and Signal Monitoring Active._"

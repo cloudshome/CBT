@@ -160,7 +160,7 @@ export const GeminiDeskCopilot: React.FC<GeminiDeskCopilotProps> = ({
           </div>
           <div>
             <h3 className="text-xs font-mono font-bold text-white flex items-center gap-1.5">
-              GEMINI DESK INTELLIGENCE
+              SKY SOVEREIGN DESK INTELLIGENCE (NATIVE QUANT ENGINE)
             </h3>
             <p className="text-[10px] font-mono text-slate-400">
               Grounded Institutional Copilot • {symbol} ({timeframe})
@@ -255,7 +255,7 @@ export const GeminiDeskCopilot: React.FC<GeminiDeskCopilotProps> = ({
           </div>
         ) : (
           <div className="bg-background p-4 rounded border border-border text-center font-mono text-xs text-slate-400">
-            Click "Refresh Brief" to generate Gemini market intelligence for {symbol}.
+            Click "Refresh Brief" to generate sovereign market intelligence for {symbol}.
           </div>
         )}
       </div>

@@ -314,6 +314,7 @@ class TelegramCallbackRouter:
                 or (tf_name == "1W" and tf_clean in ("1W", "WEEKLY", "WEEK"))
                 or (tf_name == "1D" and tf_clean in ("1D", "DAILY", "DAY"))
                 or (tf_name == "4H" and tf_clean in ("4H", "4HOURS"))
+                or (tf_name == "1H" and tf_clean in ("1H", "HOURLY", "60M"))
                 or (tf_name == "15M" and tf_clean in ("15M", "15"))
             )
             label = f"• {tf_name} •" if is_active else tf_name
@@ -333,9 +334,10 @@ class TelegramCallbackRouter:
                 ],
                 [
                     tf_btn("15M"),
+                    tf_btn("1H"),
                     tf_btn("4H"),
                     tf_btn("1D"),
-                    tf_btn("1M"),
+                    tf_btn("1W"),
                 ],
                 [
                     {

@@ -212,9 +212,18 @@ class PDFBookExtractor:
     and crypto relevance mapping.
     """
 
-    def __init__(self, vision_transcriber_override=None):
-        self.api_key = os.getenv("GEMINI_API_KEY", "") or os.getenv("GOOGLE_API_KEY", "")
-        self.vision_model = os.getenv("GEMINI_VISION_MODEL", "gemini-2.5-flash")
+    def __init__(
+        self,
+        vision_transcriber_override=None,
+        api_key: str | None = None,
+        vision_model: str | None = None,
+    ):
+        self.api_key = (
+            api_key
+            if api_key is not None
+            else (os.getenv("GEMINI_API_KEY", "") or os.getenv("GOOGLE_API_KEY", ""))
+        )
+        self.vision_model = vision_model or os.getenv("GEMINI_VISION_MODEL", "gemini-2.5-flash")
         self.vision_transcriber_override = vision_transcriber_override
 
     def extract_page_with_vision(
@@ -238,6 +247,39 @@ class PDFBookExtractor:
 
         if not image_bytes:
             return "", "NONE"
+
+        # Constitutional Directive M50: Honour USE_NATIVE_QUANT_ENGINE=true (default true)
+        use_native = os.getenv("USE_NATIVE_QUANT_ENGINE", "true").lower() in ("true", "1")
+        if use_native:
+            # 1. Attempt local OCR via pytesseract if available
+            try:
+                import io
+                from PIL import Image
+                import pytesseract
+
+                img = Image.open(io.BytesIO(image_bytes))
+                text = pytesseract.image_to_string(img).strip()
+                if text:
+                    return text, "LOCAL_TESSERACT_OCR"
+            except Exception:
+                pass
+
+            # 2. Local structural image inspection
+            header_str = ""
+            try:
+                if len(image_bytes) >= 24:
+                    if image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+                        w = int.from_bytes(image_bytes[16:20], "big")
+                        h = int.from_bytes(image_bytes[20:24], "big")
+                        header_str = f"[NATIVE_IMAGE_PAGE: {w}x{h} PNG, {len(image_bytes)} bytes]"
+                    elif image_bytes.startswith(b"\xff\xd8"):
+                        header_str = f"[NATIVE_IMAGE_PAGE: JPEG, {len(image_bytes)} bytes]"
+                    else:
+                        header_str = f"[NATIVE_IMAGE_PAGE: {len(image_bytes)} bytes]"
+            except Exception:
+                header_str = f"[NATIVE_IMAGE_PAGE: {len(image_bytes)} bytes]"
+
+            return header_str, "NATIVE_LOCAL_EXTRACTOR"
 
         api_key = (
             self.api_key

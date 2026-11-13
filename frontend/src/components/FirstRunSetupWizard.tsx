@@ -440,16 +440,19 @@ export const FirstRunSetupWizard: React.FC<FirstRunSetupWizardProps> = ({ onComp
             </div>
           )}
 
-          {/* STEP 2: GEMINI API KEY */}
+          {/* STEP 2: AI INTELLIGENCE ENGINE (100% NATIVE ACTIVE) */}
           {step === 2 && (
             <div className="space-y-6 max-w-xl mx-auto">
               <div className="text-center space-y-2">
-                <div className="w-12 h-12 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mx-auto text-blue-400">
+                <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto text-emerald-400">
                   <Cpu className="w-6 h-6" />
                 </div>
-                <h2 className="text-xl font-bold text-zinc-100">Google Gemini Intelligence</h2>
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px] font-semibold mb-1">
+                  100% NATIVE QUANT ENGINE ACTIVE
+                </div>
+                <h2 className="text-xl font-bold text-zinc-100">AI Intelligence Engine (Gemini Optional)</h2>
                 <p className="text-xs text-zinc-400 leading-relaxed">
-                  Required for AI Quant Sentinel, Kronos model calibration, and autonomous multi-agent quantitative research.
+                  CBT runs entirely on its internal sovereign quantitative algorithms, SMC order flow, local RAG, and live exchange streams. An external Google Gemini key is completely optional.
                 </p>
               </div>
 

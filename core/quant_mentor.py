@@ -688,7 +688,7 @@ class QuantMentor:
                     "━━━━━━━━━━━━━━━━━━━━━━\n"
                     "🟢 **Open Positions:** `0 Active Trades`\n"
                     f"💰 **Virtual Equity:** `${equity_val:,.2f}`\n"
-                    "🛡️ **Active Risk Exposure:** `0.00%` (Risk Cap: 2.50%)\n"
+                    "🛡️ **Active Risk Exposure:** `0.00%` (Risk Cap: 1.50%)\n"
                     "⚡ **Queue:** 3 high-probability setups queued awaiting trigger conditions.\n\n"
                     "Use `/signal` to scan for execution or check the Web UI Paper Desk tab!"
                 )
@@ -710,7 +710,7 @@ class QuantMentor:
                     + "\n".join(pos_lines)
                     + "\n"
                     "🛡️ **Capital Preservation:** Half-Kelly risk bounds active.\n"
-                    "⚡ **Breakeven Shield:** Automatically engages at `+1.5R`."
+                    "⚡ **Two-Stage Ratchet:** Stage 1 (+1.20R -> +0.25R lock); Stage 2 (+1.50R -> bank 35% + lock at +0.65R)."
                 )
 
         # --------------------------------------------------------------------------
@@ -815,7 +815,7 @@ class QuantMentor:
                     f"💵 **লাইভ মার্ক প্রাইজ:** `${price:,.2f}` | বায়াস: `{bias} Expansion`\n"
                     f"📥 **আইডিয়াল একুমুলেশন জোন:** `${entry_low:,.2f} — ${entry_high:,.2f}`\n"
                     f"🛑 **স্ট্রাকচারাল ইনভ্যালিডেশন (SL):** `${sl:,.2f}` (কঠোর `{risk_pct:.1f}%` রিস্ক)\n"
-                    f"🎯 **টেক প্রফিট ১ (+1.5R):** `${tp1:,.2f}` (ব্রেক-ইভেন শিল্ড অ্যাক্টিভ)\n"
+                    f"🎯 **টেক প্রফিট ১ (+1.20R / +1.50R):** `${tp1:,.2f}` (টু-স্টেজ প্রগ্রেসিভ র‍্যাচেট সক্রিয়)\n"
                     f"🎯 **টেক প্রফিট ২ (+2.5R):** `${tp2:,.2f}` ({horizon_desc})\n"
                     f"⚖️ **রিস্ক গভর্নেন্স:** হাফ-কেলি ক্যাপ: সর্বোচ্চ `1.50% ক্যাপিটাল` (সাংবিধানিক নিয়ম)।\n"
                     f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -830,7 +830,7 @@ class QuantMentor:
                     f"💵 **Live Mark Price:** `${price:,.2f}` | Posture: `{bias} Expansion`\n"
                     f"📥 **Ideal Accumulation Zone:** `${entry_low:,.2f} — ${entry_high:,.2f}`\n"
                     f"🛑 **Structural Invalidation (SL):** `${sl:,.2f}` (Strict `{risk_pct:.1f}%` dynamic risk)\n"
-                    f"🎯 **Take Profit 1 (+1.5R):** `${tp1:,.2f}` (Arm Breakeven Shield)\n"
+                    f"🎯 **Take Profit 1 (+1.20R / +1.50R):** `${tp1:,.2f}` (Two-Stage Progressive Ratchet Active)\n"
                     f"🎯 **Take Profit 2 (+2.5R):** `${tp2:,.2f}` ({horizon_desc})\n"
                     f"⚖️ **Risk Governance:** Half-Kelly Cap: Max `1.50% Equity` (Constitutional Invariant)\n"
                     f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"

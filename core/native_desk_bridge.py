@@ -483,10 +483,24 @@ class NativeDeskIntelligenceBridge:
         else:
             decision = "WAIT"
             entry_p = cur_price
-            entry_z = f"Wait for liquidity sweep of ${low_24h:,.2f} / ${high_24h:,.2f}"
-            sl_p = round(low_24h, 2)
-            tp1_p = round(high_24h, 2)
-            tp2_p = round(high_24h * 1.02, 2)
+            if trend_bias == "BEARISH":
+                entry_z = f"Wait for liquidity sweep above ${high_24h:,.2f}"
+                sl_p = round(high_24h, 2)
+                if sl_p <= entry_p:
+                    sl_p = round(entry_p * 1.015, 2)
+                tp1_p = round(low_24h, 2)
+                if tp1_p >= entry_p:
+                    tp1_p = round(entry_p * 0.985, 2)
+                tp2_p = round(low_24h * 0.98, 2)
+            else:
+                entry_z = f"Wait for liquidity sweep of ${low_24h:,.2f} / ${high_24h:,.2f}"
+                sl_p = round(low_24h, 2)
+                if sl_p >= entry_p:
+                    sl_p = round(entry_p * 0.985, 2)
+                tp1_p = round(high_24h, 2)
+                if tp1_p <= entry_p:
+                    tp1_p = round(entry_p * 1.015, 2)
+                tp2_p = round(high_24h * 1.02, 2)
             rr_ratio = "1:2.0R"
 
         confidence_val = float(intel.get("confidence", 78.5) if intel else 80.0)

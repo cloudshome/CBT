@@ -35,12 +35,29 @@ class MacroVitalSnapshot:
     fear_and_greed: float = 68.0
 
     @property
+    def dxy(self) -> float:
+        return self.dxy_price
+
+    @property
     def dxy_index(self) -> float:
         return self.dxy_price
 
     @property
+    def us10y(self) -> float:
+        return self.us10y_yield
+
+    @property
+    def gold(self) -> float:
+        return self.gold_price
+
+    @property
     def regime(self) -> str:
         return self.macro_regime
+
+    def to_dict(self) -> dict[str, Any]:
+        from dataclasses import asdict
+
+        return asdict(self)
 
 
 class MacroSentinel:

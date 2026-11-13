@@ -433,6 +433,30 @@ async def get_macro_state() -> dict[str, Any]:
     return {"macro_state": state, "status": "AVAILABLE" if state else "NOT_YET_RECORDED"}
 
 
+@router.get("/macro-vitals")
+async def get_macro_vitals() -> dict[str, Any]:
+    """Returns the latest live cross-asset vitals, MacroMicro indicators, and macro sentinel snapshot."""
+    from core.macro_live_collector import macro_live_collector
+    from core.macro_sentinel import macro_sentinel
+
+    vitals = macro_live_collector.get_cached_vitals()
+    snap = macro_sentinel.get_macro_snapshot()
+    return {
+        "status": "SUCCESS",
+        "timestamp_ms": int(time.time() * 1000),
+        "vitals": vitals,
+        "sentinel_snapshot": snap.to_dict() if hasattr(snap, "to_dict") else {
+            "dxy": snap.dxy,
+            "us10y": snap.us10y,
+            "gold": snap.gold,
+            "vix": snap.vix if hasattr(snap, "vix") else 15.2,
+            "fear_and_greed": snap.fear_and_greed,
+            "global_risk_index": snap.global_risk_index,
+            "macro_regime": snap.macro_regime,
+        },
+    }
+
+
 @router.get("/trading-plans")
 async def get_macro_trading_plans() -> dict[str, Any]:
     """Returns live, dynamic trading plans incorporating active macro talk show intelligence."""

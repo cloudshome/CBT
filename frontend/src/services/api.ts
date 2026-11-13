@@ -495,6 +495,23 @@ export const api = {
   },
 
   /**
+   * GET /api/knowledge/dictionary
+   */
+  async getTradingDictionary(limit = 100, category?: string): Promise<any> {
+    const query = category ? `?limit=${limit}&category=${encodeURIComponent(category)}` : `?limit=${limit}`;
+    const res = await authFetch(`${BASE_URL}/api/knowledge/dictionary${query}`);
+    return handleResponse<any>(res);
+  },
+
+  /**
+   * GET /api/knowledge/macro-vitals
+   */
+  async getMacroVitals(): Promise<any> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/macro-vitals`);
+    return handleResponse<any>(res);
+  },
+
+  /**
    * GET /api/institutional/orderbook-imbalance
    */
   async getOrderBookImbalance(

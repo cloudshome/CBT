@@ -56,6 +56,7 @@ INTERVAL_YOUTUBE_CRAWLER = 6 * 60 * 60  # 6 hours
 INTERVAL_RESEARCH_FEED_CRAWLER = 30 * 60  # 30 minutes
 INTERVAL_KNOWLEDGE_AUDIT = 24 * 60 * 60  # 24 hours
 INTERVAL_DRIVE_SYNC = 6 * 60 * 60  # 6 hours
+INTERVAL_MACRO_VITALS_SYNC = 15 * 60  # 15 minutes
 
 # User preference: Quiz reminders to Telegram disabled by default (play in Research Lab)
 ENABLE_TELEGRAM_QUIZ_REMINDERS = os.getenv("ENABLE_TELEGRAM_QUIZ_REMINDERS", "false").lower() in (
@@ -101,6 +102,7 @@ class ResearchAutomationOrchestrator:
             "research_feed_crawler": PipelineStatus("research_feed_crawler"),
             "knowledge_audit": PipelineStatus("knowledge_audit"),
             "drive_sync": PipelineStatus("drive_sync"),
+            "macro_vitals_sync": PipelineStatus("macro_vitals_sync"),
         }
 
     # ------------------------------------------------------------------
@@ -135,6 +137,13 @@ class ResearchAutomationOrchestrator:
             asyncio.create_task(
                 self._loop("drive_sync", INTERVAL_DRIVE_SYNC, self._run_drive_sync)
             ),
+            asyncio.create_task(
+                self._loop(
+                    "macro_vitals_sync",
+                    INTERVAL_MACRO_VITALS_SYNC,
+                    self._run_macro_vitals_sync,
+                )
+            ),
         ]
         if self.quiz_reminders_enabled:
             logger.info(
@@ -166,6 +175,7 @@ class ResearchAutomationOrchestrator:
             "research_feed_crawler": self._run_research_feed_crawler,
             "knowledge_audit": self._run_knowledge_audit,
             "drive_sync": self._run_drive_sync,
+            "macro_vitals_sync": self._run_macro_vitals_sync,
         }
         if name not in runners:
             return {"error": f"Unknown pipeline: {name}"}
@@ -206,6 +216,7 @@ class ResearchAutomationOrchestrator:
         """Runs a pipeline on a fixed interval, isolating failures."""
         # Stagger startup to avoid all pipelines hitting DB simultaneously
         stagger = {
+            "macro_vitals_sync": 5,
             "hypothesis_backtest": 10,
             "research_feed_crawler": 15,
             "quiz_reminder": 25,
@@ -832,6 +843,78 @@ class ResearchAutomationOrchestrator:
             "items_processed": files_synced + errors,
             "files_synced": files_synced,
             "errors": errors,
+        }
+
+    async def _run_macro_vitals_sync(self) -> dict[str, Any]:
+        """
+        Refreshes live cross-asset vitals, DefiLlama Stablecoin MCap,
+        Alternative.me Fear & Greed, and MacroMicro indicators.
+        Updates active Macro Regime Thesis and Knowledge Graph causal edges.
+        """
+        logger.info("ResearchAutomationOrchestrator: Executing macro_vitals_sync pipeline.")
+        from core.macro_live_collector import macro_live_collector
+        from core.knowledge_os.thesis_engine import thesis_engine
+        from core.knowledge_os.knowledge_graph import knowledge_graph_engine
+
+        # 1. Refresh all macro vitals
+        vitals = await macro_live_collector.refresh_all()
+
+        # 2. Update or upsert institutional macro regime thesis
+        t = thesis_engine.create_thesis(
+            thesis_id="THESIS_MACRO_LIVE_REGIME",
+            title="Live Macroeconomic Regime & Liquidity Cycle",
+            description="Continuous cross-asset macro synthesis from MacroMicro, Yahoo Finance, DefiLlama, and Alternative.me.",
+            asset_class="MACRO",
+        )
+
+        # 3. Ensure knowledge graph entities and causal relations are synchronized
+        try:
+            if not knowledge_graph_engine.get_entity("Stablecoins Market Cap"):
+                knowledge_graph_engine.create_entity(
+                    entity_id="ent_stablecoins_mcap",
+                    name="Stablecoins Market Cap",
+                    entity_type="MACRO_INDICATOR",
+                    aliases=["stablecoins", "usdt mcap", "usdc mcap", "dry powder"],
+                    description="Aggregate market capitalization of dollar-pegged stablecoins",
+                )
+            if not knowledge_graph_engine.get_entity("Crypto Liquidity"):
+                knowledge_graph_engine.create_entity(
+                    entity_id="ent_crypto_liquidity",
+                    name="Crypto Liquidity",
+                    entity_type="MARKET_METRIC",
+                    aliases=["crypto liquidity", "market depth", "stablecoin liquidity"],
+                    description="Available capital pool and liquidity depth in crypto assets",
+                )
+
+            knowledge_graph_engine.add_relation(
+                "US Dollar Index",
+                "Bitcoin",
+                "INVERSE_CORRELATION",
+                weight=0.85,
+                description="Dollar softening correlates with crypto liquidity expansion",
+            )
+            knowledge_graph_engine.add_relation(
+                "10-Year Treasury Yield",
+                "Gold",
+                "REAL_YIELD_SENSITIVITY",
+                weight=0.80,
+                description="Elevated real rates apply discount pressure to non-yielding bullion",
+            )
+            knowledge_graph_engine.add_relation(
+                "Stablecoins Market Cap",
+                "Crypto Liquidity",
+                "DRY_POWDER_EXPANSION",
+                weight=0.90,
+                description="Stablecoin issuance expands on-chain dry powder liquidity",
+            )
+        except Exception as e:
+            logger.warning(f"Error updating knowledge graph relations in macro_vitals_sync: {e}")
+
+        return {
+            "items_processed": len(vitals) if isinstance(vitals, dict) else 1,
+            "vitals_count": len(vitals) if isinstance(vitals, dict) else 1,
+            "thesis_id": t.thesis_id,
+            "status": "COMPLETED",
         }
 
     # ------------------------------------------------------------------

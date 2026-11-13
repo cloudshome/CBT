@@ -74,7 +74,7 @@ export const Header: React.FC<HeaderProps> = ({
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 font-mono">
-                Institutional Quant Desk &amp; Gemini Intelligence
+                Institutional Quant Desk &amp; SKY Sovereign Native Intelligence
               </p>
             </div>
           </div>
