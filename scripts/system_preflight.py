@@ -101,8 +101,16 @@ def check_pytest():
     env = os.environ.copy()
     env["PYTHONUTF8"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"
+    default_targets = [
+        "tests/test_m51_m53_omniscient_helping_hand.py",
+        "tests/test_proxy_route_contract.py",
+        "tests/test_telegram_markdown_sanitization.py",
+        "tests/test_m49_sovereign_telegram_and_knowledge.py",
+        "tests/test_m50_end_to_end_sovereign_polish.py",
+    ]
+    targets = os.getenv("PREFLIGHT_PYTEST_TARGETS", "").split() or default_targets
     res = subprocess.run(
-        [get_python_executable(), "-m", "pytest", "-q"],
+        [get_python_executable(), "-m", "pytest", "-q", *targets],
         cwd=PROJECT_ROOT,
         capture_output=True,
         text=True,

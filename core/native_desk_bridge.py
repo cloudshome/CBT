@@ -364,35 +364,62 @@ class NativeDeskIntelligenceBridge:
         # 5. Microstructure, Order Flow & Derivatives Telemetry
         deriv_telemetry: dict[str, Any] = {}
         try:
-            # Check CVD order flow
-            cvd_res = cvd_absorption_engine.analyze_orderflow(clean_sym, norm_tf, candles)
-            deriv_telemetry["cvd_delta"] = float(cvd_res.cvd_delta)
-            deriv_telemetry["cvd_divergence"] = bool(cvd_res.divergence_detected)
-            deriv_telemetry["absorption_state"] = str(
-                cvd_res.absorption_state.value
-                if hasattr(cvd_res.absorption_state, "value")
-                else cvd_res.absorption_state
+            # Check CVD order flow on closed candles
+            cvd_res = cvd_absorption_engine.analyze_orderflow(candles, symbol=clean_sym)
+            abs_type = getattr(cvd_res, "absorption_type", "NONE")
+            state_val = (
+                "BULLISH_ABSORPTION"
+                if "BULL" in str(abs_type).upper()
+                else ("BEARISH_ABSORPTION" if "BEAR" in str(abs_type).upper() else "NEUTRAL")
             )
+            deriv_telemetry["cvd_delta"] = float(getattr(cvd_res, "cvd_delta", 0.0))
+            deriv_telemetry["cvd_divergence"] = bool(
+                abs(getattr(cvd_res, "divergence_score", 0.0)) >= 0.35
+            )
+            deriv_telemetry["cvd_absorption"] = state_val
+            deriv_telemetry["absorption_state"] = state_val
+            deriv_telemetry["absorption_score"] = float(getattr(cvd_res, "absorption_score", 0.0))
         except Exception as e:
             logger.debug(f"CVD order flow evaluation fallback: {e}")
+            deriv_telemetry["cvd_absorption"] = "NEUTRAL"
             deriv_telemetry["absorption_state"] = "NEUTRAL"
 
         try:
-            # Order book imbalance
+            # Order book imbalance - fetch live L2 if available
             bids = [[cur_price * 0.999, 10.0], [cur_price * 0.998, 25.0]]
             asks = [[cur_price * 1.001, 10.0], [cur_price * 1.002, 25.0]]
+            try:
+                ob_snap = await data_streamer.get_order_book(clean_sym, limit=15)
+                if ob_snap and ob_snap.get("bids") and ob_snap.get("asks"):
+                    bids = ob_snap["bids"]
+                    asks = ob_snap["asks"]
+            except Exception:
+                pass
+
             obi_res = orderbook_imbalance_engine.compute_imbalance(bids, asks)
-            deriv_telemetry["l2_imbalance_ratio"] = float(obi_res.imbalance_ratio)
+            imb_ratio = float(obi_res.imbalance_ratio)
+            deriv_telemetry["orderbook_imbalance"] = imb_ratio
+            deriv_telemetry["l2_imbalance_ratio"] = imb_ratio
             deriv_telemetry["micro_bias"] = str(obi_res.micro_bias)
         except Exception:
+            deriv_telemetry["orderbook_imbalance"] = 0.52
             deriv_telemetry["l2_imbalance_ratio"] = 0.52
             deriv_telemetry["micro_bias"] = "BALANCED"
 
         try:
             # OI & Funding Squeeze
+            funding_val = 0.0001
+            try:
+                from core.derivatives_engine import derivatives_engine
+
+                funding_val = float(await derivatives_engine.get_funding_rate(clean_sym))
+            except Exception:
+                pass
+            deriv_telemetry["funding_rate"] = funding_val
+
             ois_res = oi_funding_squeeze_engine.analyze_positioning(
                 symbol=clean_sym,
-                funding_rate=0.0001,
+                funding_rate=funding_val,
                 oi_delta_pct=1.5,
                 price_delta_pct=change_24h,
             )
@@ -402,6 +429,7 @@ class NativeDeskIntelligenceBridge:
                 else ois_res.squeeze_risk
             )
         except Exception:
+            deriv_telemetry["funding_rate"] = 0.0001
             deriv_telemetry["squeeze_risk"] = "NORMAL"
 
         # 6. Macro Vitals
@@ -410,13 +438,24 @@ class NativeDeskIntelligenceBridge:
             from core.macro_sentinel import macro_sentinel
 
             snap = macro_sentinel.get_macro_snapshot()
+            dxy_val = getattr(snap, "dxy_price", getattr(snap, "dxy", 104.18))
+            us10y_val = getattr(snap, "us10y_yield", getattr(snap, "us10y", 4.42))
+            vix_val = getattr(snap, "vix", 15.2)
+            gold_val = getattr(snap, "gold_price", getattr(snap, "gold", 4110.0))
+            gri_val = getattr(snap, "global_risk_index", 60.9)
+            regime_val = getattr(snap, "macro_regime", getattr(snap, "regime", "NEUTRAL"))
+
             macro_vitals = {
-                "dxy": snap.dxy,
-                "us10y": snap.us10y,
-                "vix": snap.vix if hasattr(snap, "vix") else 15.2,
-                "gold": snap.gold,
-                "global_risk_index": snap.global_risk_index,
-                "macro_regime": snap.macro_regime,
+                "dxy": dxy_val,
+                "dxy_index": dxy_val,
+                "us10y": us10y_val,
+                "us10y_yield": us10y_val,
+                "vix": vix_val,
+                "gold": gold_val,
+                "gold_price": gold_val,
+                "global_risk_index": gri_val,
+                "macro_regime": regime_val,
+                "regime": regime_val,
             }
         except Exception as e:
             logger.debug(f"Macro snapshot error: {e}")

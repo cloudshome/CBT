@@ -118,6 +118,49 @@ async def handle_signal(
     return msg
 
 
+async def handle_setups(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
+    """
+    /setups [symbol] [timeframe]
+    Scans all 28 setups via OmniscientSetupEngine and returns Trading Helping Hand Dossier.
+    """
+    from core.telegram.rbac import TelegramRole, TelegramUserIdentity
+    from core.telegram.tool_gateway import telegram_tool_gateway
+    from core.telegram_bot import telegram_bot
+
+    ident = identity or TelegramUserIdentity(
+        user_id=str(chat_id or "ANONYMOUS"),
+        role=TelegramRole.TRADER,
+        chat_id=str(chat_id or ""),
+    )
+
+    parts = args.strip().split() if args else []
+    symbol = "BTC/USDT"
+    timeframe = "15m"
+
+    if parts:
+        first = parts[0].upper().strip()
+        if first in ("1M", "5M", "15M", "30M", "1H", "4H", "1D"):
+            timeframe = first.lower()
+        else:
+            symbol = first if "/" in first else f"{first}/USDT"
+
+    if len(parts) > 1:
+        timeframe = parts[1].lower().strip()
+
+    result = await telegram_tool_gateway.execute_tool(
+        tool_name="scan_omniscient_setups",
+        arguments={"symbol": symbol, "timeframe": timeframe},
+        identity=ident,
+    )
+
+    msg = result.output_text
+    if chat_id:
+        await telegram_bot.send_message(msg, chat_id=chat_id)
+    return msg
+
+
 async def handle_positions(
     args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
 ) -> str:
@@ -1322,6 +1365,15 @@ def register_all_v5_commands() -> None:
             aliases=["/signals"],
             argument_schema="[symbol]",
             risk_level="MEDIUM",
+        ),
+        TelegramCommand(
+            name="/setups",
+            description="Omniscient 28-Setup Quantitative Scanner & Helping Hand Dossier",
+            handler=handle_setups,
+            required_role=TelegramRole.TRADER,
+            aliases=["/helper", "/allsetups", "/scan"],
+            argument_schema="[symbol] [timeframe]",
+            risk_level="LOW",
         ),
         TelegramCommand(
             name="/positions",

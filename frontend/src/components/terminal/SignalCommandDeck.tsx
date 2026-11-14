@@ -215,6 +215,22 @@ export const SignalCommandDeck: React.FC<SignalCommandDeckProps> = ({
                 {currentSignal.thesis}
               </p>
 
+              {/* Omniscient Confluence Badges */}
+              {(currentSignal.candlestickConfirmation || currentSignal.smtDivergence) && (
+                <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
+                  {currentSignal.candlestickConfirmation && (
+                    <span className="px-2 py-0.5 rounded text-[10px] bg-amber-950/70 text-amber-300 border border-amber-500/40 font-mono">
+                      🕯️ {currentSignal.candlestickConfirmation}
+                    </span>
+                  )}
+                  {currentSignal.smtDivergence && (
+                    <span className="px-2 py-0.5 rounded text-[10px] bg-purple-950/70 text-purple-300 border border-purple-500/40 font-mono">
+                      🔄 {currentSignal.smtDivergence}
+                    </span>
+                  )}
+                </div>
+              )}
+
               {/* Vertical Execution Ladder */}
               <div className="space-y-1.5 text-[10px]">
                 {isSignalLong ? (

@@ -109,13 +109,24 @@ fi
 if [ "$RESTART_BACKEND" -eq 1 ] || [ "$RESTART_FRONTEND" -eq 1 ]; then
     log "Restarting affected systemd services..."
     if [ "$RESTART_BACKEND" -eq 1 ]; then
-        systemctl restart cbt-fastapi.service || log "WARNING: Failed to restart cbt-fastapi.service"
-        systemctl restart cbt-express.service || log "WARNING: Failed to restart cbt-express.service"
-        log "cbt-fastapi and cbt-express services restarted."
+        if command -v sudo >/dev/null 2>&1; then
+            sudo -n systemctl restart cbt-fastapi.service cbt-express.service 2>/dev/null || systemctl restart cbt-fastapi.service cbt-express.service 2>/dev/null || log "WARNING: Failed to restart cbt-fastapi/cbt-express via systemctl"
+            if systemctl is-active --quiet ai_quant_sentinel.service 2>/dev/null; then
+                sudo -n systemctl restart ai_quant_sentinel.service 2>/dev/null || systemctl restart ai_quant_sentinel.service 2>/dev/null || true
+            fi
+        else
+            systemctl restart cbt-fastapi.service || log "WARNING: Failed to restart cbt-fastapi.service"
+            systemctl restart cbt-express.service || log "WARNING: Failed to restart cbt-express.service"
+        fi
+        log "cbt-fastapi and cbt-express services restart attempted."
     fi
     if [ "$RESTART_FRONTEND" -eq 1 ]; then
-        systemctl restart cbt-frontend.service || log "WARNING: Failed to restart cbt-frontend.service"
-        log "cbt-frontend service restarted."
+        if command -v sudo >/dev/null 2>&1; then
+            sudo -n systemctl restart cbt-frontend.service 2>/dev/null || systemctl restart cbt-frontend.service 2>/dev/null || log "WARNING: Failed to restart cbt-frontend.service"
+        else
+            systemctl restart cbt-frontend.service || log "WARNING: Failed to restart cbt-frontend.service"
+        fi
+        log "cbt-frontend service restart attempted."
     fi
 else
     log "No service restarts required for this commit."

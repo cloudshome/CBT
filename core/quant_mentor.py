@@ -52,7 +52,7 @@ class QuantMentor:
 
         # 1. Native Quantitative Engine Priority (100% Autonomous & Grounded)
         if self.use_native_engine or self._api_disabled or not self._client:
-            return self._generate_heuristic_response(
+            return await self._generate_heuristic_response(
                 user_message, telemetry_ctx, language_preference
             )
 
@@ -93,7 +93,9 @@ class QuantMentor:
                         break
 
         # Local High-Precision Heuristic Fallback
-        return self._generate_heuristic_response(user_message, telemetry_ctx, language_preference)
+        return await self._generate_heuristic_response(
+            user_message, telemetry_ctx, language_preference
+        )
 
     def _detect_symbol(self, text: str, default: str = "BTC/USDT") -> str:
         t = text.upper()
@@ -159,7 +161,7 @@ class QuantMentor:
 
         return default
 
-    def _generate_heuristic_response(
+    async def _generate_heuristic_response(
         self, user_message: str, telemetry: dict[str, Any], lang: str
     ) -> str:
         msg_lower = user_message.lower().strip()
@@ -222,26 +224,9 @@ class QuantMentor:
         ob_str = f"${round(price * 0.985, 2):,.2f}"
         ob_low = round(price * 0.985, 2)
         try:
-            import asyncio
-            import concurrent.futures
-
             from core.native_desk_bridge import native_desk_bridge
 
-            try:
-                loop = asyncio.get_running_loop()
-            except RuntimeError:
-                loop = None
-
-            if loop and loop.is_running():
-                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
-                    dossier = ex.submit(
-                        lambda: asyncio.run(
-                            native_desk_bridge.compile_asset_dossier(target_sym, "15m")
-                        )
-                    ).result(timeout=4.0)
-            else:
-                dossier = asyncio.run(native_desk_bridge.compile_asset_dossier(target_sym, "15m"))
-
+            dossier = await native_desk_bridge.compile_asset_dossier(target_sym, "15m")
             if dossier:
                 price = dossier.current_price
                 bias = dossier.market_bias

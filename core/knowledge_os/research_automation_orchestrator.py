@@ -682,7 +682,8 @@ class ResearchAutomationOrchestrator:
                     # Ingest feed item into Research Wikipedia
                     content_to_ingest = f"Title: {item.title}\nSource: {item.link}\nSummary: {item.summary}\nDate: {item.published_at}"
                     try:
-                        research_wikipedia_engine.ingest_url_or_content(
+                        await asyncio.to_thread(
+                            research_wikipedia_engine.ingest_url_or_content,
                             url_or_text=content_to_ingest,
                             custom_title=item.title,
                             custom_category=category,

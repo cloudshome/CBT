@@ -175,6 +175,27 @@ export const ActionableEntryRadar: React.FC<ActionableEntryRadarProps> = ({
                       </span>
                     </div>
 
+                    {/* Confluence triggers: Candlestick, SMT, Setup */}
+                    {(entry.candlestickConfirmation || entry.smtDivergence || entry.setupName) && (
+                      <div className="flex flex-wrap items-center gap-1 text-[8px]">
+                        {entry.candlestickConfirmation && (
+                          <span className="px-1 py-0.2 rounded bg-amber-950/60 text-amber-300 border border-amber-600/40">
+                            🕯️ {entry.candlestickConfirmation}
+                          </span>
+                        )}
+                        {entry.smtDivergence && (
+                          <span className="px-1 py-0.2 rounded bg-purple-950/60 text-purple-300 border border-purple-600/40">
+                            🔄 SMT
+                          </span>
+                        )}
+                        {entry.setupName && (
+                          <span className="px-1 py-0.2 rounded bg-cyan-950/60 text-cyan-300 border border-cyan-600/40 truncate max-w-[100px]" title={entry.setupName}>
+                            ⚡ {entry.setupName}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
                     {/* Bottom row: R:R, MTF alignment & Origin */}
                     <div className="flex items-center justify-between text-[9px] pt-1 border-t border-slate-800/60 text-slate-400">
                       <span className="font-mono text-cyan-300 font-semibold">

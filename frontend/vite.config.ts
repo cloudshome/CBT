@@ -38,6 +38,7 @@ const PYTHON_PREFIXES = [
   '/api/paper',
   '/api/institutional',
   '/api/terminal',
+  '/api/omniscient',
   '/api/sky',
   '/api/decision',
   '/api/prediction',

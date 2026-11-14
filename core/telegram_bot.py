@@ -825,9 +825,30 @@ class TelegramBotDispatcher:
         self._command_handlers: dict[str, Callable[..., Any]] = {}
         self._is_polling = False
         self._is_broadcasting = False
-        self._last_update_id = 0
+        self._polling_lock_fd: Any = None
+        self._offset_file = Path(os.getenv("DATA_DIR", "data")) / "telegram_offset.txt"
+        self._last_update_id = self._load_last_update_id()
         self.state_mind = DeskStateMind()
         self.smart_notifier = SmartBrainNotificationEngine(self)
+
+    def _load_last_update_id(self) -> int:
+        """Loads persisted update offset to prevent replaying stale updates on restart."""
+        try:
+            if self._offset_file.exists():
+                val = self._offset_file.read_text().strip()
+                if val.isdigit():
+                    return int(val)
+        except Exception as exc:
+            logger.debug("Failed to read telegram offset file: %s", exc)
+        return 0
+
+    def _save_last_update_id(self, update_id: int) -> None:
+        """Persists the latest processed update_id."""
+        try:
+            self._offset_file.parent.mkdir(parents=True, exist_ok=True)
+            self._offset_file.write_text(str(update_id))
+        except Exception as exc:
+            logger.debug("Failed to write telegram offset file: %s", exc)
 
     def is_configured(self) -> bool:
         """Returns True if both bot token and chat ID are present."""
@@ -903,8 +924,10 @@ class TelegramBotDispatcher:
         """
         Sanitizes text for Telegram Markdown (v1) parsing.
         Preserves deliberate *bold*, _italic_, `code`, ```blocks```, and [links](url).
-        Escapes rogue underscores inside identifiers (e.g. BTC_USDT, pos_id),
-        unbalanced single asterisks, and standalone brackets that trigger Telegram entity errors.
+        Converts CommonMark headers (# ...), list asterisks (* item), and **bold**
+        to compliant Telegram single-asterisk *bold* and bullet • elements.
+        Performs line-level delimiter balancing to prevent an unmatched asterisk
+        on one line from escaping or destroying formatting on subsequent lines.
         """
         if not text:
             return text
@@ -933,27 +956,46 @@ class TelegramBotDispatcher:
 
             protected = link_pattern.sub(_save_link, part)
 
-            # 2. Escape standalone brackets that are not part of links
+            # 2. Convert Markdown headers ^#{1,6}\s+(.+)$ to bold *\1*
+            protected = re.sub(r"(?m)^#{1,6}\s+(.+)$", r"*\1*", protected)
+
+            # 3. Convert leading unordered list asterisks ^(\s*)\*\s+ to bullet •
+            protected = re.sub(r"(?m)^(\s*)\*\s+", r"\1• ", protected)
+
+            # 4. Convert CommonMark double-asterisk bold **...** to single-asterisk Telegram bold *...*
+            while re.search(r"\*\*([^\*\n]+?)\*\*", protected):
+                protected = re.sub(r"\*\*([^\*\n]+?)\*\*", r"*\1*", protected)
+
+            # 5. Escape standalone brackets that are not part of links
             protected = protected.replace("[", "\\[").replace("]", "\\]")
 
-            # 3. Restore valid links
+            # 6. Restore valid links
             for idx, link_str in enumerate(links):
                 placeholder = f"\x00LINK_{idx}\x00"
                 protected = protected.replace(placeholder, link_str)
 
-            # 4. Escape underscores adjacent to word characters (e.g. BTC_USDT, pos_id)
+            # 7. Escape underscores adjacent to word characters (e.g. BTC_USDT, pos_id)
             protected = re.sub(r"(?<=\w)_(?=\w)", r"\\_", protected)
 
-            # 5. If odd number of unescaped underscores remain, escape all remaining
-            unescaped_underscores = len(re.findall(r"(?<!\\)_", protected))
-            if unescaped_underscores % 2 != 0:
-                protected = re.sub(r"(?<!\\)_", r"\\_", protected)
+            # 8. Line-level balanced delimiter check for * and _
+            lines = protected.split("\n")
+            balanced_lines: list[str] = []
+            for line in lines:
+                # Balance unescaped asterisks on this line
+                unescaped_ast = [m.start() for m in re.finditer(r"(?<!\\)\*", line)]
+                if len(unescaped_ast) % 2 != 0:
+                    last_idx = unescaped_ast[-1]
+                    line = line[:last_idx] + "\\" + line[last_idx:]
 
-            # 6. If odd number of unescaped asterisks remain, escape all remaining
-            unescaped_asterisks = len(re.findall(r"(?<!\\)\*", protected))
-            if unescaped_asterisks % 2 != 0:
-                protected = re.sub(r"(?<!\\)\*", r"\\*", protected)
+                # Balance unescaped underscores on this line
+                unescaped_und = [m.start() for m in re.finditer(r"(?<!\\)_", line)]
+                if len(unescaped_und) % 2 != 0:
+                    last_idx = unescaped_und[-1]
+                    line = line[:last_idx] + "\\" + line[last_idx:]
 
+                balanced_lines.append(line)
+
+            protected = "\n".join(balanced_lines)
             sanitized_parts.append(protected)
 
         return "".join(sanitized_parts)
@@ -3370,36 +3412,89 @@ class TelegramBotDispatcher:
     # TWO-WAY POLLING LISTENER & CONTINUOUS BROADCASTER
     # ==============================================================================
 
+    async def _safe_handle_update(self, up_dict: dict[str, Any], sem: asyncio.Semaphore) -> None:
+        """Safely processes an incoming update within semaphore limits."""
+        async with sem:
+            try:
+                await self.handle_webhook_update(up_dict)
+            except Exception as e:
+                logger.error(
+                    f"Error handling Telegram update {up_dict.get('update_id')}: {e}",
+                    exc_info=True,
+                )
+
     async def start_polling(self) -> None:
         """
-        Long-polling loop that fetches incoming messages from Telegram's getUpdates endpoint
-        and dispatches them to command handlers or QuantMentor conversational AI.
+        Long-polling listener with cross-worker file lock, persisted offset,
+        and concurrent non-blocking update dispatching via Semaphore(8).
         """
         if self._is_polling:
             logger.info("Telegram polling loop is already running.")
             return
 
-        lock_fd = None
         try:
             import fcntl
 
-            lock_path = "/tmp/cbt_telegram_polling_supervisor.lock"
-            lock_fd = open(lock_path, "w")
-            fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            lock_path = Path(os.getenv("DATA_DIR", "data")) / "cbt_telegram_polling.lock"
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            self._polling_lock_fd = open(lock_path, "a+")
+            fcntl.flock(self._polling_lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:
             logger.info(
                 "Telegram polling passive in worker PID %d (another worker holds polling lock).",
                 os.getpid(),
             )
-            if lock_fd is not None:
-                lock_fd.close()
+            if self._polling_lock_fd is not None:
+                try:
+                    self._polling_lock_fd.close()
+                except Exception:
+                    pass
+                self._polling_lock_fd = None
             return
         except Exception as exc:
             logger.debug("Telegram polling lock check error: %s", exc)
 
         self._is_polling = True
-        logger.info("Starting Telegram Bot long-polling listener...")
+        logger.info(
+            f"Starting Telegram Bot long-polling listener (PID {os.getpid()}, initial offset {self._last_update_id})..."
+        )
         invalid_token_logged = False
+        concurrency_sem = asyncio.Semaphore(8)
+        active_tasks: set[asyncio.Task[Any]] = set()
+
+        # On fresh start with no persisted offset, check backlog age to avoid replay spikes
+        if self._last_update_id == 0 and self.bot_token and ":" in self.bot_token:
+            try:
+                from core.market_providers import HttpSessionManager
+
+                session = await HttpSessionManager.get_session()
+                chk_url = f"https://api.telegram.org/bot{self.bot_token}/getUpdates"
+                async with session.get(
+                    chk_url,
+                    params={"offset": -1, "limit": 1},
+                    timeout=aiohttp.ClientTimeout(total=10),
+                ) as chk_resp:
+                    if chk_resp.status == 200:
+                        chk_data = await chk_resp.json()
+                        results = chk_data.get("result", [])
+                        if results:
+                            latest_up = results[-1]
+                            latest_id = latest_up.get("update_id", 0)
+                            msg_obj = (
+                                latest_up.get("message")
+                                or latest_up.get("callback_query", {}).get("message")
+                                or {}
+                            )
+                            msg_date = msg_obj.get("date", 0)
+                            # If older than 5 minutes, advance offset past stale backlog
+                            if msg_date and (time.time() - msg_date > 300):
+                                logger.info(
+                                    f"Advancing initial Telegram offset to {latest_id} to flush stale backlog ({int(time.time() - msg_date)}s old)."
+                                )
+                                self._last_update_id = latest_id
+                                self._save_last_update_id(latest_id)
+            except Exception as e:
+                logger.debug(f"Backlog age check skipped: {e}")
 
         while self._is_polling:
             token = self.bot_token
@@ -3416,33 +3511,40 @@ class TelegramBotDispatcher:
             params = {"offset": self._last_update_id + 1, "timeout": 20}
 
             try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(
-                        url, params=params, timeout=aiohttp.ClientTimeout(total=25)
-                    ) as resp:
-                        if resp.status == 200:
-                            invalid_token_logged = False
-                            data = await resp.json()
-                            updates = data.get("result", [])
-                            for up in updates:
-                                update_id = up.get("update_id", 0)
-                                if update_id > self._last_update_id:
-                                    self._last_update_id = update_id
-                                await self.handle_webhook_update(up)
-                        elif resp.status in (401, 404):
-                            if not invalid_token_logged:
-                                logger.warning(
-                                    f"Telegram getUpdates returned {resp.status} (invalid/unconfigured token); backing off 300s."
-                                )
-                                invalid_token_logged = True
-                            await asyncio.sleep(300)
-                        elif resp.status == 409:
-                            # Another instance is polling or webhook is active
-                            logger.warning("Telegram polling conflict (409). Backing off 15s.")
-                            await asyncio.sleep(15)
-                        else:
-                            logger.warning(f"Telegram getUpdates returned status {resp.status}")
-                            await asyncio.sleep(10)
+                from core.market_providers import HttpSessionManager
+
+                session = await HttpSessionManager.get_session()
+                async with session.get(
+                    url, params=params, timeout=aiohttp.ClientTimeout(total=25)
+                ) as resp:
+                    if resp.status == 200:
+                        invalid_token_logged = False
+                        data = await resp.json()
+                        updates = data.get("result", [])
+                        for up in updates:
+                            update_id = up.get("update_id", 0)
+                            if update_id > self._last_update_id:
+                                self._last_update_id = update_id
+                                self._save_last_update_id(update_id)
+                            # Dispatch updates concurrently without blocking getUpdates loop
+                            task = asyncio.create_task(
+                                self._safe_handle_update(up, concurrency_sem)
+                            )
+                            active_tasks.add(task)
+                            task.add_done_callback(active_tasks.discard)
+                    elif resp.status in (401, 404):
+                        if not invalid_token_logged:
+                            logger.warning(
+                                f"Telegram getUpdates returned {resp.status} (invalid/unconfigured token); backing off 300s."
+                            )
+                            invalid_token_logged = True
+                        await asyncio.sleep(300)
+                    elif resp.status == 409:
+                        logger.warning("Telegram polling conflict (409). Backing off 15s.")
+                        await asyncio.sleep(15)
+                    else:
+                        logger.warning(f"Telegram getUpdates returned status {resp.status}")
+                        await asyncio.sleep(10)
             except asyncio.CancelledError:
                 break
             except Exception as e:

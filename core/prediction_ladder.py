@@ -616,94 +616,174 @@ def compute_bidirectional_style_signals(
             risk_pct = 1.25
             notional = 8400.0
             half_kelly = 0.62
-            score = 86
-            conf = 90
+            score = max(60, min(95, int(86 + cvd_score * 0.10 + obi_score * 0.10)))
+            conf = max(65, min(96, 90 + (1 if is_bull_regime else -2)))
             stab_dur = 3600
             reaffirms = 14
             rr_ratio = 5.4
 
             if is_long:
-                e_zone = [round(low_50 + range_50 * 0.12, 2), round(low_50 + range_50 * 0.24, 2)]
-                sl = round(low_50 * 0.995, 2)
-                inv = round(sl * 0.998, 2)
+                ob = next(
+                    (o for o in reversed(bull_obs) if getattr(o, "top_price", 0) <= cur_p * 1.03),
+                    None,
+                )
+                if ob:
+                    e_zone = [round(ob.bottom_price, 2), round(ob.top_price, 2)]
+                    sl = round(getattr(ob, "invalidation_level", ob.bottom_price * 0.993), 2)
+                    inv = round(sl * 0.998, 2)
+                    origin = "BULLISH_OB_FVG"
+                    thesis = f"4H Swing Demand Block anchored at ${ob.bottom_price:,.2f}-${ob.top_price:,.2f} with structural continuation."
+                else:
+                    e_zone = [
+                        round(low_50 + range_50 * 0.12, 2),
+                        round(low_50 + range_50 * 0.24, 2),
+                    ]
+                    sl = round(low_50 * 0.995, 2)
+                    inv = round(sl * 0.998, 2)
+                    origin = "LIQUIDITY_SWEEP_RECLAIM"
+                    thesis = "HTF demand continuation anchored to 4H demand order block."
                 r_dist = max(e_zone[1] - sl, range_50 * 0.08)
                 tp1 = round(high_50, 2)
                 tp2 = round(high_50 + range_50 * 0.5, 2)
                 tp3 = round(high_50 + range_50 * 1.2, 2)
-                origin = "LIQUIDITY_SWEEP_RECLAIM"
-                thesis = "HTF demand continuation anchored to 4H demand order block."
             else:
-                e_zone = [round(high_50 - range_50 * 0.24, 2), round(high_50 - range_50 * 0.12, 2)]
-                sl = round(high_50 * 1.005, 2)
-                inv = round(sl * 1.002, 2)
+                ob = next(
+                    (
+                        o
+                        for o in reversed(bear_obs)
+                        if getattr(o, "bottom_price", float("inf")) >= cur_p * 0.97
+                    ),
+                    None,
+                )
+                if ob:
+                    e_zone = [round(ob.bottom_price, 2), round(ob.top_price, 2)]
+                    sl = round(getattr(ob, "invalidation_level", ob.top_price * 1.007), 2)
+                    inv = round(sl * 1.002, 2)
+                    origin = "BEARISH_OB_FVG"
+                    thesis = f"4H Swing Supply Block anchored at ${ob.bottom_price:,.2f}-${ob.top_price:,.2f} with structural distribution."
+                else:
+                    e_zone = [
+                        round(high_50 - range_50 * 0.24, 2),
+                        round(high_50 - range_50 * 0.12, 2),
+                    ]
+                    sl = round(high_50 * 1.005, 2)
+                    inv = round(sl * 1.002, 2)
+                    origin = "BEARISH_OB_FVG"
+                    thesis = "HTF supply continuation anchored to 4H distribution block."
                 r_dist = max(sl - e_zone[0], range_50 * 0.08)
                 tp1 = round(low_50, 2)
                 tp2 = round(low_50 - range_50 * 0.5, 2)
                 tp3 = round(low_50 - range_50 * 1.2, 2)
-                origin = "BEARISH_OB_FVG"
-                thesis = "HTF supply continuation anchored to 4H distribution block."
 
         elif style == "MOMENTUM":
             tf = "1H"
             risk_pct = 0.75
             notional = 5200.0
             half_kelly = 0.55
-            score = 81
-            conf = 84
+            score = max(55, min(92, int(81 + cvd_score * 0.15 + obi_score * 0.10)))
+            conf = max(60, min(94, 84 + (2 if cvd_score > 0 else -1)))
             stab_dur = 1200
             reaffirms = 6
             rr_ratio = 3.8
 
             if is_long:
-                e_zone = [round(fib_05, 2), round(fib_05 + range_50 * 0.08, 2)]
-                sl = round(fib_05 - range_50 * 0.10, 2)
-                inv = round(sl * 0.998, 2)
+                fvg = next(
+                    (f for f in reversed(bull_fvgs) if getattr(f, "top_price", 0) <= cur_p * 1.02),
+                    None,
+                )
+                if fvg:
+                    e_zone = [round(fvg.bottom_price, 2), round(fvg.top_price, 2)]
+                    sl = round(getattr(fvg, "invalidation_level", fvg.bottom_price * 0.995), 2)
+                    inv = round(sl * 0.998, 2)
+                    origin = "BULLISH_OB_FVG"
+                    thesis = f"1H Momentum Displacement FVG anchored at ${fvg.bottom_price:,.2f}-${fvg.top_price:,.2f}."
+                else:
+                    e_zone = [round(fib_05, 2), round(fib_05 + range_50 * 0.08, 2)]
+                    sl = round(fib_05 - range_50 * 0.10, 2)
+                    inv = round(sl * 0.998, 2)
+                    origin = "VWAP_VAL_CONFLUENCE"
+                    thesis = "Volatility expansion coil release breaking above Asian high."
                 r_dist = max(e_zone[1] - sl, range_50 * 0.05)
                 tp1 = round(high_50, 2)
                 tp2 = round(high_50 + range_50 * 0.35, 2)
                 tp3 = round(high_50 + range_50 * 0.75, 2)
-                origin = "VWAP_VAL_CONFLUENCE"
-                thesis = "Volatility expansion coil release breaking above Asian high."
             else:
-                e_zone = [round(fib_05 - range_50 * 0.08, 2), round(fib_05, 2)]
-                sl = round(fib_05 + range_50 * 0.10, 2)
-                inv = round(sl * 1.002, 2)
+                fvg = next(
+                    (
+                        f
+                        for f in reversed(bear_fvgs)
+                        if getattr(f, "bottom_price", float("inf")) >= cur_p * 0.98
+                    ),
+                    None,
+                )
+                if fvg:
+                    e_zone = [round(fvg.bottom_price, 2), round(fvg.top_price, 2)]
+                    sl = round(getattr(fvg, "invalidation_level", fvg.top_price * 1.005), 2)
+                    inv = round(sl * 1.002, 2)
+                    origin = "BEARISH_OB_FVG"
+                    thesis = f"1H Momentum Supply FVG anchored at ${fvg.bottom_price:,.2f}-${fvg.top_price:,.2f}."
+                else:
+                    e_zone = [round(fib_05 - range_50 * 0.08, 2), round(fib_05, 2)]
+                    sl = round(fib_05 + range_50 * 0.10, 2)
+                    inv = round(sl * 1.002, 2)
+                    origin = "VWAP_VAL_CONFLUENCE"
+                    thesis = "Volatility expansion breakdown breaking below Asian low."
                 r_dist = max(sl - e_zone[0], range_50 * 0.05)
                 tp1 = round(low_50, 2)
                 tp2 = round(low_50 - range_50 * 0.35, 2)
                 tp3 = round(low_50 - range_50 * 0.75, 2)
-                origin = "VWAP_VAL_CONFLUENCE"
-                thesis = "Volatility expansion breakdown breaking below Asian low."
 
         else:  # POSITION
             tf = "1D"
             risk_pct = 1.5
             notional = 12000.0
             half_kelly = 0.7
-            score = 91
+            score = max(65, min(98, 91 + (4 if is_bull_regime else -4)))
             conf = 94
             stab_dur = 86400
             reaffirms = 42
             rr_ratio = 6.8
 
             if is_long:
-                e_zone = [round(low_50 * 0.985, 2), round(low_50 * 1.01, 2)]
-                sl = round(low_50 * 0.965, 2)
-                inv = round(sl * 0.998, 2)
+                macro_ob = next((o for o in bull_obs if getattr(o, "top_price", 0) <= cur_p), None)
+                if macro_ob:
+                    e_zone = [round(macro_ob.bottom_price, 2), round(macro_ob.top_price, 2)]
+                    sl = round(
+                        getattr(macro_ob, "invalidation_level", macro_ob.bottom_price * 0.98), 2
+                    )
+                    inv = round(sl * 0.998, 2)
+                    origin = "BULLISH_OB_FVG"
+                    thesis = f"Institutional Daily Accumulation Block anchored at ${macro_ob.bottom_price:,.2f}-${macro_ob.top_price:,.2f}."
+                else:
+                    e_zone = [round(low_50 * 0.985, 2), round(low_50 * 1.01, 2)]
+                    sl = round(low_50 * 0.965, 2)
+                    inv = round(sl * 0.998, 2)
+                    origin = "LIQUIDITY_SWEEP_RECLAIM"
+                    thesis = "Macro post-halving expansion supported by institutional ETF inflows."
                 tp1 = round(high_50 * 1.05, 2)
-                tp2 = round(high_50 * 1.15, 2)
-                tp3 = round(high_50 * 1.30, 2)
-                origin = "LIQUIDITY_SWEEP_RECLAIM"
-                thesis = "Macro post-halving expansion supported by institutional ETF inflows."
+                tp2 = round(high_50 + range_50 * 1.5, 2)
+                tp3 = round(high_50 + range_50 * 3.0, 2)
             else:
-                e_zone = [round(high_50 * 0.99, 2), round(high_50 * 1.015, 2)]
-                sl = round(high_50 * 1.035, 2)
-                inv = round(sl * 1.002, 2)
+                macro_ob = next(
+                    (o for o in bear_obs if getattr(o, "bottom_price", float("inf")) >= cur_p), None
+                )
+                if macro_ob:
+                    e_zone = [round(macro_ob.bottom_price, 2), round(macro_ob.top_price, 2)]
+                    sl = round(
+                        getattr(macro_ob, "invalidation_level", macro_ob.top_price * 1.02), 2
+                    )
+                    inv = round(sl * 1.002, 2)
+                    origin = "BEARISH_OB_FVG"
+                    thesis = f"Institutional Daily Distribution Block anchored at ${macro_ob.bottom_price:,.2f}-${macro_ob.top_price:,.2f}."
+                else:
+                    e_zone = [round(high_50 * 0.99, 2), round(high_50 * 1.015, 2)]
+                    sl = round(high_50 * 1.035, 2)
+                    inv = round(sl * 1.002, 2)
+                    origin = "LIQUIDITY_SWEEP_RECLAIM"
+                    thesis = "Macro distribution unwind supported by derivative funding exhaustion."
                 tp1 = round(low_50 * 0.95, 2)
-                tp2 = round(low_50 * 0.85, 2)
-                tp3 = round(low_50 * 0.70, 2)
-                origin = "LIQUIDITY_SWEEP_RECLAIM"
-                thesis = "Macro distribution unwind supported by derivative funding exhaustion."
+                tp2 = round(low_50 - range_50 * 1.5, 2)
+                tp3 = round(low_50 - range_50 * 3.0, 2)
 
         # Evaluate tick state for this plan
         plan_dict = {
@@ -771,7 +851,7 @@ def compute_bidirectional_style_signals(
     recommended_side = "LONG" if is_bull_regime else "SHORT"
     active_side = (
         force_side.upper()
-        if (force_side and force_side.upper() in ("LONG", "SHORT"))
+        if (isinstance(force_side, str) and force_side.upper() in ("LONG", "SHORT"))
         else recommended_side
     )
 

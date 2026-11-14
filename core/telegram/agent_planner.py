@@ -14,12 +14,13 @@ Capabilities:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from dataclasses import dataclass
 from typing import Any
 
-from core.telegram.rbac import TelegramUserIdentity
+from core.telegram.rbac import TelegramRole, TelegramUserIdentity
 from core.telegram.tool_gateway import (
     telegram_tool_gateway,
 )
@@ -155,6 +156,86 @@ class TelegramAgentPlanner:
                 intent="INGEST_URL",
                 tool_name="ingest_research_url",
                 tool_args={"url": urls[0]},
+            )
+
+        # 2.5 Fast-Path Greetings / Salutations (< 200ms Instant Telemetry Snapshot)
+        greeting_words = (
+            "hi",
+            "hello",
+            "hey",
+            "hlw",
+            "helo",
+            "hola",
+            "salam",
+            "assalam",
+            "assalamu alaikum",
+            "assalamualaikum",
+            "slm",
+            "হাই",
+            "হ্যালো",
+            "সালাম",
+            "আসসালামু আলাইকুম",
+            "আসসালামু",
+            "কি অবস্থা",
+            "kemon acho",
+            "kemon achen",
+        )
+        if lower in greeting_words or any(
+            lower == w or lower.startswith(w + " ") for w in greeting_words
+        ):
+            is_bn = any(ord(char) >= 0x0980 and ord(char) <= 0x09FF for char in clean) or any(
+                w in lower for w in ("kemon", "bhai", "vai", "khobor", "salam", "সালাম")
+            )
+            return PlannerDecision(
+                intent="GREETING",
+                tool_name="get_instant_greeting_snapshot",
+                tool_args={"language": "bn" if is_bn else "en"},
+            )
+
+        # 2.8 Omniscient Setup Scanner & Helping Hand (/setups, "what setups active", "কোন সেটআপ আছে", "এখন কি ট্রেড নিব")
+        if any(
+            w in lower
+            for w in (
+                "/setups",
+                "/helper",
+                "/allsetups",
+                "/scan",
+                "setups",
+                "active setups",
+                "what setups",
+                "best setup",
+                "how to trade",
+                "trade setup",
+                "helping hand",
+                "কোন সেটআপ",
+                "সেটআপ আছে",
+                "এখন কি ট্রেড",
+                "ট্রেড নিব",
+                "ট্রেড নেওয়া যায়",
+            )
+        ):
+            target_sym = "BTC/USDT"
+            if any(k in lower for k in ("eth", "ethereum", "ইথেরিয়াম")):
+                target_sym = "ETH/USDT"
+            elif any(k in lower for k in ("sol", "solana", "সোলানা")):
+                target_sym = "SOL/USDT"
+            elif any(k in lower for k in ("gold", "xau", "paxg", "স্বর্ণ", "সোনা")):
+                target_sym = "XAU/USD"
+
+            target_tf = "15m"
+            if "1h" in lower or "১ ঘণ্টা" in lower or "1 hour" in lower:
+                target_tf = "1h"
+            elif "4h" in lower or "৪ ঘণ্টা" in lower or "4 hour" in lower:
+                target_tf = "4h"
+            elif "5m" in lower or "৫ মিনিট" in lower:
+                target_tf = "5m"
+            elif "1d" in lower or "দৈনিক" in lower or "daily" in lower:
+                target_tf = "1d"
+
+            return PlannerDecision(
+                intent="SCAN_SETUPS",
+                tool_name="scan_omniscient_setups",
+                tool_args={"symbol": target_sym, "timeframe": target_tf},
             )
 
         # 3. Open Positions / PnL / Portfolio
@@ -731,12 +812,23 @@ class TelegramAgentPlanner:
     async def handle_user_message(
         self,
         message: str,
-        chat_id: int | str,
-        identity: TelegramUserIdentity,
+        chat_id: int | str | TelegramUserIdentity,
+        identity: TelegramUserIdentity | None = None,
     ) -> str:
         """
         Master execution pipeline for any natural language user message.
         """
+        if isinstance(chat_id, TelegramUserIdentity) and identity is None:
+            identity = chat_id
+            chat_id = identity.chat_id
+        elif identity is None:
+            identity = TelegramUserIdentity(
+                user_id=str(chat_id),
+                chat_id=str(chat_id),
+                username="Telegram User",
+                role=TelegramRole.TRADER,
+            )
+
         decision = self.resolve_intent(message, identity.user_id)
         logger.info(
             f"[AgentPlanner] Resolved intent '{decision.intent}' for message: {message[:60]}"
@@ -771,36 +863,40 @@ class TelegramAgentPlanner:
         from core.portfolio_shadow import portfolio_shadow
         from core.quant_mentor import quant_mentor
 
-        # 1. Fetch current live market telemetry defensively
-        btc_price = 78000.0
-        btc_change_24h = 2.15
+        # 1. Fetch current live market telemetry concurrently
+        btc_price, btc_change_24h = 78000.0, 2.15
         eth_price = 2500.0
-        try:
-            btc_ticker = await market_gateway.get_ticker("BTC/USDT")
-            btc_price = float(btc_ticker.get("price", btc_price))
-            btc_change_24h = float(btc_ticker.get("change_24h_pct", btc_change_24h))
-        except Exception as e:
-            logger.debug(f"[AgentPlanner] BTC ticker fetch error: {e}")
-
-        try:
-            eth_ticker = await market_gateway.get_ticker("ETH/USDT")
-            eth_price = float(eth_ticker.get("price", eth_price))
-        except Exception as e:
-            logger.debug(f"[AgentPlanner] ETH ticker fetch error: {e}")
-
         sol_price = 105.0
-        try:
-            sol_ticker = await market_gateway.get_ticker("SOL/USDT")
-            sol_price = float(sol_ticker.get("price", sol_price))
-        except Exception as e:
-            logger.debug(f"[AgentPlanner] SOL ticker fetch error: {e}")
-
         gold_price = 4110.0
+
+        async def _safe_ticker(sym: str, def_p: float, def_chg: float = 0.0) -> tuple[float, float]:
+            try:
+                t = await market_gateway.get_ticker(sym)
+                return float(t.get("price", def_p)), float(t.get("change_24h_pct", def_chg))
+            except Exception:
+                return def_p, def_chg
+
         try:
-            gold_ticker = await market_gateway.get_ticker("XAU/USD")
-            gold_price = float(gold_ticker.get("price", gold_price))
+            ticker_res = await asyncio.wait_for(
+                asyncio.gather(
+                    _safe_ticker("BTC/USDT", 78000.0, 2.15),
+                    _safe_ticker("ETH/USDT", 2500.0, 0.0),
+                    _safe_ticker("SOL/USDT", 105.0, 0.0),
+                    _safe_ticker("XAU/USD", 4110.0, 0.0),
+                    return_exceptions=True,
+                ),
+                timeout=2.5,
+            )
+            if isinstance(ticker_res[0], tuple):
+                btc_price, btc_change_24h = ticker_res[0]
+            if isinstance(ticker_res[1], tuple):
+                eth_price, _ = ticker_res[1]
+            if isinstance(ticker_res[2], tuple):
+                sol_price, _ = ticker_res[2]
+            if isinstance(ticker_res[3], tuple):
+                gold_price, _ = ticker_res[3]
         except Exception as e:
-            logger.debug(f"[AgentPlanner] Gold ticker fetch error: {e}")
+            logger.debug(f"[AgentPlanner] Concurrent ticker fetch timeout/error: {e}")
 
         try:
             accounting = portfolio_shadow.get_portfolio_accounting()
@@ -825,11 +921,13 @@ class TelegramAgentPlanner:
             "capital_mode": "REAL_CAPITAL_ENABLED = False (Paper Simulation Locked)",
         }
 
-        # 2. Compile Grounded Project RAG Dossier across the 5 ledgers (defensive)
+        # 2. Compile Grounded Project RAG Dossier across the 5 ledgers asynchronously
         try:
             from core.knowledge_os.project_rag import project_rag
 
-            dossier = project_rag.compile_grounded_dossier(query=query, market_vitals=telemetry_ctx)
+            dossier = await asyncio.to_thread(
+                project_rag.compile_grounded_dossier, query=query, market_vitals=telemetry_ctx
+            )
             telemetry_ctx["rag_dossier"] = dossier.to_dict()
             telemetry_ctx["research_grounding"] = dossier.summary_grounding
         except Exception as e:
@@ -845,7 +943,7 @@ class TelegramAgentPlanner:
             return response
         except Exception as e:
             logger.warning(f"[AgentPlanner] quant_mentor generation error: {e}")
-            return quant_mentor._generate_heuristic_response(query, telemetry_ctx, "auto")
+            return await quant_mentor._generate_heuristic_response(query, telemetry_ctx, "auto")
 
 
 # Singleton

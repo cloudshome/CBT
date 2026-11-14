@@ -1666,6 +1666,8 @@ export interface StyleSignalPlan {
   executionStateNote?: string;
   distanceToEntryPct?: number;
   mtfAlignment?: 'ALIGNED' | 'COUNTER_TREND' | 'NEUTRAL';
+  candlestickConfirmation?: string;
+  smtDivergence?: string;
   longPlan?: StyleSignalPlan;
   shortPlan?: StyleSignalPlan;
 }
@@ -1692,6 +1694,11 @@ export interface ActionableEntryItem {
   thesis: string;
   zoneOrigin: string;
   timestamp: string;
+  candlestickConfirmation?: string;
+  smtDivergence?: string;
+  devilsAdvocateWarning?: string;
+  setupName?: string;
+  setupFamily?: string;
 }
 
 export interface ActionableEntriesResponse {

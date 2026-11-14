@@ -11,7 +11,7 @@ import logging
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from core.data_streamer import data_streamer
 from core.regime_transition import regime_transition_detector
@@ -117,6 +117,22 @@ class EmpiricalAccumulator:
             )
             conn.commit()
 
+    def store_samples_batch(self, samples: list[tuple[Any, ...]]) -> int:
+        """Stores a batch of validated empirical trade samples in a single transaction."""
+        if not samples:
+            return 0
+        with sqlite3.connect(self.db_path) as conn:
+            conn.executemany(
+                """
+                INSERT INTO empirical_samples 
+                (symbol, timeframe, regime, concept, r_multiple, entry_price, exit_price, entry_time, exit_time, pnl_usd)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                samples,
+            )
+            conn.commit()
+        return len(samples)
+
     def get_samples_for_regime(
         self, regime: str, concept: str = "SETUP_A_SWEEP_MSS"
     ) -> list[float]:
@@ -156,20 +172,24 @@ class EmpiricalAccumulator:
 
                     # Run walk-forward backtest
                     bt_report = sandbox_lab.run_backtest(sym, tf, candles)
-                    for trade in bt_report.trades:
-                        self.store_sample(
-                            symbol=sym,
-                            timeframe=tf,
-                            regime=regime_str,
-                            concept="SETUP_A_SWEEP_MSS",
-                            r_multiple=trade.r_multiple,
-                            entry_price=trade.entry_price,
-                            exit_price=trade.exit_price,
-                            entry_time=trade.entry_time,
-                            exit_time=trade.exit_time,
-                            pnl_usd=trade.pnl_usd,
+                    batch = [
+                        (
+                            sym,
+                            tf,
+                            regime_str,
+                            "SETUP_A_SWEEP_MSS",
+                            trade.r_multiple,
+                            trade.entry_price,
+                            trade.exit_price,
+                            trade.entry_time,
+                            trade.exit_time,
+                            trade.pnl_usd,
                         )
-                        new_samples += 1
+                        for trade in bt_report.trades
+                    ]
+                    if batch:
+                        self.store_samples_batch(batch)
+                        new_samples += len(batch)
                 except Exception as e:
                     logger.debug(f"Accumulation cycle error on {sym} {tf}: {e}")
 

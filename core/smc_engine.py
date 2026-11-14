@@ -92,6 +92,9 @@ class SMCEngine:
 
         return patterns
 
+    # Alias for master terminal callers
+    detect_patterns = scan
+
     def _get_expectancy(self, pattern_type: str, regime: str) -> float:
         return self._expectancy_table.get((pattern_type, regime), 0.50)
 

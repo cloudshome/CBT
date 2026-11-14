@@ -896,7 +896,7 @@ async def empirical_accumulator_loop():
     """Periodically executes chronological walk-forward validations to build sample sizes."""
     while True:
         try:
-            empirical_accumulator.run_accumulation_cycle()
+            await asyncio.to_thread(empirical_accumulator.run_accumulation_cycle)
         except Exception as e:
             logger.debug(f"Empirical accumulator loop error: {e}")
         await asyncio.sleep(300.0)  # Cycle every 5 minutes

@@ -7,6 +7,7 @@ Supports Binance REST, Bybit V5 Linear, Persistent SQLite Cache, and Synthetic F
 from __future__ import annotations
 
 import abc
+import asyncio
 import logging
 import time
 from typing import Any
@@ -103,22 +104,34 @@ class BaseMarketDataProvider(abc.ABC):
 
 
 class HttpSessionManager:
-    """Manages persistent pooled aiohttp ClientSession with TCP keep-alive."""
+    """Manages persistent pooled aiohttp ClientSession keyed by running event loop with TCP keep-alive."""
 
-    _session: aiohttp.ClientSession | None = None
+    _sessions: dict[int, aiohttp.ClientSession] = {}
 
     @classmethod
     async def get_session(cls) -> aiohttp.ClientSession:
-        if cls._session is None or cls._session.closed:
+        loop = asyncio.get_running_loop()
+        loop_id = id(loop)
+        session = cls._sessions.get(loop_id)
+        if session is None or session.closed:
             connector = aiohttp.TCPConnector(limit=50, keepalive_timeout=30.0)
-            cls._session = aiohttp.ClientSession(connector=connector)
-        return cls._session
+            session = aiohttp.ClientSession(connector=connector)
+            cls._sessions[loop_id] = session
+        return session
 
     @classmethod
     async def close_session(cls) -> None:
-        if cls._session is not None and not cls._session.closed:
-            await cls._session.close()
-            cls._session = None
+        try:
+            loop = asyncio.get_running_loop()
+            loop_id = id(loop)
+            session = cls._sessions.pop(loop_id, None)
+            if session is not None and not session.closed:
+                await session.close()
+        except RuntimeError:
+            for session in list(cls._sessions.values()):
+                if not session.closed:
+                    await session.close()
+            cls._sessions.clear()
 
 
 class BinanceMarketDataProvider(BaseMarketDataProvider):

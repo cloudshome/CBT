@@ -165,6 +165,33 @@ class TradingDictionaryManager:
             )
             conn.commit()
 
+    def get_term(self, term_id: str) -> DictionaryTerm | None:
+        """Retrieves raw DictionaryTerm dataclass by term_id."""
+        clean_id = term_id.strip().lower()
+        with self._get_connection() as conn:
+            row = conn.execute(
+                "SELECT * FROM trading_dictionary_terms WHERE term_id = ?", (clean_id,)
+            ).fetchone()
+            if not row:
+                return None
+            return DictionaryTerm(
+                term_id=row["term_id"],
+                canonical_name=row["canonical_name"],
+                aliases=json.loads(row["aliases_json"]) if row["aliases_json"] else [],
+                category=row["category"],
+                definition_en=row["definition_en"],
+                definition_bn=row["definition_bn"],
+                mathematical_formula=row["mathematical_formula"] or "",
+                institutional_mechanism=row["institutional_mechanism"] or "",
+                anti_retail_pitfall=row["anti_retail_pitfall"] or "",
+                cbt_code_implementation=row["cbt_code_implementation"] or "",
+                related_terms=json.loads(row["related_terms_json"])
+                if row["related_terms_json"]
+                else [],
+                created_at=row["created_at"],
+                updated_at=row["updated_at"],
+            )
+
     def lookup(
         self,
         query: str,
@@ -937,6 +964,122 @@ class TradingDictionaryManager:
                 anti_retail_pitfall="In-sample overfitting where a strategy looks profitable on past data but collapses in forward production.",
                 cbt_code_implementation="research/m47_cp2_joint_certification_results.json, docs/QUANT_RESEARCH_PROTOCOL.md",
                 related_terms=["cpcv", "deflated_sharpe_ratio", "net_expected_value"],
+            ),
+            # 8 Omniscient Setup Encyclopedia Terms
+            DictionaryTerm(
+                term_id="smt_divergence",
+                canonical_name="Smart Money Technique (SMT) Divergence",
+                aliases=[
+                    "smt",
+                    "smt divergence",
+                    "smart money divergence",
+                    "এসএমটি",
+                    "এসএমটি ডাইভারজেন্স",
+                ],
+                category="SMC_PRICE_ACTION",
+                definition_en="A cross-asset intermarket divergence where correlated assets (e.g., BTC and ETH) fail to confirm each other's swing extremes. E.g., BTC makes a lower low while ETH forms a higher low at key support, signaling hidden institutional accumulation.",
+                definition_bn="আন্তঃসম্পর্কিত দুটি অ্যাসেটের (যেমন বিটকয়েন ও ইথেরিয়াম) মধ্যে তুলনামূলক সুইং ডাইভারজেন্স। যখন একটি অ্যাসেট লোয়ার লো বানায় কিন্তু অপরটি হায়ার লো ধরে রাখে, তখন তা স্মার্ট মানির গোপন একুমুলেশন নির্দেশ করে।",
+                mathematical_formula=r"\text{Target: } Low_t < Low_{t-k} \land \text{Correlated: } Low_t > Low_{t-k}",
+                institutional_mechanism="Institutions accumulate the stronger asset discreetly while retail liquidations trigger on the weaker asset, causing an asymmetric cross-asset reversal.",
+                anti_retail_pitfall="Assuming all correlated crypto assets must move in 100% lockstep. SMT divergence occurs precisely at major institutional inflection points.",
+                cbt_code_implementation="core/omniscient_setup_encyclopedia.py (Setup 25)",
+                related_terms=["fvg", "order_block", "liquidity_sweep"],
+            ),
+            DictionaryTerm(
+                term_id="wyckoff_spring",
+                canonical_name="Wyckoff Spring & Upthrust (Phase C)",
+                aliases=["wyckoff spring", "spring", "utad", "ওয়াইকফ স্প্রিং", "স্প্রিং"],
+                category="SMC_PRICE_ACTION",
+                definition_en="A terminal shakeout below the established trading range support (Spring in Accumulation) or above resistance (Upthrust in Distribution) with immediate closing reclaim back inside the range.",
+                definition_bn="ট্রেডিং রেঞ্জের নিচে দ্রুত ফেক ব্রেকডাউন (স্প্রিং) অথবা উপরে ফেক ব্রেকআউট (UTAD) ঘটিয়ে রিটেইল স্টপ শিকারের পর দ্রুত রেঞ্জের ভেতরে ফিরে আসা।",
+                mathematical_formula=r"\text{Close}_t > \text{Range\_Low} \land \text{Low}_t < \text{Range\_Low} \text{ with heavy Volume}",
+                institutional_mechanism="Tests the availability of floating supply before initiating major mark-up or mark-down campaign.",
+                anti_retail_pitfall="Shorting the breakdown beneath support without waiting for a retest confirmation, getting caught in an institutional bear trap.",
+                cbt_code_implementation="core/omniscient_setup_encyclopedia.py (Setup 18)",
+                related_terms=["liquidity_sweep", "power_of_3"],
+            ),
+            DictionaryTerm(
+                term_id="silver_bullet",
+                canonical_name="ICT Silver Bullet",
+                aliases=["silver bullet", "ict silver bullet", "সিলভার বুলেট"],
+                category="SMC_PRICE_ACTION",
+                definition_en="A high-probability 60-minute killzone execution setup based on an external liquidity sweep, internal market structure shift (MSS), displacement, and retest of the resulting Fair Value Gap.",
+                definition_bn="আইসিটি ৬০-মিনিট সেশন কিলজোন সেটআপ: লিকুইডিটি সুইপের পর স্ট্রাকচারাল শিফট (MSS) এবং ডিসপ্লেসমেন্ট এফভিজি রিটেস্টে এন্ট্রি।",
+                mathematical_formula=r"\text{Entry at FVG retest post-MSS with R:R} \ge 2.5",
+                institutional_mechanism="Smart money algorithms inject directional volume during defined killzones (London, NY AM, NY PM) after purging session liquidity.",
+                anti_retail_pitfall="Trading Silver Bullet outside institutional killzones or without a confirmed displacement candle.",
+                cbt_code_implementation="core/omniscient_setup_encyclopedia.py (Setup 1)",
+                related_terms=["fvg", "bos", "liquidity_sweep"],
+            ),
+            DictionaryTerm(
+                term_id="ote",
+                canonical_name="Optimal Trade Entry (OTE)",
+                aliases=["ote", "optimal trade entry", "অপটিমাল ট্রেড এন্ট্রি"],
+                category="SMC_PRICE_ACTION",
+                definition_en="A precision entry framework anchoring Fibonacci retracements between 61.8% and 78.6% (sweet spot at 70.5%) overlapping an unmitigated Order Block or Fair Value Gap.",
+                definition_bn="সুইং রেঞ্জের ৬১.৮% থেকে ৭৮.৬% ফিবোনাচ্চি গোল্ডেন পকেটে আনমিটিগেটেড ওবি অথবা এফভিজি কনফ্লুয়েন্সে প্রাতিষ্ঠানিক ডিসকাউন্ট এন্ট্রি।",
+                mathematical_formula=r"\text{OTE} = [\text{High} - 0.786 \cdot \Delta, \text{High} - 0.618 \cdot \Delta]",
+                institutional_mechanism="Institutions prefer reloading inventory at deep discount (>= 61.8% retracement) to maximize asymmetric payoff.",
+                anti_retail_pitfall="Buying at 50% equilibrium when higher timeframe order blocks rest deeper at the 70.5%–78.6% zone.",
+                cbt_code_implementation="core/omniscient_setup_encyclopedia.py (Setup 8)",
+                related_terms=["fvg", "order_block"],
+            ),
+            DictionaryTerm(
+                term_id="mitigation_block",
+                canonical_name="Mitigation Block",
+                aliases=["mitigation block", "মিটিগেশন ব্লক"],
+                category="SMC_PRICE_ACTION",
+                definition_en="An order block created during a failure swing that did not take prior swing liquidity, retested as institutions mitigate offside losing positions.",
+                definition_bn="ফেইলিউর সুইংয়ের সময় তৈরি ব্লক যা পূর্ববর্তী লিকুইডিটি সুইপ করতে ব্যর্থ হয়েছে; প্রতিষ্ঠানগুলো ব্রেক-ইভেনে পজিশন কাটানোর জন্য প্রাইস এখানে আনে।",
+                mathematical_formula=r"\text{Failure Swing Pivot broken by displacement and retested}",
+                institutional_mechanism="Institutions mitigating underwater inventory on failed expansion legs.",
+                anti_retail_pitfall="Confusing a Mitigation Block with a Breaker Block (Breakers always sweep liquidity; Mitigation blocks do not).",
+                cbt_code_implementation="core/omniscient_setup_encyclopedia.py (Setup 4)",
+                related_terms=["breaker_block", "order_block"],
+            ),
+            DictionaryTerm(
+                term_id="volume_profile_vpoc",
+                canonical_name="Volume Profile VPOC & Value Area",
+                aliases=["volume profile", "vpoc", "poc", "value area", "ভলিউম প্রোফাইল", "ভিপিওসি"],
+                category="ORDER_FLOW_MICROSTRUCTURE",
+                definition_en="Volume Point of Control (VPOC) represents the exact price level with the highest traded volume over a session, surrounded by the 70% Value Area (VAH and VAL).",
+                definition_bn="ভলিউম পয়েন্ট অব কন্ট্রোল (VPOC) হলো সেই প্রাইস লেভেল যেখানে সবচেয়ে বেশি ভলিউমে লেনদেন হয়েছে, যার চারপাশের ৭০% ভলিউমকে ভ্যালু এরিয়া বলে।",
+                mathematical_formula=r"\text{VPOC} = \arg\max_p V(p); \quad \int_{\text{VAL}}^{\text{VAH}} V(p) dp = 0.70 \int V(p) dp",
+                institutional_mechanism="Represents institutional consensus of fair value; deviation from Value Area creates mean reversion pressure.",
+                anti_retail_pitfall="Trading counter-trend when price accepts outside the Value Area with expanding volume.",
+                cbt_code_implementation="core/omniscient_setup_encyclopedia.py (Setup 10)",
+                related_terms=["cvd", "orderbook_imbalance"],
+            ),
+            DictionaryTerm(
+                term_id="bollinger_keltner_squeeze",
+                canonical_name="Bollinger inside Keltner Volatility Squeeze",
+                aliases=[
+                    "volatility squeeze",
+                    "squeeze",
+                    "bollinger keltner squeeze",
+                    "ভোলাটিলিটি স্কুইজ",
+                ],
+                category="QUANT_RISK_EXECUTION",
+                definition_en="A market regime where Bollinger Bands completely compress inside Keltner Channels, indicating severe volatility contraction preceding a massive expansion breakout.",
+                definition_bn="বলিঙ্গার ব্যান্ড যখন কেল্টনার চ্যানেলের ভেতরে ঢুকে যায় (অত্যন্ত কম অস্থিরতা), তার পরপরই বড় ধরনের প্রাইস এক্সপানশন আসে।",
+                mathematical_formula=r"\text{BB\_Upper} < \text{KC\_Upper} \land \text{BB\_Lower} > \text{KC\_Lower}",
+                institutional_mechanism="Market energy coiling as institutional inventory accumulates quietly before explosive trend release.",
+                anti_retail_pitfall="Taking directional bets while the squeeze is still tight before the first momentum dot or directional bar prints.",
+                cbt_code_implementation="core/omniscient_setup_encyclopedia.py (Setup 19)",
+                related_terms=["momentum_divergence"],
+            ),
+            DictionaryTerm(
+                term_id="oi_price_triad",
+                canonical_name="Open Interest & Price Quadrant Triad",
+                aliases=["oi price", "oi price quadrant", "open interest build", "ওআই প্রাইস ট্রায়াড"],
+                category="DERIVATIVES_LIQUIDATION",
+                definition_en="The directional classification of futures positioning: Price Up + OI Up (Authentic Long Build), Price Down + OI Up (Authentic Short Build), Price Up + OI Down (Short Covering), Price Down + OI Down (Long Liquidation).",
+                definition_bn="ডেরিভেটিভস পজিশনিংয়ের ৪টি রূপ: প্রাইস ও ওআই দুটোই বাড়লে প্রাতিষ্ঠানিক লং বিল্ড, প্রাইস কমে ওআই বাড়লে প্রাতিষ্ঠানিক শর্ট বিল্ড।",
+                mathematical_formula=r"\text{Classification}(\Delta P, \Delta OI) \in \{\text{Long Build, Short Build, Short Cover, Long Flush}\}",
+                institutional_mechanism="Differentiates between new aggressive institutional capital inflow versus involuntary retail liquidations.",
+                anti_retail_pitfall="Confusing a short-covering pump (price up, OI down) with a genuine institutional bull trend.",
+                cbt_code_implementation="core/omniscient_setup_encyclopedia.py (Setup 15), core/oi_funding_squeeze.py",
+                related_terms=["funding_rate", "liquidation_cascade"],
             ),
         ]
 
