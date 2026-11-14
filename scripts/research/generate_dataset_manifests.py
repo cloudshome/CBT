@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+
 import pandas as pd
-import fastparquet
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 PARQUET_STORE = ROOT_DIR / "data" / "store" / "parquet" / "candles"
@@ -66,14 +66,16 @@ def process_all_datasets():
                 dfs.append(df)
                 min_t = int(df["ts"].min()) if "ts" in df else 0
                 max_t = int(df["ts"].max()) if "ts" in df else 0
-                files_meta.append({
-                    "relative_path": rel_path,
-                    "size_bytes": f_size,
-                    "sha256": f_hash,
-                    "rows": len(df),
-                    "min_ts": min_t,
-                    "max_ts": max_t,
-                })
+                files_meta.append(
+                    {
+                        "relative_path": rel_path,
+                        "size_bytes": f_size,
+                        "sha256": f_hash,
+                        "rows": len(df),
+                        "min_ts": min_t,
+                        "max_ts": max_t,
+                    }
+                )
             except Exception as e:
                 print(f"Error reading {f}: {e}")
 
@@ -85,8 +87,8 @@ def process_all_datasets():
 
         min_ts = int(full_df["ts"].min())
         max_ts = int(full_df["ts"].max())
-        min_dt = datetime.fromtimestamp(min_ts / 1000, tz=timezone.utc).isoformat()
-        max_dt = datetime.fromtimestamp(max_ts / 1000, tz=timezone.utc).isoformat()
+        min_dt = datetime.fromtimestamp(min_ts / 1000, tz=UTC).isoformat()
+        max_dt = datetime.fromtimestamp(max_ts / 1000, tz=UTC).isoformat()
 
         # Step check
         tf = d["timeframe"]
@@ -105,11 +107,13 @@ def process_all_datasets():
                 g_start = full_df.loc[idx - 1, "ts"]
                 g_end = full_df.loc[idx, "ts"]
                 missing = int((g_end - g_start) / tf_step) - 1
-                gaps.append({
-                    "start_ts": int(g_start),
-                    "end_ts": int(g_end),
-                    "missing_bars": missing,
-                })
+                gaps.append(
+                    {
+                        "start_ts": int(g_start),
+                        "end_ts": int(g_end),
+                        "missing_bars": missing,
+                    }
+                )
 
         # Schema & dtypes
         dtypes_map = {col: str(dtype) for col, dtype in full_df.dtypes.items()}
@@ -160,4 +164,3 @@ def process_all_datasets():
 if __name__ == "__main__":
     summary = process_all_datasets()
     print(json.dumps(summary, indent=2))
-

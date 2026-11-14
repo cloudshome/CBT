@@ -71,7 +71,14 @@ class Generation6IndependentAuditor:
         self.log("--> Interrogating Obligation 1: Milestone 18 Immutability...")
         manifest_path = self.repo_root / "core" / "execution" / "m18_certification_manifest.json"
         if not manifest_path.exists():
-            return AuditObligationResult("AUDIT_01_M18_IMMUTABILITY", "M18 Immutability", False, str(manifest_path), "Manifest missing", {})
+            return AuditObligationResult(
+                "AUDIT_01_M18_IMMUTABILITY",
+                "M18 Immutability",
+                False,
+                str(manifest_path),
+                "Manifest missing",
+                {},
+            )
 
         with open(manifest_path, encoding="utf-8") as f:
             m18_data = json.load(f)
@@ -110,7 +117,11 @@ class Generation6IndependentAuditor:
             passed=passed,
             evidence_path="core/execution/m18_certification_manifest.json",
             details="Verified commit c9cc1cad is ancestor of HEAD; 14 certified files exist; test identity matches 2acbff25f391249c.",
-            metrics={"certified_commit": certified_commit, "test_identity_sha256": test_sha, "certified_files_count": len(certified_files)},
+            metrics={
+                "certified_commit": certified_commit,
+                "test_identity_sha256": test_sha,
+                "certified_files_count": len(certified_files),
+            },
         )
 
     def audit_02_m31r_evidence_reproducibility(self) -> AuditObligationResult:
@@ -120,7 +131,14 @@ class Generation6IndependentAuditor:
         evidence_file = self.repo_root / "docs" / "research" / "M31_R_EVIDENCE.json"
 
         if not decision_file.exists() or not evidence_file.exists():
-            return AuditObligationResult("AUDIT_02_M31R_EVIDENCE_REPRODUCIBILITY", "M31-R Evidence", False, "docs/research/", "Files missing", {})
+            return AuditObligationResult(
+                "AUDIT_02_M31R_EVIDENCE_REPRODUCIBILITY",
+                "M31-R Evidence",
+                False,
+                "docs/research/",
+                "Files missing",
+                {},
+            )
 
         with open(decision_file, encoding="utf-8") as f:
             dec = json.load(f)
@@ -148,8 +166,15 @@ class Generation6IndependentAuditor:
             name="Milestone 31-R Evidence Hardening & 4-Denominator Rule",
             passed=passed,
             evidence_path="docs/research/M31_R_EVIDENCE.json",
-            details=f"Audited {n_trades} forward validation trades (raw={raw}, eligible={elig}, excluded={excl}, feed_continuity={feed_rate*100:.2f}%).",
-            metrics={"status": dec.get("status"), "sample_size_n": n_trades, "raw": raw, "eligible": elig, "excluded": excl, "denominator_conserved": denom_conserved},
+            details=f"Audited {n_trades} forward validation trades (raw={raw}, eligible={elig}, excluded={excl}, feed_continuity={feed_rate * 100:.2f}%).",
+            metrics={
+                "status": dec.get("status"),
+                "sample_size_n": n_trades,
+                "raw": raw,
+                "eligible": elig,
+                "excluded": excl,
+                "denominator_conserved": denom_conserved,
+            },
         )
 
     def audit_03_m31_5_freeze_binding(self) -> AuditObligationResult:
@@ -157,7 +182,14 @@ class Generation6IndependentAuditor:
         self.log("--> Interrogating Obligation 3: M31.5 Freeze Binding...")
         freeze_file = self.repo_root / "docs" / "research" / "M31_5_FREEZE_MANIFEST.json"
         if not freeze_file.exists():
-            return AuditObligationResult("AUDIT_03_M31_5_FREEZE_BINDING", "M31.5 Freeze Binding", False, str(freeze_file), "Manifest missing", {})
+            return AuditObligationResult(
+                "AUDIT_03_M31_5_FREEZE_BINDING",
+                "M31.5 Freeze Binding",
+                False,
+                str(freeze_file),
+                "Manifest missing",
+                {},
+            )
 
         with open(freeze_file, encoding="utf-8") as f:
             freeze_data = json.load(f)
@@ -173,7 +205,10 @@ class Generation6IndependentAuditor:
             passed=passed,
             evidence_path="docs/research/M31_5_FREEZE_MANIFEST.json",
             details=f"Verified master freeze digest {master_digest[:16]}... binding {len(strategies)} strategy manifests.",
-            metrics={"master_freeze_digest": master_digest, "frozen_strategies_count": len(strategies)},
+            metrics={
+                "master_freeze_digest": master_digest,
+                "frozen_strategies_count": len(strategies),
+            },
         )
 
     def audit_04_time_conservation_and_exclusion_reconciliation(self) -> AuditObligationResult:
@@ -183,7 +218,14 @@ class Generation6IndependentAuditor:
         dossier_file = self.repo_root / "docs" / "execution" / "M32_R_BURN_IN_DOSSIER.md"
 
         if not quality_file.exists() or not dossier_file.exists():
-            return AuditObligationResult("AUDIT_04_TIME_CONSERVATION_AND_EXCLUSION_RECONCILIATION", "Time Reconciliation", False, "docs/execution/", "Files missing", {})
+            return AuditObligationResult(
+                "AUDIT_04_TIME_CONSERVATION_AND_EXCLUSION_RECONCILIATION",
+                "Time Reconciliation",
+                False,
+                "docs/execution/",
+                "Files missing",
+                {},
+            )
 
         with open(quality_file, encoding="utf-8") as f:
             q_data = json.load(f)
@@ -204,7 +246,9 @@ class Generation6IndependentAuditor:
         breakdown_matches = abs(disq - sum_breakdown) < 0.05
 
         dossier_content = dossier_file.read_text(encoding="utf-8")
-        has_table = "Two-Clock Time Conservation & Itemized Exclusion Reconciliation" in dossier_content
+        has_table = (
+            "Two-Clock Time Conservation & Itemized Exclusion Reconciliation" in dossier_content
+        )
 
         passed = exact_conservation and breakdown_matches and has_table and qual >= 300.0
 
@@ -231,7 +275,14 @@ class Generation6IndependentAuditor:
         self.log("--> Interrogating Obligation 5: Lost-ACK Finite State Transitions...")
         rec_file = self.repo_root / "docs" / "execution" / "M32_R_RECONCILIATION_REPORT.json"
         if not rec_file.exists():
-            return AuditObligationResult("AUDIT_05_LOST_ACK_STATE_TRANSITIONS", "Lost-ACK Matrix", False, str(rec_file), "Report missing", {})
+            return AuditObligationResult(
+                "AUDIT_05_LOST_ACK_STATE_TRANSITIONS",
+                "Lost-ACK Matrix",
+                False,
+                str(rec_file),
+                "Report missing",
+                {},
+            )
 
         with open(rec_file, encoding="utf-8") as f:
             rec_data = json.load(f)
@@ -248,18 +299,32 @@ class Generation6IndependentAuditor:
             passed=passed,
             evidence_path="docs/execution/M32_R_RECONCILIATION_REPORT.json",
             details="All testnet orders reconciled through LostAckState finite state recovery; 0 ambiguous orders; 0 duplicate fills.",
-            metrics={"unreconciled_ambiguous": unreconciled, "overfill_violations": overfills, "zero_duplicate_fills": zero_dups},
+            metrics={
+                "unreconciled_ambiguous": unreconciled,
+                "overfill_violations": overfills,
+                "zero_duplicate_fills": zero_dups,
+            },
         )
 
     def audit_06_allocator_determinism(self) -> AuditObligationResult:
         """Audits Multi-Strategy Allocator 7-tier decomposed 1.5% equity cap."""
         self.log("--> Interrogating Obligation 6: Allocator Determinism & 7-Tier Ceilings...")
-        alloc_path = self.repo_root / "core" / "execution" / "strategy_gateway" / "ensemble_allocator.py"
+        alloc_path = (
+            self.repo_root / "core" / "execution" / "strategy_gateway" / "ensemble_allocator.py"
+        )
         content = alloc_path.read_text(encoding="utf-8")
 
         has_7_ceilings = all(
             c in content
-            for c in ("quantity_cap", "notional_cap", "margin_cap", "loss_cap", "strategy_risk_cap", "portfolio_risk_cap", "liquidity_cap")
+            for c in (
+                "quantity_cap",
+                "notional_cap",
+                "margin_cap",
+                "loss_cap",
+                "strategy_risk_cap",
+                "portfolio_risk_cap",
+                "liquidity_cap",
+            )
         )
         has_min_clamping = "min(" in content
         passed = has_7_ceilings and has_min_clamping
@@ -276,7 +341,9 @@ class Generation6IndependentAuditor:
     def audit_07_m33_leg_risk_fail_safe(self) -> AuditObligationResult:
         """Audits M33 synthetic router Leg-Risk Fail-Safe protective unwind."""
         self.log("--> Interrogating Obligation 7: M33 Leg-Risk Fail-Safe Router...")
-        router_path = self.repo_root / "core" / "execution" / "strategy_gateway" / "synthetic_router.py"
+        router_path = (
+            self.repo_root / "core" / "execution" / "strategy_gateway" / "synthetic_router.py"
+        )
         content = router_path.read_text(encoding="utf-8")
 
         has_protective_unwind = "unwind_leg" in content and "unwind_executor" in content
@@ -289,7 +356,10 @@ class Generation6IndependentAuditor:
             passed=passed,
             evidence_path="core/execution/strategy_gateway/synthetic_router.py",
             details="Verified 2-phase commit dual-leg router with immediate protective unwind on Leg 2 rejection.",
-            metrics={"has_protective_unwind": has_protective_unwind, "has_fail_safe_state": has_fail_safe_state},
+            metrics={
+                "has_protective_unwind": has_protective_unwind,
+                "has_fail_safe_state": has_fail_safe_state,
+            },
         )
 
     def audit_08_m34_collateral_calculations(self) -> AuditObligationResult:
@@ -299,7 +369,9 @@ class Generation6IndependentAuditor:
         content = collat_path.read_text(encoding="utf-8")
 
         has_ldb_formula = "10000.0" in content and "abs(mark_price - liquidation_price)" in content
-        has_hazard_detection = "evaluate_asymmetric_hazard" in content and "hazard_detected" in content
+        has_hazard_detection = (
+            "evaluate_asymmetric_hazard" in content and "hazard_detected" in content
+        )
         passed = has_ldb_formula and has_hazard_detection
 
         return AuditObligationResult(
@@ -308,7 +380,10 @@ class Generation6IndependentAuditor:
             passed=passed,
             evidence_path="core/risk_engine/collateral_monitor.py",
             details="Verified real-time Liquidation Distance Buffer formula (LDB = |P_mark - P_liq| / P_mark * 10^4 bps) and Asymmetric Liquidation Hazard detector.",
-            metrics={"has_ldb_formula": has_ldb_formula, "has_hazard_detection": has_hazard_detection},
+            metrics={
+                "has_ldb_formula": has_ldb_formula,
+                "has_hazard_detection": has_hazard_detection,
+            },
         )
 
     def audit_09_advisory_boundary_integrity(self) -> AuditObligationResult:
@@ -317,7 +392,9 @@ class Generation6IndependentAuditor:
         advisor_path = self.repo_root / "core" / "risk_engine" / "rebalancing_advisor.py"
         content = advisor_path.read_text(encoding="utf-8")
 
-        is_advisory = "advisory_mode_only: bool = True" in content or "advisory_mode_only=True" in content
+        is_advisory = (
+            "advisory_mode_only: bool = True" in content or "advisory_mode_only=True" in content
+        )
         has_no_send = "send_transaction" not in content and "execute_transfer" not in content
         passed = is_advisory and has_no_send
 
@@ -334,7 +411,11 @@ class Generation6IndependentAuditor:
         """Audits that real_capital_enabled == False is permanently locked across all Gen 6 modules."""
         self.log("--> Interrogating Obligation 10: Permanent Constitutional Capital Firewall...")
         modules_to_audit = [
-            self.repo_root / "core" / "intelligence" / "forward_validation" / "strategy_manifest.py",
+            self.repo_root
+            / "core"
+            / "intelligence"
+            / "forward_validation"
+            / "strategy_manifest.py",
             self.repo_root / "core" / "execution" / "testnet" / "daemon_orchestrator.py",
             self.repo_root / "core" / "execution" / "strategy_gateway" / "ensemble_allocator.py",
             self.repo_root / "core" / "execution" / "strategy_gateway" / "synthetic_router.py",
@@ -367,7 +448,14 @@ class Generation6IndependentAuditor:
         self.log("--> Interrogating Obligation 11: Authenticode & RFC-3161 HTTPS Signatures...")
         signing_report = self.repo_root / "release" / "CODE_SIGNING_REPORT.json"
         if not signing_report.exists():
-            return AuditObligationResult("AUDIT_11_AUTHENTICODE_AND_RFC3161_SIGNATURES", "Code Signing", False, str(signing_report), "Report missing", {})
+            return AuditObligationResult(
+                "AUDIT_11_AUTHENTICODE_AND_RFC3161_SIGNATURES",
+                "Code Signing",
+                False,
+                str(signing_report),
+                "Report missing",
+                {},
+            )
 
         with open(signing_report, encoding="utf-8") as f:
             sign_data = json.load(f)
@@ -389,9 +477,20 @@ class Generation6IndependentAuditor:
         self.log("--> Interrogating Obligation 12: Release Manifest Cryptographic Integrity...")
         sums_file = self.repo_root / "release" / "SHA256SUMS.txt"
         if not sums_file.exists():
-            return AuditObligationResult("AUDIT_12_RELEASE_MANIFEST_CRYPTOGRAPHIC_INTEGRITY", "Manifest Integrity", False, "release/", "SHA256SUMS.txt missing", {})
+            return AuditObligationResult(
+                "AUDIT_12_RELEASE_MANIFEST_CRYPTOGRAPHIC_INTEGRITY",
+                "Manifest Integrity",
+                False,
+                "release/",
+                "SHA256SUMS.txt missing",
+                {},
+            )
 
-        lines = [line.strip() for line in sums_file.read_text(encoding="utf-8").splitlines() if line.strip()]
+        lines = [
+            line.strip()
+            for line in sums_file.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
         all_digests_match = True
         verified_count = 0
 
@@ -438,7 +537,7 @@ class Generation6IndependentAuditor:
             passed = has_auth and has_sig
             details = "Release is officially authorized via verified cryptographic operator signature and dossier."
         else:
-            passed = (state == "RELEASE_CANDIDATE")
+            passed = state == "RELEASE_CANDIDATE"
             details = "Confirmed release state machine is strictly clamped to RELEASE_CANDIDATE; zero automated live trading promotion."
 
         return AuditObligationResult(
@@ -457,7 +556,9 @@ class Generation6IndependentAuditor:
         content = script_path.read_text(encoding="utf-8")
 
         has_human_gate = "G-21_human_approval_gate" in content
-        pauses_at_candidate = "State machine is PAUSED awaiting explicit HUMAN OPERATOR APPROVAL" in content
+        pauses_at_candidate = (
+            "State machine is PAUSED awaiting explicit HUMAN OPERATOR APPROVAL" in content
+        )
         passed = has_human_gate and pauses_at_candidate
 
         return AuditObligationResult(
@@ -471,7 +572,9 @@ class Generation6IndependentAuditor:
 
     def audit_15_clean_room_reconstruction(self) -> AuditObligationResult:
         """Performs clean-room reconstruction of the complete Generation 6 certification state."""
-        self.log("--> Interrogating Obligation 15: Clean-Room Reconstruction of Certification State...")
+        self.log(
+            "--> Interrogating Obligation 15: Clean-Room Reconstruction of Certification State..."
+        )
         all_prior_passed = all(r.passed for r in self.results)
 
         return AuditObligationResult(
@@ -480,7 +583,10 @@ class Generation6IndependentAuditor:
             passed=all_prior_passed,
             evidence_path="docs/release/M35_R_INDEPENDENT_AUDIT_REPORT.md",
             details="All 14 prior independent audit obligations verified green; clean-room reconstruction confirms 100% certification integrity.",
-            metrics={"prior_obligations_passed": sum(1 for r in self.results if r.passed), "total_prior": len(self.results)},
+            metrics={
+                "prior_obligations_passed": sum(1 for r in self.results if r.passed),
+                "total_prior": len(self.results),
+            },
         )
 
     def run_all(self) -> bool:

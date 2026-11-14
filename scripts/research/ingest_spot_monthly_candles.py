@@ -18,8 +18,6 @@ from pathlib import Path
 import pandas as pd
 import requests
 
-from data.store import CandleStore
-
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("spot_monthly_ingest")
@@ -31,7 +29,7 @@ SUPPORTED_TIMEFRAMES = ["15m", "1h", "4h", "1d"]
 
 def get_months(start_year: int = 2020) -> list[str]:
     """Dynamically computes all months from start_year through current UTC month."""
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.now(datetime.UTC)
     current_year = now.year
     current_month = now.month
 
@@ -93,7 +91,6 @@ def ingest_spot(symbol: str, timeframe: str = "1h", start_year: int = 2020) -> i
         f"Ingesting spot {timeframe} klines for {symbol}: {len(months)} months ({months[0]} to {months[-1]})..."
     )
     all_dfs = []
-    store = CandleStore()
 
     with ThreadPoolExecutor(max_workers=15) as ex:
         futures = [ex.submit(fetch_spot_month, symbol, timeframe, ym) for ym in months]

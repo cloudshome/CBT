@@ -37,6 +37,7 @@ sys.path.insert(0, str(ROOT_DIR))
 
 try:
     import dotenv
+
     dotenv.load_dotenv(ROOT_DIR / ".env")
 except ImportError:
     pass
@@ -63,7 +64,9 @@ def show_status() -> None:
 
     # Lease status
     if lease and lease.is_valid():
-        print(f"[*] Live Execution Lease: ACTIVE (Token #{lease.fencing_token}, Owner: {lease.node_id})")
+        print(
+            f"[*] Live Execution Lease: ACTIVE (Token #{lease.fencing_token}, Owner: {lease.node_id})"
+        )
         print(f"    Lease Expires At    : {lease.expires_at}")
     else:
         print("[*] Live Execution Lease: FAIL-CLOSED (No active lease)")
@@ -154,7 +157,9 @@ def manage_lease(action: str, duration: int = 300) -> None:
     else:
         lease = lease_manager.get_current_lease()
         if lease and lease.is_valid():
-            print(f"[+] Active Lease: Token #{lease.fencing_token}, Node: {lease.node_id}, Expires: {lease.expires_at}")
+            print(
+                f"[+] Active Lease: Token #{lease.fencing_token}, Node: {lease.node_id}, Expires: {lease.expires_at}"
+            )
         else:
             print("[*] No active lease. Live execution gate is FAIL-CLOSED (BLOCKED).")
 
@@ -167,7 +172,9 @@ def main() -> None:
     parser.add_argument("--role", type=str, default="PRIMARY_CONTROLLER", help="Node role")
     parser.add_argument("--epoch", type=int, help="Node epoch number")
     parser.add_argument("--push", action="store_true", help="Push local events to Google Drive")
-    parser.add_argument("--pull", action="store_true", help="Pull peer events and rebuild projections")
+    parser.add_argument(
+        "--pull", action="store_true", help="Pull peer events and rebuild projections"
+    )
     parser.add_argument("--cluster", action="store_true", help="List registered cluster nodes")
     parser.add_argument("--lease", action="store_true", help="Manage Primary Execution Lease")
     parser.add_argument("--acquire", action="store_true", help="Acquire or renew execution lease")

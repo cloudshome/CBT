@@ -212,8 +212,7 @@ def _probe_discord_backends() -> list[Backend]:
     wh = Backend(
         name="webhook",
         label="Outbound webhook (push only, ToS-safe)",
-        configured=bool(DISCORD_WEBHOOK_URL)
-        or bool(os.getenv("DISCORD_ANNOUNCE_WEBHOOK", "")),
+        configured=bool(DISCORD_WEBHOOK_URL) or bool(os.getenv("DISCORD_ANNOUNCE_WEBHOOK", "")),
         detail=(
             "DISCORD_WEBHOOK_URL or DISCORD_ANNOUNCE_WEBHOOK set"
             if (DISCORD_WEBHOOK_URL or os.getenv("DISCORD_ANNOUNCE_WEBHOOK", ""))
@@ -316,14 +315,11 @@ def _probe_llm_backends() -> list[Backend]:
     openai = Backend(
         name="openai",
         label="OpenAI (or any OpenAI-compatible endpoint)",
-        configured=bool(OPENAI_API_KEY)
-        and "groq" not in (OPENAI_BASE_URL or "").lower(),
+        configured=bool(OPENAI_API_KEY) and "groq" not in (OPENAI_BASE_URL or "").lower(),
     )
     if openai.configured:
         openai.ok = True
-        openai.detail = (
-            f"OPENAI_BASE_URL={OPENAI_BASE_URL}, model={os.getenv('OPENAI_MODEL', '')}"
-        )
+        openai.detail = f"OPENAI_BASE_URL={OPENAI_BASE_URL}, model={os.getenv('OPENAI_MODEL', '')}"
     else:
         openai.detail = "needs OPENAI_API_KEY + OPENAI_BASE_URL (non-groq)"
     out.append(openai)
@@ -480,13 +476,9 @@ def doctor_report(as_json: bool = False) -> Any:
         if ch.status == "ok":
             lines.append(f"      → serving via: {ch.active}")
         elif ch.status == "degraded":
-            lines.append(
-                "      → no backend configured; channel returns empty results safely"
-            )
+            lines.append("      → no backend configured; channel returns empty results safely")
         else:
-            lines.append(
-                "      → all backends failed; engine continues with empty data"
-            )
+            lines.append("      → all backends failed; engine continues with empty data")
     return "\n".join(lines)
 
 
@@ -508,7 +500,5 @@ def list_channels(as_json: bool = False) -> Any:
     for name, ch in channels.items():
         n_ok = sum(1 for b in ch.backends if b.configured and b.ok)
         n_tot = len(ch.backends)
-        lines.append(
-            f"{name:<12} {ch.status:<10} {ch.active or '-'!s:<14} {n_ok}/{n_tot} ok"
-        )
+        lines.append(f"{name:<12} {ch.status:<10} {ch.active or '-'!s:<14} {n_ok}/{n_tot} ok")
     return "\n".join(lines)

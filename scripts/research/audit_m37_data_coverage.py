@@ -15,10 +15,10 @@ Calculates SHA-256 digests, row counts, missing intervals, and emits:
 import hashlib
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+
 import pandas as pd
-import numpy as np
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -37,7 +37,7 @@ def audit_metric_partitions(base_path: Path, symbol: str, metric: str):
     p = base_path / f"symbol={symbol}" / f"metric={metric}"
     if not p.exists():
         return []
-    
+
     files = sorted(list(p.rglob("*.parquet")))
     partitions = []
     for f in files:
@@ -49,23 +49,35 @@ def audit_metric_partitions(base_path: Path, symbol: str, metric: str):
         max_ts = int(df[ts_col].max())
         rows = len(df)
         rel = str(f.relative_to(ROOT_DIR)).replace("\\", "/")
-        partitions.append({
-            "relative_path": rel,
-            "size_bytes": size,
-            "sha256": sha,
-            "rows": rows,
-            "min_ts": min_ts,
-            "max_ts": max_ts,
-            "min_datetime_utc": str(pd.to_datetime(min_ts, unit="ms", utc=True)),
-            "max_datetime_utc": str(pd.to_datetime(max_ts, unit="ms", utc=True)),
-            "metric": metric,
-            "symbol": symbol
-        })
+        partitions.append(
+            {
+                "relative_path": rel,
+                "size_bytes": size,
+                "sha256": sha,
+                "rows": rows,
+                "min_ts": min_ts,
+                "max_ts": max_ts,
+                "min_datetime_utc": str(pd.to_datetime(min_ts, unit="ms", utc=True)),
+                "max_datetime_utc": str(pd.to_datetime(max_ts, unit="ms", utc=True)),
+                "metric": metric,
+                "symbol": symbol,
+            }
+        )
     return partitions
 
 
 def audit_spot_partitions(symbol: str):
-    p = ROOT_DIR / "data" / "store" / "parquet" / "candles" / "exchange=binance" / "market=spot" / f"symbol={symbol}" / "timeframe=1h"
+    p = (
+        ROOT_DIR
+        / "data"
+        / "store"
+        / "parquet"
+        / "candles"
+        / "exchange=binance"
+        / "market=spot"
+        / f"symbol={symbol}"
+        / "timeframe=1h"
+    )
     if not p.exists():
         return []
     files = sorted(list(p.rglob("*.parquet")))
@@ -78,23 +90,35 @@ def audit_spot_partitions(symbol: str):
         max_ts = int(df["ts"].max())
         rows = len(df)
         rel = str(f.relative_to(ROOT_DIR)).replace("\\", "/")
-        partitions.append({
-            "relative_path": rel,
-            "size_bytes": size,
-            "sha256": sha,
-            "rows": rows,
-            "min_ts": min_ts,
-            "max_ts": max_ts,
-            "min_datetime_utc": str(pd.to_datetime(min_ts, unit="ms", utc=True)),
-            "max_datetime_utc": str(pd.to_datetime(max_ts, unit="ms", utc=True)),
-            "metric": "spot_1h_candle",
-            "symbol": symbol
-        })
+        partitions.append(
+            {
+                "relative_path": rel,
+                "size_bytes": size,
+                "sha256": sha,
+                "rows": rows,
+                "min_ts": min_ts,
+                "max_ts": max_ts,
+                "min_datetime_utc": str(pd.to_datetime(min_ts, unit="ms", utc=True)),
+                "max_datetime_utc": str(pd.to_datetime(max_ts, unit="ms", utc=True)),
+                "metric": "spot_1h_candle",
+                "symbol": symbol,
+            }
+        )
     return partitions
 
 
 def audit_perp_partitions(symbol: str):
-    p = ROOT_DIR / "data" / "store" / "parquet" / "candles" / "exchange=binance" / "market=perp" / f"symbol={symbol}" / "timeframe=1h"
+    p = (
+        ROOT_DIR
+        / "data"
+        / "store"
+        / "parquet"
+        / "candles"
+        / "exchange=binance"
+        / "market=perp"
+        / f"symbol={symbol}"
+        / "timeframe=1h"
+    )
     if not p.exists():
         return []
     files = sorted(list(p.rglob("*.parquet")))
@@ -107,31 +131,35 @@ def audit_perp_partitions(symbol: str):
         max_ts = int(df["ts"].max())
         rows = len(df)
         rel = str(f.relative_to(ROOT_DIR)).replace("\\", "/")
-        partitions.append({
-            "relative_path": rel,
-            "size_bytes": size,
-            "sha256": sha,
-            "rows": rows,
-            "min_ts": min_ts,
-            "max_ts": max_ts,
-            "min_datetime_utc": str(pd.to_datetime(min_ts, unit="ms", utc=True)),
-            "max_datetime_utc": str(pd.to_datetime(max_ts, unit="ms", utc=True)),
-            "metric": "perp_1h_candle",
-            "symbol": symbol
-        })
+        partitions.append(
+            {
+                "relative_path": rel,
+                "size_bytes": size,
+                "sha256": sha,
+                "rows": rows,
+                "min_ts": min_ts,
+                "max_ts": max_ts,
+                "min_datetime_utc": str(pd.to_datetime(min_ts, unit="ms", utc=True)),
+                "max_datetime_utc": str(pd.to_datetime(max_ts, unit="ms", utc=True)),
+                "metric": "perp_1h_candle",
+                "symbol": symbol,
+            }
+        )
     return partitions
 
 
 def main():
     logger.info("Starting M37 Derivatives Data Coverage and Quality Audit...")
 
-    derivatives_base = ROOT_DIR / "data" / "store" / "derivatives" / "exchange=binance" / "market=perp"
+    derivatives_base = (
+        ROOT_DIR / "data" / "store" / "derivatives" / "exchange=binance" / "market=perp"
+    )
 
     all_partitions = []
     quality_report = {
         "audit_version": "M37-DERIVATIVES-COVERAGE-AUDIT",
-        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
-        "datasets": {}
+        "generated_at_utc": datetime.now(UTC).isoformat(),
+        "datasets": {},
     }
 
     symbols = ["BTCUSDT", "ETHUSDT"]
@@ -154,7 +182,7 @@ def main():
                 "latest_timestamp_utc": max_dt,
                 "duplicate_count": 0,
                 "missing_intervals_count": 0,
-                "status": "PASS_FULL_COVERAGE"
+                "status": "PASS_FULL_COVERAGE",
             }
 
         # Spot 1h
@@ -164,9 +192,13 @@ def main():
             "partition_count": len(spot_parts),
             "total_rows": sum(p["rows"] for p in spot_parts),
             "total_size_bytes": sum(p["size_bytes"] for p in spot_parts),
-            "earliest_timestamp_utc": min(p["min_datetime_utc"] for p in spot_parts) if spot_parts else None,
-            "latest_timestamp_utc": max(p["min_datetime_utc"] for p in spot_parts) if spot_parts else None,
-            "status": "PASS_FULL_COVERAGE"
+            "earliest_timestamp_utc": min(p["min_datetime_utc"] for p in spot_parts)
+            if spot_parts
+            else None,
+            "latest_timestamp_utc": max(p["min_datetime_utc"] for p in spot_parts)
+            if spot_parts
+            else None,
+            "status": "PASS_FULL_COVERAGE",
         }
 
         # Perp 1h
@@ -176,9 +208,13 @@ def main():
             "partition_count": len(perp_parts),
             "total_rows": sum(p["rows"] for p in perp_parts),
             "total_size_bytes": sum(p["size_bytes"] for p in perp_parts),
-            "earliest_timestamp_utc": min(p["min_datetime_utc"] for p in perp_parts) if perp_parts else None,
-            "latest_timestamp_utc": max(p["max_datetime_utc"] for p in perp_parts) if perp_parts else None,
-            "status": "PASS_FULL_COVERAGE"
+            "earliest_timestamp_utc": min(p["min_datetime_utc"] for p in perp_parts)
+            if perp_parts
+            else None,
+            "latest_timestamp_utc": max(p["max_datetime_utc"] for p in perp_parts)
+            if perp_parts
+            else None,
+            "status": "PASS_FULL_COVERAGE",
         }
 
         quality_report["datasets"][sym] = sym_report
@@ -186,7 +222,7 @@ def main():
     # Save manifest
     manifest_obj = {
         "manifest_version": "M37-DERIVATIVES-MANIFEST",
-        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "generated_at_utc": datetime.now(UTC).isoformat(),
         "total_partitions": len(all_partitions),
         "total_size_bytes": sum(p["size_bytes"] for p in all_partitions),
         "contract_specifications": {
@@ -197,7 +233,7 @@ def main():
                 "maker_fee_pct": 0.020,
                 "taker_fee_pct": 0.040,
                 "funding_interval_hours": 8,
-                "settlement_hours_utc": [0, 8, 16]
+                "settlement_hours_utc": [0, 8, 16],
             },
             "ETHUSDT": {
                 "contract_type": "Perpetual USD-M",
@@ -206,10 +242,10 @@ def main():
                 "maker_fee_pct": 0.020,
                 "taker_fee_pct": 0.040,
                 "funding_interval_hours": 8,
-                "settlement_hours_utc": [0, 8, 16]
-            }
+                "settlement_hours_utc": [0, 8, 16],
+            },
         },
-        "partitions": all_partitions
+        "partitions": all_partitions,
     }
 
     manifest_path = ROOT_DIR / "research" / "m37_derivatives_manifest.json"
@@ -226,7 +262,7 @@ def main():
     md_content = f"""# M37 — Derivatives Data Coverage & Quality Audit Report
 
 **Audit Version:** M37-DERIVATIVES-COVERAGE-AUDIT  
-**Date of Audit:** {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")}  
+**Date of Audit:** {datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")}  
 **Auditor:** Institutional Quantitative Research Director & Data Integrity Engineer  
 **Lakehouse Storage:** `data/store/derivatives/` & `data/store/parquet/candles/`  
 **Manifest:** [`research/m37_derivatives_manifest.json`]({(ROOT_DIR / "research" / "m37_derivatives_manifest.json").as_uri()})
@@ -244,7 +280,7 @@ Under **Milestone 37**, a trustworthy, continuous, multi-year derivatives datase
 
 ### Key Audit Metrics:
 - **Total Partitions Audited:** {len(all_partitions)} Parquet files
-- **Total Storage Size:** {sum(p['size_bytes'] for p in all_partitions) / 1024 / 1024:.2f} MB
+- **Total Storage Size:** {sum(p["size_bytes"] for p in all_partitions) / 1024 / 1024:.2f} MB
 - **Cryptographic Verification:** 100% SHA-256 match verified against manifest.
 - **Data Gap Status:** ZERO missing intervals; ZERO duplicates; ZERO synthetic backfilling.
 
@@ -294,4 +330,3 @@ Under **Milestone 37**, a trustworthy, continuous, multi-year derivatives datase
 
 if __name__ == "__main__":
     main()
-

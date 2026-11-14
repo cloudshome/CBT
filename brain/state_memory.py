@@ -158,9 +158,7 @@ class SignalMemory:
         return [dict(r) for r in self.db.conn.execute(q, args).fetchall()]
 
     # ── the decision ─────────────────────────────────────────────────────
-    def update(
-        self, symbol: str, tf: str, mtf: dict, styles: dict, frame: dict
-    ) -> dict:
+    def update(self, symbol: str, tf: str, mtf: dict, styles: dict, frame: dict) -> dict:
         """Reconcile the current analysis with what the AI remembered.
 
         Returns a dict describing what happened:
@@ -177,9 +175,7 @@ class SignalMemory:
         fp = _fingerprint(parts)
         prev = self.get_state(symbol, tf)
 
-        htf_flip = (
-            prev and prev["htf_bias"] != parts["htf"] and parts["htf"] != "neutral"
-        )
+        htf_flip = prev and prev["htf_bias"] != parts["htf"] and parts["htf"] != "neutral"
         # pricestill inside previous state's range?
         price = f.get("price") or 0.0
 
@@ -220,10 +216,7 @@ class SignalMemory:
                 changes.append("market state changed (levels/zone moved)")
         else:
             # same fingerprint → reaffirm; roll a fresh flip window
-            if (
-                prev.get("last_flip_at")
-                and now - prev.get("last_flip_at", 0) > 3600_000
-            ):
+            if prev.get("last_flip_at") and now - prev.get("last_flip_at", 0) > 3600_000:
                 flips = 0
             else:
                 flips = prev.get("flips_1h", 0)
@@ -323,9 +316,7 @@ class SignalMemory:
             ),
         }
         self._put_state(symbol, tf, state)
-        self._log_event(
-            symbol, tf, status, "; ".join(changes) if changes else "state changed"
-        )
+        self._log_event(symbol, tf, status, "; ".join(changes) if changes else "state changed")
 
         # stable_since = when this fingerprint first appeared
         stable_since = now

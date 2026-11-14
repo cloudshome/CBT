@@ -31,9 +31,7 @@ def compute_hold_time_and_expiry(timeframe: str) -> tuple[str, str, int]:
     elif tf in ("4h", "6h", "8h", "12h"):
         hold_str = "2–5 Days"
         expiry = now + timedelta(days=5)
-    elif tf in ("1d", "d", "daily", "1w", "weekly", "1m", "monthly") and tf not in (
-        "1m",
-    ):
+    elif tf in ("1d", "d", "daily", "1w", "weekly", "1m", "monthly") and tf not in ("1m",):
         hold_str = "1–3 Weeks"
         expiry = now + timedelta(days=21)
     else:
@@ -85,9 +83,7 @@ def compute_ips_score(
 
     if features.get("nearest_bull_ob") or features.get("nearest_bear_ob"):
         pts_smc += 4
-    if (features.get("fvg_bull_count") or 0) + (
-        features.get("fvg_bear_count") or 0
-    ) > 0:
+    if (features.get("fvg_bull_count") or 0) + (features.get("fvg_bear_count") or 0) > 0:
         pts_smc += 3
 
     # 2. MTF & Trend (25 pts)
@@ -213,9 +209,7 @@ def compute_smart_tp_ladder(
         tps_out.append(
             {
                 "target": f"TP{idx}",
-                "price": round(target_price, 2)
-                if target_price >= 1
-                else round(target_price, 6),
+                "price": round(target_price, 2) if target_price >= 1 else round(target_price, 6),
                 "gain_pct": round(pct_gain, 2),
                 "allocation_pct": pct_close,
                 "management": note,
@@ -225,9 +219,7 @@ def compute_smart_tp_ladder(
     return tps_out
 
 
-def compute_entry_zone(
-    entry: float, atr: float, action: str
-) -> tuple[float, float, str]:
+def compute_entry_zone(entry: float, atr: float, action: str) -> tuple[float, float, str]:
     """Compute entry zone (low and high bounds) around the target entry."""
     if not entry or entry <= 0:
         return (0.0, 0.0, "$0 – $0")
@@ -259,13 +251,9 @@ def compute_kelly_criterion(
     half_kelly_pct = kelly_full_pct / 2.0
 
     # Cap by max risk policy
-    recommended_risk_pct = min(
-        half_kelly_pct if half_kelly_pct > 0 else 1.0, max_risk_cap
-    )
+    recommended_risk_pct = min(half_kelly_pct if half_kelly_pct > 0 else 1.0, max_risk_cap)
     recommended_risk_amt = (
-        round(account_balance * (recommended_risk_pct / 100.0), 2)
-        if account_balance
-        else 0.0
+        round(account_balance * (recommended_risk_pct / 100.0), 2) if account_balance else 0.0
     )
 
     # Recommended leverage

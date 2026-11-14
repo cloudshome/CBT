@@ -21,16 +21,13 @@ Governance:
 from __future__ import annotations
 
 import argparse
-import hashlib
-import json
 import logging
 import sqlite3
 import sys
 import time
-from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
-import numpy as np
 import pandas as pd
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -42,8 +39,8 @@ from core.research.concept_evaluation import (
     concept_evaluation_engine,
 )
 from core.research.concept_registry import (
-    ConceptLifecycleStatus,
     REAL_CAPITAL_ENABLED,
+    ConceptLifecycleStatus,
     concept_registry,
 )
 from data.binance_client import TIMEFRAME_TO_MS, BinanceClient
@@ -97,7 +94,9 @@ def ingest_series(
             time.sleep(10.0)
             continue
         if res.data is None or res.data.empty:
-            logger.info("No further candles returned for %s %s at cursor %s.", symbol, timeframe, cursor)
+            logger.info(
+                "No further candles returned for %s %s at cursor %s.", symbol, timeframe, cursor
+            )
             break
 
         df_page = res.data.sort_values("ts").reset_index(drop=True)
@@ -158,9 +157,13 @@ def ingest_series(
             source="rest",
         )
         store.write(canon)
-        logger.info("Persisted %d candles into CandleStore for %s %s.", len(full_df), symbol, timeframe)
+        logger.info(
+            "Persisted %d candles into CandleStore for %s %s.", len(full_df), symbol, timeframe
+        )
     except Exception as e:
-        logger.warning("Could not write to CandleStore Parquet (%s); proceeding with SQLite market_data.db.", e)
+        logger.warning(
+            "Could not write to CandleStore Parquet (%s); proceeding with SQLite market_data.db.", e
+        )
 
     # 2. Write to SQLite data/market_data.db
     # Write under both raw symbol ('BTCUSDT') and slash symbol ('BTC/USDT')
@@ -200,7 +203,11 @@ def ingest_series(
                 rows_to_insert,
             )
         conn.commit()
-        logger.info("Upserted %d rows into SQLite market_data.db for symbols: %s", len(full_df), symbols_to_record)
+        logger.info(
+            "Upserted %d rows into SQLite market_data.db for symbols: %s",
+            len(full_df),
+            symbols_to_record,
+        )
     finally:
         conn.close()
 
@@ -331,8 +338,12 @@ def main():
     if REAL_CAPITAL_ENABLED:
         raise RuntimeError("CRITICAL: REAL_CAPITAL_ENABLED must remain False.")
 
-    parser = argparse.ArgumentParser(description="Ingest multi-year data and evaluate strategy candidates.")
-    parser.add_argument("--skip-ingest", action="store_true", help="Skip Binance fetch and use local data.")
+    parser = argparse.ArgumentParser(
+        description="Ingest multi-year data and evaluate strategy candidates."
+    )
+    parser.add_argument(
+        "--skip-ingest", action="store_true", help="Skip Binance fetch and use local data."
+    )
     args = parser.parse_args()
 
     client = BinanceClient()
@@ -362,9 +373,7 @@ def main():
     if not args.skip_ingest:
         for symbol, tf in series_configs:
             key = f"{symbol}_{tf}"
-            df = ingest_series(
-                client, store, symbol, tf, start_ts=START_TS_2020, market="perp"
-            )
+            df = ingest_series(client, store, symbol, tf, start_ts=START_TS_2020, market="perp")
             dfs[key] = df
     else:
         logger.info("Skipping network ingestion; loading existing candles from market_data.db...")
@@ -402,7 +411,6 @@ def main():
     logger.info("=" * 70)
     logger.info("CANDIDATE B (TC_014) MULTI-ASSET 4H POOLED SAMPLE EVALUATION")
     logger.info("=" * 70)
-    eval_4h: dict[str, CandidateEvaluationResult] = {}
     candidate_b_4h: dict[str, CandidateEvaluationResult] = {}
 
     for sym in ["BTCUSDT", "ETHUSDT", "SOLUSDT"]:
@@ -456,7 +464,9 @@ def main():
         print("\n" + "=" * 115)
         print("CANDIDATE B (TC_014) MULTI-ASSET 4H POOLED SAMPLE EVALUATION (2022-2026)")
         print("=" * 115)
-        print(f"{'Asset':<12} {'Total N':<8} {'N_eff':<8} {'Net Base':<10} {'Net Cons 1.5x':<15} {'PF':<6} {'OOS N':<8} {'OOS N_eff':<10} {'OOS Net':<10} {'DSR':<7}")
+        print(
+            f"{'Asset':<12} {'Total N':<8} {'N_eff':<8} {'Net Base':<10} {'Net Cons 1.5x':<15} {'PF':<6} {'OOS N':<8} {'OOS N_eff':<10} {'OOS Net':<10} {'DSR':<7}"
+        )
         print("-" * 115)
         pooled_total_n = 0
         pooled_oos_n = 0
@@ -478,13 +488,19 @@ def main():
             pooled_total_n += res.overall_metrics.nominal_trades
             pooled_oos_n += res.sealed_oos_metrics.nominal_trades
             pooled_oos_neff += res.sealed_oos_metrics.effective_sample_size_n_eff
-            weighted_net_base += res.overall_metrics.net_expectancy_r_base * res.overall_metrics.nominal_trades
-            weighted_oos_net += res.sealed_oos_metrics.net_expectancy_r_base * res.sealed_oos_metrics.nominal_trades
+            weighted_net_base += (
+                res.overall_metrics.net_expectancy_r_base * res.overall_metrics.nominal_trades
+            )
+            weighted_oos_net += (
+                res.sealed_oos_metrics.net_expectancy_r_base * res.sealed_oos_metrics.nominal_trades
+            )
 
         pooled_net_base = weighted_net_base / max(1, pooled_total_n)
         pooled_oos_net_avg = weighted_oos_net / max(1, pooled_oos_n)
         print("-" * 115)
-        print(f"POOLED 4H BASKET: Total Trades={pooled_total_n} | OOS Trades={pooled_oos_n} (OOS N_eff={pooled_oos_neff:.1f}) | Pooled Net Base={pooled_net_base:+.3f}R | Pooled OOS Net={pooled_oos_net_avg:+.3f}R")
+        print(
+            f"POOLED 4H BASKET: Total Trades={pooled_total_n} | OOS Trades={pooled_oos_n} (OOS N_eff={pooled_oos_neff:.1f}) | Pooled Net Base={pooled_net_base:+.3f}R | Pooled OOS Net={pooled_oos_net_avg:+.3f}R"
+        )
         print("=" * 115)
 
 

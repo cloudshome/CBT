@@ -36,7 +36,10 @@ def generate_checksums() -> dict[str, str]:
             for p in RELEASE_DIR.iterdir()
             if p.is_file()
             and p.name != "SHA256SUMS.txt"
-            and (p.suffix in (".exe", ".zip", ".msi", ".json", ".txt", ".deb", ".appimage") or p.name.endswith(".tar.gz"))
+            and (
+                p.suffix in (".exe", ".zip", ".msi", ".json", ".txt", ".deb", ".appimage")
+                or p.name.endswith(".tar.gz")
+            )
         ],
         key=lambda x: x.name,
     )

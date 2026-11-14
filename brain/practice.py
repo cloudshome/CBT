@@ -127,9 +127,7 @@ def _f(value) -> float | None:
 # ── the desk's read ─────────────────────────────────────────────────────
 
 
-def desk_read_from_payload(
-    payload: dict, symbol: str = "", timeframe: str = ""
-) -> dict:
+def desk_read_from_payload(payload: dict, symbol: str = "", timeframe: str = "") -> dict:
     """Extract the desk's current read from an engine scan payload.
 
     Never raises: a missing/broken payload yields ``available: False`` and
@@ -218,18 +216,14 @@ def validate_user_read(body: dict) -> dict:
         raise ValueError(f"unknown bias {bias!r} — allowed: {', '.join(USER_BIASES)}")
     decision = str(body.get("decision") or "").strip().lower()
     if decision not in USER_DECISIONS:
-        raise ValueError(
-            f"unknown decision {decision!r} — allowed: {', '.join(USER_DECISIONS)}"
-        )
+        raise ValueError(f"unknown decision {decision!r} — allowed: {', '.join(USER_DECISIONS)}")
 
     entry = _f(body.get("entry"))
     stop = _f(body.get("stop"))
     target = _f(body.get("target"))
     given = [v is not None for v in (entry, stop, target)]
     if any(given) and not all(given):
-        raise ValueError(
-            "give all three of entry/stop/target or none — a half-plan is not a plan"
-        )
+        raise ValueError("give all three of entry/stop/target or none — a half-plan is not a plan")
     for name, v in (("entry", entry), ("stop", stop), ("target", target)):
         if v is not None and v <= 0:
             raise ValueError(f"{name} must be a positive price")
@@ -318,9 +312,7 @@ def score_attempt(user: dict, desk: dict) -> dict:
         d_detail = f"both {desk_dec}"
     elif user["decision"] == "no_trade":
         d_pts = 15
-        d_detail = (
-            f"desk says {desk_dec}, you passed — safe, but missed the desk's trade"
-        )
+        d_detail = f"desk says {desk_dec}, you passed — safe, but missed the desk's trade"
     else:
         d_pts = 0
         d_detail = f"desk says {desk_dec}, you said {user['decision']}" + (
@@ -343,20 +335,12 @@ def score_attempt(user: dict, desk: dict) -> dict:
         ref = desk.get("atr") or (0.005 * float(desk["entry"]))
         ref = ref if ref and ref > 0 else 0.005 * float(desk["entry"])
         gap = abs(user["entry"] - float(desk["entry"]))
-        e_pts = (
-            10 if gap <= 0.5 * ref else 7 if gap <= ref else 4 if gap <= 2 * ref else 0
-        )
+        e_pts = 10 if gap <= 0.5 * ref else 7 if gap <= ref else 4 if gap <= 2 * ref else 0
         long = user["decision"] == "buy"
-        side_ok = (
-            (user["stop"] < user["entry"]) if long else (user["stop"] > user["entry"])
-        )
+        side_ok = (user["stop"] < user["entry"]) if long else (user["stop"] > user["entry"])
         s_pts = 10 if side_ok else 0
         risk = abs(user["entry"] - user["stop"])
-        reward = (
-            (user["target"] - user["entry"])
-            if long
-            else (user["entry"] - user["target"])
-        )
+        reward = (user["target"] - user["entry"]) if long else (user["entry"] - user["target"])
         rr = reward / risk if risk > 0 else 0.0
         r_pts = 10 if rr >= RR_FLOOR else 5 if rr >= 1.0 else 0
         l_pts = e_pts + s_pts + r_pts
@@ -461,9 +445,7 @@ def frame_to_ohlc(frame) -> list[dict]:
     return out
 
 
-def load_ohlc(
-    symbol: str, timeframe: str, *, bars: int = 500, client=None
-) -> list[dict]:
+def load_ohlc(symbol: str, timeframe: str, *, bars: int = 500, client=None) -> list[dict]:
     """Fetch the same series the chart draws (DEMO_MODE stays offline)."""
     if client is None:
         from data.sample_client import maybe_client
@@ -488,9 +470,7 @@ def locate_commit(candles: list[dict], commit_ms: int) -> int:
     for i, c in enumerate(candles):
         if abs(int(c["ts"]) - int(commit_ms)) <= 500:
             return i
-    raise ValueError(
-        "commit_time is not a loaded candle — freeze replay on a visible bar"
-    )
+    raise ValueError("commit_time is not a loaded candle — freeze replay on a visible bar")
 
 
 def _atr_proxy(bar: dict) -> float:
@@ -505,9 +485,7 @@ def validate_tape_request(body: dict) -> tuple[dict, int, int]:
     user = validate_user_read(body)
     raw = body.get("commit_time", body.get("commit_ts"))
     if raw in (None, ""):
-        raise ValueError(
-            "commit_time is required — freeze replay at the bar you are reading"
-        )
+        raise ValueError("commit_time is required — freeze replay at the bar you are reading")
     try:
         commit_ms = _as_epoch_ms(raw)
     except (TypeError, ValueError):
@@ -632,10 +610,7 @@ def score_tape(user: dict, walk: dict) -> dict:
         if move < 0.5:
             pts, detail = (
                 100,
-                (
-                    f"price stayed inside 0.5 ATR ({move:.2f}) — "
-                    "standing aside was right"
-                ),
+                (f"price stayed inside 0.5 ATR ({move:.2f}) — standing aside was right"),
             )
         elif move < 1.0:
             pts, detail = (
@@ -644,9 +619,7 @@ def score_tape(user: dict, walk: dict) -> dict:
             )
         else:
             pts, detail = 25, f"price moved {move:.2f} ATR — you missed a move"
-        comps.append(
-            {"name": "standing aside", "points": pts, "max": 100, "detail": detail}
-        )
+        comps.append({"name": "standing aside", "points": pts, "max": 100, "detail": detail})
     elif outcome == "DIRECTION":
         move = float(walk.get("move_atr") or 0.0)
         if move >= 0.5:
@@ -673,19 +646,11 @@ def score_tape(user: dict, walk: dict) -> dict:
                 else f"target hit in {walk.get('bars_used')} bars"
             ),
         )
-        comps.append(
-            {"name": "ladder vs the tape", "points": pts, "max": 100, "detail": detail}
-        )
+        comps.append({"name": "ladder vs the tape", "points": pts, "max": 100, "detail": detail})
     elif outcome == "STOP_LOSS":
-        extra = (
-            " — ambiguous candle, conservative stop-first"
-            if walk.get("ambiguous")
-            else ""
-        )
+        extra = " — ambiguous candle, conservative stop-first" if walk.get("ambiguous") else ""
         pts, detail = 0, f"stop hit in {walk.get('bars_used')} bars{extra}"
-        comps.append(
-            {"name": "ladder vs the tape", "points": pts, "max": 100, "detail": detail}
-        )
+        comps.append({"name": "ladder vs the tape", "points": pts, "max": 100, "detail": detail})
     else:
         risk = 0.0
         if (
@@ -702,9 +667,7 @@ def score_tape(user: dict, walk: dict) -> dict:
             )
         else:
             pts, detail = 20, "window expired without target or stop"
-        comps.append(
-            {"name": "ladder vs the tape", "points": pts, "max": 100, "detail": detail}
-        )
+        comps.append({"name": "ladder vs the tape", "points": pts, "max": 100, "detail": detail})
 
     total = int(comps[0]["points"])
     return {
@@ -779,9 +742,7 @@ def submit_tape_attempt(
         "ambiguous": walk.get("ambiguous"),
         "end_close": walk.get("end_close"),
     }
-    attempt_id = db.save_practice_attempt(
-        user["symbol"], user["tf"], user, tape, score, ts=now_ms
-    )
+    attempt_id = db.save_practice_attempt(user["symbol"], user["tf"], user, tape, score, ts=now_ms)
     attempt = {
         "id": attempt_id,
         "ts": now_ms,
@@ -803,9 +764,7 @@ def submit_tape_attempt(
 # ── persistence ─────────────────────────────────────────────────────────
 
 
-def submit_attempt(
-    db: SignalDB, body: dict, desk_read: dict, *, now_ms: int | None = None
-) -> dict:
+def submit_attempt(db: SignalDB, body: dict, desk_read: dict, *, now_ms: int | None = None) -> dict:
     """Validate, score and remember one practice attempt.
 
     A double-submit (identical read on the same symbol+timeframe within two
@@ -930,9 +889,7 @@ def _tape_block(tape_rows: list[dict]) -> dict:
     }
 
 
-def practice_scorecard(
-    db: SignalDB, days: int = 30, *, now_ms: int | None = None
-) -> dict:
+def practice_scorecard(db: SignalDB, days: int = 30, *, now_ms: int | None = None) -> dict:
     """Aggregate practice history into the calibration mirror.
 
     Read-only coaching memory — no P12 surface ever reads it. ``days`` is the
@@ -978,8 +935,7 @@ def practice_scorecard(
             comp_sum[key] += float(c["points"])
             comp_max[key] += int(c["max"])
     comp_means = {
-        k: (round(comp_sum[k] / comp_max[k], 3) if comp_max[k] else None)
-        for k in comp_sum
+        k: (round(comp_sum[k] / comp_max[k], 3) if comp_max[k] else None) for k in comp_sum
     }
     weakest = None
     for k, mean in comp_means.items():
@@ -1065,17 +1021,13 @@ def format_practice_scorecard(sc: dict) -> str:
         f"final call {_pct(sc['decision_agreement'])}",
     ]
     if sc["grades"]:
-        tally = "  ".join(
-            f"{g}×{sc['grades'][g]}" for g in "ABCDE" if sc["grades"].get(g)
-        )
+        tally = "  ".join(f"{g}×{sc['grades'][g]}" for g in "ABCDE" if sc["grades"].get(g))
         lines.append(f"  grades         {tally}")
     means = sc.get("component_means") or {}
     if any(v is not None for v in means.values()):
         lines.append(
             "  components     "
-            + "   ·   ".join(
-                f"{k} {_pct(v)}" for k, v in means.items() if v is not None
-            )
+            + "   ·   ".join(f"{k} {_pct(v)}" for k, v in means.items() if v is not None)
         )
     lines += [
         "-" * 74,

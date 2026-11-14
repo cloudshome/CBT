@@ -9,13 +9,13 @@ Partitions into data/store/derivatives/ by exchange, market, symbol, metric, yea
 import io
 import json
 import logging
-import os
 import sys
 import time
 import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+
 import pandas as pd
 import requests
 
@@ -45,16 +45,18 @@ def download_and_parse_day(symbol: str, date_str: str):
             hourly = df.groupby("hour").last().reset_index()
             records = []
             for _, row in hourly.iterrows():
-                ts_ms = int(row["hour"].replace(tzinfo=timezone.utc).timestamp() * 1000)
+                ts_ms = int(row["hour"].replace(tzinfo=UTC).timestamp() * 1000)
                 oi = float(row["sum_open_interest"])
                 oiv = float(row["sum_open_interest_value"])
-                records.append({
-                    "ts": ts_ms,
-                    "date_str": date_str,
-                    "hour": row["hour"],
-                    "open_interest": oi,
-                    "open_interest_value": oiv
-                })
+                records.append(
+                    {
+                        "ts": ts_ms,
+                        "date_str": date_str,
+                        "hour": row["hour"],
+                        "open_interest": oi,
+                        "open_interest_value": oiv,
+                    }
+                )
             return symbol, date_str, True, records
         else:
             return symbol, date_str, False, []
@@ -91,9 +93,13 @@ def ingest_symbol_oi(symbol: str, start_date: str = "2022-01-01", end_date: str 
 
             if completed % 250 == 0 or completed == total_days:
                 elapsed = time.time() - t0
-                logger.info(f"[{symbol}] Progress: {completed}/{total_days} days ({len(all_records)} hourly records, {elapsed:.1f}s)")
+                logger.info(
+                    f"[{symbol}] Progress: {completed}/{total_days} days ({len(all_records)} hourly records, {elapsed:.1f}s)"
+                )
 
-    logger.info(f"Completed {symbol}: {len(all_records)} records, {len(failed_days)} failed days in {time.time() - t0:.1f}s.")
+    logger.info(
+        f"Completed {symbol}: {len(all_records)} records, {len(failed_days)} failed days in {time.time() - t0:.1f}s."
+    )
 
     if not all_records:
         logger.error(f"No records acquired for {symbol}!")
@@ -112,38 +118,66 @@ def ingest_symbol_oi(symbol: str, start_date: str = "2022-01-01", end_date: str 
 
     for (yr, mo), grp in df_full.groupby(["year", "month"]):
         # 1. open_interest
-        dir_oi = ROOT_DIR / "data" / "store" / "derivatives" / "exchange=binance" / "market=perp" / f"symbol={symbol}" / "metric=open_interest" / f"year={yr}" / f"month={mo}"
+        dir_oi = (
+            ROOT_DIR
+            / "data"
+            / "store"
+            / "derivatives"
+            / "exchange=binance"
+            / "market=perp"
+            / f"symbol={symbol}"
+            / "metric=open_interest"
+            / f"year={yr}"
+            / f"month={mo}"
+        )
         dir_oi.mkdir(parents=True, exist_ok=True)
         file_oi = dir_oi / "part-000.parquet"
-        p_oi = pd.DataFrame({
-            "ts": grp["ts"].values,
-            "exchange": "binance",
-            "market": "perp",
-            "symbol": symbol,
-            "metric": "open_interest",
-            "value": grp["open_interest"].values,
-            "ingested_at": now_ms
-        })
+        p_oi = pd.DataFrame(
+            {
+                "ts": grp["ts"].values,
+                "exchange": "binance",
+                "market": "perp",
+                "symbol": symbol,
+                "metric": "open_interest",
+                "value": grp["open_interest"].values,
+                "ingested_at": now_ms,
+            }
+        )
         p_oi.to_parquet(file_oi, index=False)
         saved_oi_files.append(file_oi)
 
         # 2. open_interest_value
-        dir_oiv = ROOT_DIR / "data" / "store" / "derivatives" / "exchange=binance" / "market=perp" / f"symbol={symbol}" / "metric=open_interest_value" / f"year={yr}" / f"month={mo}"
+        dir_oiv = (
+            ROOT_DIR
+            / "data"
+            / "store"
+            / "derivatives"
+            / "exchange=binance"
+            / "market=perp"
+            / f"symbol={symbol}"
+            / "metric=open_interest_value"
+            / f"year={yr}"
+            / f"month={mo}"
+        )
         dir_oiv.mkdir(parents=True, exist_ok=True)
         file_oiv = dir_oiv / "part-000.parquet"
-        p_oiv = pd.DataFrame({
-            "ts": grp["ts"].values,
-            "exchange": "binance",
-            "market": "perp",
-            "symbol": symbol,
-            "metric": "open_interest_value",
-            "value": grp["open_interest_value"].values,
-            "ingested_at": now_ms
-        })
+        p_oiv = pd.DataFrame(
+            {
+                "ts": grp["ts"].values,
+                "exchange": "binance",
+                "market": "perp",
+                "symbol": symbol,
+                "metric": "open_interest_value",
+                "value": grp["open_interest_value"].values,
+                "ingested_at": now_ms,
+            }
+        )
         p_oiv.to_parquet(file_oiv, index=False)
         saved_oiv_files.append(file_oiv)
 
-    logger.info(f"Partitioned {symbol}: {len(saved_oi_files)} open_interest files, {len(saved_oiv_files)} open_interest_value files.")
+    logger.info(
+        f"Partitioned {symbol}: {len(saved_oi_files)} open_interest files, {len(saved_oiv_files)} open_interest_value files."
+    )
     return {
         "symbol": symbol,
         "total_hourly_records": len(df_full),
@@ -151,7 +185,7 @@ def ingest_symbol_oi(symbol: str, start_date: str = "2022-01-01", end_date: str 
         "min_timestamp_utc": str(df_full["dt_utc"].min()),
         "max_timestamp_utc": str(df_full["dt_utc"].max()),
         "oi_partitions": len(saved_oi_files),
-        "oiv_partitions": len(saved_oiv_files)
+        "oiv_partitions": len(saved_oiv_files),
     }
 
 
@@ -171,4 +205,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

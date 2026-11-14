@@ -133,8 +133,7 @@ def _mae_mfe_insight(mae_r: list[float], mfe_r: list[float]) -> list[str]:
         )
     if not out:
         out.append(
-            f"MAE {avg_mae:.2f}R vs MFE {avg_mfe:.2f}R — reasonable "
-            f"asymmetry, keep executing"
+            f"MAE {avg_mae:.2f}R vs MFE {avg_mfe:.2f}R — reasonable asymmetry, keep executing"
         )
     return out
 
@@ -156,9 +155,7 @@ def monte_carlo_equity(
     (:func:`SignalDB.live_book_rows`, P12.15).
     """
     rows = db.live_book_rows()
-    outcomes = [
-        float(r["rr_achieved"]) for r in rows if r.get("rr_achieved") is not None
-    ]
+    outcomes = [float(r["rr_achieved"]) for r in rows if r.get("rr_achieved") is not None]
     if not outcomes:
         return {"available": False, "note": "no decided paper trades yet"}
 
@@ -441,10 +438,7 @@ def r_distribution(db) -> dict:
             bin_counts[">=3R"] += 1
 
     total = len(r_vals)
-    bins = [
-        {"label": k, "count": v, "pct": round(v / total, 3)}
-        for k, v in bin_counts.items()
-    ]
+    bins = [{"label": k, "count": v, "pct": round(v / total, 3)} for k, v in bin_counts.items()]
 
     wins = [r for r in r_vals if r > 0]
     losses = [r for r in r_vals if r < 0]

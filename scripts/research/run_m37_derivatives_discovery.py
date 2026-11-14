@@ -27,9 +27,9 @@ import json
 import logging
 import math
 import sys
-import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -42,40 +42,97 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger("m37_discovery")
 
 # Transaction friction parameters
-TAKER_FEE_PCT = 0.00040    # 4.0 bps
-MAKER_FEE_PCT = 0.00020    # 2.0 bps
-SLIPPAGE_PCT = 0.00010     # 1.0 bps
-SPREAD_PCT = 0.00010       # 1.0 bps
+TAKER_FEE_PCT = 0.00040  # 4.0 bps
+MAKER_FEE_PCT = 0.00020  # 2.0 bps
+SLIPPAGE_PCT = 0.00010  # 1.0 bps
+SPREAD_PCT = 0.00010  # 1.0 bps
 ROUNDTRIP_TAKER_FRICTION = (TAKER_FEE_PCT + SLIPPAGE_PCT + SPREAD_PCT) * 2  # ~0.12%
 
 
 def load_market_data(symbol: str) -> pd.DataFrame:
     logger.info(f"Loading continuous derivatives & price stream for {symbol}...")
     # 1. Perp 1h
-    perp_files = sorted(list((ROOT_DIR / f"data/store/parquet/candles/exchange=binance/market=perp/symbol={symbol}/timeframe=1h").rglob("*.parquet")))
-    df_perp = pd.concat([pd.read_parquet(f) for f in perp_files], ignore_index=True).sort_values("ts").drop_duplicates(subset=["ts"])
+    perp_files = sorted(
+        list(
+            (
+                ROOT_DIR
+                / f"data/store/parquet/candles/exchange=binance/market=perp/symbol={symbol}/timeframe=1h"
+            ).rglob("*.parquet")
+        )
+    )
+    df_perp = (
+        pd.concat([pd.read_parquet(f) for f in perp_files], ignore_index=True)
+        .sort_values("ts")
+        .drop_duplicates(subset=["ts"])
+    )
 
     # 2. Spot 1h
-    spot_files = sorted(list((ROOT_DIR / f"data/store/parquet/candles/exchange=binance/market=spot/symbol={symbol}/timeframe=1h").rglob("*.parquet")))
-    df_spot = pd.concat([pd.read_parquet(f) for f in spot_files], ignore_index=True).sort_values("ts").drop_duplicates(subset=["ts"])
+    spot_files = sorted(
+        list(
+            (
+                ROOT_DIR
+                / f"data/store/parquet/candles/exchange=binance/market=spot/symbol={symbol}/timeframe=1h"
+            ).rglob("*.parquet")
+        )
+    )
+    df_spot = (
+        pd.concat([pd.read_parquet(f) for f in spot_files], ignore_index=True)
+        .sort_values("ts")
+        .drop_duplicates(subset=["ts"])
+    )
 
     # 3. Open Interest 1h
-    oi_files = sorted(list((ROOT_DIR / f"data/store/derivatives/exchange=binance/market=perp/symbol={symbol}/metric=open_interest").rglob("*.parquet")))
-    df_oi = pd.concat([pd.read_parquet(f) for f in oi_files], ignore_index=True).sort_values("ts").drop_duplicates(subset=["ts"])
+    oi_files = sorted(
+        list(
+            (
+                ROOT_DIR
+                / f"data/store/derivatives/exchange=binance/market=perp/symbol={symbol}/metric=open_interest"
+            ).rglob("*.parquet")
+        )
+    )
+    df_oi = (
+        pd.concat([pd.read_parquet(f) for f in oi_files], ignore_index=True)
+        .sort_values("ts")
+        .drop_duplicates(subset=["ts"])
+    )
 
     # 4. Funding Rate
-    fr_files = sorted(list((ROOT_DIR / f"data/store/derivatives/exchange=binance/market=perp/symbol={symbol}/metric=funding_rate").rglob("*.parquet")))
-    df_fr = pd.concat([pd.read_parquet(f) for f in fr_files], ignore_index=True).sort_values("ts").drop_duplicates(subset=["ts"])
-    df_fr["ts_floor"] = pd.to_datetime(df_fr["ts"], unit="ms", utc=True).dt.floor("h").astype("int64") // 10**6
+    fr_files = sorted(
+        list(
+            (
+                ROOT_DIR
+                / f"data/store/derivatives/exchange=binance/market=perp/symbol={symbol}/metric=funding_rate"
+            ).rglob("*.parquet")
+        )
+    )
+    df_fr = (
+        pd.concat([pd.read_parquet(f) for f in fr_files], ignore_index=True)
+        .sort_values("ts")
+        .drop_duplicates(subset=["ts"])
+    )
+    df_fr["ts_floor"] = (
+        pd.to_datetime(df_fr["ts"], unit="ms", utc=True).dt.floor("h").astype("int64") // 10**6
+    )
 
     # Merge Perp & Spot & OI
-    df = pd.merge(df_perp[["ts", "open", "high", "low", "close", "volume"]], 
-                  df_spot[["ts", "close"]].rename(columns={"close": "spot_close"}), on="ts", how="inner")
-    df = pd.merge(df, df_oi[["ts", "value"]].rename(columns={"value": "open_interest"}), on="ts", how="inner")
+    df = pd.merge(
+        df_perp[["ts", "open", "high", "low", "close", "volume"]],
+        df_spot[["ts", "close"]].rename(columns={"close": "spot_close"}),
+        on="ts",
+        how="inner",
+    )
+    df = pd.merge(
+        df, df_oi[["ts", "value"]].rename(columns={"value": "open_interest"}), on="ts", how="inner"
+    )
 
     # Merge Funding with asof backward
-    df = pd.merge_asof(df.sort_values("ts"), df_fr[["ts_floor", "value"]].rename(columns={"value": "funding_rate"}), 
-                       left_on="ts", right_on="ts_floor", direction="backward")
+    df = pd.merge_asof(
+        df.sort_values("ts"),
+        df_fr[["ts_floor", "value"]].rename(columns={"value": "funding_rate"}),
+        left_on="ts",
+        right_on="ts_floor",
+        direction="backward",
+    )
     df["funding_rate"] = df["funding_rate"].fillna(0.0001)
 
     # Technical features
@@ -85,7 +142,10 @@ def load_market_data(symbol: str) -> pd.DataFrame:
 
     # ATR 14
     prev_close = df["close"].shift(1)
-    tr = np.maximum(df["high"] - df["low"], np.maximum(np.abs(df["high"] - prev_close), np.abs(df["low"] - prev_close)))
+    tr = np.maximum(
+        df["high"] - df["low"],
+        np.maximum(np.abs(df["high"] - prev_close), np.abs(df["low"] - prev_close)),
+    )
     df["atr_14"] = tr.rolling(14).mean().bfill()
 
     # EMAs for trend
@@ -105,7 +165,9 @@ def load_market_data(symbol: str) -> pd.DataFrame:
     fr_roll_mean = df["funding_rate"].rolling(2160, min_periods=720).mean()
     fr_roll_std = df["funding_rate"].rolling(2160, min_periods=720).std().replace(0, 1e-6)
     df["fr_zscore"] = (df["funding_rate"] - fr_roll_mean) / fr_roll_std
-    df["fr_accel"] = df["funding_rate"] - 2 * df["funding_rate"].shift(8) + df["funding_rate"].shift(16)
+    df["fr_accel"] = (
+        df["funding_rate"] - 2 * df["funding_rate"].shift(8) + df["funding_rate"].shift(16)
+    )
 
     # Open Interest features
     df["oi_pct_chg_1h"] = df["open_interest"].pct_change(1)
@@ -124,13 +186,22 @@ def load_market_data(symbol: str) -> pd.DataFrame:
     df.loc[(df["date"] >= "2024-07-01") & (df["date"] <= "2025-06-30"), "partition"] = "VALIDATION"
     df.loc[df["date"] >= "2025-07-01", "partition"] = "SEALED_OOS"
 
-    logger.info(f"Loaded {len(df)} merged hourly candles for {symbol}. Partitions: {df['partition'].value_counts().to_dict()}")
+    logger.info(
+        f"Loaded {len(df)} merged hourly candles for {symbol}. Partitions: {df['partition'].value_counts().to_dict()}"
+    )
     return df
 
 
-def simulate_trades(df: pd.DataFrame, signals: pd.Series, direction: str, 
-                    take_profit_r: float, stop_loss_r: float, max_bars_hold: int, 
-                    risk_atr_mult: float = 1.5, experiment_id: str = ""):
+def simulate_trades(
+    df: pd.DataFrame,
+    signals: pd.Series,
+    direction: str,
+    take_profit_r: float,
+    stop_loss_r: float,
+    max_bars_hold: int,
+    risk_atr_mult: float = 1.5,
+    experiment_id: str = "",
+):
     """
     Simulates trades with point-in-time entry on the next bar open,
     including full 3-tier frictions and funding payments.
@@ -190,7 +261,7 @@ def simulate_trades(df: pd.DataFrame, signals: pd.Series, direction: str,
                     exit_triggered = True
                     exit_price = closes[i]
                     exit_reason = "MAX_HOLD"
-            else: # SHORT
+            else:  # SHORT
                 if highs[i] >= sl_price:
                     exit_triggered = True
                     exit_price = sl_price
@@ -210,7 +281,7 @@ def simulate_trades(df: pd.DataFrame, signals: pd.Series, direction: str,
                     gross_pnl_usd = exit_price - entry_price
                 else:
                     gross_pnl_usd = entry_price - exit_price
-                
+
                 gross_r = gross_pnl_usd / risk_usd
 
                 # Frictions in R space:
@@ -221,22 +292,24 @@ def simulate_trades(df: pd.DataFrame, signals: pd.Series, direction: str,
 
                 net_r = gross_r - friction_r + funding_r
 
-                trades.append({
-                    "experiment_id": experiment_id,
-                    "partition": trade_partition,
-                    "direction": direction,
-                    "entry_ts": int(ts_arr[entry_bar]),
-                    "exit_ts": int(ts_arr[i]),
-                    "entry_price": float(entry_price),
-                    "exit_price": float(exit_price),
-                    "exit_reason": exit_reason,
-                    "bars_held": bars_held,
-                    "gross_r": round(float(gross_r), 4),
-                    "friction_r": round(float(friction_r), 4),
-                    "funding_r": round(float(funding_r), 4),
-                    "net_r": round(float(net_r), 4),
-                    "win": 1 if net_r > 0 else 0
-                })
+                trades.append(
+                    {
+                        "experiment_id": experiment_id,
+                        "partition": trade_partition,
+                        "direction": direction,
+                        "entry_ts": int(ts_arr[entry_bar]),
+                        "exit_ts": int(ts_arr[i]),
+                        "entry_price": float(entry_price),
+                        "exit_price": float(exit_price),
+                        "exit_reason": exit_reason,
+                        "bars_held": bars_held,
+                        "gross_r": round(float(gross_r), 4),
+                        "friction_r": round(float(friction_r), 4),
+                        "funding_r": round(float(funding_r), 4),
+                        "net_r": round(float(net_r), 4),
+                        "win": 1 if net_r > 0 else 0,
+                    }
+                )
                 in_pos = False
 
         # 2. Check for new entry signal (executable at bar i open if signal at i-1)
@@ -250,7 +323,7 @@ def simulate_trades(df: pd.DataFrame, signals: pd.Series, direction: str,
             atr = atrs[i - 1]
             if atr <= 0 or np.isnan(atr):
                 atr = entry_price * 0.015
-            
+
             risk_usd = risk_atr_mult * atr
 
             if direction == "LONG":
@@ -276,7 +349,7 @@ def evaluate_trade_set(trades: list) -> dict:
             "t_stat": 0.0,
             "p_value": 1.0,
             "ci_95_low": 0.0,
-            "ci_95_high": 0.0
+            "ci_95_high": 0.0,
         }
 
     net_returns = np.array([t["net_r"] for t in trades])
@@ -316,7 +389,7 @@ def evaluate_trade_set(trades: list) -> dict:
         "t_stat": round(float(t_stat), 3),
         "p_value": round(float(p_val), 4),
         "ci_95_low": ci_low,
-        "ci_95_high": ci_high
+        "ci_95_high": ci_high,
     }
 
 
@@ -335,44 +408,64 @@ def main():
         # -------------------------------------------------------------
         # H1-Long: extreme negative funding crowd (retail shorting heavily)
         sig_h1_long = df["fr_zscore"] < -2.0
-        h1_long_trades = simulate_trades(df, sig_h1_long, "LONG", 2.0, 1.0, 48, experiment_id=f"H1_EXTREME_FUNDING_LONG_{sym}")
+        h1_long_trades = simulate_trades(
+            df, sig_h1_long, "LONG", 2.0, 1.0, 48, experiment_id=f"H1_EXTREME_FUNDING_LONG_{sym}"
+        )
 
         # H1-Short: extreme positive funding crowd (retail leveraged long)
         sig_h1_short = df["fr_zscore"] > 2.0
-        h1_short_trades = simulate_trades(df, sig_h1_short, "SHORT", 2.0, 1.0, 48, experiment_id=f"H1_EXTREME_FUNDING_SHORT_{sym}")
+        h1_short_trades = simulate_trades(
+            df, sig_h1_short, "SHORT", 2.0, 1.0, 48, experiment_id=f"H1_EXTREME_FUNDING_SHORT_{sym}"
+        )
 
         # -------------------------------------------------------------
         # 2. H2 — Price / OI Divergence (Exhaustion & Absorption)
         # -------------------------------------------------------------
         # H2-Short (Exhaustion High): Price makes 72h high, but OI 24h falls >= 3%
         sig_h2_short = (df["high"] >= df["price_high_72h"]) & (df["oi_pct_chg_24h"] <= -0.03)
-        h2_short_trades = simulate_trades(df, sig_h2_short, "SHORT", 2.0, 1.0, 48, experiment_id=f"H2_PRICE_OI_DIV_SHORT_{sym}")
+        h2_short_trades = simulate_trades(
+            df, sig_h2_short, "SHORT", 2.0, 1.0, 48, experiment_id=f"H2_PRICE_OI_DIV_SHORT_{sym}"
+        )
 
         # H2-Long (Absorption Low): Price makes 72h low, but OI 24h falls >= 3%
         sig_h2_long = (df["low"] <= df["price_low_72h"]) & (df["oi_pct_chg_24h"] <= -0.03)
-        h2_long_trades = simulate_trades(df, sig_h2_long, "LONG", 2.0, 1.0, 48, experiment_id=f"H2_PRICE_OI_DIV_LONG_{sym}")
+        h2_long_trades = simulate_trades(
+            df, sig_h2_long, "LONG", 2.0, 1.0, 48, experiment_id=f"H2_PRICE_OI_DIV_LONG_{sym}"
+        )
 
         # -------------------------------------------------------------
         # 3. H3 — Violent OI Flush Capitulation
         # -------------------------------------------------------------
         # H3-Long: 1h OI collapses > 4%, sharp down candle -> Capitulation Long
-        sig_h3_long = (df["oi_pct_chg_1h"] <= -0.04) & (df["close"] < df["open"] - 0.8 * df["atr_14"])
-        h3_long_trades = simulate_trades(df, sig_h3_long, "LONG", 2.0, 1.0, 24, experiment_id=f"H3_OI_FLUSH_LONG_{sym}")
+        sig_h3_long = (df["oi_pct_chg_1h"] <= -0.04) & (
+            df["close"] < df["open"] - 0.8 * df["atr_14"]
+        )
+        h3_long_trades = simulate_trades(
+            df, sig_h3_long, "LONG", 2.0, 1.0, 24, experiment_id=f"H3_OI_FLUSH_LONG_{sym}"
+        )
 
         # H3-Short: 1h OI collapses > 4%, sharp up candle -> Short Squeeze Exhaustion
-        sig_h3_short = (df["oi_pct_chg_1h"] <= -0.04) & (df["close"] > df["open"] + 0.8 * df["atr_14"])
-        h3_short_trades = simulate_trades(df, sig_h3_short, "SHORT", 2.0, 1.0, 24, experiment_id=f"H3_OI_FLUSH_SHORT_{sym}")
+        sig_h3_short = (df["oi_pct_chg_1h"] <= -0.04) & (
+            df["close"] > df["open"] + 0.8 * df["atr_14"]
+        )
+        h3_short_trades = simulate_trades(
+            df, sig_h3_short, "SHORT", 2.0, 1.0, 24, experiment_id=f"H3_OI_FLUSH_SHORT_{sym}"
+        )
 
         # -------------------------------------------------------------
         # 4. H4 — Perpetual Basis Dislocation Arbitrage
         # -------------------------------------------------------------
         # H4-Long: Perp trades at sharp discount to spot (< -0.15%)
         sig_h4_long = df["basis_pct"] < -0.0015
-        h4_long_trades = simulate_trades(df, sig_h4_long, "LONG", 1.5, 1.0, 36, experiment_id=f"H4_BASIS_DISCOUNT_LONG_{sym}")
+        h4_long_trades = simulate_trades(
+            df, sig_h4_long, "LONG", 1.5, 1.0, 36, experiment_id=f"H4_BASIS_DISCOUNT_LONG_{sym}"
+        )
 
         # H4-Short: Perp trades at sharp premium to spot (> +0.20%)
         sig_h4_short = df["basis_pct"] > 0.0020
-        h4_short_trades = simulate_trades(df, sig_h4_short, "SHORT", 1.5, 1.0, 36, experiment_id=f"H4_BASIS_PREMIUM_SHORT_{sym}")
+        h4_short_trades = simulate_trades(
+            df, sig_h4_short, "SHORT", 1.5, 1.0, 36, experiment_id=f"H4_BASIS_PREMIUM_SHORT_{sym}"
+        )
 
         # -------------------------------------------------------------
         # 5. H5 — High OI Compression Breakout
@@ -381,8 +474,24 @@ def main():
         compression = (df["bb_width"] <= df["bb_width_q20"]) & (df["oi_pct_chg_24h"] >= 0.03)
         sig_h5_long = compression & (df["close"] > df["bb_upper"])
         sig_h5_short = compression & (df["close"] < df["bb_lower"])
-        h5_long_trades = simulate_trades(df, sig_h5_long, "LONG", 2.5, 1.0, 72, experiment_id=f"H5_COMPRESSION_BREAKOUT_LONG_{sym}")
-        h5_short_trades = simulate_trades(df, sig_h5_short, "SHORT", 2.5, 1.0, 72, experiment_id=f"H5_COMPRESSION_BREAKOUT_SHORT_{sym}")
+        h5_long_trades = simulate_trades(
+            df,
+            sig_h5_long,
+            "LONG",
+            2.5,
+            1.0,
+            72,
+            experiment_id=f"H5_COMPRESSION_BREAKOUT_LONG_{sym}",
+        )
+        h5_short_trades = simulate_trades(
+            df,
+            sig_h5_short,
+            "SHORT",
+            2.5,
+            1.0,
+            72,
+            experiment_id=f"H5_COMPRESSION_BREAKOUT_SHORT_{sym}",
+        )
 
         # -------------------------------------------------------------
         # 6. H6 — Negative Funding in Bullish Trend (Short Trap)
@@ -390,20 +499,32 @@ def main():
         # 4h Trend Bullish: ema_50 > ema_200 and close > ema_200. Funding rate is negative (< -0.005%)
         bull_trend = (df["ema_50"] > df["ema_200"]) & (df["close"] > df["ema_200"])
         sig_h6_long = bull_trend & (df["funding_rate"] < -0.00005)
-        h6_long_trades = simulate_trades(df, sig_h6_long, "LONG", 2.5, 1.0, 72, experiment_id=f"H6_NEGATIVE_FUNDING_TREND_LONG_{sym}")
+        h6_long_trades = simulate_trades(
+            df,
+            sig_h6_long,
+            "LONG",
+            2.5,
+            1.0,
+            72,
+            experiment_id=f"H6_NEGATIVE_FUNDING_TREND_LONG_{sym}",
+        )
 
         # -------------------------------------------------------------
         # Beyond H1-H6 Exploratory Concepts
         # -------------------------------------------------------------
         # E1: Funding Acceleration Dislocation (Sharp second derivative shock)
         sig_e1_short = df["fr_accel"] > 0.00020
-        e1_short_trades = simulate_trades(df, sig_e1_short, "SHORT", 2.0, 1.0, 48, experiment_id=f"E1_FUNDING_ACCEL_SHORT_{sym}")
+        e1_short_trades = simulate_trades(
+            df, sig_e1_short, "SHORT", 2.0, 1.0, 48, experiment_id=f"E1_FUNDING_ACCEL_SHORT_{sym}"
+        )
 
         # E2: OI Stealth Accumulation (Flat price with heavy OI build > +5%)
         price_range_24h = (df["high"].rolling(24).max() - df["low"].rolling(24).min()) / df["close"]
         stealth_build = (price_range_24h < 0.015) & (df["oi_pct_chg_24h"] > 0.05)
         sig_e2_long = stealth_build & (df["close"] > df["open"])
-        e2_long_trades = simulate_trades(df, sig_e2_long, "LONG", 2.0, 1.0, 48, experiment_id=f"E2_STEALTH_OI_BUILD_LONG_{sym}")
+        e2_long_trades = simulate_trades(
+            df, sig_e2_long, "LONG", 2.0, 1.0, 48, experiment_id=f"E2_STEALTH_OI_BUILD_LONG_{sym}"
+        )
 
         all_experiments = {
             "H1_EXTREME_FUNDING_LONG": h1_long_trades,
@@ -460,10 +581,12 @@ def main():
                 "train_metrics": eval_train,
                 "validation_metrics": eval_val,
                 "sealed_oos_metrics": eval_oos,
-                "full_sample_metrics": eval_all
+                "full_sample_metrics": eval_all,
             }
 
-            logger.info(f"[{full_key}] Status={status} | Full: N={eval_all['trade_count']}, Exp={eval_all['expectancy_r']:+.3f}R, WR={eval_all['win_rate_pct']}%, PF={eval_all['profit_factor']} | OOS: N={eval_oos['trade_count']}, Exp={eval_oos['expectancy_r']:+.3f}R")
+            logger.info(
+                f"[{full_key}] Status={status} | Full: N={eval_all['trade_count']}, Exp={eval_all['expectancy_r']:+.3f}R, WR={eval_all['win_rate_pct']}%, PF={eval_all['profit_factor']} | OOS: N={eval_oos['trade_count']}, Exp={eval_oos['expectancy_r']:+.3f}R"
+            )
 
     # Save Experiment Ledger JSONL
     ledger_path = ROOT_DIR / "research" / "m37_experiment_ledger.jsonl"
@@ -481,19 +604,19 @@ def main():
     # Save Manifest
     manifest_obj = {
         "manifest_version": "M37-ALPHA-DISCOVERY",
-        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "generated_at_utc": datetime.now(UTC).isoformat(),
         "total_experiments_evaluated": len(strategy_results),
         "total_trades_simulated": len(experiment_ledger),
         "partition_boundaries": {
             "train": ["2022-01-01", "2024-06-30"],
             "validation": ["2024-07-01", "2025-06-30"],
-            "sealed_oos": ["2025-07-01", "2026-10-20"]
+            "sealed_oos": ["2025-07-01", "2026-10-20"],
         },
         "friction_model": {
             "roundtrip_taker_fee_pct": ROUNDTRIP_TAKER_FRICTION * 100,
-            "funding_payment_settlement": "Actual continuous 8h payments deducted/added based on holding duration and position direction"
+            "funding_payment_settlement": "Actual continuous 8h payments deducted/added based on holding duration and position direction",
         },
-        "strategy_results": strategy_results
+        "strategy_results": strategy_results,
     }
     man_path = ROOT_DIR / "research" / "m37_research_manifest.json"
     with open(man_path, "w", encoding="utf-8") as f:
@@ -503,4 +626,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

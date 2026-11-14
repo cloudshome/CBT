@@ -127,9 +127,7 @@ def _fvg_label(features: dict, action: str) -> str:
         return "Bullish Present"
     if action == "SELL" and features.get("fvg_bear_count"):
         return "Bearish Present"
-    total = (features.get("fvg_bull_count") or 0) + (
-        features.get("fvg_bear_count") or 0
-    )
+    total = (features.get("fvg_bull_count") or 0) + (features.get("fvg_bear_count") or 0)
     return "Present" if total else "None"
 
 
@@ -219,10 +217,7 @@ def _smc(features: dict, action: str) -> dict:
         "premium_zone": features.get("premium_discount") == "premium",
         "discount_zone": features.get("premium_discount") == "discount",
         "imbalance": "Present"
-        if (
-            (features.get("fvg_bull_count") or 0)
-            + (features.get("fvg_bear_count") or 0)
-        )
+        if ((features.get("fvg_bull_count") or 0) + (features.get("fvg_bear_count") or 0))
         else "None",
         "institutional_footprint": "Possible"
         if features.get("volume_spike") or features.get("sweep")
@@ -488,8 +483,7 @@ def _filters(
             "value": "available" if macro.get("available") else "missing",
         },
         "news_window_30m": {
-            "ok": bool(macro.get("available"))
-            and not macro.get("high_impact_imminent", False),
+            "ok": bool(macro.get("available")) and not macro.get("high_impact_imminent", False),
             "value": _news_label(ctx),
             "window_minutes": HIGH_IMPACT_MINUTES_WINDOW,
         },
@@ -500,8 +494,7 @@ def _filters(
         "not_sideways": {
             "ok": not (
                 features.get("trend") == "mixed"
-                and (mtf.get("alignment") or {}).get("label")
-                in ("mixed", "counter_trend")
+                and (mtf.get("alignment") or {}).get("label") in ("mixed", "counter_trend")
             ),
             "value": features.get("trend"),
         },
@@ -571,9 +564,7 @@ def _scenario(plan: dict | None, label: str, fallback: str) -> str:
     return f"{label}: {cond}" + (f" Entry near {entry}." if entry else "")
 
 
-def build_intelligence(
-    payload: dict, df: pd.DataFrame | None = None, db=None
-) -> dict:
+def build_intelligence(payload: dict, df: pd.DataFrame | None = None, db=None) -> dict:
     """Build the professional JSON report from a full analysis payload."""
     sig = payload.get("signal") or {}
     features = (payload.get("snapshot") or {}).get("features") or {}
@@ -597,23 +588,15 @@ def build_intelligence(
         )
     )
 
-    passed, filter_reasons, checks = _filters(
-        plan, action, confidence, features, mtf, ctx
-    )
+    passed, filter_reasons, checks = _filters(plan, action, confidence, features, mtf, ctx)
     final_signal = action if passed and action in ("BUY", "SELL") else "NO TRADE"
-    entry = (
-        [_round((plan or {}).get("entry"))]
-        if plan and final_signal != "NO TRADE"
-        else []
-    )
+    entry = [_round((plan or {}).get("entry"))] if plan and final_signal != "NO TRADE" else []
     # Do not invent a second/third entry.  If the engine provided only one,
     # the report returns only one.
     entry = [x for x in entry if x is not None]
     stop = _round((plan or {}).get("stop_loss")) if final_signal != "NO TRADE" else None
     tps = [
-        x
-        for x in [_round(tp) for tp in ((plan or {}).get("take_profits") or [])]
-        if x is not None
+        x for x in [_round(tp) for tp in ((plan or {}).get("take_profits") or [])] if x is not None
     ]
     if final_signal == "NO TRADE":
         tps = []
@@ -675,32 +658,26 @@ def build_intelligence(
     if final_signal == "BUY" and sell_plan:
         alt_cond = sell_plan.get("condition") or "rejection at resistance"
         alt_entry = _round(sell_plan.get("entry"))
-        alt_scenario = (
-            f"If price rejects at resistance → watch for short setup: {alt_cond}"
-            + (f" near ${alt_entry:,.2f}" if alt_entry else "")
+        alt_scenario = f"If price rejects at resistance → watch for short setup: {alt_cond}" + (
+            f" near ${alt_entry:,.2f}" if alt_entry else ""
         )
     elif final_signal == "SELL" and buy_plan:
         alt_cond = buy_plan.get("condition") or "bounce at demand"
         alt_entry = _round(buy_plan.get("entry"))
-        alt_scenario = (
-            f"If price bounces at support → watch for long setup: {alt_cond}"
-            + (f" near ${alt_entry:,.2f}" if alt_entry else "")
+        alt_scenario = f"If price bounces at support → watch for long setup: {alt_cond}" + (
+            f" near ${alt_entry:,.2f}" if alt_entry else ""
         )
     elif final_signal == "NO TRADE":
-        alt_scenario = "Stand aside until price sweeps key liquidity and prints clean CHOCH confirmation."
+        alt_scenario = (
+            "Stand aside until price sweeps key liquidity and prints clean CHOCH confirmation."
+        )
 
     # Kelly Criterion & Risk Calculation
     est_win_rate = (
-        68.0
-        if trade_quality_grade in ("A+", "A")
-        else 58.0
-        if trade_quality_grade == "B"
-        else 50.0
+        68.0 if trade_quality_grade in ("A+", "A") else 58.0 if trade_quality_grade == "B" else 50.0
     )
     rr_num = float((plan or {}).get("risk_reward") or 2.0)
-    kelly = compute_kelly_criterion(
-        est_win_rate, rr_num, ACCOUNT_BALANCE or 10000.0, RISK_PCT
-    )
+    kelly = compute_kelly_criterion(est_win_rate, rr_num, ACCOUNT_BALANCE or 10000.0, RISK_PCT)
 
     # Institutional Signal Card data container
     signal_card = {
@@ -709,9 +686,7 @@ def build_intelligence(
         "ai_confidence_index": f"{confidence:.1f}%",
         "confidence_delta": "+2.1%" if trade_quality_grade in ("A+", "A") else "+0.0%",
         "institutional_probability_score": ips_score,
-        "trade_quality_grade": trade_quality_grade
-        if final_signal != "NO TRADE"
-        else "F",
+        "trade_quality_grade": trade_quality_grade if final_signal != "NO TRADE" else "F",
         "entry_zone": ez_str if final_signal != "NO TRADE" else "N/A",
         "entry_low": ez_low if final_signal != "NO TRADE" else None,
         "entry_high": ez_high if final_signal != "NO TRADE" else None,
@@ -733,9 +708,7 @@ def build_intelligence(
         "signal": final_signal,
         "confidence": confidence,
         "institutional_probability_score": ips_score,
-        "trade_quality_grade": trade_quality_grade
-        if final_signal != "NO TRADE"
-        else "F",
+        "trade_quality_grade": trade_quality_grade if final_signal != "NO TRADE" else "F",
         "trend": trend["current_trend"],
         "market_structure": structure["structure"],
         "regime": regime,
@@ -821,9 +794,9 @@ def build_intelligence(
             "is_liquidity_identified": smc["liquidity"] != "No clear sweep",
             "is_rr_acceptable": checks.get("rr_minimum", {}).get("ok", False),
             "any_news_risk": not checks.get("news_window_30m", {}).get("ok", True),
-            "any_conflicting_indicators": not checks.get(
-                "no_htf_contradiction", {}
-            ).get("ok", True),
+            "any_conflicting_indicators": not checks.get("no_htf_contradiction", {}).get(
+                "ok", True
+            ),
             "would_professional_take_trade": passed,
             "capital_preservation_decision": "Trade allowed"
             if passed
@@ -832,9 +805,7 @@ def build_intelligence(
         "data_quality": {
             "has_market_data": bool(features.get("price")),
             "has_macro_calendar": bool((ctx.get("macro") or {}).get("available")),
-            "has_futures_context": bool(
-                (payload.get("market_context") or {}).get("futures")
-            ),
+            "has_futures_context": bool((payload.get("market_context") or {}).get("futures")),
             "provider_symbol": (payload.get("market_context") or {}).get("data_symbol"),
         },
     }
@@ -881,9 +852,7 @@ def build_intelligence(
                 # failed into "unavailable" on a populated book.
                 kelly = kelly_from_rows(db.live_book_rows())
                 ks = kelly.get("kelly_size")
-                clamped = (
-                    round(min(ks, KELLY_MAX_RISK_PCT), 4) if ks is not None else None
-                )
+                clamped = round(min(ks, KELLY_MAX_RISK_PCT), 4) if ks is not None else None
                 chart_read["kelly"] = {
                     "kelly_size": ks,
                     "clamped_size": clamped,

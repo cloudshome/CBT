@@ -54,14 +54,14 @@ def post_trade_review(scan_id: int, db: SignalDB | None = None) -> dict:
         fr = journal_dict.get("followed_rules")
         fr_str = "YES" if fr == 1 else ("NO" if fr == 0 else "YES (auto)")
 
-        headline = f"{outcome} · {rr_str} · MAE {mae_str} · MFE {mfe_str} · Followed rules: {fr_str}"
+        headline = (
+            f"{outcome} · {rr_str} · MAE {mae_str} · MFE {mfe_str} · Followed rules: {fr_str}"
+        )
 
         # Key lessons / mentor feedback
         takeaways = []
         if outcome in ("WIN", "FULL_WIN", "TP_HIT"):
-            takeaways.append(
-                "Target reached according to plan. Good discipline and patience."
-            )
+            takeaways.append("Target reached according to plan. Good discipline and patience.")
         elif outcome in ("LOSS", "SL_HIT"):
             takeaways.append(
                 "Stop loss protected capital. Loss is an ordinary cost of doing business."
@@ -71,9 +71,7 @@ def post_trade_review(scan_id: int, db: SignalDB | None = None) -> dict:
 
         if mae is not None and mfe is not None and mae > 0:
             ratio = round(mfe / mae, 2) if mae else 0.0
-            takeaways.append(
-                f"Excursion ratio (MFE/MAE): {ratio:.2f} — entry precision evaluated."
-            )
+            takeaways.append(f"Excursion ratio (MFE/MAE): {ratio:.2f} — entry precision evaluated.")
 
         if journal_dict.get("emotion"):
             takeaways.append(f"Recorded emotion: {journal_dict['emotion']}.")
@@ -99,9 +97,7 @@ def post_trade_review(scan_id: int, db: SignalDB | None = None) -> dict:
             db.close()
 
 
-def generate_morning_brief(
-    symbols: list[str] | None = None, db: SignalDB | None = None
-) -> dict:
+def generate_morning_brief(symbols: list[str] | None = None, db: SignalDB | None = None) -> dict:
     """Cross-asset morning briefing for the trading desk."""
     target_symbols = symbols or ["BTCUSDT", "ETHUSDT", "XAUUSD"]
     target_symbols = [normalize_symbol(s) for s in target_symbols]
@@ -118,9 +114,7 @@ def generate_morning_brief(
 
         for sym in target_symbols:
             try:
-                payload = analyze_full(
-                    sym, "15m", 150, with_context=False, with_memory=False
-                )
+                payload = analyze_full(sym, "15m", 150, with_context=False, with_memory=False)
                 sig = payload.get("signal", {})
                 act = sig.get("action", "NO TRADE")
                 conf = sig.get("confidence", 50)

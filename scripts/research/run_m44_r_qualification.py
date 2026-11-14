@@ -53,8 +53,12 @@ def evaluate_m44_r_obligations() -> dict:
     # --------------------------------------------------------------------------
     # OBL-1: Continuous Order Book Surface Reconstruction & Geometry Invariants
     # --------------------------------------------------------------------------
-    logger.info("Evaluating OBL-1: Continuous Order Book Surface Reconstruction & Geometry Invariants...")
-    snap = liquidity_surface_geometry_engine.build_surface_snapshot("BTC/USDT", int(time.time() * 1000), bids_mock, asks_mock)
+    logger.info(
+        "Evaluating OBL-1: Continuous Order Book Surface Reconstruction & Geometry Invariants..."
+    )
+    snap = liquidity_surface_geometry_engine.build_surface_snapshot(
+        "BTC/USDT", int(time.time() * 1000), bids_mock, asks_mock
+    )
 
     obl1_passed = (
         snap.mid_price == 60000.0
@@ -81,7 +85,9 @@ def evaluate_m44_r_obligations() -> dict:
     # --------------------------------------------------------------------------
     # OBL-2: Non-Linear Market Impact Curvature (Kyle's Lambda & Square-Root Law)
     # --------------------------------------------------------------------------
-    logger.info("Evaluating OBL-2: Non-Linear Market Impact Curvature (Kyle's Lambda & Square-Root Law)...")
+    logger.info(
+        "Evaluating OBL-2: Non-Linear Market Impact Curvature (Kyle's Lambda & Square-Root Law)..."
+    )
     params = liquidity_surface_geometry_engine.fit_impact_curves(snap)
     impact_10k = liquidity_surface_geometry_engine.estimate_order_impact_bps(10_000.0, params)
     impact_1m = liquidity_surface_geometry_engine.estimate_order_impact_bps(1_000_000.0, params)
@@ -146,7 +152,9 @@ def evaluate_m44_r_obligations() -> dict:
     # OBL-4: Hawkes Self-Excitation Intensity & Flow Clustering Dynamics
     # --------------------------------------------------------------------------
     logger.info("Evaluating OBL-4: Hawkes Self-Excitation Intensity & Flow Clustering Dynamics...")
-    detector_hawkes = HighFrequencyToxicFlowDetector(hawkes_alpha=0.8, hawkes_beta=1.5, hawkes_mu=0.5)
+    detector_hawkes = HighFrequencyToxicFlowDetector(
+        hawkes_alpha=0.8, hawkes_beta=1.5, hawkes_mu=0.5
+    )
     t_start = int(time.time() * 1000)
 
     # Ingest concentrated burst
@@ -207,7 +215,9 @@ def evaluate_m44_r_obligations() -> dict:
     # --------------------------------------------------------------------------
     # OBL-6: Microstructure Toxicity Circuit Breaker (VPIN >= 0.85 Immediate Halt)
     # --------------------------------------------------------------------------
-    logger.info("Evaluating OBL-6: Microstructure Toxicity Circuit Breaker (VPIN >= 0.85 Immediate Halt)...")
+    logger.info(
+        "Evaluating OBL-6: Microstructure Toxicity Circuit Breaker (VPIN >= 0.85 Immediate Halt)..."
+    )
     extreme_detector = HighFrequencyToxicFlowDetector(bucket_volume=2.0, num_buckets=5)
     for i in range(25):
         extreme_detector.process_trade(60000.0, 2.0, now_ms + i * 5, is_buyer_maker=False)
@@ -257,7 +267,8 @@ def evaluate_m44_r_obligations() -> dict:
     obl7_passed = (
         adj_adapt.is_halted is False
         and adj_adapt.dark_pool_allocation_pct >= 0.20
-        and adj_adapt.urgency in (ExecutionUrgency.PASSIVE_POST_ONLY, ExecutionUrgency.NORMAL_SCHEDULED)
+        and adj_adapt.urgency
+        in (ExecutionUrgency.PASSIVE_POST_ONLY, ExecutionUrgency.NORMAL_SCHEDULED)
     )
 
     results["OBL-7"] = {
@@ -274,8 +285,12 @@ def evaluate_m44_r_obligations() -> dict:
     # --------------------------------------------------------------------------
     # OBL-8: Permanent Capital Firewall & Milestone 18 Certified Surface Area Isolation
     # --------------------------------------------------------------------------
-    logger.info("Evaluating OBL-8: Permanent Capital Firewall & Milestone 18 Surface Area Isolation...")
-    capital_isolated = (REAL_CAPITAL_ENABLED is False and surface_sentinel.real_capital_enabled is False)
+    logger.info(
+        "Evaluating OBL-8: Permanent Capital Firewall & Milestone 18 Surface Area Isolation..."
+    )
+    capital_isolated = (
+        REAL_CAPITAL_ENABLED is False and surface_sentinel.real_capital_enabled is False
+    )
 
     from core.governance.architecture_registry import (
         ArchitectureLayer,
@@ -283,6 +298,7 @@ def evaluate_m44_r_obligations() -> dict:
         resolve_module_authority,
         resolve_module_layer,
     )
+
     layer = resolve_module_layer("core.execution.liquidity_surface")
     authority = resolve_module_authority("core.execution.liquidity_surface")
     authority_clean = (
@@ -295,7 +311,9 @@ def evaluate_m44_r_obligations() -> dict:
         capture_output=True,
         text=True,
     )
-    m18_intact = (m18_proc.returncode == 0 and "M18 Production Pass remains ACTIVE" in m18_proc.stdout)
+    m18_intact = (
+        m18_proc.returncode == 0 and "M18 Production Pass remains ACTIVE" in m18_proc.stdout
+    )
 
     obl8_passed = capital_isolated and authority_clean and m18_intact
 
@@ -344,7 +362,9 @@ def main() -> int:
 
     dossier_file = audit_dir / "M44_R_LIQUIDITY_SURFACE_DOSSIER.md"
     with open(dossier_file, "w", encoding="utf-8") as f:
-        f.write("# SKY Milestone 44-R: Liquidity Surface Geometry & Toxic Flow Qualification Dossier\n\n")
+        f.write(
+            "# SKY Milestone 44-R: Liquidity Surface Geometry & Toxic Flow Qualification Dossier\n\n"
+        )
         f.write(f"> **Status:** {'[QUALIFIED] PASS' if all_passed else '[REJECTED] FAIL'}\n")
         f.write(f"> **Evaluated Obligations:** {passed_count} / {total_count}\n")
         f.write(f"> **Verification Timestamp:** {report_payload['timestamp_utc']}\n\n")
@@ -359,12 +379,18 @@ def main() -> int:
         f.write("\n---\n\n")
         f.write("## 2. Invariant & Boundary Sign-Off\n\n")
         f.write("- **Simulation Isolation:** `REAL_CAPITAL_ENABLED = False` strictly enforced.\n")
-        f.write("- **Milestone 18 Surface Area:** Certified commit ancestor check and SHA-256 test identities verified untouched.\n")
-        f.write("- **Architecture Contract:** Registered in Layer 2 with `SIMULATION_RESEARCH_ONLY` authority.\n\n")
+        f.write(
+            "- **Milestone 18 Surface Area:** Certified commit ancestor check and SHA-256 test identities verified untouched.\n"
+        )
+        f.write(
+            "- **Architecture Contract:** Registered in Layer 2 with `SIMULATION_RESEARCH_ONLY` authority.\n\n"
+        )
     logger.info("Saved qualification dossier to %s", dossier_file)
 
     print("\n" + "=" * 65)
-    print(f"SKY MILESTONE 44-R QUALIFICATION RESULT: {'QUALIFIED [PASS]' if all_passed else 'REJECTED [FAIL]'}")
+    print(
+        f"SKY MILESTONE 44-R QUALIFICATION RESULT: {'QUALIFIED [PASS]' if all_passed else 'REJECTED [FAIL]'}"
+    )
     print(f"Passed: {passed_count}/{total_count} Obligations (Elapsed: {elapsed:.2f}s)")
     print("=" * 65)
 

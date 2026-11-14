@@ -43,7 +43,10 @@ def check_pe_arch(file_path: Path) -> tuple[bool, str]:
                 return True, "x64 (AMD64)"
             elif machine == 0x014C:
                 # Standard NSIS installer or portable single-binary bootstrap stub
-                if any(w in file_path.name.lower() for w in ("setup", "installer", "portable", "terminal", "crypto")):
+                if any(
+                    w in file_path.name.lower()
+                    for w in ("setup", "installer", "portable", "terminal", "crypto")
+                ):
                     return True, "x86 (NSIS Bootstrap / Portable Stub for x64 Payload)"
                 return False, "x86 (32-bit)"
             return False, f"UNKNOWN_ARCH_0x{machine:04x}"

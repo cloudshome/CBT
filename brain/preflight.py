@@ -57,9 +57,7 @@ def _cross_exchange_check(cross: dict) -> dict:
             if "deviation_pct" in info:
                 compared += 1
             if info.get("flag"):
-                flagged.append(
-                    f"{exchange}:{symbol} {float(info.get('deviation_pct', 0)):+.2f}%"
-                )
+                flagged.append(f"{exchange}:{symbol} {float(info.get('deviation_pct', 0)):+.2f}%")
     if flagged:
         return _check(
             "cross_exchange",
@@ -224,12 +222,8 @@ def preflight_report(
         db_path = Path(db_path_raw).expanduser().resolve()
         checkout = Path(config.ROOT).resolve()
         in_checkout = db_path == checkout or checkout in db_path.parents
-        ephemeral_roots = tuple(
-            Path(root).resolve() for root in ("/tmp", "/var/tmp", "/dev/shm")
-        )
-        ephemeral = any(
-            db_path == root or root in db_path.parents for root in ephemeral_roots
-        )
+        ephemeral_roots = tuple(Path(root).resolve() for root in ("/tmp", "/var/tmp", "/dev/shm"))
+        ephemeral = any(db_path == root or root in db_path.parents for root in ephemeral_roots)
     except (OSError, TypeError, ValueError):
         db_path = None
         in_checkout = True
@@ -420,13 +414,10 @@ def preflight_report(
         )
 
     notifiers = bool(
-        (config.TELEGRAM_BOT_TOKEN and config.TELEGRAM_CHAT_ID)
-        or config.DISCORD_ANNOUNCE_WEBHOOK
+        (config.TELEGRAM_BOT_TOKEN and config.TELEGRAM_CHAT_ID) or config.DISCORD_ANNOUNCE_WEBHOOK
     )
     if notifiers:
-        checks.append(
-            _check("notifications", PASS, "an outbound alert channel is configured")
-        )
+        checks.append(_check("notifications", PASS, "an outbound alert channel is configured"))
     else:
         checks.append(
             _check(
@@ -469,9 +460,7 @@ def format_preflight(report: dict) -> str:
         details = row.get("details") or {}
         if details:
             bits = [
-                f"{key}={value}"
-                for key, value in details.items()
-                if value not in (None, [], {})
+                f"{key}={value}" for key, value in details.items() if value not in (None, [], {})
             ]
             if bits:
                 lines.append("      " + " · ".join(bits))

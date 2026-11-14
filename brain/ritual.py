@@ -26,9 +26,7 @@ RITUAL_STEPS: tuple[str, ...] = ("readiness", "loop", "gate", "act")
 
 
 def _today(now: int | None = None) -> str:
-    return time.strftime(
-        "%Y-%m-%d", time.gmtime(now if now is not None else time.time())
-    )
+    return time.strftime("%Y-%m-%d", time.gmtime(now if now is not None else time.time()))
 
 
 def ritual_today(db: SignalDB, *, now: int | None = None) -> dict:
@@ -99,16 +97,12 @@ def ritual_today(db: SignalDB, *, now: int | None = None) -> dict:
     return payload
 
 
-def ritual_set(
-    db: SignalDB, name: str, done: bool, *, now: int | None = None
-) -> dict:
+def ritual_set(db: SignalDB, name: str, done: bool, *, now: int | None = None) -> dict:
     """Tick (or untick) one canonical step for today. Fail closed on unknown
     names so a client can never invent ritual history."""
     name = str(name or "").strip().lower()
     if name not in RITUAL_STEPS:
-        raise ValueError(
-            f"unknown ritual step {name!r} — allowed: {', '.join(RITUAL_STEPS)}"
-        )
+        raise ValueError(f"unknown ritual step {name!r} — allowed: {', '.join(RITUAL_STEPS)}")
     day = _today(now)
     db.ritual_mark(day, name, bool(done))
     return ritual_today(db, now=now)

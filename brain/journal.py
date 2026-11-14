@@ -56,9 +56,7 @@ def pre_trade_checklist(payload: dict) -> dict:
         "htf_bias": (mtf.get("htf_bias") or {}).get("label")
         if isinstance(mtf.get("htf_bias"), dict)
         else mtf.get("htf_bias"),
-        "setup": (payload.get("plans") or [{}])[0].get("type")
-        if payload.get("plans")
-        else None,
+        "setup": (payload.get("plans") or [{}])[0].get("type") if payload.get("plans") else None,
         "action": sig.get("action"),
         "entry": sig.get("entry"),
         "stop_loss": sig.get("stop_loss"),
@@ -93,9 +91,7 @@ def save_journal(
     """Record post-trade journal fields; returns the stored entry."""
     db.save_journal(
         scan_id,
-        followed_rules=(1 if followed_rules else 0)
-        if followed_rules is not None
-        else None,
+        followed_rules=(1 if followed_rules else 0) if followed_rules is not None else None,
         emotion=emotion,
         mistake=mistake,
         screenshot_path=screenshot_path,
@@ -246,15 +242,9 @@ def graduation_discipline(db: SignalDB, source_key: str = LIVE_SOURCE_KEY) -> di
 def describe_discipline(d: dict) -> str:
     """One-line human summary of a :func:`graduation_discipline` payload."""
     if not d or not d.get("eligible"):
-        return (
-            "discipline: unproven — no decided real paper trades on the "
-            "canonical live book yet"
-        )
+        return "discipline: unproven — no decided real paper trades on the canonical live book yet"
     pct = f"{d['compliance'] * 100:.1f}%"
-    line = (
-        f"discipline: {pct} compliance "
-        f"({d['compliant']}/{d['eligible']} real canonical trades)"
-    )
+    line = f"discipline: {pct} compliance ({d['compliant']}/{d['eligible']} real canonical trades)"
     if d.get("missing_journals"):
         line += f" — {d['missing_journals']} missing journal(s) count against you"
     if d.get("violations"):

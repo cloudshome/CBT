@@ -135,13 +135,7 @@ def _feature_plain(f: dict) -> list[str]:
         )
     rsi = f.get("rsi")
     if rsi is not None:
-        zone = (
-            "overbought (≥70)"
-            if rsi >= 70
-            else "oversold (≤30)"
-            if rsi <= 30
-            else "neutral"
-        )
+        zone = "overbought (≥70)" if rsi >= 70 else "oversold (≤30)" if rsi <= 30 else "neutral"
         lines.append(f"RSI {rsi:.1f} — {zone}.")
     div = f.get("rsi_divergence") or {}
     if div.get("bull"):
@@ -272,9 +266,7 @@ def management_checklist(plan: dict | None = None) -> list[str]:
     tps = [t for t in (plan.get("take_profits") or []) if t is not None]
     out = ["HOLD — the original thesis is intact; monitor the trigger/entry."]
     if tps:
-        out.append(
-            f"REDUCE — close ~50% at TP1 {tps[0]:,.2f} and move the stop to break-even."
-        )
+        out.append(f"REDUCE — close ~50% at TP1 {tps[0]:,.2f} and move the stop to break-even.")
         out.append("TRAIL — trail the remaining position behind structure or ATR.")
     out.append(
         "EXIT — if HTF structure flips against the trade or high-impact "
@@ -361,9 +353,7 @@ def five_levels(payload: dict, db=None) -> list[str]:
         measured = _setup_evidence(plan.get("type"), db)
         out.append(f"   • {measured}")
         if len(plans) > 1:
-            out.append(
-                f"   • Also watching: {', '.join(p.get('type') for p in plans[1:4])}."
-            )
+            out.append(f"   • Also watching: {', '.join(p.get('type') for p in plans[1:4])}.")
     else:
         out.append(
             "   • No plan above the confidence threshold — the opportunity "
@@ -372,9 +362,7 @@ def five_levels(payload: dict, db=None) -> list[str]:
 
     # LEVEL 4 — Decision: is the expected return worth the risk?
     out.append("LEVEL 4 — DECISION: is the expected return worth the risk?")
-    desk_action = (
-        decision.get("action") or intel.get("signal") or sig.get("action") or "NO TRADE"
-    )
+    desk_action = decision.get("action") or intel.get("signal") or sig.get("action") or "NO TRADE"
     out.append(f"   • Desk decision: {desk_action}.")
     for b in decision.get("blocked_by") or []:
         out.append(f"      blocked by: {b}")
@@ -391,14 +379,10 @@ def five_levels(payload: dict, db=None) -> list[str]:
     if bits:
         out.append(f"   • Score ≠ permission — {', '.join(bits)}.")
     if intel.get("self_review", {}).get("would_professional_take_trade") is False:
-        out.append(
-            "   • Self-review: a professional desk would NOT take this trade right now."
-        )
+        out.append("   • Self-review: a professional desk would NOT take this trade right now.")
 
     # LEVEL 5 — Action: exactly where do I enter, stop, target, size, manage, exit?
-    out.append(
-        "LEVEL 5 — ACTION: exactly where do I enter, stop, target, size, manage and exit?"
-    )
+    out.append("LEVEL 5 — ACTION: exactly where do I enter, stop, target, size, manage and exit?")
     if desk_action == "NO TRADE" and plan:
         out.append(
             "   • ⚠️ The desk says NO TRADE — this plan is a watch-item "
@@ -421,9 +405,7 @@ def five_levels(payload: dict, db=None) -> list[str]:
             out.append(line + ".")
         out += [f"   • {c}" for c in management_checklist(plan)]
     else:
-        out.append(
-            "   • No entry, stop or target — there is nothing to size. Stand aside."
-        )
+        out.append("   • No entry, stop or target — there is nothing to size. Stand aside.")
     out.append(
         "   • Homework: write the plan BEFORE price moves. If the trigger "
         "doesn't happen, the plan is cancelled — no revenge trades."
@@ -482,13 +464,9 @@ def personal_feedback(db, limit: int = 25) -> list[str]:
             ).fetchall()
         ]
     except Exception:
-        return [
-            "No decision history yet — approve/reject a few signals and I'll teach from them."
-        ]
+        return ["No decision history yet — approve/reject a few signals and I'll teach from them."]
     if not decisions:
-        return [
-            "No decision history yet — approve/reject a few signals and I'll teach from them."
-        ]
+        return ["No decision history yet — approve/reject a few signals and I'll teach from them."]
 
     approved = [d for d in decisions if d["to_state"] == "APPROVED"]
     rejected = [d for d in decisions if d["to_state"] == "REJECTED"]
@@ -534,8 +512,6 @@ def personal_feedback(db, limit: int = 25) -> list[str]:
 
         top = Counter(rej_notes).most_common(3)
         notes.append(
-            "Most common rejection reasons: "
-            + ", ".join(f"{r} ({n}x)" for r, n in top)
-            + "."
+            "Most common rejection reasons: " + ", ".join(f"{r} ({n}x)" for r, n in top) + "."
         )
     return notes

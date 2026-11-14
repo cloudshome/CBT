@@ -83,7 +83,11 @@ def evaluate_m42_r_obligations() -> dict:
         else:
             obl1_passed = False
 
-    obl1_status = "PASS" if (obl1_passed and obl1_monotonic and obl1_reversals == len(sorted_ticks)) else "FAIL"
+    obl1_status = (
+        "PASS"
+        if (obl1_passed and obl1_monotonic and obl1_reversals == len(sorted_ticks))
+        else "FAIL"
+    )
     results["OBL-1"] = {
         "title": "Exact Q64.96 Bitwise Determinism & Round-Trip Invertibility",
         "status": obl1_status,
@@ -119,7 +123,10 @@ def evaluate_m42_r_obligations() -> dict:
 
     conservation_verified = (
         report.is_conservation_verified
-        and (report.total_amount_in + report.total_fee_amount + report.amount_unconsumed == swap_amount)
+        and (
+            report.total_amount_in + report.total_fee_amount + report.amount_unconsumed
+            == swap_amount
+        )
         and report.step_count >= 1
     )
 
@@ -150,11 +157,7 @@ def evaluate_m42_r_obligations() -> dict:
     qual3, impact3, _ = evaluate_price_impact_constraint(100.0, 99.90, max_allowed_impact_bps=5.0)
 
     obl3_passed = (
-        qual1 is True
-        and qual2 is True
-        and qual3 is False
-        and impact1 <= 5.0
-        and impact3 > 5.0
+        qual1 is True and qual2 is True and qual3 is False and impact1 <= 5.0 and impact3 > 5.0
     )
     obl3_status = "PASS" if obl3_passed else "FAIL"
     results["OBL-3"] = {
@@ -220,15 +223,15 @@ def evaluate_m42_r_obligations() -> dict:
         "details": f"Delta {pos_delta:.4f} WETH hedged via perp: target_hedge={hedge.target_hedge_base:.4f} (matches -Delta(P)), needs_rebalance={hedge.needs_rebalance}.",
     }
 
-
-
     # --------------------------------------------------------------------------
     # OBL-6: Uniswap v4 Hook Sandboxing & Fail-Closed State Isolation
     # --------------------------------------------------------------------------
     logger.info("Evaluating OBL-6: Hook Sandboxing & Fail-Closed State Isolation...")
+
     class MaliciousFaultHook(BaseV4Hook):
         def __init__(self):
             super().__init__(HookPermissions.BEFORE_SWAP | HookPermissions.AFTER_SWAP)
+
         def before_swap(self, *args, **kwargs):
             raise RuntimeError("Injected adversarial hook failure!")
 
@@ -389,38 +392,44 @@ def main() -> int:
 
     for obl_id, data in report["obligations"].items():
         status_icon = "🟢 PASS" if data["status"] == "PASS" else "🔴 FAIL"
-        md_lines.append(f"| **{obl_id}** | {data['title']} | `core/execution/concentrated_amm/` | {status_icon} | {data['details']} |")
+        md_lines.append(
+            f"| **{obl_id}** | {data['title']} | `core/execution/concentrated_amm/` | {status_icon} | {data['details']} |"
+        )
 
-    md_lines.extend([
-        "",
-        "---",
-        "",
-        "### 3. Quantitative Invariants Verified",
-        "",
-        "1. **Q64.96 Invertibility & Boundary Discipline:** All ticks within $[-887272, 887272]$ obey exact roundtrip inversion `get_tick_at_sqrt_ratio(get_sqrt_ratio_at_tick(t)) == t` and strict monotonicity across the entire domain.",
-        "2. **Strict Integer Conservation:** Multi-tick swap traversals obey exact integer input conservation: $\\Delta x_{\\text{specified}} == \\sum \\Delta x_{\\text{in}} + \\sum \\text{fee} + \\Delta x_{\\text{unconsumed}}$ with zero wei leakage.",
-        "3. **Price Impact Qualification Ceiling:** $0.05\\%$ ($5.0\\text{ bps}$) maximum impact constraint acts as a rigorous qualification boundary to identify and reject oversized simulation trades.",
-        "4. **Closed-Form Capital Multiplier:** Capital efficiency multiplier $M = \\frac{1}{1 - (P_a/P_b)^{1/4}}$ matches numerical simulation within $\\epsilon \\le 10^{-6}$.",
-        "5. **Fundamental AMM Greeks:** Proved analytically and numerically that $\\Delta_{\\text{AMM}}(P) \\equiv x(P)$, $\\Gamma_{\\text{AMM}}(P) < 0$ inside $[P_a, P_b]$ (short straddle), and $IL(P) \\le 0$ everywhere.",
-        "6. **Hook Sandbox Containment:** Unhandled exceptions in custom Uniswap v4 hooks are caught by `HookSandbox`, failing closed without mutating pool state or leaking funds.",
-        "7. **Volatility Breaker & Dynamic Fees:** Short-term price drift $>150\\text{ bps}$ in 60s trips circuit breaker and rejects trades during cool-off; dynamic fees scale linearly with realized volatility.",
-        "8. **Capital Firewall & M18 Isolation:** `real_capital_enabled = False` permanent across all data structures. Zero modification to the 14 Milestone 18 certified files.",
-        "",
-        "---",
-        "",
-        "### 4. Milestone 43 Entry Clearance",
-        "",
-        "With all 8 obligations verified green (100% PASS across 37 M42 unit tests and 8 M42-R qualification gates),",
-        "Milestone 42 is formally certified and cleared for:",
-        "**Milestone 43: Advanced Execution Routing & Cross-Venue Arbitrage Analytics**.",
-    ])
+    md_lines.extend(
+        [
+            "",
+            "---",
+            "",
+            "### 3. Quantitative Invariants Verified",
+            "",
+            "1. **Q64.96 Invertibility & Boundary Discipline:** All ticks within $[-887272, 887272]$ obey exact roundtrip inversion `get_tick_at_sqrt_ratio(get_sqrt_ratio_at_tick(t)) == t` and strict monotonicity across the entire domain.",
+            "2. **Strict Integer Conservation:** Multi-tick swap traversals obey exact integer input conservation: $\\Delta x_{\\text{specified}} == \\sum \\Delta x_{\\text{in}} + \\sum \\text{fee} + \\Delta x_{\\text{unconsumed}}$ with zero wei leakage.",
+            "3. **Price Impact Qualification Ceiling:** $0.05\\%$ ($5.0\\text{ bps}$) maximum impact constraint acts as a rigorous qualification boundary to identify and reject oversized simulation trades.",
+            "4. **Closed-Form Capital Multiplier:** Capital efficiency multiplier $M = \\frac{1}{1 - (P_a/P_b)^{1/4}}$ matches numerical simulation within $\\epsilon \\le 10^{-6}$.",
+            "5. **Fundamental AMM Greeks:** Proved analytically and numerically that $\\Delta_{\\text{AMM}}(P) \\equiv x(P)$, $\\Gamma_{\\text{AMM}}(P) < 0$ inside $[P_a, P_b]$ (short straddle), and $IL(P) \\le 0$ everywhere.",
+            "6. **Hook Sandbox Containment:** Unhandled exceptions in custom Uniswap v4 hooks are caught by `HookSandbox`, failing closed without mutating pool state or leaking funds.",
+            "7. **Volatility Breaker & Dynamic Fees:** Short-term price drift $>150\\text{ bps}$ in 60s trips circuit breaker and rejects trades during cool-off; dynamic fees scale linearly with realized volatility.",
+            "8. **Capital Firewall & M18 Isolation:** `real_capital_enabled = False` permanent across all data structures. Zero modification to the 14 Milestone 18 certified files.",
+            "",
+            "---",
+            "",
+            "### 4. Milestone 43 Entry Clearance",
+            "",
+            "With all 8 obligations verified green (100% PASS across 37 M42 unit tests and 8 M42-R qualification gates),",
+            "Milestone 42 is formally certified and cleared for:",
+            "**Milestone 43: Advanced Execution Routing & Cross-Venue Arbitrage Analytics**.",
+        ]
+    )
 
     dossier_path = output_dir / "M42_R_AMM_MICROSTRUCTURE_DOSSIER.md"
     dossier_path.write_text("\n".join(md_lines), encoding="utf-8")
     logger.info(f"Emitted M42-R Markdown Dossier: {dossier_path}")
 
     print("\n=======================================================")
-    print(f"M42-R QUALIFICATION RESULT: {report['qualification_status']} ({report['obligations_passed']}/{report['obligations_evaluated']} PASS)")
+    print(
+        f"M42-R QUALIFICATION RESULT: {report['qualification_status']} ({report['obligations_passed']}/{report['obligations_evaluated']} PASS)"
+    )
     print("=======================================================")
     return 0 if report["qualification_status"] == "QUALIFIED" else 1
 

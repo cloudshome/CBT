@@ -209,8 +209,7 @@ def eth_gates(
                 "check": "btc_direction_gate",
                 "ok": rel_ok,
                 "detail": (
-                    "BTC is strongly bearish — ETH long only if ETH/BTC shows "
-                    "relative strength"
+                    "BTC is strongly bearish — ETH long only if ETH/BTC shows relative strength"
                     if rel_ok
                     else "BTC is strongly bearish — ETH long blocked (BTC first, ETH second)"
                 ),
@@ -224,8 +223,7 @@ def eth_gates(
                 "check": "btc_direction_gate",
                 "ok": rel_ok,
                 "detail": (
-                    "BTC is strongly bullish — ETH short only if ETH/BTC shows "
-                    "relative weakness"
+                    "BTC is strongly bullish — ETH short only if ETH/BTC shows relative weakness"
                     if rel_ok
                     else "BTC is strongly bullish — ETH short blocked (BTC first, ETH second)"
                 ),

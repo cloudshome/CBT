@@ -64,7 +64,9 @@ def find_available_port(start_port: int = DEFAULT_PORT, max_attempts: int = 20) 
     for p in range(start_port, start_port + max_attempts):
         if is_port_available(p):
             return p
-    raise RuntimeError(f"Could not find an available port in range {start_port}-{start_port + max_attempts}")
+    raise RuntimeError(
+        f"Could not find an available port in range {start_port}-{start_port + max_attempts}"
+    )
 
 
 def main() -> None:

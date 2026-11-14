@@ -202,9 +202,7 @@ def trader_state_blocked(db: SignalDB) -> dict:
     return {"blocked": bool(flags), "state": st, "flags": flags}
 
 
-def setup_proven(
-    db: SignalDB, plan_type: str, source_key: str | None = LIVE_SOURCE_KEY
-) -> dict:
+def setup_proven(db: SignalDB, plan_type: str, source_key: str | None = LIVE_SOURCE_KEY) -> dict:
     """Setup-proven gate (decisions A6/B10): >=100 backtest samples AND >=20
     decided paper samples AND positive expectancy.
 
@@ -231,9 +229,7 @@ def setup_proven(
         if st.get("paper_expectancy_net") is None
         else st["paper_expectancy_net"]
     )
-    proven = bool(
-        st["backtest_n"] >= 100 and st["paper_n"] >= 20 and pp_e > 0 and bt_e > 0
-    )
+    proven = bool(st["backtest_n"] >= 100 and st["paper_n"] >= 20 and pp_e > 0 and bt_e > 0)
     return {
         "proven": proven,
         "source_key": source_key,
@@ -279,9 +275,7 @@ def evaluate(
         )
     if ts["blocked"]:
         blocked_by.append(
-            "trader state: "
-            + ", ".join(ts["flags"])
-            + " — no trading while these flags are set"
+            "trader state: " + ", ".join(ts["flags"]) + " — no trading while these flags are set"
         )
 
     proven_check = None
@@ -292,9 +286,7 @@ def evaluate(
             # P12.8 — say *which* condition failed. When the sample floors are
             # met, the setup is unproven because it does not make money net of
             # costs, and reporting only the counts would read as a bug.
-            floors_met = (
-                proven_check["backtest_n"] >= 100 and proven_check["paper_n"] >= 20
-            )
+            floors_met = proven_check["backtest_n"] >= 100 and proven_check["paper_n"] >= 20
             if floors_met:
                 bt_e = (
                     proven_check["backtest_expectancy"]
@@ -317,8 +309,7 @@ def evaluate(
                     f"{proven_check['paper_n']} paper samples"
                 )
             blocked_by.append(
-                f"setup unproven ({plan_type}): {reason} — research only at "
-                f"'{prog['level']}' level"
+                f"setup unproven ({plan_type}): {reason} — research only at '{prog['level']}' level"
             )
 
     details.update(

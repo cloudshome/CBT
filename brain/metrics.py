@@ -79,11 +79,7 @@ def _metrics(rows: list[dict]) -> dict:
 
     gross_profit = sum(wins)
     gross_loss = abs(sum(losses))
-    pf = (
-        (gross_profit / gross_loss)
-        if gross_loss > 0
-        else (99.0 if gross_profit > 0 else None)
-    )
+    pf = (gross_profit / gross_loss) if gross_loss > 0 else (99.0 if gross_profit > 0 else None)
 
     # Streaks
     cur_w, cur_l, max_w, max_l = 0, 0, 0, 0
@@ -176,11 +172,7 @@ def format_metrics(metrics: dict) -> str:
             )
     e = metrics["execution"]
     if e.get("eligible") or e.get("n"):
-        rate = (
-            f"{e['violation_rate'] * 100:.0f}%"
-            if e.get("violation_rate") is not None
-            else "n/a"
-        )
+        rate = f"{e['violation_rate'] * 100:.0f}%" if e.get("violation_rate") is not None else "n/a"
         line = (
             f"  execution       {rate} rule violations "
             f"({e.get('violations', 0)}/{e.get('n', 0)} journaled trades)"
@@ -191,8 +183,6 @@ def format_metrics(metrics: dict) -> str:
     return "\n".join(lines)
 
 
-def compute_business_metrics(
-    db: SignalDB, windows: tuple[int, ...] = (50, 100)
-) -> dict:
+def compute_business_metrics(db: SignalDB, windows: tuple[int, ...] = (50, 100)) -> dict:
     """Convenience alias for business_metrics."""
     return business_metrics(db, windows=windows)

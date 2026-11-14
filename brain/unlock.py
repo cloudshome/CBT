@@ -67,8 +67,7 @@ def setup_progress(db: SignalDB, plan_type: str) -> dict:
             "unit": "samples",
             "action": "backtest",
             "action_label": "Run a backtest",
-            "why": "The setup must be graded over enough history to be more than "
-            "a lucky streak.",
+            "why": "The setup must be graded over enough history to be more than a lucky streak.",
         },
         {
             "name": "Paper samples",
@@ -102,8 +101,7 @@ def setup_progress(db: SignalDB, plan_type: str) -> dict:
             "unit": "R per trade",
             "action": "scorecard",
             "action_label": "Inspect the scorecard",
-            "why": "Forward results must be positive too, or the backtest was "
-            "curve-fitted.",
+            "why": "Forward results must be positive too, or the backtest was curve-fitted.",
         },
     ]
     met = sum(1 for c in criteria if c["met"])
@@ -203,9 +201,7 @@ def _classify(reason: str) -> dict:
     }
 
 
-def explain(
-    db: SignalDB, plan_type: str | None = None, symbol: str | None = None
-) -> dict:
+def explain(db: SignalDB, plan_type: str | None = None, symbol: str | None = None) -> dict:
     """Full 'why am I blocked and what do I do' report for the dashboard."""
     from brain.risk_gate import evaluate, progression
 

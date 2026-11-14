@@ -41,9 +41,7 @@ def _probe_http(url: str, headers: dict | None = None) -> tuple[bool, str]:
     import requests
 
     try:
-        r = requests.get(
-            url, timeout=PROBE_TIMEOUT, headers=headers or {"User-Agent": "SKY/1.0"}
-        )
+        r = requests.get(url, timeout=PROBE_TIMEOUT, headers=headers or {"User-Agent": "SKY/1.0"})
         if r.status_code < 400:
             return True, f"HTTP {r.status_code}"
         return False, f"HTTP {r.status_code}"
@@ -220,8 +218,7 @@ def _probe_account() -> dict:
         return {
             "configured": False,
             "live": False,
-            "detail": "BINANCE_READ_API_KEY / _SECRET not set — SKY shows "
-            "its paper book only",
+            "detail": "BINANCE_READ_API_KEY / _SECRET not set — SKY shows its paper book only",
         }
     snap = acct.snapshot()
     if not snap.get("connected"):
@@ -302,8 +299,7 @@ CONNECTIONS: list[dict] = [
         "id": "dominance",
         "tier": "context",
         "label": "Market cap & BTC dominance",
-        "gives": "Total market cap and BTC dominance — is money rotating into "
-        "or out of alts.",
+        "gives": "Total market cap and BTC dominance — is money rotating into or out of alts.",
         "needs": "Nothing — public CoinGecko API.",
         "how": ["Set DEMO_MODE=0."],
         "probe": _probe_dominance,
@@ -376,8 +372,7 @@ CONNECTIONS: list[dict] = [
         "needs": "A Binance API key with ONLY 'Enable Reading' ticked.",
         "how": [
             "Binance → API Management → Create API key.",
-            "Tick ONLY 'Enable Reading'. Leave every trading and withdrawal "
-            "permission OFF.",
+            "Tick ONLY 'Enable Reading'. Leave every trading and withdrawal permission OFF.",
             "Restrict access to your IP address.",
             "Put it in BINANCE_READ_API_KEY / BINANCE_READ_API_SECRET.",
             "Restart SKY and press Test on this card.",
@@ -438,14 +433,11 @@ def probe_all(ids: list[str] | None = None) -> dict:
     demo = _demo()
     if demo:
         headline = (
-            "DEMO MODE — synthetic data. Set DEMO_MODE=0 in .env and "
-            "restart for the real market."
+            "DEMO MODE — synthetic data. Set DEMO_MODE=0 in .env and restart for the real market."
         )
         level = "degraded"
     elif len(core_live) == core_total:
-        headline = (
-            f"Connected to the real market · {len(live)}/{len(ordered)} links live"
-        )
+        headline = f"Connected to the real market · {len(live)}/{len(ordered)} links live"
         level = "ok"
     elif core_live:
         headline = (

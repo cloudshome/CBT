@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import sqlite3
 import time
 import uuid
 from dataclasses import asdict, dataclass
@@ -959,12 +960,16 @@ class MastermindArbiterCouncil:
 
     def get_recent_decisions(self, limit: int = 50) -> list[dict[str, Any]]:
         """Retrieves audit trail of recent mastermind arbitration decisions."""
+        self._ensure_tables()
         with db_manager.get_brain_conn() as conn:
-            rows = conn.execute(
-                "SELECT * FROM mastermind_decisions ORDER BY timestamp_ms DESC LIMIT ?;",
-                (limit,),
-            ).fetchall()
-        return [dict(r) for r in rows]
+            try:
+                rows = conn.execute(
+                    "SELECT * FROM mastermind_decisions ORDER BY timestamp_ms DESC LIMIT ?;",
+                    (limit,),
+                ).fetchall()
+                return [dict(r) for r in rows]
+            except sqlite3.OperationalError:
+                return []
 
     async def start_loop(self, interval_sec: float = 60.0) -> None:
         """Runs the continuous Mastermind Swarm polling loop in the background."""

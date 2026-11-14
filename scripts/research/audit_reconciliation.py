@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
+
 import pandas as pd
-import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -31,10 +31,10 @@ print("\n--- Family 3 Detailed Breakdown ---")
 if not df_f3.empty:
     print("Breakdown by symbol and timeframe:")
     print(df_f3.groupby(["symbol", "timeframe"]).size())
-    
+
     print("\nColumns in Family 3:")
     print(df_f3.columns.tolist())
-    
+
     # Check BTCUSDT 1h
     btc_1h = df_f3[(df_f3["symbol"] == "BTCUSDT") & (df_f3["timeframe"] == "1h")]
     print(f"\nBTCUSDT 1h F3 trade count: {len(btc_1h)}")
@@ -76,4 +76,3 @@ if not df_bm.empty:
     elif "net_pnl_r" in df_bm.columns:
         print(f"Net PnL sum: {df_bm['net_pnl_r'].sum():.4f}")
         print(f"Mean Net PnL: {df_bm['net_pnl_r'].mean():.4f}")
-

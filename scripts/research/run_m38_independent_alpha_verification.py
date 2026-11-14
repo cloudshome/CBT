@@ -22,9 +22,9 @@ import json
 import logging
 import math
 import sys
-import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -37,10 +37,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger("m38_verification")
 
 # Transaction friction parameters
-BASE_TAKER_FEE_PCT = 0.00040    # 4.0 bps
-BASE_MAKER_FEE_PCT = 0.00020    # 2.0 bps
-BASE_SLIPPAGE_PCT = 0.00010     # 1.0 bps
-BASE_SPREAD_PCT = 0.00010       # 1.0 bps
+BASE_TAKER_FEE_PCT = 0.00040  # 4.0 bps
+BASE_MAKER_FEE_PCT = 0.00020  # 2.0 bps
+BASE_SLIPPAGE_PCT = 0.00010  # 1.0 bps
+BASE_SPREAD_PCT = 0.00010  # 1.0 bps
 BASE_ROUNDTRIP_FRICTION = (BASE_TAKER_FEE_PCT + BASE_SLIPPAGE_PCT + BASE_SPREAD_PCT) * 2  # ~0.12%
 
 
@@ -50,25 +50,82 @@ def compute_sha256(data: str) -> str:
 
 def load_market_data(symbol: str) -> pd.DataFrame:
     logger.info(f"Loading market data for {symbol}...")
-    perp_files = sorted(list((ROOT_DIR / f"data/store/parquet/candles/exchange=binance/market=perp/symbol={symbol}/timeframe=1h").rglob("*.parquet")))
-    df_perp = pd.concat([pd.read_parquet(f) for f in perp_files], ignore_index=True).sort_values("ts").drop_duplicates(subset=["ts"])
+    perp_files = sorted(
+        list(
+            (
+                ROOT_DIR
+                / f"data/store/parquet/candles/exchange=binance/market=perp/symbol={symbol}/timeframe=1h"
+            ).rglob("*.parquet")
+        )
+    )
+    df_perp = (
+        pd.concat([pd.read_parquet(f) for f in perp_files], ignore_index=True)
+        .sort_values("ts")
+        .drop_duplicates(subset=["ts"])
+    )
 
-    spot_files = sorted(list((ROOT_DIR / f"data/store/parquet/candles/exchange=binance/market=spot/symbol={symbol}/timeframe=1h").rglob("*.parquet")))
-    df_spot = pd.concat([pd.read_parquet(f) for f in spot_files], ignore_index=True).sort_values("ts").drop_duplicates(subset=["ts"])
+    spot_files = sorted(
+        list(
+            (
+                ROOT_DIR
+                / f"data/store/parquet/candles/exchange=binance/market=spot/symbol={symbol}/timeframe=1h"
+            ).rglob("*.parquet")
+        )
+    )
+    df_spot = (
+        pd.concat([pd.read_parquet(f) for f in spot_files], ignore_index=True)
+        .sort_values("ts")
+        .drop_duplicates(subset=["ts"])
+    )
 
-    oi_files = sorted(list((ROOT_DIR / f"data/store/derivatives/exchange=binance/market=perp/symbol={symbol}/metric=open_interest").rglob("*.parquet")))
-    df_oi = pd.concat([pd.read_parquet(f) for f in oi_files], ignore_index=True).sort_values("ts").drop_duplicates(subset=["ts"])
+    oi_files = sorted(
+        list(
+            (
+                ROOT_DIR
+                / f"data/store/derivatives/exchange=binance/market=perp/symbol={symbol}/metric=open_interest"
+            ).rglob("*.parquet")
+        )
+    )
+    df_oi = (
+        pd.concat([pd.read_parquet(f) for f in oi_files], ignore_index=True)
+        .sort_values("ts")
+        .drop_duplicates(subset=["ts"])
+    )
 
-    fr_files = sorted(list((ROOT_DIR / f"data/store/derivatives/exchange=binance/market=perp/symbol={symbol}/metric=funding_rate").rglob("*.parquet")))
-    df_fr = pd.concat([pd.read_parquet(f) for f in fr_files], ignore_index=True).sort_values("ts").drop_duplicates(subset=["ts"])
-    df_fr["ts_floor"] = pd.to_datetime(df_fr["ts"], unit="ms", utc=True).dt.floor("h").astype("int64") // 10**6
+    fr_files = sorted(
+        list(
+            (
+                ROOT_DIR
+                / f"data/store/derivatives/exchange=binance/market=perp/symbol={symbol}/metric=funding_rate"
+            ).rglob("*.parquet")
+        )
+    )
+    df_fr = (
+        pd.concat([pd.read_parquet(f) for f in fr_files], ignore_index=True)
+        .sort_values("ts")
+        .drop_duplicates(subset=["ts"])
+    )
+    df_fr["ts_floor"] = (
+        pd.to_datetime(df_fr["ts"], unit="ms", utc=True).dt.floor("h").astype("int64") // 10**6
+    )
 
     # Merge streams
-    df = pd.merge(df_perp[["ts", "open", "high", "low", "close", "volume"]], 
-                  df_spot[["ts", "close"]].rename(columns={"close": "spot_close"}), on="ts", how="inner")
-    df = pd.merge(df, df_oi[["ts", "value"]].rename(columns={"value": "open_interest"}), on="ts", how="inner")
-    df = pd.merge_asof(df.sort_values("ts"), df_fr[["ts_floor", "value"]].rename(columns={"value": "funding_rate"}), 
-                       left_on="ts", right_on="ts_floor", direction="backward")
+    df = pd.merge(
+        df_perp[["ts", "open", "high", "low", "close", "volume"]],
+        df_spot[["ts", "close"]].rename(columns={"close": "spot_close"}),
+        on="ts",
+        how="inner",
+    )
+    df = pd.merge(
+        df, df_oi[["ts", "value"]].rename(columns={"value": "open_interest"}), on="ts", how="inner"
+    )
+    df = pd.merge_asof(
+        df.sort_values("ts"),
+        df_fr[["ts_floor", "value"]].rename(columns={"value": "funding_rate"}),
+        left_on="ts",
+        right_on="ts_floor",
+        direction="backward",
+    )
     df["funding_rate"] = df["funding_rate"].fillna(0.0001)
 
     df["dt"] = pd.to_datetime(df["ts"], unit="ms", utc=True)
@@ -77,7 +134,10 @@ def load_market_data(symbol: str) -> pd.DataFrame:
 
     # Technical indicators
     prev_close = df["close"].shift(1)
-    tr = np.maximum(df["high"] - df["low"], np.maximum(np.abs(df["high"] - prev_close), np.abs(df["low"] - prev_close)))
+    tr = np.maximum(
+        df["high"] - df["low"],
+        np.maximum(np.abs(df["high"] - prev_close), np.abs(df["low"] - prev_close)),
+    )
     df["atr_14"] = tr.rolling(14).mean().bfill()
 
     sma_20 = df["close"].rolling(20).mean()
@@ -99,11 +159,20 @@ def load_market_data(symbol: str) -> pd.DataFrame:
     return df
 
 
-def simulate_strategy(df: pd.DataFrame, signals: pd.Series, direction: str, 
-                      take_profit_r: float, stop_loss_r: float, max_bars_hold: int, 
-                      risk_atr_mult: float = 1.5, friction_mult: float = 1.0, 
-                      entry_delay_bars: int = 1, sl_gap_r: float = 0.0, 
-                      funding_mult: float = 1.0, experiment_id: str = ""):
+def simulate_strategy(
+    df: pd.DataFrame,
+    signals: pd.Series,
+    direction: str,
+    take_profit_r: float,
+    stop_loss_r: float,
+    max_bars_hold: int,
+    risk_atr_mult: float = 1.5,
+    friction_mult: float = 1.0,
+    entry_delay_bars: int = 1,
+    sl_gap_r: float = 0.0,
+    funding_mult: float = 1.0,
+    experiment_id: str = "",
+):
     """
     Parametric simulation engine supporting adversarial stress testing.
     entry_delay_bars: 1 = standard next bar open; 2 = delayed entry by 1 additional bar.
@@ -162,7 +231,7 @@ def simulate_strategy(df: pd.DataFrame, signals: pd.Series, direction: str,
                     exit_triggered = True
                     exit_price = closes[i]
                     exit_reason = "MAX_HOLD"
-            else: # SHORT
+            else:  # SHORT
                 if highs[i] >= sl_price:
                     exit_triggered = True
                     exit_price = sl_price
@@ -182,30 +251,32 @@ def simulate_strategy(df: pd.DataFrame, signals: pd.Series, direction: str,
                     gross_pnl_usd = exit_price - entry_price
                 else:
                     gross_pnl_usd = entry_price - exit_price
-                
+
                 gross_r = gross_pnl_usd / risk_usd
                 friction_r = (roundtrip_friction * entry_price) / risk_usd
                 funding_r = (accumulated_funding * entry_price) / risk_usd
                 net_r = gross_r - friction_r + funding_r - extra_sl_cost_r
 
-                trades.append({
-                    "experiment_id": experiment_id,
-                    "partition": trade_partition,
-                    "direction": direction,
-                    "signal_ts": int(ts_arr[entry_bar - entry_delay_bars]),
-                    "entry_ts": int(ts_arr[entry_bar]),
-                    "exit_ts": int(ts_arr[i]),
-                    "entry_price": float(entry_price),
-                    "exit_price": float(exit_price),
-                    "exit_reason": exit_reason,
-                    "bars_held": bars_held,
-                    "gross_r": round(float(gross_r), 4),
-                    "friction_r": round(float(friction_r), 4),
-                    "funding_r": round(float(funding_r), 4),
-                    "sl_gap_r": round(float(extra_sl_cost_r), 4),
-                    "net_r": round(float(net_r), 4),
-                    "win": 1 if net_r > 0 else 0
-                })
+                trades.append(
+                    {
+                        "experiment_id": experiment_id,
+                        "partition": trade_partition,
+                        "direction": direction,
+                        "signal_ts": int(ts_arr[entry_bar - entry_delay_bars]),
+                        "entry_ts": int(ts_arr[entry_bar]),
+                        "exit_ts": int(ts_arr[i]),
+                        "entry_price": float(entry_price),
+                        "exit_price": float(exit_price),
+                        "exit_reason": exit_reason,
+                        "bars_held": bars_held,
+                        "gross_r": round(float(gross_r), 4),
+                        "friction_r": round(float(friction_r), 4),
+                        "funding_r": round(float(funding_r), 4),
+                        "sl_gap_r": round(float(extra_sl_cost_r), 4),
+                        "net_r": round(float(net_r), 4),
+                        "win": 1 if net_r > 0 else 0,
+                    }
+                )
                 in_pos = False
 
         # Signal execution check with entry delay
@@ -247,7 +318,7 @@ def evaluate_trade_set(trades: list) -> dict:
             "ci_95_low": 0.0,
             "ci_95_high": 0.0,
             "skewness": 0.0,
-            "kurtosis": 0.0
+            "kurtosis": 0.0,
         }
 
     net_returns = np.array([t["net_r"] for t in trades])
@@ -291,11 +362,13 @@ def evaluate_trade_set(trades: list) -> dict:
         "ci_95_low": ci_low,
         "ci_95_high": ci_high,
         "skewness": round(skew, 3),
-        "kurtosis": round(kurt, 3)
+        "kurtosis": round(kurt, 3),
     }
 
 
-def compute_deflated_sharpe_ratio(sr_hat: float, n_obs: int, skew: float, kurt: float, n_trials: int = 26) -> float:
+def compute_deflated_sharpe_ratio(
+    sr_hat: float, n_obs: int, skew: float, kurt: float, n_trials: int = 26
+) -> float:
     """
     Computes Deflated Sharpe Ratio (Bailey & López de Prado, 2014) adjusting for selection bias over n_trials.
     """
@@ -303,9 +376,11 @@ def compute_deflated_sharpe_ratio(sr_hat: float, n_obs: int, skew: float, kurt: 
         return 0.0
     # Expected maximum Sharpe under null hypothesis (Euler-Mascheroni approximation)
     gamma = 0.5772156649
-    sr_star = (1.0 - gamma) * stats.norm.ppf(1.0 - 1.0 / n_trials) + gamma * stats.norm.ppf(1.0 - 1.0 / (n_trials * math.e))
+    sr_star = (1.0 - gamma) * stats.norm.ppf(1.0 - 1.0 / n_trials) + gamma * stats.norm.ppf(
+        1.0 - 1.0 / (n_trials * math.e)
+    )
     # Standard deviation of Sharpe estimator with non-normal returns
-    var_sr = (1.0 - skew * sr_hat + ((kurt - 1.0) / 4.0) * (sr_hat ** 2)) / (n_obs - 1)
+    var_sr = (1.0 - skew * sr_hat + ((kurt - 1.0) / 4.0) * (sr_hat**2)) / (n_obs - 1)
     if var_sr <= 0:
         return 0.0
     z = (sr_hat - sr_star) / math.sqrt(var_sr)
@@ -325,11 +400,15 @@ def clustered_bootstrap_ci(trades: list, block_size: int = 5, n_resamples: int =
     np.random.seed(42)
     boot_means = []
     for _ in range(n_resamples):
-        sampled_blocks = [blocks[idx] for idx in np.random.choice(len(blocks), size=len(blocks), replace=True)]
+        sampled_blocks = [
+            blocks[idx] for idx in np.random.choice(len(blocks), size=len(blocks), replace=True)
+        ]
         resampled_series = np.concatenate(sampled_blocks)
         boot_means.append(np.mean(resampled_series))
 
-    return round(float(np.percentile(boot_means, 2.5)), 4), round(float(np.percentile(boot_means, 97.5)), 4)
+    return round(float(np.percentile(boot_means, 2.5)), 4), round(
+        float(np.percentile(boot_means, 97.5)), 4
+    )
 
 
 def main():
@@ -356,8 +435,8 @@ def main():
         "discrepancy_investigation_2450": {
             "root_cause_1_trade_ledger": "Family 1 in independent_edges_trade_ledger.jsonl contains exactly 2,481 total simulated trades across 4 asset/timeframe slices (BTC 1h: 1029, BTC 4h: 240, ETH 1h: 997, ETH 4h: 215). Informal rounding in executive communication cited '~2,450 records'.",
             "root_cause_2_calendar_horizon": "The difference between 42,078 recorded perpetual hourly bars (ending 2026-10-20 05:00 UTC) and the theoretical 5.0 full calendar years (44,528 hours through 2027-01-31) is exactly 2,450 hours (102.08 calendar days).",
-            "audit_verdict": "RECONCILED. No missing data inside the active 2022-01-01 to 2026-10-20 research window. Inner-merged stream is 100% synchronized across 42,009 hourly observations with 0 gaps."
-        }
+            "audit_verdict": "RECONCILED. No missing data inside the active 2022-01-01 to 2026-10-20 research window. Inner-merged stream is 100% synchronized across 42,009 hourly observations with 0 gaps.",
+        },
     }
 
     # -------------------------------------------------------------
@@ -375,7 +454,7 @@ def main():
         "take_profit_r": 2.0,
         "risk_unit": "1.5 * atr_14",
         "max_hold_bars": 24,
-        "frictions": "Taker entry 0.04%, Maker exit 0.02%, Slippage 0.01%, Spread 0.01%, 8h funding settlement payments"
+        "frictions": "Taker entry 0.04%, Maker exit 0.02%, Slippage 0.01%, Spread 0.01%, 8h funding settlement payments",
     }
     h5_def = {
         "strategy_id": "H5_OI_COMPRESSION_BREAKDOWN_SHORT_ETH",
@@ -388,7 +467,7 @@ def main():
         "take_profit_r": 2.5,
         "risk_unit": "1.5 * atr_14",
         "max_hold_bars": 72,
-        "frictions": "Taker entry 0.04%, Maker exit 0.02%, Slippage 0.01%, Spread 0.01%, 8h funding settlement payments"
+        "frictions": "Taker entry 0.04%, Maker exit 0.02%, Slippage 0.01%, Spread 0.01%, 8h funding settlement payments",
     }
     h3_sha = compute_sha256(json.dumps(h3_def, sort_keys=True))
     h5_sha = compute_sha256(json.dumps(h5_def, sort_keys=True))
@@ -397,11 +476,8 @@ def main():
 
     hypothesis_manifest = {
         "manifest_version": "M38-HYPOTHESIS-FREEZE",
-        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
-        "candidates": {
-            "H3_BTC": h3_def,
-            "H5_ETH": h5_def
-        }
+        "generated_at_utc": datetime.now(UTC).isoformat(),
+        "candidates": {"H3_BTC": h3_def, "H5_ETH": h5_def},
     }
     with open(ROOT_DIR / "research" / "m38_hypothesis_manifest.json", "w", encoding="utf-8") as f:
         json.dump(hypothesis_manifest, f, indent=2)
@@ -410,12 +486,20 @@ def main():
     # PHASE 3: MULTI-TIMEFRAME REPLICATION & 1H BASELINE
     # -------------------------------------------------------------
     logger.info("Phase 3: Running 1H baseline and evaluating multi-timeframe availability...")
-    sig_h3_btc = (btc_df["oi_pct_chg_1h"] <= -0.04) & (btc_df["close"] < btc_df["open"] - 0.8 * btc_df["atr_14"])
-    h3_btc_trades = simulate_strategy(btc_df, sig_h3_btc, "LONG", 2.0, 1.0, 24, experiment_id="H3_BTC_1H_BASELINE")
+    sig_h3_btc = (btc_df["oi_pct_chg_1h"] <= -0.04) & (
+        btc_df["close"] < btc_df["open"] - 0.8 * btc_df["atr_14"]
+    )
+    h3_btc_trades = simulate_strategy(
+        btc_df, sig_h3_btc, "LONG", 2.0, 1.0, 24, experiment_id="H3_BTC_1H_BASELINE"
+    )
 
-    compression_eth = (eth_df["bb_width"] <= eth_df["bb_width_q20"]) & (eth_df["oi_pct_chg_24h"] >= 0.03)
+    compression_eth = (eth_df["bb_width"] <= eth_df["bb_width_q20"]) & (
+        eth_df["oi_pct_chg_24h"] >= 0.03
+    )
     sig_h5_eth = compression_eth & (eth_df["close"] < eth_df["bb_lower"])
-    h5_eth_trades = simulate_strategy(eth_df, sig_h5_eth, "SHORT", 2.5, 1.0, 72, experiment_id="H5_ETH_1H_BASELINE")
+    h5_eth_trades = simulate_strategy(
+        eth_df, sig_h5_eth, "SHORT", 2.5, 1.0, 72, experiment_id="H5_ETH_1H_BASELINE"
+    )
 
     eval_h3 = evaluate_trade_set(h3_btc_trades)
     eval_h5 = evaluate_trade_set(h5_eth_trades)
@@ -438,11 +522,15 @@ def main():
         n_eff = round(n * (1.0 - abs(autocorr_1)) / (1.0 + abs(autocorr_1)), 1)
 
         # 2. Clustered Block Bootstrap
-        ci_block_low, ci_block_high = clustered_bootstrap_ci(trades, block_size=3, n_resamples=10000)
+        ci_block_low, ci_block_high = clustered_bootstrap_ci(
+            trades, block_size=3, n_resamples=10000
+        )
 
         # 3. Deflated Sharpe Ratio
         sr_per_trade = full_eval["sharpe_trade"] / math.sqrt(n) if n > 0 else 0.0
-        dsr = compute_deflated_sharpe_ratio(sr_per_trade, n, full_eval["skewness"], full_eval["kurtosis"], n_trials=26)
+        dsr = compute_deflated_sharpe_ratio(
+            sr_per_trade, n, full_eval["skewness"], full_eval["kurtosis"], n_trials=26
+        )
 
         # 4. Partition Walk-Forward
         train_t = [t for t in trades if t["partition"] == "TRAIN"]
@@ -470,8 +558,27 @@ def main():
             "val_expectancy_r": eval_v["expectancy_r"],
             "oos_expectancy_r": eval_o["expectancy_r"],
             "oos_trade_count": eval_o["trade_count"],
-            "ulcer_index": round(float(np.sqrt(np.mean(np.square((100 + np.cumsum(returns) - np.maximum.accumulate(100 + np.cumsum(returns))) / 100 * 100)))), 3),
-            "cvar_95_r": round(float(np.mean(returns[returns <= np.percentile(returns, 5)])), 4) if len(returns) > 10 else 0.0
+            "ulcer_index": round(
+                float(
+                    np.sqrt(
+                        np.mean(
+                            np.square(
+                                (
+                                    100
+                                    + np.cumsum(returns)
+                                    - np.maximum.accumulate(100 + np.cumsum(returns))
+                                )
+                                / 100
+                                * 100
+                            )
+                        )
+                    )
+                ),
+                3,
+            ),
+            "cvar_95_r": round(float(np.mean(returns[returns <= np.percentile(returns, 5)])), 4)
+            if len(returns) > 10
+            else 0.0,
         }
 
     stat_h3 = run_10_pillars(h3_btc_trades, eval_h3, "H3_BTC")
@@ -483,18 +590,64 @@ def main():
     logger.info("Phase 5: Running Adversarial Execution Testing...")
     adversarial_results = {}
 
-    def run_adversarial_suite(df: pd.DataFrame, signals: pd.Series, direction: str, 
-                              tp: float, sl: float, max_h: int, base_eval: dict, strat_id: str):
+    def run_adversarial_suite(
+        df: pd.DataFrame,
+        signals: pd.Series,
+        direction: str,
+        tp: float,
+        sl: float,
+        max_h: int,
+        base_eval: dict,
+        strat_id: str,
+    ):
         # 1. 1.5x Frictions
-        tr_15x = simulate_strategy(df, signals, direction, tp, sl, max_h, friction_mult=1.5, experiment_id=f"{strat_id}_1.5X_COSTS")
+        tr_15x = simulate_strategy(
+            df,
+            signals,
+            direction,
+            tp,
+            sl,
+            max_h,
+            friction_mult=1.5,
+            experiment_id=f"{strat_id}_1.5X_COSTS",
+        )
         # 2. 2.5x Frictions
-        tr_25x = simulate_strategy(df, signals, direction, tp, sl, max_h, friction_mult=2.5, experiment_id=f"{strat_id}_2.5X_COSTS")
+        tr_25x = simulate_strategy(
+            df,
+            signals,
+            direction,
+            tp,
+            sl,
+            max_h,
+            friction_mult=2.5,
+            experiment_id=f"{strat_id}_2.5X_COSTS",
+        )
         # 3. Delayed Entry by 1 bar (execution latency)
-        tr_delay = simulate_strategy(df, signals, direction, tp, sl, max_h, entry_delay_bars=2, experiment_id=f"{strat_id}_DELAYED_ENTRY")
+        tr_delay = simulate_strategy(
+            df,
+            signals,
+            direction,
+            tp,
+            sl,
+            max_h,
+            entry_delay_bars=2,
+            experiment_id=f"{strat_id}_DELAYED_ENTRY",
+        )
         # 4. Stop-Loss Gap Slippage (-0.20R gap)
-        tr_sl_gap = simulate_strategy(df, signals, direction, tp, sl, max_h, sl_gap_r=0.20, experiment_id=f"{strat_id}_SL_GAP")
+        tr_sl_gap = simulate_strategy(
+            df, signals, direction, tp, sl, max_h, sl_gap_r=0.20, experiment_id=f"{strat_id}_SL_GAP"
+        )
         # 5. Funding Shock (2.0x adverse funding)
-        tr_fund_shock = simulate_strategy(df, signals, direction, tp, sl, max_h, funding_mult=2.0, experiment_id=f"{strat_id}_FUNDING_SHOCK")
+        tr_fund_shock = simulate_strategy(
+            df,
+            signals,
+            direction,
+            tp,
+            sl,
+            max_h,
+            funding_mult=2.0,
+            experiment_id=f"{strat_id}_FUNDING_SHOCK",
+        )
 
         return {
             "base_expectancy_r": base_eval["expectancy_r"],
@@ -503,7 +656,9 @@ def main():
             "delayed_entry_expectancy_r": evaluate_trade_set(tr_delay)["expectancy_r"],
             "sl_gap_expectancy_r": evaluate_trade_set(tr_sl_gap)["expectancy_r"],
             "funding_shock_expectancy_r": evaluate_trade_set(tr_fund_shock)["expectancy_r"],
-            "breakeven_cost_multiplier": round(base_eval["expectancy_r"] / (BASE_ROUNDTRIP_FRICTION * 1.5) + 1.0, 2)
+            "breakeven_cost_multiplier": round(
+                base_eval["expectancy_r"] / (BASE_ROUNDTRIP_FRICTION * 1.5) + 1.0, 2
+            ),
         }
 
     adv_h3 = run_adversarial_suite(btc_df, sig_h3_btc, "LONG", 2.0, 1.0, 24, eval_h3, "H3_BTC")
@@ -521,7 +676,7 @@ def main():
 
     # Record sample shadow entry for protocol verification
     sample_shadow_entry = {
-        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "timestamp_utc": datetime.now(UTC).isoformat(),
         "strategy_id": "H3_BTC_OI_FLUSH",
         "symbol": "BTCUSDT",
         "action": "OBSERVE_ONLY_NO_ORDER",
@@ -529,7 +684,7 @@ def main():
         "current_price": float(btc_df["close"].iloc[-1]),
         "signal_state": bool(sig_h3_btc.iloc[-1]),
         "execution_permission": "DENIED_RESEARCH_ONLY",
-        "notes": "Prospective shadow logging active; zero execution bypass."
+        "notes": "Prospective shadow logging active; zero execution bypass.",
     }
     with open(shadow_ledger_path, "a", encoding="utf-8") as f:
         f.write(json.dumps(sample_shadow_entry) + "\n")
@@ -546,7 +701,11 @@ def main():
     def classify_candidate(stat_dict: dict, adv_dict: dict) -> str:
         if stat_dict["oos_trade_count"] < 10:
             return "RESEARCH_CANDIDATE / NEEDS_MORE_OOS_DATA"
-        if stat_dict["oos_expectancy_r"] > 0 and adv_dict["cost_1_5x_expectancy_r"] > 0 and stat_dict["deflated_sharpe_ratio"] > 0.80:
+        if (
+            stat_dict["oos_expectancy_r"] > 0
+            and adv_dict["cost_1_5x_expectancy_r"] > 0
+            and stat_dict["deflated_sharpe_ratio"] > 0.80
+        ):
             return "INDEPENDENT_OOS_CANDIDATE"
         return "REJECTED"
 
@@ -556,21 +715,21 @@ def main():
     validation_results = {
         "metadata": {
             "milestone": "M38-INDEPENDENT-ALPHA-VERIFICATION",
-            "timestamp_utc": datetime.now(timezone.utc).isoformat(),
-            "data_audit": data_audit_findings
+            "timestamp_utc": datetime.now(UTC).isoformat(),
+            "data_audit": data_audit_findings,
         },
         "H3_BTC_OI_FLUSH": {
             "baseline_metrics": eval_h3,
             "statistical_certification": stat_h3,
             "adversarial_stress_testing": adv_h3,
-            "governance_classification": class_h3
+            "governance_classification": class_h3,
         },
         "H5_ETH_OI_COMPRESSION": {
             "baseline_metrics": eval_h5,
             "statistical_certification": stat_h5,
             "adversarial_stress_testing": adv_h5,
-            "governance_classification": class_h5
-        }
+            "governance_classification": class_h5,
+        },
     }
 
     with open(ROOT_DIR / "research" / "m38_validation_results.json", "w", encoding="utf-8") as f:
@@ -582,11 +741,12 @@ def main():
         for t in all_m38_trades:
             f.write(json.dumps(t) + "\n")
 
-    logger.info(f"Emitted research/m38_validation_results.json and experiment ledger ({len(all_m38_trades)} trades).")
+    logger.info(
+        f"Emitted research/m38_validation_results.json and experiment ledger ({len(all_m38_trades)} trades)."
+    )
     logger.info(f"H3 Classification: {class_h3}")
     logger.info(f"H5 Classification: {class_h5}")
 
 
 if __name__ == "__main__":
     main()
-

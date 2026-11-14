@@ -27,15 +27,13 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import platform
 import shutil
 import sqlite3
 import sys
 import tarfile
 import tempfile
-import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -121,7 +119,9 @@ def show_status() -> None:
     print(f"    • Research Sources       : {stats['research_sources_rows']:,}")
     print(f"    • Epistemic Claims       : {stats['research_claims_rows']:,}")
     print(f"    • Markdown Article Files : {stats['articles_markdown_count']:,}")
-    print(f"[*] Raw Uploads Vault (PDFs) : {stats['uploads_count']:,} files ({stats['uploads_size_mb']} MB)")
+    print(
+        f"[*] Raw Uploads Vault (PDFs) : {stats['uploads_count']:,} files ({stats['uploads_size_mb']} MB)"
+    )
     print(f"[*] Brain Provenance DB      : {'FOUND' if stats['brain_db_exists'] else 'NOT FOUND'}")
     print(f"    • Provenance Records     : {stats['provenance_rows']:,}")
     print(f"    • Strategy Candidates    : {stats['strategy_rows']:,}")
@@ -155,13 +155,15 @@ def checkpoint_sqlite_db(src: Path, dest: Path) -> None:
 
 def export_vault(output_path: Path | None = None) -> Path:
     """Creates a complete compressed research vault bundle."""
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     if not output_path:
         output_path = ROOT_DIR / f"cbt_research_vault_bundle_{timestamp}.tar.gz"
 
     stats = get_vault_stats()
     print(f"[*] Packaging Research Vault into: {output_path.name}...")
-    print(f"    • Capturing {stats['wiki_articles_rows']} wiki articles, {stats['uploads_count']} uploaded PDFs...")
+    print(
+        f"    • Capturing {stats['wiki_articles_rows']} wiki articles, {stats['uploads_count']} uploaded PDFs..."
+    )
 
     with tempfile.TemporaryDirectory(prefix="cbt_vault_export_") as tmp_dir:
         tmp_path = Path(tmp_dir)
@@ -170,7 +172,7 @@ def export_vault(output_path: Path | None = None) -> Path:
 
         manifest: dict[str, Any] = {
             "version": "1.0",
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
             "exported_from_os": platform.system(),
             "node_hostname": platform.node(),
             "stats": stats,
@@ -244,7 +246,7 @@ def export_vault(output_path: Path | None = None) -> Path:
     print("=" * 68)
     print("Next Steps:")
     print("1. Copy this bundle file to your other machine (via Google Drive, USB, or scp).")
-    print(f"2. On the other machine, run:")
+    print("2. On the other machine, run:")
     print(f"   python scripts/sync_research_vault.py --import {output_path.name}")
     print("=" * 68)
     return output_path
@@ -276,14 +278,20 @@ def inspect_bundle(bundle_path: Path) -> dict[str, Any]:
     print("=" * 68)
     print("   📦 CBT RESEARCH VAULT BUNDLE INSPECTION   ")
     print("=" * 68)
-    print(f"[*] Bundle File       : {bundle_path.name} ({round(bundle_path.stat().st_size / (1024*1024), 2)} MB)")
+    print(
+        f"[*] Bundle File       : {bundle_path.name} ({round(bundle_path.stat().st_size / (1024 * 1024), 2)} MB)"
+    )
     print(f"[*] Created At        : {manifest.get('created_at')}")
-    print(f"[*] Exported From OS  : {manifest.get('exported_from_os')} (Host: {manifest.get('node_hostname')})")
+    print(
+        f"[*] Exported From OS  : {manifest.get('exported_from_os')} (Host: {manifest.get('node_hostname')})"
+    )
     stats = manifest.get("stats", {})
     print(f"[*] Wiki Articles     : {stats.get('wiki_articles_rows', 0):,}")
     print(f"[*] Research Sources  : {stats.get('research_sources_rows', 0):,}")
     print(f"[*] Epistemic Claims  : {stats.get('research_claims_rows', 0):,}")
-    print(f"[*] Uploaded PDFs     : {stats.get('uploads_count', 0):,} ({stats.get('uploads_size_mb', 0)} MB)")
+    print(
+        f"[*] Uploaded PDFs     : {stats.get('uploads_count', 0):,} ({stats.get('uploads_size_mb', 0)} MB)"
+    )
     print(f"[*] Total Files Stored: {len(manifest.get('files', {})):,}")
     print("=" * 68)
     return manifest
@@ -292,7 +300,7 @@ def inspect_bundle(bundle_path: Path) -> dict[str, Any]:
 def import_vault(bundle_path: Path, force: bool = False) -> None:
     """Safely extracts bundle contents into local data/ directory with auto-backup."""
     manifest = inspect_bundle(bundle_path)
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
 
     print(f"\n[*] Preparing to import into: {DATA_DIR}...")
     DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -378,10 +386,14 @@ def import_vault(bundle_path: Path, force: bool = False) -> None:
 def main():
     parser = argparse.ArgumentParser(description="Deterministic Research Vault Sync Utility")
     parser.add_argument("--status", action="store_true", help="Display local research vault status")
-    parser.add_argument("--export", action="store_true", help="Export research vault to compressed bundle")
+    parser.add_argument(
+        "--export", action="store_true", help="Export research vault to compressed bundle"
+    )
     parser.add_argument("-o", "--output", type=Path, help="Custom export output path")
     parser.add_argument("--inspect", type=Path, help="Inspect existing vault bundle manifest")
-    parser.add_argument("--import", dest="import_bundle", type=Path, help="Import vault bundle into local CBT")
+    parser.add_argument(
+        "--import", dest="import_bundle", type=Path, help="Import vault bundle into local CBT"
+    )
     parser.add_argument("--force", action="store_true", help="Force overwrite without confirmation")
 
     args = parser.parse_args()
@@ -401,4 +413,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

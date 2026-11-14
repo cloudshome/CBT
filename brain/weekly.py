@@ -247,9 +247,7 @@ def _graduation_tracker(db: SignalDB) -> list[dict]:
         e_net = p.get("expectancy_net")
         missing: list[str] = []
         if bt_n < bt_t:
-            missing.append(
-                f"{bt_t - bt_n} more unique backtest samples ({bt_n}/{bt_t})"
-            )
+            missing.append(f"{bt_t - bt_n} more unique backtest samples ({bt_n}/{bt_t})")
         if pp_n < pp_t:
             missing.append(f"{pp_t - pp_n} more real paper samples ({pp_n}/{pp_t})")
         if bt_n >= bt_t and pp_n >= pp_t and (e_net is None or e_net < bar_e):
@@ -296,15 +294,11 @@ def _next_task(review: dict) -> dict:
                 "journal-first gate (W3.3) will hold your next approval "
                 "until this is done."
             ),
-            "action": "unjournaled scans: "
-            + ", ".join(f"#{s}" for s in v["missing_scan_ids"])
+            "action": "unjournaled scans: " + ", ".join(f"#{s}" for s in v["missing_scan_ids"])
             if v["missing_scan_ids"]
             else "open the Journal tab",
         }
-    if (
-        v["compliance"] is not None
-        and v["compliance"] < GRADUATION_CRITERIA["compliance"]
-    ):
+    if v["compliance"] is not None and v["compliance"] < GRADUATION_CRITERIA["compliance"]:
         top = next(iter(v["by_mistake"]), None)
         return {
             "name": "discipline",
@@ -419,9 +413,7 @@ def _grade(review: dict) -> dict:
     e = week["expectancy_net"]
     pts = 25 if (e is not None and e > 0) else (12 if e == 0 else 0)
     score += pts
-    comps.append(
-        {"name": "week net expectancy > 0R", "current": e, "points": pts, "max": 25}
-    )
+    comps.append({"name": "week net expectancy > 0R", "current": e, "points": pts, "max": 25})
     # 5. expectancy trend not degrading vs all-time (15%)
     all_e = review["all_time"]["expectancy_net"]
     pts = 15 if (e is None or all_e is None or e >= all_e) else 0
@@ -543,9 +535,7 @@ def format_weekly_review(review: dict) -> str:
     if w["n"] == 0 and a["n"] == 0:
         lines.append("  No decided real paper trades yet — approve candidates, let the")
         lines.append("  paper runner close them, and journal every outcome. This page")
-        lines.append(
-            "  fills in as your own decisions land. Simulator rows never count."
-        )
+        lines.append("  fills in as your own decisions land. Simulator rows never count.")
     dd = review["drawdown"]
     lines.append(
         f"  drawdown       {dd.get('max_drawdown_pct', 0.0):.2f}% max   "
@@ -578,11 +568,7 @@ def format_weekly_review(review: dict) -> str:
     if review["graduation_tracker"]:
         lines.append("  graduation tracker (per setup, canonical live only):")
         for t in review["graduation_tracker"]:
-            mark = (
-                "✓ proven"
-                if t["proven"]
-                else "· " + ("; ".join(t["missing"]) or "watching")
-            )
+            mark = "✓ proven" if t["proven"] else "· " + ("; ".join(t["missing"]) or "watching")
             lines.append(
                 f"    {t['plan_type']:<26} bt {t['backtest_n']}/{t['backtest_target']}"
                 f"  paper {t['paper_n']}/{t['paper_target']}  {mark}"

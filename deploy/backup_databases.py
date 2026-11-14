@@ -28,10 +28,14 @@ def get_db_files(data_dir: Path) -> list[Path]:
     """Finds all SQLite database files in the data directory."""
     if not data_dir.exists():
         return []
-    
+
     # Common SQLite filenames in SKY
     db_extensions = {".db", ".sqlite", ".sqlite3"}
-    db_files = [p for p in data_dir.glob("*") if p.suffix in db_extensions and not p.name.endswith("-wal") and not p.name.endswith("-shm")]
+    db_files = [
+        p
+        for p in data_dir.glob("*")
+        if p.suffix in db_extensions and not p.name.endswith("-wal") and not p.name.endswith("-shm")
+    ]
     return db_files
 
 
@@ -40,10 +44,10 @@ def backup_single_database(source_path: Path, dest_path: Path) -> bool:
     try:
         source_conn = sqlite3.connect(str(source_path), timeout=30.0)
         dest_conn = sqlite3.connect(str(dest_path))
-        
+
         with dest_conn:
             source_conn.backup(dest_conn, pages=100, sleep=0.01)
-        
+
         dest_conn.close()
         source_conn.close()
         logger.info(f"Successfully backed up {source_path.name} -> {dest_path.name}")
@@ -106,9 +110,13 @@ def run_backup(data_dir: Path, backup_root: Path, retention_days: int = 14) -> d
 
 def main():
     parser = argparse.ArgumentParser(description="SKY / CTB SQLite Online Database Backup Tool")
-    parser.add_argument("--data-dir", default=os.getenv("DATA_DIR", "data"), help="Path to data directory")
+    parser.add_argument(
+        "--data-dir", default=os.getenv("DATA_DIR", "data"), help="Path to data directory"
+    )
     parser.add_argument("--backup-dir", default=None, help="Path to backup storage directory")
-    parser.add_argument("--retention-days", type=int, default=14, help="Days to retain historical backups")
+    parser.add_argument(
+        "--retention-days", type=int, default=14, help="Days to retain historical backups"
+    )
     args = parser.parse_args()
 
     data_path = Path(args.data_dir)

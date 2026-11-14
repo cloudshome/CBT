@@ -25,8 +25,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from core.sky_intelligence import DecisionAction, sky_orchestrator  # noqa: E402
-from scripts.research.production_orchestrator_replay import (  # noqa: E402
+from core.sky_intelligence import DecisionAction, sky_orchestrator
+from scripts.research.production_orchestrator_replay import (
     ASSET_CONFIGS,
     AssetFrictionConfig,
     ReplayPortfolioEngine,
@@ -61,21 +61,23 @@ def run_full_reconciliation() -> dict[str, Any]:
         reconciled_final = init_eq + pure_gross_pnl - fees - slippage - funding
         delta = round(reconciled_final - final_eq, 4)
 
-        reconciliation_results.append({
-            "window_name": name,
-            "date_range": f"{start_dt[:10]} to {end_dt[:10]}",
-            "initial_equity": init_eq,
-            "pure_gross_pnl": round(pure_gross_pnl, 2),
-            "trading_fees": round(fees, 2),
-            "spread_and_slippage": round(slippage, 2),
-            "funding_fees": round(funding, 2),
-            "net_pnl": round(net_pnl, 2),
-            "final_equity": round(final_eq, 2),
-            "reconciled_final_equity": round(reconciled_final, 2),
-            "accounting_delta": delta,
-            "policy_a_raw": p_a,
-            "policy_b_raw": res["policy_b"],
-        })
+        reconciliation_results.append(
+            {
+                "window_name": name,
+                "date_range": f"{start_dt[:10]} to {end_dt[:10]}",
+                "initial_equity": init_eq,
+                "pure_gross_pnl": round(pure_gross_pnl, 2),
+                "trading_fees": round(fees, 2),
+                "spread_and_slippage": round(slippage, 2),
+                "funding_fees": round(funding, 2),
+                "net_pnl": round(net_pnl, 2),
+                "final_equity": round(final_eq, 2),
+                "reconciled_final_equity": round(reconciled_final, 2),
+                "accounting_delta": delta,
+                "policy_a_raw": p_a,
+                "policy_b_raw": res["policy_b"],
+            }
+        )
 
     return {"reconciliation_table": reconciliation_results}
 
@@ -101,18 +103,26 @@ def run_displacement_controlled_experiment(db_path: str) -> dict[str, Any]:
         candles_4h[sym] = c4
         ts_4h[sym] = [c["timestamp"] for c in c4]
 
-    common_ts = set(c["timestamp"] for c in candles_1h["BTC/USDT"] if start_ms <= c["timestamp"] <= end_ms)
+    common_ts = set(
+        c["timestamp"] for c in candles_1h["BTC/USDT"] if start_ms <= c["timestamp"] <= end_ms
+    )
     for sym in symbols[1:]:
-        common_ts.intersection_update(c["timestamp"] for c in candles_1h[sym] if start_ms <= c["timestamp"] <= end_ms)
+        common_ts.intersection_update(
+            c["timestamp"] for c in candles_1h[sym] if start_ms <= c["timestamp"] <= end_ms
+        )
     sorted_timeline = sorted(list(common_ts))
 
-    c1h_idx_map = {sym: {c["timestamp"]: idx for idx, c in enumerate(candles_1h[sym])} for sym in symbols}
+    c1h_idx_map = {
+        sym: {c["timestamp"]: idx for idx, c in enumerate(candles_1h[sym])} for sym in symbols
+    }
 
     capacities = [1, 2]
     experiment_results = {}
 
     for cap in capacities:
-        port_fcfs = ReplayPortfolioEngine(policy_name=f"FCFS_cap_{cap}", max_positions=cap, use_displacement=False)
+        port_fcfs = ReplayPortfolioEngine(
+            policy_name=f"FCFS_cap_{cap}", max_positions=cap, use_displacement=False
+        )
         port_arb = ReplayPortfolioEngine(
             policy_name=f"Arb_cap_{cap}",
             max_positions=cap,
@@ -143,7 +153,10 @@ def run_displacement_controlled_experiment(db_path: str) -> dict[str, Any]:
                     candles_by_tf=tf_map,
                     simulated_now_ms=curr_ts,
                 )
-                if out.decision in (DecisionAction.LONG, DecisionAction.SHORT) and out.setup_qualified:
+                if (
+                    out.decision in (DecisionAction.LONG, DecisionAction.SHORT)
+                    and out.setup_qualified
+                ):
                     next_open = candles_1h[sym][idx + 1]["open"]
                     future_c = candles_1h[sym][idx + 1 : idx + 120]
                     signals.append((sym, out, next_open, future_c))
@@ -196,7 +209,9 @@ def run_displacement_controlled_experiment(db_path: str) -> dict[str, Any]:
     return experiment_results
 
 
-def run_drawdown_and_risk_analytics(equity_curve: list[tuple[int, float]], closed_positions: list[Any]) -> dict[str, Any]:
+def run_drawdown_and_risk_analytics(
+    equity_curve: list[tuple[int, float]], closed_positions: list[Any]
+) -> dict[str, Any]:
     """Task 5: Independent Drawdown, Tail Risk, and Distribution Analytics."""
     equities = [eq for _, eq in equity_curve]
     peak = equities[0]
@@ -248,7 +263,11 @@ def run_drawdown_and_risk_analytics(equity_curve: list[tuple[int, float]], close
     max_consec_losses = 0
     cur_losses = 0
     for p in closed_positions:
-        pnl = getattr(p, "realized_pnl_usd", 0.0) if hasattr(p, "realized_pnl_usd") else p.get("realized_pnl_usd", 0.0)
+        pnl = (
+            getattr(p, "realized_pnl_usd", 0.0)
+            if hasattr(p, "realized_pnl_usd")
+            else p.get("realized_pnl_usd", 0.0)
+        )
         if pnl <= 0:
             cur_losses += 1
             if cur_losses > max_consec_losses:
@@ -257,12 +276,20 @@ def run_drawdown_and_risk_analytics(equity_curve: list[tuple[int, float]], close
             cur_losses = 0
 
     # Risk per trade and notional exposure
-    notionals = [getattr(p, "notional_usd", 0.0) if hasattr(p, "notional_usd") else p.get("notional_usd", 0.0) for p in closed_positions]
+    notionals = [
+        getattr(p, "notional_usd", 0.0)
+        if hasattr(p, "notional_usd")
+        else p.get("notional_usd", 0.0)
+        for p in closed_positions
+    ]
     max_notional = max(notionals) if notionals else 0.0
     avg_notional = (sum(notionals) / len(notionals)) if notionals else 0.0
 
     # Value at Risk (VaR) and Expected Shortfall (CVaR) on trade returns in R
-    r_multiples = [getattr(p, "realized_r", 0.0) if hasattr(p, "realized_r") else p.get("realized_r", 0.0) for p in closed_positions]
+    r_multiples = [
+        getattr(p, "realized_r", 0.0) if hasattr(p, "realized_r") else p.get("realized_r", 0.0)
+        for p in closed_positions
+    ]
     sorted_r = sorted(r_multiples)
     n = len(sorted_r)
     var_95 = sorted_r[int(0.05 * n)] if n > 0 else 0.0
@@ -309,11 +336,17 @@ def run_robustness_stress_matrix(db_path: str) -> dict[str, Any]:
         candles_4h[sym] = c4
         ts_4h[sym] = [c["timestamp"] for c in c4]
 
-    common_ts = set(c["timestamp"] for c in candles_1h["BTC/USDT"] if start_ms <= c["timestamp"] <= end_ms)
+    common_ts = set(
+        c["timestamp"] for c in candles_1h["BTC/USDT"] if start_ms <= c["timestamp"] <= end_ms
+    )
     for sym in symbols[1:]:
-        common_ts.intersection_update(c["timestamp"] for c in candles_1h[sym] if start_ms <= c["timestamp"] <= end_ms)
+        common_ts.intersection_update(
+            c["timestamp"] for c in candles_1h[sym] if start_ms <= c["timestamp"] <= end_ms
+        )
     sorted_timeline = sorted(list(common_ts))
-    c1h_idx_map = {sym: {c["timestamp"]: idx for idx, c in enumerate(candles_1h[sym])} for sym in symbols}
+    c1h_idx_map = {
+        sym: {c["timestamp"]: idx for idx, c in enumerate(candles_1h[sym])} for sym in symbols
+    }
 
     scenarios = [
         ("Base Case", 7.0, 1.0, 0.0001, 1),
@@ -358,7 +391,10 @@ def run_robustness_stress_matrix(db_path: str) -> dict[str, Any]:
                     candles_by_tf=tf_map,
                     simulated_now_ms=curr_ts,
                 )
-                if out.decision in (DecisionAction.LONG, DecisionAction.SHORT) and out.setup_qualified:
+                if (
+                    out.decision in (DecisionAction.LONG, DecisionAction.SHORT)
+                    and out.setup_qualified
+                ):
                     # Apply lag
                     target_idx = min(len(candles_1h[sym]) - 1, idx + lag_bars)
                     next_open = candles_1h[sym][target_idx]["open"]
@@ -404,16 +440,18 @@ def run_robustness_stress_matrix(db_path: str) -> dict[str, Any]:
             if dd > mdd:
                 mdd = dd
 
-        stress_results.append({
-            "scenario": s_name,
-            "net_return_pct": round(ret_pct, 2),
-            "trades": n_trades,
-            "win_rate_pct": round((len(wins) / n_trades) * 100.0, 1) if n_trades else 0.0,
-            "profit_factor": round(pf, 3),
-            "max_drawdown_pct": round(mdd, 2),
-            "final_equity": round(port.equity, 2),
-            "fees_paid": round(sum(t.fees_paid_usd for t in trades), 2),
-        })
+        stress_results.append(
+            {
+                "scenario": s_name,
+                "net_return_pct": round(ret_pct, 2),
+                "trades": n_trades,
+                "win_rate_pct": round((len(wins) / n_trades) * 100.0, 1) if n_trades else 0.0,
+                "profit_factor": round(pf, 3),
+                "max_drawdown_pct": round(mdd, 2),
+                "final_equity": round(port.equity, 2),
+                "fees_paid": round(sum(t.fees_paid_usd for t in trades), 2),
+            }
+        )
 
     return {"stress_scenarios": stress_results}
 
@@ -433,14 +471,18 @@ def main() -> None:
     recon = run_full_reconciliation()
     print("    Financial Reconciliation complete.")
     for row in recon["reconciliation_table"]:
-        print(f"    {row['window_name']}: Delta = ${row['accounting_delta']:.4f} (Identity Balance: PASS)")
+        print(
+            f"    {row['window_name']}: Delta = ${row['accounting_delta']:.4f} (Identity Balance: PASS)"
+        )
 
     # 2. Controlled Displacement Experiment
     print("\n[+] STEP 2: Running Controlled Displacement Experiment under Capacity Saturation...")
     disp_exp = run_displacement_controlled_experiment(db_path)
     print("    Displacement experiment complete:")
     for cap_key, data in disp_exp.items():
-        print(f"    {cap_key}: FCFS Return={data['fcfs_return_pct']:+.2f}% ({data['fcfs_rejected']} rejected) | Arb Return={data['arb_return_pct']:+.2f}% ({data['arb_displacements']} displacements)")
+        print(
+            f"    {cap_key}: FCFS Return={data['fcfs_return_pct']:+.2f}% ({data['fcfs_rejected']} rejected) | Arb Return={data['arb_return_pct']:+.2f}% ({data['arb_displacements']} displacements)"
+        )
 
     # 3. Drawdown and Risk Distribution
     print("\n[+] STEP 3: Computing Drawdown, Recovery Time, and Tail-Risk Distribution...")
@@ -453,13 +495,17 @@ def main() -> None:
             closed_positions=raw.get("closed_positions", []),
         )
         risk_by_window[w_name] = risk_stats
-        print(f"    {w_name}: MaxDD={risk_stats['max_drawdown_pct']}% | Worst Day={risk_stats['worst_single_day_return_pct']}% | Max Consec Losses={risk_stats['max_consecutive_losses']} | VaR95={risk_stats['value_at_risk_95_r']}R | CVaR95={risk_stats['expected_shortfall_cvar_95_r']}R")
+        print(
+            f"    {w_name}: MaxDD={risk_stats['max_drawdown_pct']}% | Worst Day={risk_stats['worst_single_day_return_pct']}% | Max Consec Losses={risk_stats['max_consecutive_losses']} | VaR95={risk_stats['value_at_risk_95_r']}R | CVaR95={risk_stats['expected_shortfall_cvar_95_r']}R"
+        )
 
     # 4. Robustness Stress Matrix
     print("\n[+] STEP 4: Executing Robustness Stress Testing (Frictions, Adverse Funding, Lag)...")
     stress = run_robustness_stress_matrix(db_path)
     for s in stress["stress_scenarios"]:
-        print(f"    {s['scenario']:<28s}: Return: {s['net_return_pct']:+.2f}% | PF: {s['profit_factor']:.2f} | MaxDD: {s['max_drawdown_pct']:.2f}% | Fees: ${s['fees_paid']:,.2f}")
+        print(
+            f"    {s['scenario']:<28s}: Return: {s['net_return_pct']:+.2f}% | PF: {s['profit_factor']:.2f} | MaxDD: {s['max_drawdown_pct']:.2f}% | Fees: ${s['fees_paid']:,.2f}"
+        )
 
     elapsed = time.time() - t0
     print(f"\n[+] All independent verification tasks completed in {elapsed:.2f}s.")

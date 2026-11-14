@@ -98,9 +98,7 @@ class TradingLibrary:
                             "regime": "all",
                             "samples": b.get("n", 0),
                             "expectancy": round(
-                                float(
-                                    b.get("avg_rr", 0.0) * (b.get("win_rate") or 0.5)
-                                ),
+                                float(b.get("avg_rr", 0.0) * (b.get("win_rate") or 0.5)),
                                 2,
                             ),
                             "win_rate": b.get("win_rate") or 0.0,
@@ -161,9 +159,7 @@ class TradingLibrary:
             )
 
     def _index_risk_rules(self) -> None:
-        ladder = ", ".join(
-            f"{k}: max {v.get('risk_pct')}%" for k, v in PROGRESSION_LEVELS.items()
-        )
+        ladder = ", ".join(f"{k}: max {v.get('risk_pct')}%" for k, v in PROGRESSION_LEVELS.items())
         rules = [
             (
                 "daily_weekly_loss",
@@ -260,9 +256,7 @@ class TradingLibrary:
                 }
             )
 
-    def search(
-        self, query: str, top_k: int = 4, category: str | None = None
-    ) -> list[dict]:
+    def search(self, query: str, top_k: int = 4, category: str | None = None) -> list[dict]:
         """Simple TF-IDF / lexical ranking search across indexed documents."""
         q_tokens = set(re.findall(r"\w+", query.lower()))
         if not q_tokens:

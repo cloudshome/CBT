@@ -32,6 +32,7 @@ sys.path.insert(0, str(ROOT_DIR))
 
 try:
     import dotenv
+
     dotenv.load_dotenv(ROOT_DIR / ".env")
 except ImportError:
     pass
@@ -73,7 +74,9 @@ async def main():
 
         print("  -> Reconciling incoming peer packages from Cloud Mesh...")
         pull_res = gdrive_cluster_mesh.pull_and_reconcile()
-        print(f"     [OK] Packages processed: {pull_res.get('packages_processed')}, Events imported: {pull_res.get('events_imported')}")
+        print(
+            f"     [OK] Packages processed: {pull_res.get('packages_processed')}, Events imported: {pull_res.get('events_imported')}"
+        )
 
         print("  -> Running local sync engine cycle...")
         receipts = sync_engine.run_sync_cycle()
@@ -84,7 +87,9 @@ async def main():
         print(f"     [OK] Export status: {push_res.get('status')}")
 
         nodes = gdrive_cluster_mesh.list_cluster_nodes()
-        print(f"     [OK] Active cluster nodes: {len(nodes)} ({', '.join(n.get('node_id', '') for n in nodes)})")
+        print(
+            f"     [OK] Active cluster nodes: {len(nodes)} ({', '.join(n.get('node_id', '') for n in nodes)})"
+        )
     except Exception as exc:
         print(f"     [!] SDCC Cluster Sync Warning: {exc}")
 
@@ -101,7 +106,9 @@ async def main():
 
         print("  -> Running Hypothesis Empirical Backtest Loop...")
         hypo_res = await research_automation_orchestrator.trigger_pipeline("hypothesis_backtest")
-        print(f"     [OK] Hypotheses evaluated: {hypo_res.get('result', {}).get('items_processed', 0)}")
+        print(
+            f"     [OK] Hypotheses evaluated: {hypo_res.get('result', {}).get('items_processed', 0)}"
+        )
 
         print("  -> Running Cloud Archive Sync Loop...")
         sync_res = await research_automation_orchestrator.trigger_pipeline("drive_sync")
@@ -136,7 +143,7 @@ async def main():
         print("  -> Flushing ring buffer latency records and slip models to SQLite...")
         flushed = hf_telemetry_pipeline.flush_to_sqlite()
         stats = hf_telemetry_pipeline.get_metrics_summary()
-        latency_p50 = stats.get('latency_p50_ms')
+        latency_p50 = stats.get("latency_p50_ms")
         latency_str = f"{latency_p50:.2f} ms" if latency_p50 is not None else "< 1.00 ms (nominal)"
         print(f"     [OK] Micro-batched records flushed : {flushed}")
         print(f"     [OK] Monotonic pipeline P50 latency: {latency_str}")
@@ -154,7 +161,9 @@ async def main():
         report = daily_learning_reporter.generate_what_ai_learned_today_report(lookback_hours=24)
         first_line = report.splitlines()[0] if report else "Report ready"
         print(f"     [OK] {first_line}")
-        print("     [OK] 4x Daily Briefings aligned to Bangladesh Time (08:00, 14:00, 20:00, 22:00 BST)")
+        print(
+            "     [OK] 4x Daily Briefings aligned to Bangladesh Time (08:00, 14:00, 20:00, 22:00 BST)"
+        )
     except Exception as exc:
         print(f"     [!] Daily Learning Warning: {exc}")
 
@@ -207,11 +216,19 @@ async def main():
             account_equity_usd=100_000.0,
         )
         regime_info = decision_out.explanation_dossier.get("regime", {})
-        regime_label = regime_info.get("market_regime", "UNCERTAIN") if isinstance(regime_info, dict) else "CLASSIFIED"
+        regime_label = (
+            regime_info.get("market_regime", "UNCERTAIN")
+            if isinstance(regime_info, dict)
+            else "CLASSIFIED"
+        )
         print(f"     [OK] Evaluated Action       : {decision_out.decision.value}")
-        print(f"     [OK] Half-Kelly Sizing Cap  : {decision_out.kelly_fraction * 100:.2f}% (Max 1.50%)")
+        print(
+            f"     [OK] Half-Kelly Sizing Cap  : {decision_out.kelly_fraction * 100:.2f}% (Max 1.50%)"
+        )
         print(f"     [OK] Regime Classification  : {regime_label}")
-        print(f"     [OK] Explanation Dossier    : Emitted {len(decision_out.explanation_dossier)} structured pillars")
+        print(
+            f"     [OK] Explanation Dossier    : Emitted {len(decision_out.explanation_dossier)} structured pillars"
+        )
     except Exception as exc:
         print(f"     [!] SKY Intelligence Decision Warning: {exc}")
 
@@ -232,9 +249,13 @@ async def main():
             if basis and hasattr(basis, "raw_basis_bps")
             else "N/A"
         )
-        print(f"     [OK] Venues & Books Monitored: {arb_res.get('quotes_count', 0)} quotes across Binance/Bybit/OKX")
+        print(
+            f"     [OK] Venues & Books Monitored: {arb_res.get('quotes_count', 0)} quotes across Binance/Bybit/OKX"
+        )
         print(f"     [OK] Raw Basis Dislocation   : {basis_spread}")
-        print(f"     [OK] Dislocation Opportunities: {opps} detected (Research-Only: real_capital_enabled=False)")
+        print(
+            f"     [OK] Dislocation Opportunities: {opps} detected (Research-Only: real_capital_enabled=False)"
+        )
     except Exception as exc:
         print(f"     [!] Arbitrage Sentinel Warning: {exc}")
     finally:

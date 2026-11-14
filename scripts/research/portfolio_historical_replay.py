@@ -34,9 +34,8 @@ if str(ROOT_DIR) not in sys.path:
 
 from core.research.portfolio_accounting_reconciler import (
     PortfolioAccountingReconciler,
-    to_dec,
-    ROUNDING_TOLERANCE_USD,
 )
+
 DB_PATH = ROOT_DIR / "data" / "market_data.db"
 OUTPUT_FILE = ROOT_DIR / "research" / "portfolio_historical_replay_results.json"
 
@@ -500,7 +499,9 @@ def run_portfolio_simulation(
         if math.isnan(current_equity) or math.isinf(current_equity):
             raise AssertionError(f"Non-finite equity detected at ts={ts}: {current_equity}")
         if current_equity < 0:
-            raise AssertionError(f"Negative equity detected on non-leveraged model at ts={ts}: {current_equity}")
+            raise AssertionError(
+                f"Negative equity detected on non-leveraged model at ts={ts}: {current_equity}"
+            )
 
         # Independent Accounting Verification Invariant (fails closed on discrepancy)
         reconciler.verify_reconciliation(ts, cash, current_equity, fail_closed=True)
@@ -540,7 +541,9 @@ def run_portfolio_simulation(
                     # Displace weakest holding at current price
                     curr_exit = current_prices.get(weakest_pos.symbol, weakest_pos.entry_price)
                     open_positions.pop(weakest_pid)
-                    reconciler.close_position(weakest_pid, ts, curr_exit, "DISPLACED", FRICTION_RATE_BPS)
+                    reconciler.close_position(
+                        weakest_pid, ts, curr_exit, "DISPLACED", FRICTION_RATE_BPS
+                    )
 
                     if weakest_pos.direction == "LONG":
                         gross_pnl = (curr_exit - weakest_pos.entry_price) * weakest_pos.size
@@ -854,9 +857,13 @@ def main():
     print(f"\n[PASS] Replay results successfully emitted to: {OUTPUT_FILE.relative_to(ROOT_DIR)}")
     assert m_displaced.final_equity > 0, "Simulation failed: non-positive final equity"
     if m_displaced.total_trades_displaced > 0:
-        print(f"[INFO] Displacement Arbiter active: {m_displaced.total_trades_displaced} trades displaced")
+        print(
+            f"[INFO] Displacement Arbiter active: {m_displaced.total_trades_displaced} trades displaced"
+        )
     else:
-        print(f"[INFO] Zero displacements triggered (capacity threshold {MAX_CONCURRENT_POSITIONS} was not exceeded)")
+        print(
+            f"[INFO] Zero displacements triggered (capacity threshold {MAX_CONCURRENT_POSITIONS} was not exceeded)"
+        )
     print(">>> MULTI-ASSET PORTFOLIO REPLAY VERIFICATION COMPLETE (PASS) <<<")
 
 

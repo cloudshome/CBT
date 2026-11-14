@@ -34,18 +34,18 @@ def run_latency_and_memory_profile(iterations: int = 100) -> dict[str, Any]:
     """Profiles execution latency and memory overhead across core quantitative engines."""
     tracemalloc.start()
     mem_start_current, mem_start_peak = tracemalloc.get_traced_memory()
-    
+
     latencies_ms: list[float] = []
 
     for i in range(iterations):
         t0 = time.perf_counter()
-        
+
         # 1. Monte Carlo 10k path execution
         monte_carlo_stress_tester.stress_test([0.02, -0.01, 0.015, -0.005, 0.03] * 10)
-        
+
         # 2. Database engine vitals check
         _ = db_manager.get_engine_info()
-        
+
         t1 = time.perf_counter()
         latencies_ms.append((t1 - t0) * 1000.0)
 
@@ -74,7 +74,7 @@ def run_latency_and_memory_profile(iterations: int = 100) -> dict[str, Any]:
         "is_latency_healthy": is_latency_healthy,
         "sla_passed": is_memory_healthy and is_latency_healthy,
     }
-    
+
     logger.info(
         f"Performance Profile: p50={p50:.2f}ms, p95={p95:.2f}ms, p99={p99:.2f}ms | "
         f"Peak Memory Delta={mem_delta_mb}MB | SLA={'PASSED' if report['sla_passed'] else 'FAILED'}"
@@ -84,7 +84,9 @@ def run_latency_and_memory_profile(iterations: int = 100) -> dict[str, Any]:
 
 def main():
     parser = argparse.ArgumentParser(description="SKY / CTB Performance & Memory Profiler")
-    parser.add_argument("--iterations", type=int, default=100, help="Number of benchmark iterations")
+    parser.add_argument(
+        "--iterations", type=int, default=100, help="Number of benchmark iterations"
+    )
     args = parser.parse_args()
 
     logger.info(f"Executing performance benchmark ({args.iterations} iterations)...")

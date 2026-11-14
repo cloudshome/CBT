@@ -14,20 +14,15 @@ Validates:
 
 from __future__ import annotations
 
-import json
 import logging
 import sys
-from decimal import Decimal
 from pathlib import Path
-from typing import Any, Dict, List
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from scripts.research.p2_production_portfolio_replay import (
-    INITIAL_CASH,
-    MAX_CONCURRENT_POSITIONS,
     generate_candidate_signals,
     run_portfolio_simulation,
 )
@@ -68,7 +63,9 @@ def main():
 
     # Invariant 1: Conservation of capital
     assert sim_base["final_equity"] > 0, "Final equity must be positive"
-    assert sim_base["max_drawdown_pct"] <= 100.0, "Max drawdown cannot exceed 100% on non-leveraged cash model"
+    assert sim_base["max_drawdown_pct"] <= 100.0, (
+        "Max drawdown cannot exceed 100% on non-leveraged cash model"
+    )
 
     # Invariant 2: No Ghost Trades
     trade_ids = set()
@@ -87,14 +84,18 @@ def main():
     assert eq_diff <= 0.05, f"Ordering discrepancy detected: {eq_diff}"
 
     logger.info(f"[PASS] Ordering Invariance Verified: Discrepancy = ${eq_diff:.4f} USD")
-    logger.info(f"[PASS] Conservation of Capital Verified: Max Drawdown = {sim_base['max_drawdown_pct']:.2f}% <= 100%")
-    logger.info(f"[PASS] Ghost Trade Audit Verified: {len(sim_base['trades'])} unique, causal trades")
+    logger.info(
+        f"[PASS] Conservation of Capital Verified: Max Drawdown = {sim_base['max_drawdown_pct']:.2f}% <= 100%"
+    )
+    logger.info(
+        f"[PASS] Ghost Trade Audit Verified: {len(sim_base['trades'])} unique, causal trades"
+    )
 
     # Write Certification Report
     report = [
         "# SKY / CBT — Phase 5 Independent Replay Certification Report",
         "",
-        f"**Audit Status:** `PRODUCTION PASS`  ",
+        "**Audit Status:** `PRODUCTION PASS`  ",
         f"**Baseline Equity:** ${sim_base['final_equity']:,.2f}  ",
         f"**Reversed Ordering Equity:** ${sim_rev['final_equity']:,.2f}  ",
         f"**Ordering Discrepancy:** ${eq_diff:.4f} USD  ",
@@ -123,7 +124,9 @@ def main():
     with open(REPORT_PATH, "w", encoding="utf-8") as f:
         f.write("\n".join(report))
 
-    logger.info(f"[PASS] Independent certification report emitted to: {REPORT_PATH.relative_to(ROOT_DIR)}")
+    logger.info(
+        f"[PASS] Independent certification report emitted to: {REPORT_PATH.relative_to(ROOT_DIR)}"
+    )
 
 
 if __name__ == "__main__":

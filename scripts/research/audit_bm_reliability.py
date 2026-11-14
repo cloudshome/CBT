@@ -1,8 +1,9 @@
 import json
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-import pandas as pd
+
 import numpy as np
-from datetime import datetime, timezone, timedelta
+import pandas as pd
 from scipy import stats
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -12,7 +13,11 @@ bm_file = ROOT / "research" / "m34_trade_level_ledger.jsonl"
 bm_trades = []
 if bm_file.exists():
     with open(bm_file, "r", encoding="utf-8") as f:
-        bm_trades = [json.loads(line) for line in f if "ORDER_BLOCK_RETEST" in line and "BTCUSDT" in line and "1h" in line]
+        bm_trades = [
+            json.loads(line)
+            for line in f
+            if "ORDER_BLOCK_RETEST" in line and "BTCUSDT" in line and "1h" in line
+        ]
 
 df_bm = pd.DataFrame(bm_trades)
 trade_net = df_bm["net_pnl_r_mixed"].values
@@ -27,7 +32,9 @@ t_stat, p_val = stats.ttest_1samp(trade_net, 0.0)
 
 # Trade-level bootstrap CI (10,000 resamples)
 np.random.seed(42)
-boot_means = [np.mean(np.random.choice(trade_net, size=n_trades, replace=True)) for _ in range(10000)]
+boot_means = [
+    np.mean(np.random.choice(trade_net, size=n_trades, replace=True)) for _ in range(10000)
+]
 ci_95_low = np.percentile(boot_means, 2.5)
 ci_95_high = np.percentile(boot_means, 97.5)
 
@@ -54,8 +61,8 @@ print(f"Mean excluding top 1 winner: {mean_ex_top1:.4f} R")
 print(f"Mean excluding top 2 winners: {mean_ex_top2:.4f} R")
 
 # Calendar Day-Level Analysis (1,754 days)
-start_date = datetime(2022, 1, 1, tzinfo=timezone.utc)
-end_date = datetime(2026, 10, 20, tzinfo=timezone.utc)
+start_date = datetime(2022, 1, 1, tzinfo=UTC)
+end_date = datetime(2026, 10, 20, tzinfo=UTC)
 calendar_days = []
 curr = start_date
 while curr <= end_date:
@@ -64,7 +71,7 @@ while curr <= end_date:
 
 daily_r = {d: 0.0 for d in calendar_days}
 for t in bm_trades:
-    dt = datetime.fromtimestamp(t["exit_ts"] / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
+    dt = datetime.fromtimestamp(t["exit_ts"] / 1000, tz=UTC).strftime("%Y-%m-%d")
     if dt in daily_r:
         daily_r[dt] += t["net_pnl_r_mixed"]
 
@@ -93,7 +100,9 @@ var_95 = np.percentile(daily_series, 5)
 cvar_95 = np.mean(daily_series[daily_series <= var_95])
 
 print("\n=== Benchmark Time-Series & Annualized Metrics ===")
-print(f"Total days: {len(daily_series)} | Active days: {active_days} ({active_days/len(daily_series)*100:.2f}%)")
+print(
+    f"Total days: {len(daily_series)} | Active days: {active_days} ({active_days / len(daily_series) * 100:.2f}%)"
+)
 print(f"Daily mean: {daily_mean:.6f} R | Daily std: {daily_std:.6f} R")
 print(f"Annualized Daily Sharpe (sqrt(365)): {daily_sharpe:.4f}")
 print(f"Monthly mean: {monthly_mean:.4f} R | Monthly std: {monthly_std:.4f} R")
@@ -101,4 +110,3 @@ print(f"Annualized Monthly Sharpe (sqrt(12)): {monthly_sharpe:.4f}")
 print(f"Max Drawdown: {max_dd:.4f} R")
 print(f"95% Daily VaR: {var_95:.6f} R")
 print(f"95% Daily CVaR: {cvar_95:.6f} R")
-

@@ -92,7 +92,11 @@ class SimulatedStressExchange:
         Returns (filled_qty, duplicate_count, was_reconciled)
         """
         # Inject Latency Jitter (50ms - 250ms scaled for simulation)
-        latency = random.uniform(0.01, 0.05) if fault_type != "HIGH_LATENCY" else random.uniform(0.08, 0.15)
+        latency = (
+            random.uniform(0.01, 0.05)
+            if fault_type != "HIGH_LATENCY"
+            else random.uniform(0.08, 0.15)
+        )
         await asyncio.sleep(latency)
 
         exchange_order_id = f"EX_{self.venue}_{slice_idx:04d}"
@@ -122,13 +126,15 @@ class SimulatedStressExchange:
             filled = qty
 
         exec_id = f"TRD_{self.venue}_{slice_idx:04d}"
-        self.fills.append({
-            "exchange": self.venue,
-            "order_id": exchange_order_id,
-            "exec_id": exec_id,
-            "qty": filled,
-            "price": price,
-        })
+        self.fills.append(
+            {
+                "exchange": self.venue,
+                "order_id": exchange_order_id,
+                "exec_id": exec_id,
+                "qty": filled,
+                "price": price,
+            }
+        )
 
         return filled, dups, reconciled
 
@@ -176,7 +182,7 @@ async def run_stress_test(total_slices: int = 1000) -> StressDrillSummary:
 
         for i in range(batch_start, batch_end):
             venue = venues[i % len(venues)]
-            client_order_id = f"CBT_{venue[:3]}_{int(time.time()*1000)}_{i:04d}"
+            client_order_id = f"CBT_{venue[:3]}_{int(time.time() * 1000)}_{i:04d}"
             fault = random.choices(fault_types, weights=fault_weights, k=1)[0]
             fault_counts[fault] += 1
             price = 65000.0 + (i * 0.1)
@@ -250,18 +256,16 @@ async def run_stress_test(total_slices: int = 1000) -> StressDrillSummary:
 
         completed_slices = batch_end
         if completed_slices % 200 == 0 or completed_slices == total_slices:
-            print(f"  --> Progress: {completed_slices:4d}/{total_slices} slices completed. "
-                  f"Filled: {accumulated_qty:.4f} BTC. Ledger duplicates: {duplicate_economic_fills}")
+            print(
+                f"  --> Progress: {completed_slices:4d}/{total_slices} slices completed. "
+                f"Filled: {accumulated_qty:.4f} BTC. Ledger duplicates: {duplicate_economic_fills}"
+            )
 
     duration = time.perf_counter() - t0
     accumulated_qty = round(accumulated_qty, 6)
     qty_error = abs(accumulated_qty - expected_total_qty)
     qty_conserved = qty_error < 1e-6
-    passed = (
-        qty_conserved
-        and duplicate_economic_fills == 0
-        and orphaned_slices == 0
-    )
+    passed = qty_conserved and duplicate_economic_fills == 0 and orphaned_slices == 0
 
     summary = StressDrillSummary(
         total_slices_attempted=total_slices,
@@ -286,7 +290,9 @@ async def run_stress_test(total_slices: int = 1000) -> StressDrillSummary:
     print(f" Total Slices Attempted      : {summary.total_slices_attempted}")
     print(f" Target Total Quantity       : {summary.target_total_qty:.4f} BTC")
     print(f" Actual Total Filled         : {summary.actual_filled_qty:.4f} BTC")
-    print(f" Quantity Conserved          : {'YES [PASS]' if summary.quantity_conserved else 'NO [CRITICAL FAIL]'}")
+    print(
+        f" Quantity Conserved          : {'YES [PASS]' if summary.quantity_conserved else 'NO [CRITICAL FAIL]'}"
+    )
     print(f" Duplicate Economic Fills    : {summary.duplicate_economic_fills} [PASS: 0]")
     print(f" Orphaned Slices Remaining   : {summary.orphaned_slices_remaining} [PASS: 0]")
     print(f" Negative Inventory Events   : {summary.negative_inventory_events} [PASS: 0]")
@@ -307,6 +313,7 @@ async def run_stress_test(total_slices: int = 1000) -> StressDrillSummary:
 
     # Keep SHA256SUMS.txt in sync: recompute the STRESS_DRILL_REPORT.json hash
     import hashlib as _hashlib
+
     sums_path = out_dir / "SHA256SUMS.txt"
     if sums_path.exists():
         new_hash = _hashlib.sha256(report_path.read_bytes()).hexdigest()
@@ -318,7 +325,9 @@ async def run_stress_test(total_slices: int = 1000) -> StressDrillSummary:
             else:
                 updated.append(ln)
         sums_path.write_text("\n".join(updated) + "\n", encoding="utf-8")
-        print(f"[OK] Updated SHA256SUMS.txt with new STRESS_DRILL_REPORT.json digest: {new_hash[:16]}...")
+        print(
+            f"[OK] Updated SHA256SUMS.txt with new STRESS_DRILL_REPORT.json digest: {new_hash[:16]}..."
+        )
 
     return summary
 

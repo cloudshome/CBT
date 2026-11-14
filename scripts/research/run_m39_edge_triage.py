@@ -25,10 +25,10 @@ from __future__ import annotations
 
 import json
 import logging
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-import sys
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 if str(ROOT_DIR) not in sys.path:
@@ -191,7 +191,7 @@ def execute_triage() -> dict[str, Any]:
     # Generate docs/EDGE_VERIFICATION_REPORT.md
     report_md = f"""# 🏛️ SKY / CBT — Formal Edge Verification & Strategy Triage Report (M39)
 
-> **Audit Date:** {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S UTC')}  
+> **Audit Date:** {datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")}  
 > **Auditor:** Principal Quantitative Systems Architect & Lead Autonomous Engineer  
 > **Governance Classification:** Level 2 Research Protocol (`docs/QUANT_RESEARCH_PROTOCOL.md`)  
 > **Outcome:** ❌ **ZERO CANDIDATES CLEARED FOR PRODUCTION PROMOTION** (Fail-Closed Integrity Maintained)  

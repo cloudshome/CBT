@@ -36,16 +36,12 @@ class MorningBriefAgent(BaseAgent):
 
     def run(self) -> dict:
         brief = generate_morning_brief(db=self.db)
-        summary = (
-            f"{brief.get('bias_summary', 'Neutral')} — {brief.get('risk_summary', '')}"
-        )
+        summary = f"{brief.get('bias_summary', 'Neutral')} — {brief.get('risk_summary', '')}"
         if brief.get("notes"):
             summary += f" ({'; '.join(brief['notes'])})"
 
         if self.db:
-            self.db.record_agent_run(
-                self.name, "COMPLETED", summary=summary, payload=brief
-            )
+            self.db.record_agent_run(self.name, "COMPLETED", summary=summary, payload=brief)
 
         return {
             "agent": self.name,
@@ -76,9 +72,7 @@ class WatchdogAgent(BaseAgent):
 
             issues = []
             if not rg.get("open"):
-                issues.append(
-                    "Risk gate closed: " + "; ".join(rg.get("blocked_by", []))
-                )
+                issues.append("Risk gate closed: " + "; ".join(rg.get("blocked_by", [])))
 
             stale_count = 0
             now = int(time.time())
@@ -148,15 +142,11 @@ class PaperReviewerAgent(BaseAgent):
 
             summary = f"Reviewed {len(reviews)} closed paper trades."
             if reviews:
-                wins = sum(
-                    1 for r in reviews if r["outcome"] in ("WIN", "FULL_WIN", "TP_HIT")
-                )
+                wins = sum(1 for r in reviews if r["outcome"] in ("WIN", "FULL_WIN", "TP_HIT"))
                 summary += f" Win rate: {wins}/{len(reviews)} ({int(wins / len(reviews) * 100)}%)."
 
             payload = {"reviewed_count": len(reviews), "reviews": reviews}
-            db.record_agent_run(
-                self.name, "COMPLETED", summary=summary, payload=payload
-            )
+            db.record_agent_run(self.name, "COMPLETED", summary=summary, payload=payload)
 
             return {
                 "agent": self.name,
@@ -209,9 +199,7 @@ class WeeklyReviewAgent(BaseAgent):
                 payload["weekly"] = weekly_review(db)
             except Exception as exc:  # never break the agent on a report
                 payload["weekly_error"] = f"{type(exc).__name__}: {exc}"
-            db.record_agent_run(
-                self.name, "COMPLETED", summary=summary, payload=payload
-            )
+            db.record_agent_run(self.name, "COMPLETED", summary=summary, payload=payload)
 
             return {
                 "agent": self.name,
@@ -309,9 +297,7 @@ def next_scheduled_agent(db: SignalDB | None = None) -> dict:
             last = last_by_name.get(name)
             last_ts = int(last["ts"]) if last and last.get("ts") else None
             age_hours = None if last_ts is None else max(0.0, (now - last_ts) / 3600.0)
-            overdue_hours = (
-                cadence if last_ts is None else max(0.0, age_hours - cadence)
-            )
+            overdue_hours = cadence if last_ts is None else max(0.0, age_hours - cadence)
             never_run = last_ts is None
             candidates.append(
                 {

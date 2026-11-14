@@ -57,13 +57,15 @@ def run_strategy_league_evaluation() -> dict[str, Any]:
     for strat in leaderboard:
         dna_id = strat["dna_id"]
         promoted, msg = strategy_league_manager.evaluate_promotion(dna_id)
-        promotions.append({
-            "dna_id": dna_id,
-            "name": strat["name"],
-            "promoted": promoted,
-            "message": msg,
-            "current_tier": strat["quarantine_tier"],
-        })
+        promotions.append(
+            {
+                "dna_id": dna_id,
+                "name": strat["name"],
+                "promoted": promoted,
+                "message": msg,
+                "current_tier": strat["quarantine_tier"],
+            }
+        )
         logger.info(f"[{dna_id}] {msg}")
 
     # Rebalance live capital allocation weights
@@ -93,14 +95,16 @@ def run_strategy_league_evaluation() -> dict[str, Any]:
 def main():
     logger.info("Starting Strategy Competition League & 30-day Campaign Evaluation...")
     results = run_strategy_league_evaluation()
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("           STRATEGY COMPETITION LEAGUE SCORECARD")
-    print("="*80)
+    print("=" * 80)
     print(f"{'DNA ID':<26} {'NAME':<32} {'TIER':<6} {'SHARPE':<8} {'WEIGHT':<8}")
-    print("-"*80)
+    print("-" * 80)
     for s in results["leaderboard"]:
-        print(f"{s['dna_id']:<26} {s['name'][:30]:<32} {s['quarantine_tier']:<6} {s['rolling_sharpe_30d']:<8.2f} {s['allocation_weight']:<8.2f}")
-    print("="*80 + "\n")
+        print(
+            f"{s['dna_id']:<26} {s['name'][:30]:<32} {s['quarantine_tier']:<6} {s['rolling_sharpe_30d']:<8.2f} {s['allocation_weight']:<8.2f}"
+        )
+    print("=" * 80 + "\n")
 
 
 if __name__ == "__main__":

@@ -17,12 +17,12 @@ Applies:
 
 import json
 import logging
-import math
 import sys
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
 import numpy as np
 import pandas as pd
 
@@ -187,7 +187,12 @@ class ResearchTrackEvaluator:
             # 3. Pullback into value zone: Low pierces EMA20, but stays above EMA50
             # 4. Rejection close: Close > EMA20 and Close > Open (bullish candle)
             if (ema20[i] > ema50[i] > ema200[i]) and adx[i] > 25.0:
-                if l[i] <= ema20[i] and min(l[i - 1], l[i]) >= ema50[i] * 0.998 and c[i] > ema20[i] and c[i] > o[i]:
+                if (
+                    l[i] <= ema20[i]
+                    and min(l[i - 1], l[i]) >= ema50[i] * 0.998
+                    and c[i] > ema20[i]
+                    and c[i] > o[i]
+                ):
                     signal_dir = "LONG"
                     entry_p = c[i]
                     stop_p = min(l[i - 1], l[i]) - 0.15 * atr[i]
@@ -197,7 +202,12 @@ class ResearchTrackEvaluator:
 
             # Bearish Trend Pullback:
             elif (ema20[i] < ema50[i] < ema200[i]) and adx[i] > 25.0:
-                if h[i] >= ema20[i] and max(h[i - 1], h[i]) <= ema50[i] * 1.002 and c[i] < ema20[i] and c[i] < o[i]:
+                if (
+                    h[i] >= ema20[i]
+                    and max(h[i - 1], h[i]) <= ema50[i] * 1.002
+                    and c[i] < ema20[i]
+                    and c[i] < o[i]
+                ):
                     signal_dir = "SHORT"
                     entry_p = c[i]
                     stop_p = max(h[i - 1], h[i]) + 0.15 * atr[i]
@@ -214,7 +224,7 @@ class ResearchTrackEvaluator:
                     entry_p=entry_p,
                     stop_p=stop_p,
                     tp_p=tp_p,
-                    setup_features={"adx": float(adx[i]), "trend_type": "EMA_ALIGNED"}
+                    setup_features={"adx": float(adx[i]), "trend_type": "EMA_ALIGNED"},
                 )
                 trades.append(trade)
                 i = trade.exit_idx
@@ -231,7 +241,13 @@ class ResearchTrackEvaluator:
         """
         trades: list[FamilyTrade] = []
         df = self.df
-        c, h, l, o, v = df["close"].values, df["high"].values, df["low"].values, df["open"].values, df["volume"].values
+        c, h, l, o, v = (
+            df["close"].values,
+            df["high"].values,
+            df["low"].values,
+            df["open"].values,
+            df["volume"].values,
+        )
         atr = df["atr"].values
         bb_upper = df["bb_upper"].values
         bb_lower = df["bb_lower"].values
@@ -276,7 +292,10 @@ class ResearchTrackEvaluator:
                     entry_p=entry_p,
                     stop_p=stop_p,
                     tp_p=tp_p,
-                    setup_features={"prior_squeeze_bars": int(prior_squeeze_count), "vol_ratio": float(v[i] / (vol_sma[i] + 1e-6))}
+                    setup_features={
+                        "prior_squeeze_bars": int(prior_squeeze_count),
+                        "vol_ratio": float(v[i] / (vol_sma[i] + 1e-6)),
+                    },
                 )
                 trades.append(trade)
                 i = trade.exit_idx
@@ -316,7 +335,11 @@ class ResearchTrackEvaluator:
                 # 2. Close ended back BELOW prior swing high
                 # 3. Upper wick >= 35% of bar range
                 upper_wick = h[i] - max(o[i], c[i])
-                if h[i] >= prior_sh + 0.1 * atr[i] and c[i] < prior_sh and upper_wick >= 0.35 * bar_range:
+                if (
+                    h[i] >= prior_sh + 0.1 * atr[i]
+                    and c[i] < prior_sh
+                    and upper_wick >= 0.35 * bar_range
+                ):
                     signal_dir = "SHORT"
                     entry_p = c[i]
                     stop_p = h[i] + 0.1 * atr[i]
@@ -329,7 +352,11 @@ class ResearchTrackEvaluator:
                 # 2. Close ended back ABOVE prior swing low
                 # 3. Lower wick >= 35% of bar range
                 lower_wick = min(o[i], c[i]) - l[i]
-                if l[i] <= prior_sl - 0.1 * atr[i] and c[i] > prior_sl and lower_wick >= 0.35 * bar_range:
+                if (
+                    l[i] <= prior_sl - 0.1 * atr[i]
+                    and c[i] > prior_sl
+                    and lower_wick >= 0.35 * bar_range
+                ):
                     signal_dir = "LONG"
                     entry_p = c[i]
                     stop_p = l[i] - 0.1 * atr[i]
@@ -346,7 +373,13 @@ class ResearchTrackEvaluator:
                     entry_p=entry_p,
                     stop_p=stop_p,
                     tp_p=tp_p,
-                    setup_features={"sweep_depth_atr": float((h[i] - prior_sh) / atr[i] if signal_dir == "SHORT" else (prior_sl - l[i]) / atr[i])}
+                    setup_features={
+                        "sweep_depth_atr": float(
+                            (h[i] - prior_sh) / atr[i]
+                            if signal_dir == "SHORT"
+                            else (prior_sl - l[i]) / atr[i]
+                        )
+                    },
                 )
                 trades.append(trade)
                 i = trade.exit_idx
@@ -372,7 +405,7 @@ class ResearchTrackEvaluator:
         ts = df["ts"].values
         atr = df["atr"].values
         risk_r_unit = abs(entry_p - stop_p)
-        is_long = (signal_dir == "LONG")
+        is_long = signal_dir == "LONG"
 
         # Maker penetration condition: Low <= entry - 0.05 ATR for long
         maker_filled = False
@@ -416,7 +449,11 @@ class ResearchTrackEvaluator:
                     break
 
         holding_bars = exit_idx - i
-        gross_r = (exit_price - entry_p) / risk_r_unit if is_long else (entry_p - exit_price) / risk_r_unit
+        gross_r = (
+            (exit_price - entry_p) / risk_r_unit
+            if is_long
+            else (entry_p - exit_price) / risk_r_unit
+        )
 
         # Friction Accounting:
         # Taker: 13 bps total
@@ -442,10 +479,10 @@ class ResearchTrackEvaluator:
             timeframe=self.timeframe,
             entry_idx=i,
             entry_ts=int(ts[i]),
-            entry_datetime_utc=datetime.fromtimestamp(ts[i] / 1000, tz=timezone.utc).isoformat(),
+            entry_datetime_utc=datetime.fromtimestamp(ts[i] / 1000, tz=UTC).isoformat(),
             exit_idx=exit_idx,
             exit_ts=int(ts[exit_idx]),
-            exit_datetime_utc=datetime.fromtimestamp(ts[exit_idx] / 1000, tz=timezone.utc).isoformat(),
+            exit_datetime_utc=datetime.fromtimestamp(ts[exit_idx] / 1000, tz=UTC).isoformat(),
             direction=signal_dir,
             entry_price=round(entry_p, 2),
             stop_loss=round(stop_p, 2),
@@ -473,7 +510,9 @@ def compute_metrics(trades: list[FamilyTrade], model: str = "strict_mixed") -> d
             "max_drawdown_r": 0.0,
             "sharpe_per_trade": 0.0,
         }
-    returns = np.array([t.net_pnl_r_strict_mixed if model == "strict_mixed" else t.net_pnl_r_taker for t in trades])
+    returns = np.array(
+        [t.net_pnl_r_strict_mixed if model == "strict_mixed" else t.net_pnl_r_taker for t in trades]
+    )
     pos = np.sum(returns[returns > 0])
     neg = abs(np.sum(returns[returns < 0]))
     pf = round(float(pos / neg), 2) if neg > 0 else 99.0
@@ -563,7 +602,11 @@ def main():
     bm_trades = []
     if benchmark_file.exists():
         with open(benchmark_file, "r", encoding="utf-8") as f:
-            bm_trades = [json.loads(line) for line in f if "ORDER_BLOCK_RETEST" in line and "BTCUSDT" in line and "1h" in line]
+            bm_trades = [
+                json.loads(line)
+                for line in f
+                if "ORDER_BLOCK_RETEST" in line and "BTCUSDT" in line and "1h" in line
+            ]
 
     logger.info(f"Loaded {len(bm_trades)} frozen benchmark trades for correlation comparison.")
 
@@ -571,17 +614,27 @@ def main():
     # We aggregate returns into monthly buckets to measure temporal co-movement
     monthly_returns = {"BENCHMARK_OB": {}}
     for t in bm_trades:
-        dt = datetime.fromtimestamp(t["entry_ts"] / 1000, tz=timezone.utc)
+        dt = datetime.fromtimestamp(t["entry_ts"] / 1000, tz=UTC)
         m_key = f"{dt.year}-{dt.month:02d}"
-        monthly_returns["BENCHMARK_OB"][m_key] = monthly_returns["BENCHMARK_OB"].get(m_key, 0.0) + t["net_pnl_r_strict_mixed"] if "net_pnl_r_strict_mixed" in t else t.get("net_pnl_r_mixed", 0.0)
+        monthly_returns["BENCHMARK_OB"][m_key] = (
+            monthly_returns["BENCHMARK_OB"].get(m_key, 0.0) + t["net_pnl_r_strict_mixed"]
+            if "net_pnl_r_strict_mixed" in t
+            else t.get("net_pnl_r_mixed", 0.0)
+        )
 
     for fam_id in ["FAMILY_1", "FAMILY_2", "FAMILY_3"]:
         monthly_returns[fam_id] = {}
-        fam_trades = [t for t in all_family_trades if t.family_id == fam_id and t.symbol == "BTCUSDT" and t.timeframe == "1h"]
+        fam_trades = [
+            t
+            for t in all_family_trades
+            if t.family_id == fam_id and t.symbol == "BTCUSDT" and t.timeframe == "1h"
+        ]
         for t in fam_trades:
-            dt = datetime.fromtimestamp(t.entry_ts / 1000, tz=timezone.utc)
+            dt = datetime.fromtimestamp(t.entry_ts / 1000, tz=UTC)
             m_key = f"{dt.year}-{dt.month:02d}"
-            monthly_returns[fam_id][m_key] = monthly_returns[fam_id].get(m_key, 0.0) + t.net_pnl_r_strict_mixed
+            monthly_returns[fam_id][m_key] = (
+                monthly_returns[fam_id].get(m_key, 0.0) + t.net_pnl_r_strict_mixed
+            )
 
     # Build monthly dataframe
     all_months = sorted(list(set().union(*[d.keys() for d in monthly_returns.values()])))
@@ -596,7 +649,7 @@ def main():
 
     manifest_output = {
         "manifest_version": "M36.1-INDEPENDENT-EDGE-DISCOVERY",
-        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "generated_at_utc": datetime.now(UTC).isoformat(),
         "total_trades_logged": len(all_family_trades),
         "families_evaluated": [
             {"family_id": "FAMILY_1", "name": "Trend Continuation & Dynamic Value Pullback"},
@@ -621,4 +674,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

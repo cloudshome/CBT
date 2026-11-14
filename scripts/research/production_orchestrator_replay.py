@@ -30,7 +30,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from core.sky_intelligence import DecisionAction, sky_orchestrator  # noqa: E402
+from core.sky_intelligence import DecisionAction, sky_orchestrator
 
 logging.basicConfig(level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("orchestrator_replay")
@@ -100,7 +100,9 @@ class DisplacementRecord:
     net_r_delta: float
 
 
-def load_candles(db_path: str, symbol: str, timeframe: str, start_ms: int, end_ms: int) -> list[dict[str, Any]]:
+def load_candles(
+    db_path: str, symbol: str, timeframe: str, start_ms: int, end_ms: int
+) -> list[dict[str, Any]]:
     """Loads candles with lookback padding before start_ms."""
     # Lookback padding: 120 hours (5 days)
     pad_ms = 120 * 3600 * 1000
@@ -215,7 +217,9 @@ class ReplayPortfolioEngine:
 
             exit_fee = (effective_exit * pos.size_units) * taker_fee_frac
             pos.fees_paid_usd += exit_fee
-            pos.slippage_paid_usd += (exit_price * pos.size_units) * (half_spread_frac + slippage_frac)
+            pos.slippage_paid_usd += (exit_price * pos.size_units) * (
+                half_spread_frac + slippage_frac
+            )
 
             net_pnl = gross_pnl - exit_fee
             # True net trade PnL incorporates all transaction fees and accrued funding
@@ -310,7 +314,9 @@ class ReplayPortfolioEngine:
             return False
 
         # Find position with lowest Net EV
-        lowest_sym = min(self.active_positions.keys(), key=lambda s: self.active_positions[s].net_ev_r)
+        lowest_sym = min(
+            self.active_positions.keys(), key=lambda s: self.active_positions[s].net_ev_r
+        )
         lowest_pos = self.active_positions[lowest_sym]
 
         ev_delta = net_ev_r - lowest_pos.net_ev_r
@@ -388,12 +394,20 @@ class ReplayPortfolioEngine:
                 if low <= pos.stop_loss:
                     return -1.0, -pos.risk_budget_usd, "WOULD_HAVE_LOST"
                 if high >= pos.take_profit:
-                    return pos.risk_reward_ratio, pos.risk_budget_usd * pos.risk_reward_ratio, "WOULD_HAVE_WON"
+                    return (
+                        pos.risk_reward_ratio,
+                        pos.risk_budget_usd * pos.risk_reward_ratio,
+                        "WOULD_HAVE_WON",
+                    )
             else:
                 if high >= pos.stop_loss:
                     return -1.0, -pos.risk_budget_usd, "WOULD_HAVE_LOST"
                 if low <= pos.take_profit:
-                    return pos.risk_reward_ratio, pos.risk_budget_usd * pos.risk_reward_ratio, "WOULD_HAVE_WON"
+                    return (
+                        pos.risk_reward_ratio,
+                        pos.risk_budget_usd * pos.risk_reward_ratio,
+                        "WOULD_HAVE_WON",
+                    )
         return 0.0, 0.0, "TIMEOUT_UNDETERMINED"
 
 
@@ -420,9 +434,13 @@ def run_window_simulation(
         ts_4h[sym] = [c["timestamp"] for c in c4]
 
     # Find common 1h timestamps within [start_ms, end_ms]
-    common_ts_set = set(c["timestamp"] for c in candles_1h["BTC/USDT"] if start_ms <= c["timestamp"] <= end_ms)
+    common_ts_set = set(
+        c["timestamp"] for c in candles_1h["BTC/USDT"] if start_ms <= c["timestamp"] <= end_ms
+    )
     for sym in symbols[1:]:
-        common_ts_set.intersection_update(c["timestamp"] for c in candles_1h[sym] if start_ms <= c["timestamp"] <= end_ms)
+        common_ts_set.intersection_update(
+            c["timestamp"] for c in candles_1h[sym] if start_ms <= c["timestamp"] <= end_ms
+        )
 
     sorted_timeline = sorted(list(common_ts_set))
     if not sorted_timeline:
@@ -579,7 +597,9 @@ def run_window_simulation(
 
         gross_profit = sum(t.realized_pnl_usd for t in wins)
         gross_loss = abs(sum(t.realized_pnl_usd for t in losses))
-        profit_factor = (gross_profit / gross_loss) if gross_loss > 0 else (999.0 if gross_profit > 0 else 0.0)
+        profit_factor = (
+            (gross_profit / gross_loss) if gross_loss > 0 else (999.0 if gross_profit > 0 else 0.0)
+        )
 
         total_return_pct = ((port.equity - port.initial_equity) / port.initial_equity) * 100.0
 

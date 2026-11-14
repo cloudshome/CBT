@@ -26,7 +26,7 @@ from typing import Any
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from core.risk.immutable_risk_accounting import (  # noqa: E402
+from core.risk.immutable_risk_accounting import (
     RiskAccountingStatus,
     calculate_immutable_realized_r,
 )
@@ -188,13 +188,19 @@ def reconstruct_historical_ledger(
         "r_unverifiable_count": unverifiable_count,
         "trade_36_comparison": {
             "original_r": next(
-                (t["original_reported_r"] for t in reconstructed_trades if t["is_trade36_anomaly"]), 0.0
+                (t["original_reported_r"] for t in reconstructed_trades if t["is_trade36_anomaly"]),
+                0.0,
             ),
             "corrected_r": next(
                 (t["corrected_r"] for t in reconstructed_trades if t["is_trade36_anomaly"]), 0.0
             ),
             "cash_pnl_usd": next(
-                (t["cash_realized_pnl_usd"] for t in reconstructed_trades if t["is_trade36_anomaly"]), 0.0
+                (
+                    t["cash_realized_pnl_usd"]
+                    for t in reconstructed_trades
+                    if t["is_trade36_anomaly"]
+                ),
+                0.0,
             ),
             "notional_usd": next(
                 (t["notional_usd"] for t in reconstructed_trades if t["is_trade36_anomaly"]), 0.0

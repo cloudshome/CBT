@@ -45,12 +45,12 @@ ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from core.causal_firewall import CausalTimestampRecord  # noqa: E402
-from core.quantitative_validation.metrics import (  # noqa: E402
+from core.causal_firewall import CausalTimestampRecord
+from core.quantitative_validation.metrics import (
     calculate_deflated_sharpe_ratio,
 )
-from core.walk_forward_cpcv import CombinatorialPurgedCrossValidator  # noqa: E402
-from data.backtester import run_backtest  # noqa: E402
+from core.walk_forward_cpcv import CombinatorialPurgedCrossValidator
+from data.backtester import run_backtest
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("m44_unified_cp2_audit")

@@ -33,8 +33,8 @@ ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from core.kronos.research.maker_execution_simulator import MakerExecutionSimulator  # noqa: E402
-from core.quantitative_validation.metrics import calculate_deflated_sharpe_ratio  # noqa: E402
+from core.kronos.research.maker_execution_simulator import MakerExecutionSimulator
+from core.quantitative_validation.metrics import calculate_deflated_sharpe_ratio
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("m40_edge_power_test")
@@ -49,26 +49,46 @@ def compute_sha256_file(path: Path) -> str:
 
 
 def build_and_freeze_derivatives_dataset() -> tuple[dict[str, pd.DataFrame], Path, str]:
-    logger.info("Building continuous multi-year derivatives dataset across BTCUSDT, ETHUSDT, SOLUSDT (2022-2026)...")
+    logger.info(
+        "Building continuous multi-year derivatives dataset across BTCUSDT, ETHUSDT, SOLUSDT (2022-2026)..."
+    )
     dfs = {}
     combined_records = []
 
     for sym in ["BTCUSDT", "ETHUSDT", "SOLUSDT"]:
-        files = sorted(glob.glob(str(ROOT_DIR / f"data/store/parquet/candles/exchange=binance/market=perp/symbol={sym}/timeframe=1h/**/*.parquet"), recursive=True))
+        files = sorted(
+            glob.glob(
+                str(
+                    ROOT_DIR
+                    / f"data/store/parquet/candles/exchange=binance/market=perp/symbol={sym}/timeframe=1h/**/*.parquet"
+                ),
+                recursive=True,
+            )
+        )
         if not files:
             raise FileNotFoundError(f"No parquet files found for {sym}")
-        df = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True).sort_values("ts").drop_duplicates("ts").reset_index(drop=True)
+        df = (
+            pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
+            .sort_values("ts")
+            .drop_duplicates("ts")
+            .reset_index(drop=True)
+        )
 
         # Date & Partition
         df["dt"] = pd.to_datetime(df["ts"], unit="ms", utc=True)
         df["date"] = df["dt"].dt.strftime("%Y-%m-%d")
         df["partition"] = "TRAIN"
-        df.loc[(df["date"] >= "2024-07-01") & (df["date"] <= "2025-06-30"), "partition"] = "VALIDATION"
+        df.loc[(df["date"] >= "2024-07-01") & (df["date"] <= "2025-06-30"), "partition"] = (
+            "VALIDATION"
+        )
         df.loc[df["date"] >= "2025-07-01", "partition"] = "SEALED_OOS"
 
         # Technical indicators
         prev_close = df["close"].shift(1)
-        tr = np.maximum(df["high"] - df["low"], np.maximum(np.abs(df["high"] - prev_close), np.abs(df["low"] - prev_close)))
+        tr = np.maximum(
+            df["high"] - df["low"],
+            np.maximum(np.abs(df["high"] - prev_close), np.abs(df["low"] - prev_close)),
+        )
         df["atr_14"] = tr.rolling(14).mean().bfill()
         df["ema_50"] = df["close"].ewm(span=50, adjust=False).mean()
         df["ema_200"] = df["close"].ewm(span=200, adjust=False).mean()
@@ -90,15 +110,21 @@ def build_and_freeze_derivatives_dataset() -> tuple[dict[str, pd.DataFrame], Pat
         df["ret_1h"] = (df["close"] - df["open"]) / df["atr_14"]
 
         # Synthetic point-in-time Open Interest & Funding Rate proxies
-        vwap_24h = (df["quote_volume"].rolling(24).sum() / (df["volume"].rolling(24).sum() + 1e-8)).bfill()
+        vwap_24h = (
+            df["quote_volume"].rolling(24).sum() / (df["volume"].rolling(24).sum() + 1e-8)
+        ).bfill()
         df["funding_rate"] = ((df["close"] - vwap_24h) / vwap_24h * 0.01).clip(-0.003, 0.003)
         fr_mean = df["funding_rate"].rolling(2160, min_periods=720).mean()
         fr_std = df["funding_rate"].rolling(2160, min_periods=720).std().replace(0, 1e-6)
         df["fr_zscore"] = ((df["funding_rate"] - fr_mean) / fr_std).fillna(0)
 
-        wick_ratio = (df["high"] - np.maximum(df["open"], df["close"])) + (np.minimum(df["open"], df["close"]) - df["low"])
+        wick_ratio = (df["high"] - np.maximum(df["open"], df["close"])) + (
+            np.minimum(df["open"], df["close"]) - df["low"]
+        )
         liquidation_drop = np.where(wick_ratio > 1.5 * df["atr_14"], -0.045, 0.001)
-        oi_series = 1e9 * np.cumprod(1.0 + np.clip(0.0005 * (df["turnover_intensity"] - 1.0) + liquidation_drop, -0.06, 0.03))
+        oi_series = 1e9 * np.cumprod(
+            1.0 + np.clip(0.0005 * (df["turnover_intensity"] - 1.0) + liquidation_drop, -0.06, 0.03)
+        )
         df["open_interest"] = oi_series
         df["oi_pct_chg_1h"] = df["open_interest"].pct_change(1).fillna(0)
         df["oi_pct_chg_24h"] = df["open_interest"].pct_change(24).fillna(0)
@@ -109,11 +135,15 @@ def build_and_freeze_derivatives_dataset() -> tuple[dict[str, pd.DataFrame], Pat
         logger.info(f"Processed {sym}: {len(df)} bars ({df['partition'].value_counts().to_dict()})")
 
     full_dataset = pd.concat(combined_records, ignore_index=True)
-    out_parquet = ROOT_DIR / "data" / "research" / "datasets" / "derivatives_expanded_2022_2026.parquet"
+    out_parquet = (
+        ROOT_DIR / "data" / "research" / "datasets" / "derivatives_expanded_2022_2026.parquet"
+    )
     out_parquet.parent.mkdir(parents=True, exist_ok=True)
     full_dataset.to_parquet(out_parquet, index=False)
     content_hash = compute_sha256_file(out_parquet)
-    logger.info(f"Frozen expanded derivatives dataset: {len(full_dataset)} total rows, SHA-256: {content_hash}")
+    logger.info(
+        f"Frozen expanded derivatives dataset: {len(full_dataset)} total rows, SHA-256: {content_hash}"
+    )
 
     # Register in manifest_k9.json
     manifest_file = ROOT_DIR / "data" / "research" / "datasets" / "manifest_k9.json"
@@ -178,8 +208,16 @@ def evaluate_candidate_b_power(dfs: dict[str, pd.DataFrame]) -> dict[str, Any]:
         short_trends = (df["close"] < df["ema_200"]).values
 
         # H3: Violent OI Flush Capitulation
-        sig_h3_long = (df["oi_pct_chg_1h"] <= -0.04) & (df["close"] < df["open"] - 0.8 * df["atr_14"]) & long_trends
-        sig_h3_short = (df["oi_pct_chg_1h"] <= -0.04) & (df["close"] > df["open"] + 0.8 * df["atr_14"]) & short_trends
+        sig_h3_long = (
+            (df["oi_pct_chg_1h"] <= -0.04)
+            & (df["close"] < df["open"] - 0.8 * df["atr_14"])
+            & long_trends
+        )
+        sig_h3_short = (
+            (df["oi_pct_chg_1h"] <= -0.04)
+            & (df["close"] > df["open"] + 0.8 * df["atr_14"])
+            & short_trends
+        )
 
         # H5: Volatility Compression Breakout
         comp = df["bb_width"] <= df["bb_width_q20"]
@@ -225,16 +263,18 @@ def evaluate_candidate_b_power(dfs: dict[str, pd.DataFrame]) -> dict[str, Any]:
                     fric_cons = (FRICTIONS["CONSERVATIVE"] * entry_px) / risk
                     fric_stress = (FRICTIONS["STRESS"] * entry_px) / risk
 
-                    all_trades.append({
-                        "symbol": sym,
-                        "partition": part,
-                        "direction": direction,
-                        "bars_held": bars_held,
-                        "gross_r": gross_r,
-                        "net_base_r": gross_r - fric_base,
-                        "net_conservative_r": gross_r - fric_cons,
-                        "net_stress_r": gross_r - fric_stress,
-                    })
+                    all_trades.append(
+                        {
+                            "symbol": sym,
+                            "partition": part,
+                            "direction": direction,
+                            "bars_held": bars_held,
+                            "gross_r": gross_r,
+                            "net_base_r": gross_r - fric_base,
+                            "net_conservative_r": gross_r - fric_cons,
+                            "net_stress_r": gross_r - fric_stress,
+                        }
+                    )
                     in_pos = False
             else:
                 if sig_long.iloc[i - 1]:
@@ -323,7 +363,9 @@ def evaluate_candidate_b_power(dfs: dict[str, pd.DataFrame]) -> dict[str, Any]:
         ),
     }
 
-    logger.info(f"Candidate B Power Test complete: N={n_oos}, Sharpe={sharpe}, DSR={dsr}, NetConsR={exp_cons:+.4f}R")
+    logger.info(
+        f"Candidate B Power Test complete: N={n_oos}, Sharpe={sharpe}, DSR={dsr}, NetConsR={exp_cons:+.4f}R"
+    )
     return results
 
 
@@ -332,7 +374,7 @@ def evaluate_candidate_c_maker_simulation(dfs: dict[str, pd.DataFrame]) -> dict[
 
     sim_maker = MakerExecutionSimulator(
         maker_fee_bps=-1.0,  # -1.0 bp maker rebate
-        taker_fee_bps=8.0,   # 8.0 bps taker fee
+        taker_fee_bps=8.0,  # 8.0 bps taker fee
         half_spread_bps=1.5,
         slippage_bps=1.5,
         queue_participation_rate=0.20,
@@ -381,7 +423,9 @@ def evaluate_candidate_c_maker_simulation(dfs: dict[str, pd.DataFrame]) -> dict[
         ),
     }
 
-    logger.info(f"Candidate C Maker Simulation complete: Fill Rate={results['fill_rate_pct']}%, Unfilled Opp Cost={results['mean_unfilled_opportunity_cost_bps']} bps")
+    logger.info(
+        f"Candidate C Maker Simulation complete: Fill Rate={results['fill_rate_pct']}%, Unfilled Opp Cost={results['mean_unfilled_opportunity_cost_bps']} bps"
+    )
     return results
 
 
@@ -402,7 +446,9 @@ def evaluate_candidate_a_ablation(dfs: dict[str, pd.DataFrame]) -> dict[str, Any
 
             if gated:
                 vol_mean = df["volume"].rolling(24).mean().bfill()
-                cand_b_regime = (df["volume"] > 1.5 * vol_mean) | (df["bb_width"] <= df["bb_width_q20"])
+                cand_b_regime = (df["volume"] > 1.5 * vol_mean) | (
+                    df["bb_width"] <= df["bb_width_q20"]
+                )
                 smc_long = smc_long & cand_b_regime
                 smc_short = smc_short & cand_b_regime
 
@@ -440,7 +486,11 @@ def evaluate_candidate_a_ablation(dfs: dict[str, pd.DataFrame]) -> dict[str, Any
 
                     if exit_trig:
                         if part == "SEALED_OOS":
-                            pnl = (exit_px - entry_px) if direction == "LONG" else (entry_px - exit_px)
+                            pnl = (
+                                (exit_px - entry_px)
+                                if direction == "LONG"
+                                else (entry_px - exit_px)
+                            )
                             gross_r = pnl / risk
                             net_r = gross_r - (ROUNDTRIP_FRICTION * entry_px) / risk
                             all_net_r.append(net_r)
@@ -454,7 +504,6 @@ def evaluate_candidate_a_ablation(dfs: dict[str, pd.DataFrame]) -> dict[str, Any
                         in_pos, entry_bar, entry_px, direction = True, i, opens[i], "SHORT"
                         risk = max(1.5 * atrs[i], entry_px * 0.005)
                         sl_px, tp_px, part = entry_px + risk, entry_px - 2.0 * risk, parts[i]
-
 
         n_oos = len(all_net_r)
         wins = [x for x in all_net_r if x > 0]
@@ -551,7 +600,7 @@ def main():
     # Generate Markdown Report
     report_md = f"""# 🏛️ SKY / CBT — Formal Edge Verification & Strategy Triage Report (M40)
 
-> **Audit Date:** {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S UTC')}  
+> **Audit Date:** {datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")}  
 > **Auditor:** Principal Quantitative Systems Architect & Lead Autonomous Engineer  
 > **Governance Classification:** Level 2 Research Protocol (`docs/QUANT_RESEARCH_PROTOCOL.md`)  
 > **Dataset Artifact:** [`derivatives_expanded_2022_2026.parquet`](file:///{parquet_path}) (`{dataset_hash[:16]}...`)  
@@ -568,16 +617,16 @@ In strict compliance with **Level 0 Governance (`AGENTS.md`)** and **The Immutab
 Milestone 40 executed the expanded statistical power campaign across continuous multi-year derivatives data (2022 to 2026) for `BTCUSDT`, `ETHUSDT`, and `SOLUSDT` (125,820 total asset-hours).
 
 ### Key Empirical Findings:
-1. **Candidate B Sample Power Expansion ($N = 8 \\to N = {cand_b['oos_trades_count']}$):**
-   - Sample size hurdle ($N \\ge 100$) was cleared ($N = {cand_b['oos_trades_count']}$ out-of-sample trades).
-   - However, empirical reality confirmed that the inflated $N=8$ Sharpe of `+1.12` deflated to **`{cand_b['observed_sharpe']:.3f}`**, and the Deflated Sharpe Ratio compressed to **`{cand_b['deflated_sharpe_ratio']:.4f}`** (failing the mandatory $\\ge 0.95$ significance hurdle).
-   - Net expectancy under Tier-2 Conservative Friction (8 bps taker fee + 1.5 bps slippage) is **`{cand_b['expectancy_conservative_r']:+.4f}R`**.
+1. **Candidate B Sample Power Expansion ($N = 8 \\to N = {cand_b["oos_trades_count"]}$):**
+   - Sample size hurdle ($N \\ge 100$) was cleared ($N = {cand_b["oos_trades_count"]}$ out-of-sample trades).
+   - However, empirical reality confirmed that the inflated $N=8$ Sharpe of `+1.12` deflated to **`{cand_b["observed_sharpe"]:.3f}`**, and the Deflated Sharpe Ratio compressed to **`{cand_b["deflated_sharpe_ratio"]:.4f}`** (failing the mandatory $\\ge 0.95$ significance hurdle).
+   - Net expectancy under Tier-2 Conservative Friction (8 bps taker fee + 1.5 bps slippage) is **`{cand_b["expectancy_conservative_r"]:+.4f}R`**.
 2. **Candidate C Maker Execution Autopsy:**
    - Simulated with `MakerExecutionSimulator` and Grade-E1 queue priority model (-1 bp maker fee rebate vs 8 bps taker penalty).
-   - Maker execution achieved a **`{cand_c['fill_rate_pct']}%` fill rate** and saved 9.0 bps per fill, but unhedged delta drift on unfilled orders during breakout surges incurred an average of **`{cand_c['mean_unfilled_opportunity_cost_bps']} bps`** opportunity cost.
+   - Maker execution achieved a **`{cand_c["fill_rate_pct"]}%` fill rate** and saved 9.0 bps per fill, but unhedged delta drift on unfilled orders during breakout surges incurred an average of **`{cand_c["mean_unfilled_opportunity_cost_bps"]} bps`** opportunity cost.
 3. **Candidate A Regime-Gated Ablation:**
    - Evaluated SMC Liquidity Sweeps with and without Candidate B's derivatives regime filter.
-   - Gating eliminated **`{cand_a['ablation_delta']['trade_reduction_pct']}%`** of false setups, but net expectancy remained negative (**`{cand_a['regime_gated_variant']['expectancy_conservative_r']:+.4f}R`** vs **`{cand_a['ungated_variant']['expectancy_conservative_r']:+.4f}R`** ungated). Standalone SMC sweeps cannot be rescued by regime-gating alone.
+   - Gating eliminated **`{cand_a["ablation_delta"]["trade_reduction_pct"]}%`** of false setups, but net expectancy remained negative (**`{cand_a["regime_gated_variant"]["expectancy_conservative_r"]:+.4f}R`** vs **`{cand_a["ungated_variant"]["expectancy_conservative_r"]:+.4f}R`** ungated). Standalone SMC sweeps cannot be rescued by regime-gating alone.
 4. **Forward Paper Quarantine & Ledger Isolation:**
    - All 3 closed losses in Round 2 were unvalidated `PRE_BREAKOUT_COMPRESSION` setups (-1.21R avg).
    - Quarantined `PRE_BREAKOUT_COMPRESSION` in `core/central_mind.py`, `core/mastermind/mastermind_arbiter.py`, `core/screener/opportunity_hunter.py`, and `core/screener/radar_executor.py`.
@@ -589,9 +638,9 @@ Milestone 40 executed the expanded statistical power campaign across continuous 
 
 | Candidate Strategy | 2a: OOS Sample ($N \\ge 100$) | 2b: Zero-Lookahead Causality | 2c: CPCV Median OOS Sharpe ($>0$) | 2d: Deflated Sharpe Ratio ($>0.95$) | 2e: Tier-2 Friction Survival | Governance Classification |
 |:---|:---:|:---:|:---:|:---:|:---:|:---|
-| **Candidate A: SMC Order Block / FVG** | ✅ $N={cand_a['ungated_variant']['oos_trades']}$ | ✅ PASS | ❌ $-0.183$ | ❌ $DSR=0.000$ | ❌ ${cand_a['ungated_variant']['expectancy_conservative_r']:+.4f}R$ | `PERMANENTLY_QUARANTINED` |
-| **Candidate A (Regime-Gated on Cand B)** | ✅ $N={cand_a['regime_gated_variant']['oos_trades']}$ | ✅ PASS | ❌ $-0.149$ | ❌ $DSR=0.000$ | ❌ ${cand_a['regime_gated_variant']['expectancy_conservative_r']:+.4f}R$ | `PERMANENTLY_QUARANTINED` |
-| **Candidate B: Derivatives OI Squeeze** | ✅ $N={cand_b['oos_trades_count']}$ | ✅ PASS | {'✅' if cand_b['observed_sharpe'] > 0 else '❌'} {cand_b['observed_sharpe']:+.3f} | ❌ $DSR={cand_b['deflated_sharpe_ratio']:.4f}$ | {'✅' if cand_b['expectancy_conservative_r'] > 0 else '❌'} {cand_b['expectancy_conservative_r']:+.4f}R | `RESEARCH_ONLY_UNDERPOWERED` |
+| **Candidate A: SMC Order Block / FVG** | ✅ $N={cand_a["ungated_variant"]["oos_trades"]}$ | ✅ PASS | ❌ $-0.183$ | ❌ $DSR=0.000$ | ❌ ${cand_a["ungated_variant"]["expectancy_conservative_r"]:+.4f}R$ | `PERMANENTLY_QUARANTINED` |
+| **Candidate A (Regime-Gated on Cand B)** | ✅ $N={cand_a["regime_gated_variant"]["oos_trades"]}$ | ✅ PASS | ❌ $-0.149$ | ❌ $DSR=0.000$ | ❌ ${cand_a["regime_gated_variant"]["expectancy_conservative_r"]:+.4f}R$ | `PERMANENTLY_QUARANTINED` |
+| **Candidate B: Derivatives OI Squeeze** | ✅ $N={cand_b["oos_trades_count"]}$ | ✅ PASS | {"✅" if cand_b["observed_sharpe"] > 0 else "❌"} {cand_b["observed_sharpe"]:+.3f} | ❌ $DSR={cand_b["deflated_sharpe_ratio"]:.4f}$ | {"✅" if cand_b["expectancy_conservative_r"] > 0 else "❌"} {cand_b["expectancy_conservative_r"]:+.4f}R | `RESEARCH_ONLY_UNDERPOWERED` |
 | **Candidate C: Delta-Neutral Basis Carry** | ❌ $N=42$ | ✅ PASS | ✅ $+0.150$ | ❌ $DSR=0.120$ | ❌ $-0.015R$ (Taker) / ⚠️ $+0.002R$ (Maker) | `REJECTED_QUEUE_RISK` |
 
 
@@ -601,10 +650,10 @@ Milestone 40 executed the expanded statistical power campaign across continuous 
 
 | Symbol | Out-of-Sample Trades | Win Rate % | Net Conservative Expectancy (R) | Sharpe Ratio | Deflated Sharpe Ratio (DSR) |
 |:---|:---:|:---:|:---:|:---:|:---:|
-| **BTCUSDT** | {cand_b['by_symbol']['BTCUSDT']['oos_trades']} | {cand_b['by_symbol']['BTCUSDT']['win_rate_pct']}% | {cand_b['by_symbol']['BTCUSDT']['mean_net_conservative_r']:+.4f}R | {cand_b['by_symbol']['BTCUSDT']['sharpe']:.3f} | {cand_b['by_symbol']['BTCUSDT']['dsr']:.4f} |
-| **ETHUSDT** | {cand_b['by_symbol']['ETHUSDT']['oos_trades']} | {cand_b['by_symbol']['ETHUSDT']['win_rate_pct']}% | {cand_b['by_symbol']['ETHUSDT']['mean_net_conservative_r']:+.4f}R | {cand_b['by_symbol']['ETHUSDT']['sharpe']:.3f} | {cand_b['by_symbol']['ETHUSDT']['dsr']:.4f} |
-| **SOLUSDT** | {cand_b['by_symbol']['SOLUSDT']['oos_trades']} | {cand_b['by_symbol']['SOLUSDT']['win_rate_pct']}% | {cand_b['by_symbol']['SOLUSDT']['mean_net_conservative_r']:+.4f}R | {cand_b['by_symbol']['SOLUSDT']['sharpe']:.3f} | {cand_b['by_symbol']['SOLUSDT']['dsr']:.4f} |
-| **Combined Multi-Asset** | **{cand_b['oos_trades_count']}** | **{cand_b['win_rate_pct']}%** | **{cand_b['expectancy_conservative_r']:+.4f}R** | **{cand_b['observed_sharpe']:.3f}** | **{cand_b['deflated_sharpe_ratio']:.4f}** |
+| **BTCUSDT** | {cand_b["by_symbol"]["BTCUSDT"]["oos_trades"]} | {cand_b["by_symbol"]["BTCUSDT"]["win_rate_pct"]}% | {cand_b["by_symbol"]["BTCUSDT"]["mean_net_conservative_r"]:+.4f}R | {cand_b["by_symbol"]["BTCUSDT"]["sharpe"]:.3f} | {cand_b["by_symbol"]["BTCUSDT"]["dsr"]:.4f} |
+| **ETHUSDT** | {cand_b["by_symbol"]["ETHUSDT"]["oos_trades"]} | {cand_b["by_symbol"]["ETHUSDT"]["win_rate_pct"]}% | {cand_b["by_symbol"]["ETHUSDT"]["mean_net_conservative_r"]:+.4f}R | {cand_b["by_symbol"]["ETHUSDT"]["sharpe"]:.3f} | {cand_b["by_symbol"]["ETHUSDT"]["dsr"]:.4f} |
+| **SOLUSDT** | {cand_b["by_symbol"]["SOLUSDT"]["oos_trades"]} | {cand_b["by_symbol"]["SOLUSDT"]["win_rate_pct"]}% | {cand_b["by_symbol"]["SOLUSDT"]["mean_net_conservative_r"]:+.4f}R | {cand_b["by_symbol"]["SOLUSDT"]["sharpe"]:.3f} | {cand_b["by_symbol"]["SOLUSDT"]["dsr"]:.4f} |
+| **Combined Multi-Asset** | **{cand_b["oos_trades_count"]}** | **{cand_b["win_rate_pct"]}%** | **{cand_b["expectancy_conservative_r"]:+.4f}R** | **{cand_b["observed_sharpe"]:.3f}** | **{cand_b["deflated_sharpe_ratio"]:.4f}** |
 
 ---
 
@@ -612,9 +661,9 @@ Milestone 40 executed the expanded statistical power campaign across continuous 
 
 | Friction Schedule | Round-Trip Cost (bps) | Net Expectancy (R) | Survival Status |
 |:---|:---:|:---:|:---:|
-| **Base (VIP Spot / Low Fee)** | 13.0 bps | {cand_b['expectancy_base_r']:+.4f}R | ✅ SURVIVED |
-| **Conservative (Retail Perp)** | 19.0 bps | {cand_b['expectancy_conservative_r']:+.4f}R | ✅ SURVIVED |
-| **Stress (Illiquid Crisis)** | 50.0 bps | {cand_b['expectancy_stress_r']:+.4f}R | {'✅ SURVIVED' if cand_b['expectancy_stress_r'] > 0 else '❌ FAILED'} |
+| **Base (VIP Spot / Low Fee)** | 13.0 bps | {cand_b["expectancy_base_r"]:+.4f}R | ✅ SURVIVED |
+| **Conservative (Retail Perp)** | 19.0 bps | {cand_b["expectancy_conservative_r"]:+.4f}R | ✅ SURVIVED |
+| **Stress (Illiquid Crisis)** | 50.0 bps | {cand_b["expectancy_stress_r"]:+.4f}R | {"✅ SURVIVED" if cand_b["expectancy_stress_r"] > 0 else "❌ FAILED"} |
 
 ---
 
@@ -636,7 +685,7 @@ Milestone 40 executed the expanded statistical power campaign across continuous 
 
 ## 7. Final Governance State & Capital Governor Lock
 
-Because Candidate B achieves DSR = {cand_b['deflated_sharpe_ratio']:.4f} (< 0.95 mandatory significance gate), **Checkpoint 2 remains OPEN**:
+Because Candidate B achieves DSR = {cand_b["deflated_sharpe_ratio"]:.4f} (< 0.95 mandatory significance gate), **Checkpoint 2 remains OPEN**:
 1. `core/execution/capital_governor.py` remains strictly locked at **`TIER_0_PAPER`**.
 2. Live capital execution (`real_capital_enabled`) remains strictly **`False`**.
 3. Candidate A and unvalidated compression mechanisms remain quarantined.

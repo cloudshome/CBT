@@ -22,8 +22,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from core.portfolio_shadow import PortfolioShadowManager  # noqa: E402
-from core.qualification.qualification_ledger import (  # noqa: E402
+from core.portfolio_shadow import PortfolioShadowManager
+from core.qualification.qualification_ledger import (
     QUALIFICATION_ANCHOR_EQUITY_USD,
     QualificationLedger,
 )

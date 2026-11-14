@@ -221,6 +221,39 @@ class DerivativesStore:
         )
 
 
+class DerivativesSeries:
+    """Convenience accessor to pivot metric series from DerivativesStore into a single time-aligned DataFrame."""
+
+    def __init__(
+        self,
+        symbol: str = "binance",
+        market: str = "perp",
+        symbol_name: str = "BTCUSDT",
+        store: DerivativesStore | None = None,
+    ):
+        self.exchange = symbol
+        self.market = market
+        self.symbol = symbol_name
+        self.store = store or DerivativesStore()
+
+    def to_frame(self) -> pd.DataFrame:
+        metrics = [FUNDING_RATE, OPEN_INTEREST, BASIS, MARK_PRICE, INDEX_PRICE]
+        dfs = []
+        for m in metrics:
+            df = self.store.read(self.exchange, self.market, self.symbol, m)
+            if not df.empty and "ts" in df.columns and "value" in df.columns:
+                sub = (
+                    df[["ts", "value"]]
+                    .rename(columns={"value": m})
+                    .drop_duplicates(subset=["ts"])
+                    .set_index("ts")
+                )
+                dfs.append(sub)
+        if not dfs:
+            return pd.DataFrame()
+        return pd.concat(dfs, axis=1).sort_index().ffill()
+
+
 # --------------------------------------------------------------------------- #
 # Basis derivation
 # --------------------------------------------------------------------------- #

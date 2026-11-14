@@ -14,44 +14,52 @@ import hashlib
 import json
 import logging
 import math
-from dataclasses import asdict
-from datetime import datetime, timezone
-from pathlib import Path
-import numpy as np
-import pandas as pd
-
 import sys
+from dataclasses import asdict
+from datetime import UTC, datetime
+from pathlib import Path
+
+import numpy as np
+
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from scripts.research.run_historical_edge_discovery import (
-    load_parquet_dataset,
-    compute_indicators,
-    compute_causal_kronos_features,
     HistoricalStrategyEvaluator,
-    compute_metrics_for_trades,
     TradeOutcome,
+    compute_causal_kronos_features,
+    compute_indicators,
+    compute_metrics_for_trades,
+    load_parquet_dataset,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("m34_audit")
 
 
-def calculate_bootstrap_ci(returns: np.ndarray, n_boot: int = 2000, alpha: float = 0.05) -> tuple[float, float]:
+def calculate_bootstrap_ci(
+    returns: np.ndarray, n_boot: int = 2000, alpha: float = 0.05
+) -> tuple[float, float]:
     """Calculates non-parametric bootstrap 95% CI for the mean."""
     if len(returns) < 2:
         val = float(np.mean(returns)) if len(returns) == 1 else 0.0
         return val, val
-    boot_means = [np.mean(np.random.choice(returns, size=len(returns), replace=True)) for _ in range(n_boot)]
-    return float(np.percentile(boot_means, 100 * (alpha / 2))), float(np.percentile(boot_means, 100 * (1 - alpha / 2)))
+    boot_means = [
+        np.mean(np.random.choice(returns, size=len(returns), replace=True)) for _ in range(n_boot)
+    ]
+    return float(np.percentile(boot_means, 100 * (alpha / 2))), float(
+        np.percentile(boot_means, 100 * (1 - alpha / 2))
+    )
 
 
 def calculate_outlier_sensitivity(trades: list[TradeOutcome], model: str = "mixed") -> dict:
     """Calculates metrics with the single best winning trade removed."""
     if not trades:
         return {"net_expectancy_drop_best": 0.0, "pf_drop_best": 0.0, "best_trade_r": 0.0}
-    returns = np.array([t.net_pnl_r_mixed if model == "mixed" else t.net_pnl_r_maker for t in trades])
+    returns = np.array(
+        [t.net_pnl_r_mixed if model == "mixed" else t.net_pnl_r_maker for t in trades]
+    )
     best_idx = int(np.argmax(returns))
     best_r = float(returns[best_idx])
     rem_returns = np.delete(returns, best_idx)
@@ -68,15 +76,19 @@ def calculate_outlier_sensitivity(trades: list[TradeOutcome], model: str = "mixe
     }
 
 
-def calculate_dsr(sharpe: float, n_trades: int, n_trials: int = 80, skew: float = 0.0, kurtosis: float = 3.0) -> float:
+def calculate_dsr(
+    sharpe: float, n_trades: int, n_trials: int = 80, skew: float = 0.0, kurtosis: float = 3.0
+) -> float:
     """Calculates Deflated Sharpe Ratio (Bailey & Lopez de Prado 2014)."""
     if n_trades < 5 or sharpe <= 0:
         return 0.0
     euler_mascheroni = 0.5772156649
     # Expected maximum Sharpe under null hypothesis of no edge across n_trials
-    sr_star = (1 - euler_mascheroni) * math.sqrt(2 * math.log(n_trials)) + euler_mascheroni * math.sqrt(2 * math.log(n_trials))
+    sr_star = (1 - euler_mascheroni) * math.sqrt(
+        2 * math.log(n_trials)
+    ) + euler_mascheroni * math.sqrt(2 * math.log(n_trials))
     sr_star = math.sqrt(2 * math.log(n_trials))  # simplified robust approximation
-    var_sr = (1 - skew * sharpe + ((kurtosis - 1) / 4.0) * (sharpe ** 2)) / (n_trades - 1)
+    var_sr = (1 - skew * sharpe + ((kurtosis - 1) / 4.0) * (sharpe**2)) / (n_trades - 1)
     if var_sr <= 0:
         return 0.0
     z = (sharpe - sr_star) / math.sqrt(var_sr)
@@ -128,9 +140,13 @@ def main():
             # 1. Base trades (Mode A)
             t_base_all = evaluator.run_strategy_sweep(strat, k_dir, k_unc, kronos_mode="OFF")
             # 2. Fusion trades (Mode C)
-            t_fusion_all = evaluator.run_strategy_sweep(strat, k_dir, k_unc, kronos_mode="FILTER_AGREEMENT")
+            t_fusion_all = evaluator.run_strategy_sweep(
+                strat, k_dir, k_unc, kronos_mode="FILTER_AGREEMENT"
+            )
             # 3. Control trades (Mode D)
-            t_control_all = evaluator.run_strategy_sweep(strat, k_dir, k_unc, kronos_mode="RANDOM_CONTROL")
+            t_control_all = evaluator.run_strategy_sweep(
+                strat, k_dir, k_unc, kronos_mode="RANDOM_CONTROL"
+            )
 
             # Collect trades into trade ledger
             for t in t_fusion_all:
@@ -160,15 +176,23 @@ def main():
                     "baseline_sky": asdict(m_base),
                     "kronos_fusion": asdict(m_fusion),
                     "random_control": asdict(m_control),
-                    "delta_expectancy_maker_r": round(m_fusion.net_expectancy_maker_r - m_base.net_expectancy_maker_r, 3),
+                    "delta_expectancy_maker_r": round(
+                        m_fusion.net_expectancy_maker_r - m_base.net_expectancy_maker_r, 3
+                    ),
                     "delta_win_rate_pct": round(m_fusion.win_rate_pct - m_base.win_rate_pct, 2),
                     "delta_drawdown_r": round(m_fusion.max_drawdown_r - m_base.max_drawdown_r, 2),
                 }
 
                 # Statistical audit for fusion mode
-                returns_mixed = np.array([t.net_pnl_r_mixed for t in t_fusion]) if t_fusion else np.array([])
-                returns_maker = np.array([t.net_pnl_r_maker for t in t_fusion]) if t_fusion else np.array([])
-                ci_low, ci_high = calculate_bootstrap_ci(returns_mixed) if len(returns_mixed) > 0 else (0.0, 0.0)
+                returns_mixed = (
+                    np.array([t.net_pnl_r_mixed for t in t_fusion]) if t_fusion else np.array([])
+                )
+                returns_maker = (
+                    np.array([t.net_pnl_r_maker for t in t_fusion]) if t_fusion else np.array([])
+                )
+                ci_low, ci_high = (
+                    calculate_bootstrap_ci(returns_mixed) if len(returns_mixed) > 0 else (0.0, 0.0)
+                )
                 outlier = calculate_outlier_sensitivity(t_fusion)
                 dsr_val = calculate_dsr(m_fusion.sharpe_ratio, len(t_fusion))
 
@@ -177,7 +201,9 @@ def main():
                     lag1_corr = float(np.corrcoef(returns_mixed[:-1], returns_mixed[1:])[0, 1])
                     if math.isnan(lag1_corr):
                         lag1_corr = 0.0
-                    n_eff = float(len(returns_mixed) * (1 - abs(lag1_corr)) / (1 + abs(lag1_corr) + 1e-6))
+                    n_eff = float(
+                        len(returns_mixed) * (1 - abs(lag1_corr)) / (1 + abs(lag1_corr) + 1e-6)
+                    )
                 else:
                     lag1_corr = 0.0
                     n_eff = float(len(returns_mixed))
@@ -193,22 +219,32 @@ def main():
                     "bootstrap_95_ci_mean_r": [round(ci_low, 3), round(ci_high, 3)],
                     "outlier_sensitivity": outlier,
                     "deflated_sharpe_ratio": dsr_val,
-                    "status": "CANDIDATE" if (m_fusion.profit_factor_mixed >= 2.0 and len(t_fusion) >= 5 and m_fusion.net_expectancy_mixed_r >= 0.3) else "NEEDS_MORE_DATA" if len(t_fusion) > 0 else "NO_EDGE",
+                    "status": "CANDIDATE"
+                    if (
+                        m_fusion.profit_factor_mixed >= 2.0
+                        and len(t_fusion) >= 5
+                        and m_fusion.net_expectancy_mixed_r >= 0.3
+                    )
+                    else "NEEDS_MORE_DATA"
+                    if len(t_fusion) > 0
+                    else "NO_EDGE",
                 }
 
-                experiment_manifest_list.append({
-                    "experiment_id": res_key,
-                    "symbol": symbol,
-                    "timeframe": tf,
-                    "strategy": strat,
-                    "split": split_name,
-                    "trades_base": len(t_base),
-                    "trades_fusion": len(t_fusion),
-                    "net_expectancy_fusion_mixed_r": m_fusion.net_expectancy_mixed_r,
-                    "profit_factor_fusion_mixed": m_fusion.profit_factor_mixed,
-                    "win_rate_fusion_pct": m_fusion.win_rate_pct,
-                    "max_drawdown_fusion_r": m_fusion.max_drawdown_r,
-                })
+                experiment_manifest_list.append(
+                    {
+                        "experiment_id": res_key,
+                        "symbol": symbol,
+                        "timeframe": tf,
+                        "strategy": strat,
+                        "split": split_name,
+                        "trades_base": len(t_base),
+                        "trades_fusion": len(t_fusion),
+                        "net_expectancy_fusion_mixed_r": m_fusion.net_expectancy_mixed_r,
+                        "profit_factor_fusion_mixed": m_fusion.profit_factor_mixed,
+                        "win_rate_fusion_pct": m_fusion.win_rate_pct,
+                        "max_drawdown_fusion_r": m_fusion.max_drawdown_r,
+                    }
+                )
 
     # Save artifacts
     research_dir = ROOT_DIR / "research"
@@ -231,7 +267,7 @@ def main():
     exp_manifest_file = research_dir / "m34_experiment_manifest.json"
     manifest_doc = {
         "manifest_version": "M34.1-RESEARCH",
-        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "generated_at_utc": datetime.now(UTC).isoformat(),
         "total_experiments": len(experiment_manifest_list),
         "total_trades_logged": len(trade_ledger_records),
         "primary_candidate": "HTF_ORDER_BLOCK_KRONOS_CONFLUENCE",
@@ -257,16 +293,33 @@ def main():
     genesis_record = {
         "event_type": "GENESIS_PAPER_SHADOW_LEDGER",
         "schema_version": "1.0.0",
-        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "timestamp_utc": datetime.now(UTC).isoformat(),
         "node_id": "WINDOWS_WORKSTATION_AUDITOR",
         "active_worker_node": "UBUNTU_24_7_SERVER",
         "operating_mode": "PAPER_SHADOW_SIMULATION",
         "real_capital_enabled": False,
-        "frozen_strategy_config_hash": hashlib.sha256(b"HTF_ORDER_BLOCK_KRONOS_CONFLUENCE_v1_0").hexdigest(),
+        "frozen_strategy_config_hash": hashlib.sha256(
+            b"HTF_ORDER_BLOCK_KRONOS_CONFLUENCE_v1_0"
+        ).hexdigest(),
         "monitored_universe": [
-            {"symbol": "BTCUSDT", "timeframe": "1h", "strategy": "ORDER_BLOCK_RETEST", "kronos_mode": "FILTER_AGREEMENT"},
-            {"symbol": "BTCUSDT", "timeframe": "4h", "strategy": "ORDER_BLOCK_RETEST", "kronos_mode": "FILTER_AGREEMENT"},
-            {"symbol": "ETHUSDT", "timeframe": "1h", "strategy": "ORDER_BLOCK_RETEST", "kronos_mode": "FILTER_AGREEMENT"},
+            {
+                "symbol": "BTCUSDT",
+                "timeframe": "1h",
+                "strategy": "ORDER_BLOCK_RETEST",
+                "kronos_mode": "FILTER_AGREEMENT",
+            },
+            {
+                "symbol": "BTCUSDT",
+                "timeframe": "4h",
+                "strategy": "ORDER_BLOCK_RETEST",
+                "kronos_mode": "FILTER_AGREEMENT",
+            },
+            {
+                "symbol": "ETHUSDT",
+                "timeframe": "1h",
+                "strategy": "ORDER_BLOCK_RETEST",
+                "kronos_mode": "FILTER_AGREEMENT",
+            },
         ],
         "risk_governance": {
             "max_risk_per_trade_usd": 25.0,
@@ -274,7 +327,7 @@ def main():
             "daily_loss_limit_usd": 75.0,
             "kill_switch_active": True,
         },
-        "notes": "Genesis block for prospective paper shadow trading. Real capital permanently isolated."
+        "notes": "Genesis block for prospective paper shadow trading. Real capital permanently isolated.",
     }
     with open(paper_file, "w", encoding="utf-8") as f:
         f.write(json.dumps(genesis_record) + "\n")
@@ -285,4 +338,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

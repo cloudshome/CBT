@@ -34,7 +34,9 @@ def run_prediction(args: argparse.Namespace) -> None:
     logger.info(f"Generating Kronos forecast for {args.symbol} on {args.timeframe}...")
 
     # Fetch canonical candles from data_streamer
-    candles = data_streamer.generate_synthetic_candles(args.symbol, args.timeframe, count=args.lookback + 20)
+    candles = data_streamer.generate_synthetic_candles(
+        args.symbol, args.timeframe, count=args.lookback + 20
+    )
 
     adapter = KronosModelAdapter(
         KronosConfig(
@@ -90,7 +92,9 @@ def run_history(args: argparse.Namespace) -> None:
 
 
 def run_benchmark(args: argparse.Namespace) -> None:
-    logger.info(f"Running 3-way ablation benchmark on {args.symbol} ({args.timeframe}, {args.bars} bars)...")
+    logger.info(
+        f"Running 3-way ablation benchmark on {args.symbol} ({args.timeframe}, {args.bars} bars)..."
+    )
     candles = data_streamer.generate_synthetic_candles(args.symbol, args.timeframe, count=args.bars)
 
     result = kronos_ablation_benchmark.run_benchmark(
@@ -106,15 +110,31 @@ def run_benchmark(args: argparse.Namespace) -> None:
     print("=========================================================================")
     print(f"Evaluation Points: {result.evaluation_bars}")
     print("-------------------------------------------------------------------------")
-    print(f"{'Metric':<25} | {'Mode A (SKY)':<14} | {'Mode B (Kronos)':<15} | {'Mode C (Fusion)':<15}")
+    print(
+        f"{'Metric':<25} | {'Mode A (SKY)':<14} | {'Mode B (Kronos)':<15} | {'Mode C (Fusion)':<15}"
+    )
     print("-------------------------------------------------------------------------")
-    print(f"{'Total Trades':<25} | {result.mode_a_sky.total_trades:<14} | {result.mode_b_kronos.total_trades:<15} | {result.mode_c_fusion.total_trades:<15}")
-    print(f"{'Win Rate %':<25} | {result.mode_a_sky.win_rate_pct:<13}% | {result.mode_b_kronos.win_rate_pct:<14}% | {result.mode_c_fusion.win_rate_pct:<14}%")
-    print(f"{'Profit Factor':<25} | {result.mode_a_sky.profit_factor:<14} | {result.mode_b_kronos.profit_factor:<15} | {result.mode_c_fusion.profit_factor:<15}")
-    print(f"{'Expectancy (R)':<25} | {result.mode_a_sky.expectancy_r:<14} | {result.mode_b_kronos.expectancy_r:<15} | {result.mode_c_fusion.expectancy_r:<15}")
-    print(f"{'Max Drawdown %':<25} | {result.mode_a_sky.max_drawdown_pct:<13}% | {result.mode_b_kronos.max_drawdown_pct:<14}% | {result.mode_c_fusion.max_drawdown_pct:<14}%")
-    print(f"{'Sharpe Ratio':<25} | {result.mode_a_sky.sharpe_ratio:<14} | {result.mode_b_kronos.sharpe_ratio:<15} | {result.mode_c_fusion.sharpe_ratio:<15}")
-    print(f"{'Dir. Accuracy %':<25} | {result.mode_a_sky.directional_accuracy_pct:<13}% | {result.mode_b_kronos.directional_accuracy_pct:<14}% | {result.mode_c_fusion.directional_accuracy_pct:<14}%")
+    print(
+        f"{'Total Trades':<25} | {result.mode_a_sky.total_trades:<14} | {result.mode_b_kronos.total_trades:<15} | {result.mode_c_fusion.total_trades:<15}"
+    )
+    print(
+        f"{'Win Rate %':<25} | {result.mode_a_sky.win_rate_pct:<13}% | {result.mode_b_kronos.win_rate_pct:<14}% | {result.mode_c_fusion.win_rate_pct:<14}%"
+    )
+    print(
+        f"{'Profit Factor':<25} | {result.mode_a_sky.profit_factor:<14} | {result.mode_b_kronos.profit_factor:<15} | {result.mode_c_fusion.profit_factor:<15}"
+    )
+    print(
+        f"{'Expectancy (R)':<25} | {result.mode_a_sky.expectancy_r:<14} | {result.mode_b_kronos.expectancy_r:<15} | {result.mode_c_fusion.expectancy_r:<15}"
+    )
+    print(
+        f"{'Max Drawdown %':<25} | {result.mode_a_sky.max_drawdown_pct:<13}% | {result.mode_b_kronos.max_drawdown_pct:<14}% | {result.mode_c_fusion.max_drawdown_pct:<14}%"
+    )
+    print(
+        f"{'Sharpe Ratio':<25} | {result.mode_a_sky.sharpe_ratio:<14} | {result.mode_b_kronos.sharpe_ratio:<15} | {result.mode_c_fusion.sharpe_ratio:<15}"
+    )
+    print(
+        f"{'Dir. Accuracy %':<25} | {result.mode_a_sky.directional_accuracy_pct:<13}% | {result.mode_b_kronos.directional_accuracy_pct:<14}% | {result.mode_c_fusion.directional_accuracy_pct:<14}%"
+    )
     print("=========================================================================")
     print(f"DELTA EXPECTANCY (C vs A): {result.delta_expectancy_r:+.3f}R")
     print(f"DELTA WIN RATE (C vs A):   {result.delta_win_rate_pct:+.2f}%")
@@ -131,18 +151,33 @@ def main():
     # Predict subcommand
     pred_parser = subparsers.add_parser("predict", help="Execute Kronos forecast prediction")
     pred_parser.add_argument("--symbol", type=str, default="BTC/USDT", help="Trading pair symbol")
-    pred_parser.add_argument("--timeframe", "--tf", type=str, default="15m", help="Timeframe (e.g. 5m, 15m, 1h)")
-    pred_parser.add_argument("--lookback", type=int, default=128, help="Number of historical lookback candles")
+    pred_parser.add_argument(
+        "--timeframe", "--tf", type=str, default="15m", help="Timeframe (e.g. 5m, 15m, 1h)"
+    )
+    pred_parser.add_argument(
+        "--lookback", type=int, default=128, help="Number of historical lookback candles"
+    )
     pred_parser.add_argument("--horizon", type=int, default=12, help="Forecast horizon in candles")
     pred_parser.add_argument("--samples", type=int, default=5, help="Number of Monte Carlo paths")
-    pred_parser.add_argument("--model", type=str, default="kronos-small", choices=["kronos-mini", "kronos-small", "kronos-base"])
-    pred_parser.add_argument("--seed", type=int, default=None, help="Random seed for reproducibility")
-    pred_parser.add_argument("--freeze", action="store_true", help="Persist forecast in SQLite freeze ledger")
+    pred_parser.add_argument(
+        "--model",
+        type=str,
+        default="kronos-small",
+        choices=["kronos-mini", "kronos-small", "kronos-base"],
+    )
+    pred_parser.add_argument(
+        "--seed", type=int, default=None, help="Random seed for reproducibility"
+    )
+    pred_parser.add_argument(
+        "--freeze", action="store_true", help="Persist forecast in SQLite freeze ledger"
+    )
 
     # History subcommand
     hist_parser = subparsers.add_parser("history", help="Query frozen forecast history")
     hist_parser.add_argument("--symbol", type=str, default=None, help="Filter by symbol")
-    hist_parser.add_argument("--timeframe", "--tf", type=str, default=None, help="Filter by timeframe")
+    hist_parser.add_argument(
+        "--timeframe", "--tf", type=str, default=None, help="Filter by timeframe"
+    )
     hist_parser.add_argument("--limit", type=int, default=20, help="Max records to return")
 
     # Benchmark subcommand

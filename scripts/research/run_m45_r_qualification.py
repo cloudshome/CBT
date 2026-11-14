@@ -97,9 +97,8 @@ def evaluate_m45_r_obligations() -> dict:
         pool_liquidity_usd=1_000_000.0,
     )
 
-    obl2_passed = (
-        safe_slip < 100.0
-        and (re_eval.net_searcher_edge_usd <= 0.0 or re_eval.risk_level != MEVRiskLevel.HIGH_HAZARD)
+    obl2_passed = safe_slip < 100.0 and (
+        re_eval.net_searcher_edge_usd <= 0.0 or re_eval.risk_level != MEVRiskLevel.HIGH_HAZARD
     )
 
     results["OBL-2"] = {
@@ -260,8 +259,12 @@ def evaluate_m45_r_obligations() -> dict:
     # --------------------------------------------------------------------------
     # OBL-8: Permanent Capital Firewall & Milestone 18 Certified Surface Area Isolation
     # --------------------------------------------------------------------------
-    logger.info("Evaluating OBL-8: Permanent Capital Firewall & Milestone 18 Surface Area Isolation...")
-    capital_isolated = (REAL_CAPITAL_ENABLED is False and mev_mitigation_sentinel.real_capital_enabled is False)
+    logger.info(
+        "Evaluating OBL-8: Permanent Capital Firewall & Milestone 18 Surface Area Isolation..."
+    )
+    capital_isolated = (
+        REAL_CAPITAL_ENABLED is False and mev_mitigation_sentinel.real_capital_enabled is False
+    )
 
     from core.governance.architecture_registry import (
         ArchitectureLayer,
@@ -269,6 +272,7 @@ def evaluate_m45_r_obligations() -> dict:
         resolve_module_authority,
         resolve_module_layer,
     )
+
     layer = resolve_module_layer("core.execution.mev_mitigation")
     authority = resolve_module_authority("core.execution.mev_mitigation")
     authority_clean = (
@@ -281,7 +285,9 @@ def evaluate_m45_r_obligations() -> dict:
         capture_output=True,
         text=True,
     )
-    m18_intact = (m18_proc.returncode == 0 and "M18 Production Pass remains ACTIVE" in m18_proc.stdout)
+    m18_intact = (
+        m18_proc.returncode == 0 and "M18 Production Pass remains ACTIVE" in m18_proc.stdout
+    )
 
     obl8_passed = capital_isolated and authority_clean and m18_intact
 
@@ -330,7 +336,9 @@ def main() -> int:
 
     dossier_file = audit_dir / "M45_R_MEV_MITIGATION_DOSSIER.md"
     with open(dossier_file, "w", encoding="utf-8") as f:
-        f.write("# SKY Milestone 45-R: Decentralized MEV Mitigation & Fair Sequencing Qualification Dossier\n\n")
+        f.write(
+            "# SKY Milestone 45-R: Decentralized MEV Mitigation & Fair Sequencing Qualification Dossier\n\n"
+        )
         f.write(f"> **Status:** {'[QUALIFIED] PASS' if all_passed else '[REJECTED] FAIL'}\n")
         f.write(f"> **Evaluated Obligations:** {passed_count} / {total_count}\n")
         f.write(f"> **Verification Timestamp:** {report_payload['timestamp_utc']}\n\n")
@@ -345,12 +353,18 @@ def main() -> int:
         f.write("\n---\n\n")
         f.write("## 2. Invariant & Boundary Sign-Off\n\n")
         f.write("- **Simulation Isolation:** `REAL_CAPITAL_ENABLED = False` strictly enforced.\n")
-        f.write("- **Milestone 18 Surface Area:** Certified commit ancestor check and SHA-256 test identities verified untouched.\n")
-        f.write("- **Architecture Contract:** Registered in Layer 2 with `SIMULATION_RESEARCH_ONLY` authority.\n\n")
+        f.write(
+            "- **Milestone 18 Surface Area:** Certified commit ancestor check and SHA-256 test identities verified untouched.\n"
+        )
+        f.write(
+            "- **Architecture Contract:** Registered in Layer 2 with `SIMULATION_RESEARCH_ONLY` authority.\n\n"
+        )
     logger.info("Saved qualification dossier to %s", dossier_file)
 
     print("\n" + "=" * 65)
-    print(f"SKY MILESTONE 45-R QUALIFICATION RESULT: {'QUALIFIED [PASS]' if all_passed else 'REJECTED [FAIL]'}")
+    print(
+        f"SKY MILESTONE 45-R QUALIFICATION RESULT: {'QUALIFIED [PASS]' if all_passed else 'REJECTED [FAIL]'}"
+    )
     print(f"Passed: {passed_count}/{total_count} Obligations (Elapsed: {elapsed:.2f}s)")
     print("=" * 65)
 

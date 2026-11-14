@@ -82,7 +82,7 @@ def checkpoint_db(db_path: Path) -> dict:
             f"log={result['log']} frames, "
             f"checkpointed={result['checkpointed']}, "
             f"busy={result['busy']}, "
-            f"WAL {wal_size_before/1024:.1f}KB → {wal_size_after/1024:.1f}KB "
+            f"WAL {wal_size_before / 1024:.1f}KB → {wal_size_after / 1024:.1f}KB "
             f"(saved {saved_mb:.2f}MB)"
         )
     except sqlite3.OperationalError as exc:

@@ -31,13 +31,11 @@ from __future__ import annotations
 import json
 import logging
 import math
-import sqlite3
 import sys
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
-from decimal import Decimal
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -48,8 +46,6 @@ if str(ROOT_DIR) not in sys.path:
 
 from core.research.portfolio_accounting_reconciler import (
     PortfolioAccountingReconciler,
-    to_dec,
-    ROUNDING_TOLERANCE_USD,
 )
 from scripts.research.run_m38_independent_alpha_verification import load_market_data
 
@@ -124,16 +120,20 @@ class SignalCandidate:
     rationale: str
 
 
-def generate_candidate_signals(df_btc: pd.DataFrame, df_eth: pd.DataFrame) -> Dict[int, List[SignalCandidate]]:
+def generate_candidate_signals(
+    df_btc: pd.DataFrame, df_eth: pd.DataFrame
+) -> dict[int, list[SignalCandidate]]:
     """
     Generates point-in-time signals across 42,009 synchronized hourly bars.
     Zero-lookahead: Signals emitted at bar t close, intended for bar t+1 open execution.
     """
-    signals: Dict[int, List[SignalCandidate]] = {}
+    signals: dict[int, list[SignalCandidate]] = {}
 
     # 1. H3: BTC Open Interest Flush Capitulation LONG
     # Entry rule: 1h OI drop >= 4.0%, sharp downward thrust
-    sig_h3 = (df_btc["oi_pct_chg_1h"] <= -0.040) & (df_btc["close"] < (df_btc["open"] - 0.8 * df_btc["atr_14"]))
+    sig_h3 = (df_btc["oi_pct_chg_1h"] <= -0.040) & (
+        df_btc["close"] < (df_btc["open"] - 0.8 * df_btc["atr_14"])
+    )
     for i in range(1, len(df_btc) - 1):
         if sig_h3.iloc[i]:
             ts_next = int(df_btc["ts"].iloc[i + 1])
@@ -182,7 +182,13 @@ def generate_candidate_signals(df_btc: pd.DataFrame, df_eth: pd.DataFrame) -> Di
             signals.setdefault(ts_next, []).append(cand)
 
     # 3. HTF_OB: ETH Order Block Retest LONG
-    c_e, o_e, l_e, h_e, atr_e = df_eth["close"], df_eth["open"], df_eth["low"], df_eth["high"], df_eth["atr_14"]
+    c_e, o_e, l_e, h_e, atr_e = (
+        df_eth["close"],
+        df_eth["open"],
+        df_eth["low"],
+        df_eth["high"],
+        df_eth["atr_14"],
+    )
     c_prev2_e = c_e.shift(2)
     o_prev2_e = o_e.shift(2)
     c_prev1_e = c_e.shift(1)
@@ -231,18 +237,18 @@ def get_partition(dt: datetime) -> str:
 def run_portfolio_simulation(
     df_btc: pd.DataFrame,
     df_eth: pd.DataFrame,
-    signals: Dict[int, List[SignalCandidate]],
+    signals: dict[int, list[SignalCandidate]],
     enable_displacement: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Executes discrete-event portfolio simulation with continuous double-entry accounting.
     """
     reconciler = PortfolioAccountingReconciler(initial_cash=INITIAL_CASH)
     cash = INITIAL_CASH
-    open_positions: Dict[str, PortfolioPosition] = {}
-    closed_trades: List[ReplayTradeEvent] = []
-    equity_curve: List[Tuple[int, float]] = []
-    daily_returns: List[float] = []
+    open_positions: dict[str, PortfolioPosition] = {}
+    closed_trades: list[ReplayTradeEvent] = []
+    equity_curve: list[tuple[int, float]] = []
+    daily_returns: list[float] = []
 
     # Map timestamps to price lookups
     btc_map = {int(r["ts"]): r for _, r in df_btc.iterrows()}
@@ -280,7 +286,7 @@ def run_portfolio_simulation(
         reconciler.update_mark_to_market(ts, current_prices)
 
         # 2. Check position exits & funding accrual
-        to_close: List[Tuple[str, str, float]] = []
+        to_close: list[tuple[str, str, float]] = []
 
         for pid, pos in list(open_positions.items()):
             pos.holding_hours += 1
@@ -375,7 +381,9 @@ def run_portfolio_simulation(
         if math.isnan(current_equity) or math.isinf(current_equity):
             raise AssertionError(f"Non-finite equity at ts={ts}: {current_equity}")
         if current_equity < 0:
-            raise AssertionError(f"Negative equity detected on non-leveraged model at ts={ts}: {current_equity}")
+            raise AssertionError(
+                f"Negative equity detected on non-leveraged model at ts={ts}: {current_equity}"
+            )
 
         # Continuous Double-Entry Reconciliation
         reconciler.verify_reconciliation(ts, cash, current_equity, fail_closed=True)
@@ -409,7 +417,9 @@ def run_portfolio_simulation(
                 for inc in incumbents:
                     achieved_r = inc.unrealized_pnl / max(1.0, inc.allocated_risk_usd)
                     utility_delta = cand.utility_score - inc.utility_score
-                    if (achieved_r >= 1.5 or (achieved_r <= -0.7 and inc.holding_hours >= 12)) and utility_delta >= DISPLACEMENT_HURDLE:
+                    if (
+                        achieved_r >= 1.5 or (achieved_r <= -0.7 and inc.holding_hours >= 12)
+                    ) and utility_delta >= DISPLACEMENT_HURDLE:
                         displaceable.append((utility_delta, inc))
 
                 if not displaceable:
@@ -422,7 +432,9 @@ def run_portfolio_simulation(
                 pid = inc_to_displace.position_id
                 open_positions.pop(pid)
                 curr_exit_p = current_prices[inc_to_displace.symbol]
-                reconciler.close_position(pid, ts, curr_exit_p, "OPPORTUNITY_DISPLACEMENT", CONSERVATIVE_FRICTION_BPS)
+                reconciler.close_position(
+                    pid, ts, curr_exit_p, "OPPORTUNITY_DISPLACEMENT", CONSERVATIVE_FRICTION_BPS
+                )
 
                 if inc_to_displace.direction == "LONG":
                     gross_pnl = (curr_exit_p - inc_to_displace.entry_price) * inc_to_displace.size
@@ -455,7 +467,9 @@ def run_portfolio_simulation(
                         take_profit=round(inc_to_displace.take_profit, 4),
                         exit_reason="OPPORTUNITY_DISPLACEMENT",
                         holding_hours=inc_to_displace.holding_hours,
-                        partition=get_partition(datetime.fromtimestamp(inc_to_displace.entry_ts / 1000, tz=UTC)),
+                        partition=get_partition(
+                            datetime.fromtimestamp(inc_to_displace.entry_ts / 1000, tz=UTC)
+                        ),
                         gross_pnl=round(gross_pnl, 2),
                         frictions=round(trade_frictions, 2),
                         funding_usd=round(0.0, 2),
@@ -484,7 +498,7 @@ def run_portfolio_simulation(
             if notional < 50.0:  # Minimum viable order
                 continue
 
-            cash -= (notional + entry_friction)
+            cash -= notional + entry_friction
             total_frictions += entry_friction
             trade_seq += 1
             pos_id = f"POS_{cand.strategy_id}_{cand.symbol}_{ts}_{trade_seq}"
@@ -555,7 +569,7 @@ def run_portfolio_simulation(
     }
 
 
-def analyze_partition_performance(trades: List[Dict[str, Any]]) -> Dict[str, Any]:
+def analyze_partition_performance(trades: list[dict[str, Any]]) -> dict[str, Any]:
     """Analyzes performance across TRAIN, VALIDATION, and SEALED_OOS."""
     partitions = ["TRAIN", "VALIDATION", "SEALED_OOS"]
     res = {}
@@ -563,7 +577,13 @@ def analyze_partition_performance(trades: List[Dict[str, Any]]) -> Dict[str, Any
         p_trades = [t for t in trades if t["partition"] == p]
         n = len(p_trades)
         if n == 0:
-            res[p] = {"trades": 0, "net_pnl": 0.0, "win_rate": 0.0, "profit_factor": 0.0, "expectancy_r": 0.0}
+            res[p] = {
+                "trades": 0,
+                "net_pnl": 0.0,
+                "win_rate": 0.0,
+                "profit_factor": 0.0,
+                "expectancy_r": 0.0,
+            }
             continue
         wins = [t for t in p_trades if t["net_pnl"] > 0]
         losses = [t for t in p_trades if t["net_pnl"] < 0]
@@ -574,7 +594,13 @@ def analyze_partition_performance(trades: List[Dict[str, Any]]) -> Dict[str, Any
         r_vals = [t["net_r"] for t in p_trades]
         exp_r = round(float(np.mean(r_vals)), 3)
         pnl = round(sum(t["net_pnl"] for t in p_trades), 2)
-        res[p] = {"trades": n, "net_pnl": pnl, "win_rate": wr, "profit_factor": pf, "expectancy_r": exp_r}
+        res[p] = {
+            "trades": n,
+            "net_pnl": pnl,
+            "win_rate": wr,
+            "profit_factor": pf,
+            "expectancy_r": exp_r,
+        }
     return res
 
 
@@ -596,7 +622,9 @@ def main():
     logger.info(f"Generated {total_signal_events} signal events across {len(signals)} timestamps.")
 
     # 3. Simulate Policy A: Hard-Wall Capacity Rejection
-    logger.info("[*] Running Simulation Policy A: Hard-Wall Capacity Rejection (No Displacement)...")
+    logger.info(
+        "[*] Running Simulation Policy A: Hard-Wall Capacity Rejection (No Displacement)..."
+    )
     sim_a = run_portfolio_simulation(df_btc, df_eth, signals, enable_displacement=False)
 
     # 4. Simulate Policy B: Opportunity Displacement Arbiter
@@ -634,11 +662,11 @@ def main():
         "# SKY / CBT — P2 Production Multi-Strategy Portfolio Replay Report",
         "",
         f"**Audit & Simulation Timestamp:** `{payload['timestamp_utc']}`  ",
-        f"**Underlying Data:** 42,009 synchronized hourly candles (2022-01-01 to 2026-10-20 UTC)  ",
+        "**Underlying Data:** 42,009 synchronized hourly candles (2022-01-01 to 2026-10-20 UTC)  ",
         f"**Starting Capital:** ${INITIAL_CASH:,.2f} USD Cash  ",
         f"**Capacity Constraint:** Max {MAX_CONCURRENT_POSITIONS} Concurrent Positions  ",
         f"**Transaction Frictions:** Conservative Tier 1.5x ({payload['conservative_friction_bps']:.1f} bps per leg = 12.0 bps roundtrip) + continuous 8h funding  ",
-        f"**Risk Governance:** `REAL_CAPITAL_ENABLED = False` (Mandatory Simulation / Paper Mode)  ",
+        "**Risk Governance:** `REAL_CAPITAL_ENABLED = False` (Mandatory Simulation / Paper Mode)  ",
         "",
         "---",
         "",
@@ -675,27 +703,29 @@ def main():
             f"| **{p}** | {date_spans[p]} | {p_data['trades']} | ${p_data['net_pnl']:+,.2f} | {p_data['win_rate']:.1f}% | {p_data['profit_factor']:.2f} | {p_data['expectancy_r']:+.3f}R |"
         )
 
-    report_lines.extend([
-        "",
-        "---",
-        "",
-        "## 3. Double-Entry Accounting Invariant & Conservation of Capital",
-        "",
-        "At every single event and hourly timestamp tick throughout all 42,009 bars:",
-        "1. `Equity == Cash + sum(open_position_notional + open_position_unrealized_pnl)`",
-        "2. `Equity == InitialEquity + RealizedPnL + UnrealizedPnL - Fees - Funding`",
-        "3. Maximum discrepancy recorded: **$0.000000 USD** (within Decimal rounding tolerance of $0.01).",
-        "4. No negative equity or drawdowns exceeding 100% were physically possible or observed.",
-        "",
-        "---",
-        "",
-        "## 4. Institutional Conclusion",
-        "",
-        "> [!IMPORTANT]",
-        "> **Multi-Strategy Replay Result:** The portfolio replay combining **H3 (BTC Flush LONG)**, **H5 (ETH Compression SHORT)**, and **HTF OB (ETH Retest LONG)** confirms sustainable capital preservation and positive equity trajectory with an annualized Sharpe ratio well above zero, strict adherence to Half-Kelly risk bounds, and zero accounting drift.",
-        "> ",
-        "> **Next Phase (P3):** Prospective Shadow Ledger continuous runner initialization.",
-    ])
+    report_lines.extend(
+        [
+            "",
+            "---",
+            "",
+            "## 3. Double-Entry Accounting Invariant & Conservation of Capital",
+            "",
+            "At every single event and hourly timestamp tick throughout all 42,009 bars:",
+            "1. `Equity == Cash + sum(open_position_notional + open_position_unrealized_pnl)`",
+            "2. `Equity == InitialEquity + RealizedPnL + UnrealizedPnL - Fees - Funding`",
+            "3. Maximum discrepancy recorded: **$0.000000 USD** (within Decimal rounding tolerance of $0.01).",
+            "4. No negative equity or drawdowns exceeding 100% were physically possible or observed.",
+            "",
+            "---",
+            "",
+            "## 4. Institutional Conclusion",
+            "",
+            "> [!IMPORTANT]",
+            "> **Multi-Strategy Replay Result:** The portfolio replay combining **H3 (BTC Flush LONG)**, **H5 (ETH Compression SHORT)**, and **HTF OB (ETH Retest LONG)** confirms sustainable capital preservation and positive equity trajectory with an annualized Sharpe ratio well above zero, strict adherence to Half-Kelly risk bounds, and zero accounting drift.",
+            "> ",
+            "> **Next Phase (P3):** Prospective Shadow Ledger continuous runner initialization.",
+        ]
+    )
 
     with open(OUTPUT_REPORT, "w", encoding="utf-8") as f:
         f.write("\n".join(report_lines))
@@ -706,8 +736,12 @@ def main():
     print("\n" + "=" * 80)
     print("SKY / CBT — P2 PRODUCTION PORTFOLIO REPLAY RESULTS")
     print("=" * 80)
-    print(f"Policy A (Hard Rejection): Final Equity=${sim_a['final_equity']:,.2f} | Ret={sim_a['total_return_pct']:+.2f}% | MaxDD={sim_a['max_drawdown_pct']:.2f}% | Sharpe={sim_a['annualized_sharpe']:.2f}")
-    print(f"Policy B (Displacement)  : Final Equity=${sim_b['final_equity']:,.2f} | Ret={sim_b['total_return_pct']:+.2f}% | MaxDD={sim_b['max_drawdown_pct']:.2f}% | Sharpe={sim_b['annualized_sharpe']:.2f}")
+    print(
+        f"Policy A (Hard Rejection): Final Equity=${sim_a['final_equity']:,.2f} | Ret={sim_a['total_return_pct']:+.2f}% | MaxDD={sim_a['max_drawdown_pct']:.2f}% | Sharpe={sim_a['annualized_sharpe']:.2f}"
+    )
+    print(
+        f"Policy B (Displacement)  : Final Equity=${sim_b['final_equity']:,.2f} | Ret={sim_b['total_return_pct']:+.2f}% | MaxDD={sim_b['max_drawdown_pct']:.2f}% | Sharpe={sim_b['annualized_sharpe']:.2f}"
+    )
     print("=" * 80)
 
 

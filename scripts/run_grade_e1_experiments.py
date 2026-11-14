@@ -16,17 +16,17 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 
-from core.research.grade_e1.contracts import (  # noqa: E402
+from core.research.grade_e1.contracts import (
     ExperimentConfig,
     ExperimentResult,
     FillEngineType,
     LatencyModelType,
     QueueModelType,
 )
-from core.research.grade_e1.dataset_registry import dataset_registry  # noqa: E402
-from core.research.grade_e1.execution_cost import CANONICAL_FEE_TIERS  # noqa: E402
-from core.research.grade_e1.experiment_runner import experiment_runner  # noqa: E402
-from core.research.grade_e1.verdict_engine import verdict_engine  # noqa: E402
+from core.research.grade_e1.dataset_registry import dataset_registry
+from core.research.grade_e1.execution_cost import CANONICAL_FEE_TIERS
+from core.research.grade_e1.experiment_runner import experiment_runner
+from core.research.grade_e1.verdict_engine import verdict_engine
 
 
 def main() -> None:

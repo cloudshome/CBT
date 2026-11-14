@@ -20,8 +20,9 @@ import json
 import logging
 import math
 import sys
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -74,7 +75,11 @@ def main():
     bm_trades = []
     if bm_file.exists():
         with open(bm_file, "r", encoding="utf-8") as f:
-            bm_trades = [json.loads(line) for line in f if "ORDER_BLOCK_RETEST" in line and "BTCUSDT" in line and "1h" in line]
+            bm_trades = [
+                json.loads(line)
+                for line in f
+                if "ORDER_BLOCK_RETEST" in line and "BTCUSDT" in line and "1h" in line
+            ]
     logger.info(f"Loaded {len(bm_trades)} frozen M35 benchmark trades.")
 
     # 2. Load M36 Family Trades (BTC 1h)
@@ -91,11 +96,13 @@ def main():
                         f2_trades.append(t)
                     elif t["family_id"] == "FAMILY_3":
                         f3_trades.append(t)
-    logger.info(f"Loaded BTC 1h trades: F1={len(f1_trades)}, F2={len(f2_trades)}, F3={len(f3_trades)}")
+    logger.info(
+        f"Loaded BTC 1h trades: F1={len(f1_trades)}, F2={len(f2_trades)}, F3={len(f3_trades)}"
+    )
 
     # 3. Build Daily Calendar Series (2022-01-01 to 2026-10-20)
-    start_date = datetime(2022, 1, 1, tzinfo=timezone.utc)
-    end_date = datetime(2026, 10, 20, tzinfo=timezone.utc)
+    start_date = datetime(2022, 1, 1, tzinfo=UTC)
+    end_date = datetime(2026, 10, 20, tzinfo=UTC)
     calendar_days = []
     curr = start_date
     while curr <= end_date:
@@ -111,7 +118,7 @@ def main():
         for t in trades:
             # Handle exit timestamp
             ts_exit = t.get("exit_ts", t.get("entry_ts"))
-            dt_exit = datetime.fromtimestamp(ts_exit / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
+            dt_exit = datetime.fromtimestamp(ts_exit / 1000, tz=UTC).strftime("%Y-%m-%d")
             ret = t.get(field, t.get("net_pnl_r_mixed", 0.0))
             if dt_exit in daily_r:
                 daily_r[dt_exit] += ret
@@ -122,12 +129,15 @@ def main():
     r_f2 = build_daily_series(f2_trades)
     r_f3 = build_daily_series(f3_trades)
 
-    df_daily = pd.DataFrame({
-        "BENCHMARK_OB": r_bm,
-        "FAMILY_1": r_f1,
-        "FAMILY_2": r_f2,
-        "FAMILY_3": r_f3,
-    }, index=pd.to_datetime(calendar_days))
+    df_daily = pd.DataFrame(
+        {
+            "BENCHMARK_OB": r_bm,
+            "FAMILY_1": r_f1,
+            "FAMILY_2": r_f2,
+            "FAMILY_3": r_f3,
+        },
+        index=pd.to_datetime(calendar_days),
+    )
 
     # Monthly Aggregation
     df_monthly = df_daily.resample("ME").sum()
@@ -149,9 +159,21 @@ def main():
     # Downside Correlation: Correlation when Benchmark daily return < 0
     downside_mask = df_daily["BENCHMARK_OB"] < 0
     if sum(downside_mask) >= 5:
-        downside_corr_f3 = float(df_daily.loc[downside_mask, "BENCHMARK_OB"].corr(df_daily.loc[downside_mask, "FAMILY_3"]))
-        downside_corr_f1 = float(df_daily.loc[downside_mask, "BENCHMARK_OB"].corr(df_daily.loc[downside_mask, "FAMILY_1"]))
-        downside_corr_f2 = float(df_daily.loc[downside_mask, "BENCHMARK_OB"].corr(df_daily.loc[downside_mask, "FAMILY_2"]))
+        downside_corr_f3 = float(
+            df_daily.loc[downside_mask, "BENCHMARK_OB"].corr(
+                df_daily.loc[downside_mask, "FAMILY_3"]
+            )
+        )
+        downside_corr_f1 = float(
+            df_daily.loc[downside_mask, "BENCHMARK_OB"].corr(
+                df_daily.loc[downside_mask, "FAMILY_1"]
+            )
+        )
+        downside_corr_f2 = float(
+            df_daily.loc[downside_mask, "BENCHMARK_OB"].corr(
+                df_daily.loc[downside_mask, "FAMILY_2"]
+            )
+        )
     else:
         downside_corr_f3 = float(df_daily["BENCHMARK_OB"].corr(df_daily["FAMILY_3"]))
         downside_corr_f1 = float(df_daily["BENCHMARK_OB"].corr(df_daily["FAMILY_1"]))
@@ -168,19 +190,27 @@ def main():
     # 7. Conservative Capped Allocation: Benchmark (0.7) + F3 (0.3)
     portfolios = {
         "BENCHMARK_ALONE": df_daily["BENCHMARK_OB"].values,
-        "PORTFOLIO_BM_PLUS_F3_EQUAL": 0.5 * df_daily["BENCHMARK_OB"].values + 0.5 * df_daily["FAMILY_3"].values,
-        "PORTFOLIO_BM_PLUS_F1_EQUAL": 0.5 * df_daily["BENCHMARK_OB"].values + 0.5 * df_daily["FAMILY_1"].values,
-        "PORTFOLIO_BM_PLUS_F2_EQUAL": 0.5 * df_daily["BENCHMARK_OB"].values + 0.5 * df_daily["FAMILY_2"].values,
-        "PORTFOLIO_BM_F1_F3_EQUAL": 0.333 * df_daily["BENCHMARK_OB"].values + 0.333 * df_daily["FAMILY_1"].values + 0.334 * df_daily["FAMILY_3"].values,
-        "PORTFOLIO_BM_F2_F3_EQUAL": 0.333 * df_daily["BENCHMARK_OB"].values + 0.333 * df_daily["FAMILY_2"].values + 0.334 * df_daily["FAMILY_3"].values,
-        "PORTFOLIO_BM_PLUS_F3_CAPPED_70_30": 0.7 * df_daily["BENCHMARK_OB"].values + 0.3 * df_daily["FAMILY_3"].values,
+        "PORTFOLIO_BM_PLUS_F3_EQUAL": 0.5 * df_daily["BENCHMARK_OB"].values
+        + 0.5 * df_daily["FAMILY_3"].values,
+        "PORTFOLIO_BM_PLUS_F1_EQUAL": 0.5 * df_daily["BENCHMARK_OB"].values
+        + 0.5 * df_daily["FAMILY_1"].values,
+        "PORTFOLIO_BM_PLUS_F2_EQUAL": 0.5 * df_daily["BENCHMARK_OB"].values
+        + 0.5 * df_daily["FAMILY_2"].values,
+        "PORTFOLIO_BM_F1_F3_EQUAL": 0.333 * df_daily["BENCHMARK_OB"].values
+        + 0.333 * df_daily["FAMILY_1"].values
+        + 0.334 * df_daily["FAMILY_3"].values,
+        "PORTFOLIO_BM_F2_F3_EQUAL": 0.333 * df_daily["BENCHMARK_OB"].values
+        + 0.333 * df_daily["FAMILY_2"].values
+        + 0.334 * df_daily["FAMILY_3"].values,
+        "PORTFOLIO_BM_PLUS_F3_CAPPED_70_30": 0.7 * df_daily["BENCHMARK_OB"].values
+        + 0.3 * df_daily["FAMILY_3"].values,
     }
 
     portfolio_metrics = {}
     for p_name, daily_series in portfolios.items():
         cum_ret = np.cumsum(daily_series)
         total_pnl_r = float(cum_ret[-1])
-        
+
         peak = np.maximum.accumulate(cum_ret)
         dd = peak - cum_ret
         max_dd_r = float(np.max(dd)) if len(dd) > 0 else 0.0
@@ -219,7 +249,7 @@ def main():
 
     results_doc = {
         "audit_version": "M36.1-PORTFOLIO-DIVERSIFICATION",
-        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "timestamp_utc": datetime.now(UTC).isoformat(),
         "calendar_days_analyzed": n_days,
         "date_range": [calendar_days[0], calendar_days[-1]],
         "correlation_analysis": {
@@ -242,13 +272,13 @@ def main():
                 "benchmark_family3": round(downside_corr_f3, 3),
                 "benchmark_family1": round(downside_corr_f1, 3),
                 "benchmark_family2": round(downside_corr_f2, 3),
-            }
+            },
         },
         "portfolio_combinations": portfolio_metrics,
         "family3_classification": {
             "status": "REJECTED_AS_STANDALONE / DIVERSIFICATION_CANDIDATE_CONDITIONAL_ON_RANGE_FILTER",
-            "justification": "While Family 3 has negative correlation with the benchmark (-0.219 monthly, -0.015 daily), its naive unconditioned negative standalone expectancy (-0.104R) causes equal-risk portfolio cumulative return to degrade from +19.9R to -14.2R. Therefore, negative correlation alone is INSUFFICIENT to justify equal allocation. Family 3 is NOT a standalone candidate. It can only serve as a diversification component if filtered to positive standalone expectancy (e.g. range-bound market filter)."
-        }
+            "justification": "While Family 3 has negative correlation with the benchmark (-0.219 monthly, -0.015 daily), its naive unconditioned negative standalone expectancy (-0.104R) causes equal-risk portfolio cumulative return to degrade from +19.9R to -14.2R. Therefore, negative correlation alone is INSUFFICIENT to justify equal allocation. Family 3 is NOT a standalone candidate. It can only serve as a diversification component if filtered to positive standalone expectancy (e.g. range-bound market filter).",
+        },
     }
 
     out_file = ROOT_DIR / "research" / "m36_1_portfolio_results.json"
@@ -261,4 +291,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

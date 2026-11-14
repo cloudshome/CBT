@@ -10,6 +10,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
+
 def remediate():
     trading_db = REPO_ROOT / "data" / "trading_logs.db"
     brain_db = REPO_ROOT / "data" / "cbt_brain.db"
@@ -42,6 +43,7 @@ def remediate():
             conn_b.close()
         except Exception as e:
             pass
+
 
 if __name__ == "__main__":
     remediate()

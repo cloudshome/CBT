@@ -35,51 +35,65 @@ def http_get(url: str, timeout: float = 5.0) -> tuple[int, str]:
         return 0, str(e)
 
 
-def run_burn_in_validation(base_node_url: str = "http://localhost:3000", base_python_url: str = "http://localhost:8000") -> dict[str, Any]:
+def run_burn_in_validation(
+    base_node_url: str = "http://localhost:3000", base_python_url: str = "http://localhost:8000"
+) -> dict[str, Any]:
     """Executes full diagnostic burn-in checks."""
     checks = []
 
     # 1. Check Node Health
     code, text = http_get(f"{base_node_url}/health")
-    checks.append({
-        "target": "Node Express Health (/health)",
-        "passed": code == 200,
-        "status_code": code,
-        "details": text[:200] if code == 200 else f"Failed with {code}: {text}",
-    })
+    checks.append(
+        {
+            "target": "Node Express Health (/health)",
+            "passed": code == 200,
+            "status_code": code,
+            "details": text[:200] if code == 200 else f"Failed with {code}: {text}",
+        }
+    )
 
     # 2. Check Node Prometheus Metrics
     code, text = http_get(f"{base_node_url}/metrics")
-    checks.append({
-        "target": "Node Prometheus Metrics (/metrics)",
-        "passed": code == 200 and "ctb_node_uptime_seconds" in text,
-        "status_code": code,
-        "details": "Prometheus plaintext gauges verified" if code == 200 else f"Failed: {text}",
-    })
+    checks.append(
+        {
+            "target": "Node Prometheus Metrics (/metrics)",
+            "passed": code == 200 and "ctb_node_uptime_seconds" in text,
+            "status_code": code,
+            "details": "Prometheus plaintext gauges verified" if code == 200 else f"Failed: {text}",
+        }
+    )
 
     # 3. Check Python FastAPI Health
     code, text = http_get(f"{base_python_url}/api/health")
-    checks.append({
-        "target": "Python FastAPI Health (/api/health)",
-        "passed": code == 200,
-        "status_code": code,
-        "details": text[:200] if code == 200 else f"Failed with {code}: {text}",
-    })
+    checks.append(
+        {
+            "target": "Python FastAPI Health (/api/health)",
+            "passed": code == 200,
+            "status_code": code,
+            "details": text[:200] if code == 200 else f"Failed with {code}: {text}",
+        }
+    )
 
     # 4. Check Python Prometheus Metrics
     code, text = http_get(f"{base_python_url}/metrics")
-    checks.append({
-        "target": "Python Prometheus Metrics (/metrics)",
-        "passed": code == 200 and "sky_shadow_open_positions" in text,
-        "status_code": code,
-        "details": "Prometheus quantitative metrics verified" if code == 200 else f"Failed: {text}",
-    })
+    checks.append(
+        {
+            "target": "Python Prometheus Metrics (/metrics)",
+            "passed": code == 200 and "sky_shadow_open_positions" in text,
+            "status_code": code,
+            "details": "Prometheus quantitative metrics verified"
+            if code == 200
+            else f"Failed: {text}",
+        }
+    )
 
     total_checks = len(checks)
     passed_checks = sum(1 for c in checks if c["passed"])
     all_passed = total_checks == passed_checks
 
-    verdict = "READY FOR PRODUCTION DEPLOYMENT" if all_passed else "FAILURES DETECTED — ACTION REQUIRED"
+    verdict = (
+        "READY FOR PRODUCTION DEPLOYMENT" if all_passed else "FAILURES DETECTED — ACTION REQUIRED"
+    )
 
     report = {
         "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
@@ -95,22 +109,26 @@ def run_burn_in_validation(base_node_url: str = "http://localhost:3000", base_py
 
 def main():
     parser = argparse.ArgumentParser(description="SKY / CTB Staging Burn-In & Soak Validation Tool")
-    parser.add_argument("--node-url", default="http://localhost:3000", help="Node.js server base URL")
-    parser.add_argument("--python-url", default="http://localhost:8000", help="Python FastAPI base URL")
+    parser.add_argument(
+        "--node-url", default="http://localhost:3000", help="Node.js server base URL"
+    )
+    parser.add_argument(
+        "--python-url", default="http://localhost:8000", help="Python FastAPI base URL"
+    )
     args = parser.parse_args()
 
     logger.info("Executing Staging Burn-In Preflight Validation...")
     report = run_burn_in_validation(args.node_url, args.python_url)
-    
-    print("\n" + "="*80)
+
+    print("\n" + "=" * 80)
     print("           STAGING BURN-IN & SOAK TEST REPORT")
-    print("="*80)
+    print("=" * 80)
     for c in report["checks"]:
         status = "PASSED ✅" if c["passed"] else "FAILED ❌"
         print(f"[{status}] {c['target']:<40} (HTTP {c['status_code']})")
-    print("-"*80)
+    print("-" * 80)
     print(f"OVERALL VERDICT: {report['verdict']}")
-    print("="*80 + "\n")
+    print("=" * 80 + "\n")
 
     if not report["all_passed"]:
         sys.exit(1)

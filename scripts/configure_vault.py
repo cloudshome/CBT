@@ -24,7 +24,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from core.auth.credential_vault import (  # noqa: E402
+from core.auth.credential_vault import (
     ExchangeCredential,
     credential_vault,
     mask_secret,
@@ -64,8 +64,13 @@ def store_credential_flow():
         return
 
     passphrase = None
-    if exchange == "BYBIT" or "y" in input("Optional: Does this key require an API Passphrase? (y/N): ").lower():
-        passphrase_input = getpass.getpass("Enter Passphrase (optional, or press Enter to skip): ").strip()
+    if (
+        exchange == "BYBIT"
+        or "y" in input("Optional: Does this key require an API Passphrase? (y/N): ").lower()
+    ):
+        passphrase_input = getpass.getpass(
+            "Enter Passphrase (optional, or press Enter to skip): "
+        ).strip()
         if passphrase_input:
             passphrase = passphrase_input
 
@@ -90,11 +95,15 @@ def store_credential_flow():
         print("—" * 68)
 
         # Prompt for immediate verification probe
-        probe_choice = input("\nRun live permission probe now to verify withdrawal prohibition? [Y/n]: ").strip().lower()
+        probe_choice = (
+            input("\nRun live permission probe now to verify withdrawal prohibition? [Y/n]: ")
+            .strip()
+            .lower()
+        )
         if probe_choice in ("", "y", "yes"):
             verify_credential_flow(exchange, environment)
 
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         print(f"\n❌ Failed to store credential in vault: {exc}")
 
 
@@ -128,7 +137,9 @@ def verify_credential_flow(default_exchange: str | None = None, default_env: str
         print(f"   API Key:            {res.masked_api_key}")
         print(f"   Authentication:     {'✅ PASSED' if res.authenticated else '❌ FAILED'}")
         print(f"   Spot Trading:       {'✅ ENABLED' if res.trading_enabled else '❌ DISABLED'}")
-        print(f"   Withdrawals:        {'🛡️ DISABLED (SAFE)' if not res.withdrawal_enabled else '🚨 ENABLED (SECURITY VIOLATION)'}")
+        print(
+            f"   Withdrawals:        {'🛡️ DISABLED (SAFE)' if not res.withdrawal_enabled else '🚨 ENABLED (SECURITY VIOLATION)'}"
+        )
         print(f"   Ping Latency:       {res.connectivity_latency_ms:.1f}ms")
         print(f"   Account Latency:    {res.account_latency_ms:.1f}ms")
         print(f"   Permission Latency: {res.permission_latency_ms:.1f}ms")
@@ -142,7 +153,7 @@ def verify_credential_flow(default_exchange: str | None = None, default_env: str
         else:
             print(f"⚠️ KEY NOT ELIGIBLE FOR LIVE TRADING: {res.message}\n")
 
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         print(f"❌ Probe execution error: {exc}")
 
 
@@ -158,7 +169,9 @@ def list_credentials_flow():
     for c in creds:
         has_sec = "YES" if c.get("has_secret") else "NO"
         stat = "ACTIVE" if c.get("is_active") else "INACTIVE"
-        print(f"{c['exchange']:<12} {c['environment']:<12} {c['masked_api_key']:<20} {has_sec:<10} {stat:<10}")
+        print(
+            f"{c['exchange']:<12} {c['environment']:<12} {c['masked_api_key']:<20} {has_sec:<10} {stat:<10}"
+        )
     print("-" * 68)
 
 
@@ -176,11 +189,19 @@ def revoke_credential_flow():
     choice_env = input("Enter selection [1/2, default: 1]: ").strip()
     environment = "PRODUCTION" if choice_env == "2" else "TESTNET"
 
-    confirm = input(f"Are you sure you want to REVOKE credentials for {exchange} [{environment}]? (yes/NO): ").strip().lower()
+    confirm = (
+        input(
+            f"Are you sure you want to REVOKE credentials for {exchange} [{environment}]? (yes/NO): "
+        )
+        .strip()
+        .lower()
+    )
     if confirm == "yes":
         deleted = credential_vault.revoke_credential(exchange, environment)
         if deleted:
-            print(f"✅ SUCCESS: Credential for {exchange} [{environment}] revoked. Capability caches flushed.")
+            print(
+                f"✅ SUCCESS: Credential for {exchange} [{environment}] revoked. Capability caches flushed."
+            )
         else:
             print(f"ℹ️ No credential found for {exchange} [{environment}].")
     else:

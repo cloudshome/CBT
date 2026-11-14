@@ -25,9 +25,7 @@ def check_database(db: SignalDB | None = None) -> dict:
     try:
         tables = [
             r[0]
-            for r in db.conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()
+            for r in db.conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
         ]
         required = [
             "scans",
@@ -86,9 +84,7 @@ def check_data_freshness() -> dict:
     try:
         df = pd.read_csv(sample_file)
         ts_col = (
-            "ts"
-            if "ts" in df.columns
-            else ("timestamp" if "timestamp" in df.columns else None)
+            "ts" if "ts" in df.columns else ("timestamp" if "timestamp" in df.columns else None)
         )
         if ts_col and len(df) > 0:
             last_ts = df[ts_col].iloc[-1]
@@ -147,9 +143,7 @@ def check_risk_system(db: SignalDB | None = None) -> dict:
 
         # Check behavioral flags directly
         st = db.get_trader_state()
-        active_flags = [
-            k for k in ("angry", "tired", "revenge", "chasing") if st.get(k)
-        ]
+        active_flags = [k for k in ("angry", "tired", "revenge", "chasing") if st.get(k)]
         if active_flags:
             return {
                 "name": "risk_system",

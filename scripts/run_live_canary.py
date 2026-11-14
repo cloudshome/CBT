@@ -26,9 +26,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from core.execution.live_canary_runner import CanaryRunRequest, live_canary_runner  # noqa: E402
-from core.execution.live_gatekeeper import live_gatekeeper  # noqa: E402
-from core.execution.symbol_constraints import symbol_constraint_engine  # noqa: E402
+from core.execution.live_canary_runner import CanaryRunRequest, live_canary_runner
+from core.execution.live_gatekeeper import live_gatekeeper
+from core.execution.symbol_constraints import symbol_constraint_engine
 
 
 def print_banner():
@@ -242,10 +242,14 @@ async def run_canary_cli():
     print(f"   Executed Qty:      {result.executed_qty}")
     print(f"   Executed Price:    ${result.executed_price:.2f}")
     print(f"   Final Notional:    ${result.notional_usd:.2f}")
-    print(f"   Dispatch -> ACK:   {result.dispatch_to_ack_latency_ms:.1f}ms {'(✅ <500ms SLA)' if not result.ack_latency_sla_breached else '(⚠️ SLA BREACH)'}")
+    print(
+        f"   Dispatch -> ACK:   {result.dispatch_to_ack_latency_ms:.1f}ms {'(✅ <500ms SLA)' if not result.ack_latency_sla_breached else '(⚠️ SLA BREACH)'}"
+    )
     print(f"   ACK -> Fill:       {result.ack_to_fill_latency_ms:.1f}ms")
     print(f"   Total Duration:    {result.total_roundtrip_ms:.1f}ms")
-    print(f"   Monotonic Timings: {result.dispatch_monotonic_ns}ns -> {result.ack_monotonic_ns}ns -> {result.fill_monotonic_ns}ns")
+    print(
+        f"   Monotonic Timings: {result.dispatch_monotonic_ns}ns -> {result.ack_monotonic_ns}ns -> {result.fill_monotonic_ns}ns"
+    )
     print(f"   UTC Dispatch Time: {result.dispatch_wall_time_utc}")
     print(f"   Reconciliation ID: {result.reconciliation_id or 'N/A'}")
     print(f"   Message:           {result.message}")

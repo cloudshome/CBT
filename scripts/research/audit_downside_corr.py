@@ -1,8 +1,9 @@
 import json
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-import pandas as pd
+
 import numpy as np
-from datetime import datetime, timezone, timedelta
+import pandas as pd
 from scipy import stats
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -12,7 +13,11 @@ bm_file = ROOT / "research" / "m34_trade_level_ledger.jsonl"
 bm_trades = []
 if bm_file.exists():
     with open(bm_file, "r", encoding="utf-8") as f:
-        bm_trades = [json.loads(line) for line in f if "ORDER_BLOCK_RETEST" in line and "BTCUSDT" in line and "1h" in line]
+        bm_trades = [
+            json.loads(line)
+            for line in f
+            if "ORDER_BLOCK_RETEST" in line and "BTCUSDT" in line and "1h" in line
+        ]
 
 # 2. Load M36 Family Trades (BTC 1h)
 fam_file = ROOT / "research" / "independent_edges_trade_ledger.jsonl"
@@ -24,23 +29,25 @@ if fam_file.exists():
             if t["symbol"] == "BTCUSDT" and t["timeframe"] == "1h" and t["family_id"] == "FAMILY_3":
                 f3_trades.append(t)
 
-start_date = datetime(2022, 1, 1, tzinfo=timezone.utc)
-end_date = datetime(2026, 10, 20, tzinfo=timezone.utc)
+start_date = datetime(2022, 1, 1, tzinfo=UTC)
+end_date = datetime(2026, 10, 20, tzinfo=UTC)
 calendar_days = []
 curr = start_date
 while curr <= end_date:
     calendar_days.append(curr.strftime("%Y-%m-%d"))
     curr += timedelta(days=1)
 
+
 def build_daily_series(trades, field="net_pnl_r_strict_mixed"):
     daily_r = {d: 0.0 for d in calendar_days}
     for t in trades:
         ts_exit = t.get("exit_ts", t.get("entry_ts"))
-        dt_exit = datetime.fromtimestamp(ts_exit / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
+        dt_exit = datetime.fromtimestamp(ts_exit / 1000, tz=UTC).strftime("%Y-%m-%d")
         ret = t.get(field, t.get("net_pnl_r_mixed", 0.0))
         if dt_exit in daily_r:
             daily_r[dt_exit] += ret
     return np.array([daily_r[d] for d in calendar_days])
+
 
 r_bm = build_daily_series(bm_trades, "net_pnl_r_mixed")
 r_f3 = build_daily_series(f3_trades, "net_pnl_r_strict_mixed")
@@ -81,5 +88,6 @@ for _ in range(2000):
         if not np.isnan(c):
             boot_corrs.append(c)
 
-print(f"\nBootstrap 95% CI (2000 resamples): [{np.percentile(boot_corrs, 2.5):.4f}, {np.percentile(boot_corrs, 97.5):.4f}]")
-
+print(
+    f"\nBootstrap 95% CI (2000 resamples): [{np.percentile(boot_corrs, 2.5):.4f}, {np.percentile(boot_corrs, 97.5):.4f}]"
+)

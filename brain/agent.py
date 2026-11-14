@@ -79,9 +79,7 @@ def _probe_data(client) -> dict:
             out[symbol] = {
                 "ok": bool(ok),
                 "bars": 0 if df is None else len(df),
-                "last": None
-                if df is None or not len(df)
-                else float(df["close"].iloc[-1]),
+                "last": None if df is None or not len(df) else float(df["close"].iloc[-1]),
                 "last_ts": last_ts,
                 "age_seconds": age_seconds,
             }
@@ -191,9 +189,7 @@ def health_report() -> dict:
     try:
         client = maybe_client()
         report["data"]["probe"] = _probe_data(client)
-        report["data"]["ok"] = any(
-            v.get("ok") for v in report["data"]["probe"].values()
-        )
+        report["data"]["ok"] = any(v.get("ok") for v in report["data"]["probe"].values())
     except Exception as exc:
         report["data"]["probe"] = {}
         report["data"]["ok"] = False
@@ -202,11 +198,7 @@ def health_report() -> dict:
     # Multi-exchange verification only makes sense against real Binance prices.
     if report["data"].get("mode") == "live":
         report["data"]["cross_exchange"] = _cross_exchange_probe(
-            {
-                sym: v.get("last")
-                for sym, v in report["data"]["probe"].items()
-                if v.get("ok")
-            }
+            {sym: v.get("last") for sym, v in report["data"]["probe"].items() if v.get("ok")}
         )
     else:
         report["data"]["cross_exchange"] = {
@@ -252,8 +244,7 @@ def format_health(report: dict) -> str:
             age = probe.get("age_seconds")
             age_note = f", age {float(age) / 60:.1f}m" if age is not None else ""
             lines.append(
-                f"    {sym:<10} ok  {probe['bars']} bars, last "
-                f"{probe.get('last'):,.2f}{age_note}"
+                f"    {sym:<10} ok  {probe['bars']} bars, last {probe.get('last'):,.2f}{age_note}"
                 if probe.get("last") is not None
                 else f"    {sym:<10} ok  {probe['bars']} bars{age_note}"
             )
@@ -274,8 +265,7 @@ def format_health(report: dict) -> str:
                 else:
                     bits.append(f"{sym} {info.get('error', 'unreachable')}")
             lines.append(
-                f"    {name:<10} {'ok  ' if ex.get('ok') else '✗   '}"
-                + " · ".join(bits)
+                f"    {name:<10} {'ok  ' if ex.get('ok') else '✗   '}" + " · ".join(bits)
                 if bits
                 else f"    {name:<10} ✗  no data"
             )
@@ -340,9 +330,7 @@ def morning_briefing(
     for symbol in symbols:
         entry: dict = {"symbol": symbol, "timeframe": timeframe, "ok": True}
         try:
-            payload = analyze_full(
-                symbol, timeframe, bars, with_context=False, with_memory=True
-            )
+            payload = analyze_full(symbol, timeframe, bars, with_context=False, with_memory=True)
             sig = payload.get("signal", {})
             decision = payload.get("decision") or {}
             plans = payload.get("plans", [])
@@ -359,21 +347,15 @@ def morning_briefing(
                     "risk_reward": sig.get("risk_reward"),
                     "reason": sig.get("reason"),
                     "signal_id": sig.get("signal_id"),
-                    "price": payload.get("snapshot", {})
-                    .get("features", {})
-                    .get("price"),
+                    "price": payload.get("snapshot", {}).get("features", {}).get("price"),
                     "desk_action": decision.get("action", sig.get("action")),
                     "blocked_by": decision.get("blocked_by", []),
-                    "playbook": (decision.get("gates") or {})
-                    .get("playbook", {})
-                    .get("name"),
+                    "playbook": (decision.get("gates") or {}).get("playbook", {}).get("name"),
                     "regime": (payload.get("intelligence", {}) or {})
                     .get("chart_read", {})
                     .get("regime", {})
                     .get("label")
-                    or payload.get("snapshot", {})
-                    .get("features", {})
-                    .get("regime_name"),
+                    or payload.get("snapshot", {}).get("features", {}).get("regime_name"),
                     "lifecycle": payload.get("lifecycle", {}),
                 }
             )
@@ -427,9 +409,7 @@ def _briefing_narrative(b: dict) -> str:
     lines = []
     for a in b.get("assets", []):
         if not a.get("ok"):
-            lines.append(
-                f"  {a['symbol']}: data feed unavailable — {a.get('error', '')}"
-            )
+            lines.append(f"  {a['symbol']}: data feed unavailable — {a.get('error', '')}")
             continue
         pct = a.get("confidence_pct")
         conf = f"{pct}%" if pct else f"{a.get('confidence') or '—'}"
@@ -500,9 +480,7 @@ def format_briefing(b: dict) -> str:
             lines.append(f"      playbook: {a['playbook']}")
     gate = b.get("risk_gate") or {}
     prog = gate.get("progression") or {}
-    gate_state = (
-        "OPEN — new trades allowed" if gate.get("allowed") else "CLOSED — no new trades"
-    )
+    gate_state = "OPEN — new trades allowed" if gate.get("allowed") else "CLOSED — no new trades"
     lines.append("-" * 66)
     lines.append(f"  RISK GATE: {gate_state}  progression={prog.get('level', '?')}")
     for reason in gate.get("blocked_by", []):
@@ -878,23 +856,15 @@ def _ask_impl(
             bt = db.backtest_stats()
             overall = bt["overall"]
             bt_wr = (
-                f"{overall['win_rate'] * 100:.1f}%"
-                if overall["win_rate"] is not None
-                else "n/a"
+                f"{overall['win_rate'] * 100:.1f}%" if overall["win_rate"] is not None else "n/a"
             )
             lines = [
                 f"Backtest learning: {overall['n']} graded | win-rate {bt_wr} "
                 f"| avgR {overall['avg_rr']}"
             ]
             for r in bt["by_type"][:6]:
-                wr = (
-                    f"{r['win_rate'] * 100:.1f}%"
-                    if r["win_rate"] is not None
-                    else "n/a"
-                )
-                lines.append(
-                    f"  {r['plan_type']:<24} n={r['n']:>4} win {wr} avgR {r['avg_rr']}"
-                )
+                wr = f"{r['win_rate'] * 100:.1f}%" if r["win_rate"] is not None else "n/a"
+                lines.append(f"  {r['plan_type']:<24} n={r['n']:>4} win {wr} avgR {r['avg_rr']}")
             try:
                 m = business_metrics(db)
                 lines.append(
@@ -927,9 +897,7 @@ def _ask_impl(
                     f"are not this desk's exposure)"
                 )
             if not p["n"]:
-                lines.append(
-                    "  Approve a signal, then run `python main.py paper --watch`."
-                )
+                lines.append("  Approve a signal, then run `python main.py paper --watch`.")
             return {
                 "intent": intent,
                 "question": question,
@@ -945,12 +913,8 @@ def _ask_impl(
             decision = payload.get("decision") or {}
             entry = sig.get("entry")
             entry_s = f"@ {entry:,.2f}" if entry else ""
-            plan_conf = [
-                int(p.get("confidence") or 0) for p in payload.get("plans", [])
-            ]
-            conf = (
-                f"{max(plan_conf)}%" if plan_conf else str(sig.get("confidence") or "—")
-            )
+            plan_conf = [int(p.get("confidence") or 0) for p in payload.get("plans", [])]
+            conf = f"{max(plan_conf)}%" if plan_conf else str(sig.get("confidence") or "—")
             read_lines = [
                 f"{sig.get('asset')} {sig.get('timeframe')}: "
                 f"{decision.get('action', sig.get('action'))} "
@@ -958,9 +922,9 @@ def _ask_impl(
             ]
             if sig.get("reason"):
                 read_lines.append(f"  reason: {sig.get('reason')}")
-            decision_lines = [
-                f"  desk veto: {b}" for b in decision.get("blocked_by", [])
-            ] or [f"  desk {decision.get('action', sig.get('action'))} — no veto."]
+            decision_lines = [f"  desk veto: {b}" for b in decision.get("blocked_by", [])] or [
+                f"  desk {decision.get('action', sig.get('action'))} — no veto."
+            ]
             lines = read_lines + decision_lines
             return {
                 "intent": intent,
@@ -993,8 +957,7 @@ def _ask_impl(
                 )
             if not rows:
                 lines.append(
-                    "  None recorded — `python main.py sourcetrust "
-                    "<source> <tier 1-5> <0-1>`"
+                    "  None recorded — `python main.py sourcetrust <source> <tier 1-5> <0-1>`"
                 )
             return {
                 "intent": intent,
@@ -1026,9 +989,7 @@ def _ask_impl(
                 "data": {"progression": prog, "ladder": order},
             }
         if intent == "morning":
-            b = morning_briefing(
-                symbols=[symbol] if symbol else None, timeframe=timeframe
-            )
+            b = morning_briefing(symbols=[symbol] if symbol else None, timeframe=timeframe)
             return {
                 "intent": intent,
                 "question": question,
@@ -1043,8 +1004,7 @@ def _ask_impl(
         "question": question,
         "answer": [
             "I can answer questions about: " + intents,
-            "Try: 'is the risk gate open?', 'what's pending?', "
-            "'how is the loop?', 'scan BTC'.",
+            "Try: 'is the risk gate open?', 'what's pending?', 'how is the loop?', 'scan BTC'.",
         ],
         "data": {"intents": intents},
     }
@@ -1155,11 +1115,7 @@ def desk_status() -> dict:
                 dws = details.get("daily_weekly") or {}
                 dw = details.get("drawdown") or {}
                 ts = details.get("trader_state") or {}
-                prog = (
-                    gate.get("progression")
-                    or details.get("progression")
-                    or progression_info()
-                )
+                prog = gate.get("progression") or details.get("progression") or progression_info()
                 status["progression"] = {
                     "level": prog.get("level", PROGRESSION),
                     "label": prog.get("label", ""),
@@ -1223,9 +1179,7 @@ def desk_status() -> dict:
 
                 j = violation_rate(db)  # general journal report
                 discipline = graduation_discipline(db)  # P12.14 criterion
-                status["graduation"] = graduation_status(
-                    paper_progress(db), discipline=discipline
-                )
+                status["graduation"] = graduation_status(paper_progress(db), discipline=discipline)
                 status["discipline"] = discipline
                 status["journal"] = {
                     "n": j.get("n", 0),
@@ -1303,8 +1257,7 @@ def _desk_advice(status: dict) -> dict:
             "action": "STAND_ASIDE",
             "headline": "stand aside — the risk gate is closed",
             "detail": (
-                f"No new trades. {why}. Re-check with "
-                "`python main.py risk` after the block lifts."
+                f"No new trades. {why}. Re-check with `python main.py risk` after the block lifts."
             ),
             "reasons": blocked or ["risk gate closed"],
         }
@@ -1344,9 +1297,7 @@ def _desk_advice(status: dict) -> dict:
         gaps = graduation.get("sample_gaps") or []
         if not graduation.get("samples_proven", False):
             for m in gaps:
-                missing.append(
-                    f"{m.get('plan_type')} sample proof ({m.get('missing')})"
-                )
+                missing.append(f"{m.get('plan_type')} sample proof ({m.get('missing')})")
         why = ", ".join(missing) if missing else "graduation gate not met"
         return {
             "action": "PAPER_GRIND",
@@ -1384,9 +1335,7 @@ def _sample_proof_word(g: dict) -> str:
     gaps = [str(m.get("missing") or "") for m in (g.get("sample_gaps") or [])]
     if not gaps:
         return "unproven"
-    count_short = any(
-        "no samples yet" in m or "backtest" in m or "paper" in m for m in gaps
-    )
+    count_short = any("no samples yet" in m or "backtest" in m or "paper" in m for m in gaps)
     exp_short = any("positive expectancy" in m for m in gaps)
     if count_short and exp_short:
         return "counts+expectancy short"
@@ -1461,8 +1410,7 @@ def format_desk_status(status: dict) -> str:
             f"  today P&L    : {today_s}  ({today.get('n', 0)} trades)",
             f"  week P&L     : {week_s}  ({week.get('n', 0)} trades)",
             f"  drawdown     : {dd_s}  → {dw.get('level', 'normal')}",
-            f"  scorecard    : n={score.get('n', 0)}  win {wr_s}  "
-            f"exp {exp_s}  PF {pf_s}",
+            f"  scorecard    : n={score.get('n', 0)}  win {wr_s}  exp {exp_s}  PF {pf_s}",
             f"  graduation   : {'READY' if g.get('ready') else 'NOT READY'}  "
             f"(samples {proof_word} · {gstats.get('n', 0)} decided)",
             f"  discipline   : {_discipline_word(status)}",
@@ -1539,13 +1487,9 @@ def loop_health(status: dict | None = None, strip: dict | None = None) -> dict:
                         "plan_type": p["plan_type"],
                         "primary": p["plan_type"] in primary_set,
                         "backtest_n": int(p.get("backtest_n") or 0),
-                        "backtest_target": int(
-                            p.get("backtest_target") or CALIBRATE_MIN_N
-                        ),
+                        "backtest_target": int(p.get("backtest_target") or CALIBRATE_MIN_N),
                         "paper_n": int(p.get("paper_n") or 0),
-                        "paper_target": int(
-                            p.get("paper_target") or CALIBRATE_MIN_PAPER_N
-                        ),
+                        "paper_target": int(p.get("paper_target") or CALIBRATE_MIN_PAPER_N),
                         "expectancy_net": p.get("expectancy_net"),
                         "win_rate_net": p.get("win_rate_net"),
                         "proven": bool(p.get("proven")),
@@ -1729,15 +1673,13 @@ def format_loop_health(health: dict) -> str:
         f"DAILY RITUAL — CryptoBrain v{health.get('version')}  {health.get('time')}",
         "-" * 66,
         f"  1. READINESS   : {ready_lvl} — {readiness.get('headline', '')}",
-        f"  2. LOOP        : n={loop.get('real_paper_n', 0)} real paper · "
-        f"E {exp_s} · WR {wr_s}",
+        f"  2. LOOP        : n={loop.get('real_paper_n', 0)} real paper · E {exp_s} · WR {wr_s}",
         f"                   graduation "
         f"{'READY' if g.get('ready') else 'NOT READY'} "
         f"({g.get('n', 0)} decided primary)",
         f"  3. GATE        : {gate_word}"
         + (f"  flags={', '.join(flags)}" if flags else "  flags=clear"),
-        f"  4. ACT         : {advice.get('action', '?')} — "
-        f"{advice.get('headline', '')}",
+        f"  4. ACT         : {advice.get('action', '?')} — {advice.get('headline', '')}",
         "-" * 66,
         "  LOOP HEALTH",
         f"    real paper   : {loop.get('real_paper_n', 0)} decided "
@@ -1763,9 +1705,7 @@ def format_loop_health(health: dict) -> str:
         name = c.get("name") or "?"
         target, kind = bar_label.get(name, ("", "plain"))
         mark = "✓" if c.get("met") else "✗"
-        lines.append(
-            f"    {mark} {name:<12} {_num(c.get('current'), kind):<14}{target}"
-        )
+        lines.append(f"    {mark} {name:<12} {_num(c.get('current'), kind):<14}{target}")
     lines.append(
         f"    sample proof : "
         f"{'✓ 100 backtest + 20 paper per primary setup' if g.get('samples_proven') else '✗ grind more history first'}"
@@ -1798,9 +1738,7 @@ def format_loop_health(health: dict) -> str:
     detail = advice.get("detail")
     if detail:
         lines.append(f"                 {detail}")
-    act = next(
-        (r for r in (health.get("ritual") or []) if r.get("name") == "act"), None
-    )
+    act = next((r for r in (health.get("ritual") or []) if r.get("name") == "act"), None)
     if act and act.get("command"):
         lines.append(f"                 {act['command']}")
     return "\n".join(lines)
@@ -1971,10 +1909,7 @@ def _data_pillar(store=None, now_ms=None) -> dict:
         if quarantined:
             headline = f"{len(quarantined)} series quarantined"
         elif level == "degraded":
-            headline = (
-                f"{sum(1 for i in items if i['level'] != 'ok')}"
-                f"/{len(items)} series lagging"
-            )
+            headline = f"{sum(1 for i in items if i['level'] != 'ok')}/{len(items)} series lagging"
         else:
             headline = f"{len(items)} series fresh"
         detail = ", ".join(f"{i['name']}={i['level']}" for i in items)
@@ -2010,9 +1945,7 @@ def _gate_pillar(status: dict) -> dict:
     else:
         level, headline = "blocked", "gate CLOSED"
 
-    detail = (
-        "; ".join(blocked) if blocked else (", ".join(flags) if flags else "no blocks")
-    )
+    detail = "; ".join(blocked) if blocked else (", ".join(flags) if flags else "no blocks")
     return {
         "name": "risk_gate",
         "level": level,
@@ -2084,15 +2017,12 @@ def format_readiness_strip(strip: dict) -> str:
     ]
     for p in strip.get("pillars") or []:
         lines.append(
-            f"  {mark.get(p['level'], '?')} {p['name']:<10} "
-            f"{p['level']:<9} {p.get('headline', '')}"
+            f"  {mark.get(p['level'], '?')} {p['name']:<10} {p['level']:<9} {p.get('headline', '')}"
         )
         if p.get("detail"):
             lines.append(f"      {p['detail']}")
     advice = strip.get("advice") or {}
     if advice.get("action"):
         lines.append("-" * 66)
-        lines.append(
-            f"  ADVICE       : {advice['action']} — {advice.get('headline', '')}"
-        )
+        lines.append(f"  ADVICE       : {advice['action']} — {advice.get('headline', '')}")
     return "\n".join(lines)

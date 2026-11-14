@@ -31,7 +31,6 @@ logger = logging.getLogger("brain.decision")
 
 def _top_plan_type(payload: dict) -> str:
     plans = payload.get("plans") or []
-    intel = payload.get("intelligence") or {}
     for p in plans:
         if p.get("primary", True):
             return p.get("type") or ""
@@ -187,8 +186,6 @@ def _build_decision_inner(
         "desk_default": DESK_DEFAULT,
         "utc": (now or datetime.now(UTC)).strftime("%Y-%m-%d %H:%M UTC"),
         "decision_text": (
-            "WAIT — no trade"
-            if final == "NO TRADE"
-            else f"TRADE {final} (desk-approved)"
+            "WAIT — no trade" if final == "NO TRADE" else f"TRADE {final} (desk-approved)"
         ),
     }

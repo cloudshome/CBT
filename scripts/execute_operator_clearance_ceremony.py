@@ -76,7 +76,12 @@ class GateG21ClearanceCeremony:
         if not Path(py_exe).exists():
             py_exe = sys.executable
 
-        m18_proc = subprocess.run([py_exe, "scripts/verify_m18_certification.py"], cwd=str(REPO_ROOT), capture_output=True, text=True)
+        m18_proc = subprocess.run(
+            [py_exe, "scripts/verify_m18_certification.py"],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+        )
         if m18_proc.returncode != 0:
             print("[ABORT] Milestone 18 certification invalid! Cannot approve release.")
             return False
@@ -263,7 +268,9 @@ Crypto Brain Terminal (CBT / SKY) is hereby promoted to **v4.0.0 Official Releas
                     "operator_signature_verified": True,
                     "operator_name": self.operator_name,
                     "attestation_digest": attestation_digest,
-                    "21_gates_summary": {k: v.get("passed", False) for k, v in manifest_data["gates"].items()},
+                    "21_gates_summary": {
+                        k: v.get("passed", False) for k, v in manifest_data["gates"].items()
+                    },
                 },
                 f,
                 indent=2,
@@ -272,6 +279,7 @@ Crypto Brain Terminal (CBT / SKY) is hereby promoted to **v4.0.0 Official Releas
         # 8. Re-generate release checksums
         log("Step 7: Refreshing Cryptographic SHA-256 Release Checksums...")
         from scripts.generate_release_checksums import generate_checksums
+
         generate_checksums()
 
         # 9. Verify and tag Git Release
@@ -279,7 +287,14 @@ Crypto Brain Terminal (CBT / SKY) is hereby promoted to **v4.0.0 Official Releas
         tag_check = subprocess.run(["git", "tag", "-l", "v4.0.0"], capture_output=True, text=True)
         if "v4.0.0" not in tag_check.stdout:
             tag_res = subprocess.run(
-                ["git", "tag", "-a", "v4.0.0", "-m", "Release v4.0.0 - Generation 6 Institutional Production Release (Gate G-21 Operator Approved)"],
+                [
+                    "git",
+                    "tag",
+                    "-a",
+                    "v4.0.0",
+                    "-m",
+                    "Release v4.0.0 - Generation 6 Institutional Production Release (Gate G-21 Operator Approved)",
+                ],
                 capture_output=True,
                 text=True,
             )

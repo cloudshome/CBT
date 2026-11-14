@@ -57,7 +57,9 @@ def run_restore(archive_path: Path, target_data_dir: Path) -> dict[str, Any]:
         for member in tar.getmembers():
             dest = (target_data_dir / member.name).resolve()
             if not is_safe_path(target_data_dir, dest):
-                raise PermissionError(f"Security Alert: Tar-Slip Path Traversal detected: {member.name}")
+                raise PermissionError(
+                    f"Security Alert: Tar-Slip Path Traversal detected: {member.name}"
+                )
 
         if hasattr(tarfile, "data_filter"):
             tar.extractall(path=target_data_dir, filter="data")
@@ -82,9 +84,13 @@ def run_restore(archive_path: Path, target_data_dir: Path) -> dict[str, Any]:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Restore SKY SQLite databases from backup archive.")
+    parser = argparse.ArgumentParser(
+        description="Restore SKY SQLite databases from backup archive."
+    )
     parser.add_argument("--archive", type=str, required=True, help="Path to backup .tar.gz archive")
-    parser.add_argument("--data-dir", type=str, default=os.getenv("DATA_DIR", "data"), help="Target data directory")
+    parser.add_argument(
+        "--data-dir", type=str, default=os.getenv("DATA_DIR", "data"), help="Target data directory"
+    )
     args = parser.parse_args()
 
     try:

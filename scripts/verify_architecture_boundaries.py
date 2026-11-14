@@ -75,7 +75,7 @@ def scan_file_imports(file_path: Path, repo_root: Path) -> list[tuple[int, str]]
                     # Construct full module from source package
                     source_mod = file_to_module_name(file_path, repo_root)
                     mod_parts = source_mod.split(".")
-                    base_parts = mod_parts[:-node.level] if len(mod_parts) >= node.level else []
+                    base_parts = mod_parts[: -node.level] if len(mod_parts) >= node.level else []
                     full_mod = ".".join(base_parts + [node.module])
                     imported_modules.append((node.lineno, full_mod))
                 else:
@@ -84,7 +84,9 @@ def scan_file_imports(file_path: Path, repo_root: Path) -> list[tuple[int, str]]
     return imported_modules
 
 
-def run_architecture_boundary_verification(root_path: Path | None = None) -> tuple[bool, list[ImportViolation], int, int]:
+def run_architecture_boundary_verification(
+    root_path: Path | None = None,
+) -> tuple[bool, list[ImportViolation], int, int]:
     """Scans all Python files under core/ and root app.py for boundary compliance."""
     target_root = root_path or REPO_ROOT
     files_to_scan: list[Path] = []
@@ -110,7 +112,12 @@ def run_architecture_boundary_verification(root_path: Path | None = None) -> tup
         for lineno, target_mod in imports:
             total_imports_checked += 1
             # Only evaluate project-internal imports
-            if target_mod.startswith("core") or target_mod.startswith("app") or target_mod.startswith("src") or target_mod.startswith("frontend"):
+            if (
+                target_mod.startswith("core")
+                or target_mod.startswith("app")
+                or target_mod.startswith("src")
+                or target_mod.startswith("frontend")
+            ):
                 is_valid, reason = validate_import_direction(source_mod, target_mod)
                 if not is_valid and reason is not None:
                     violations.append(
@@ -149,15 +156,17 @@ def main() -> int:
         print("\n[FAIL] Architecture boundaries violated. Changes rejected.")
         return 1
 
-
     print("\n[PASS] All architectural layer boundaries and authority firewalls intact.")
     print("       1. Layer Stratification Verified (0 <= 1 <= 2 <= 3 <= 4).")
-    print("       2. Authority Isolation Verified (Simulation modules isolated from Live Connectors).")
-    print("       3. Gateway & UI Firewalls Verified (No reverse dependencies into app/src/frontend).")
+    print(
+        "       2. Authority Isolation Verified (Simulation modules isolated from Live Connectors)."
+    )
+    print(
+        "       3. Gateway & UI Firewalls Verified (No reverse dependencies into app/src/frontend)."
+    )
     print("============================================================")
     return 0
 
 
 if __name__ == "__main__":
     sys.exit(main())
-

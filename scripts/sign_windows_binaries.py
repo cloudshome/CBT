@@ -187,7 +187,9 @@ def sign_and_verify(
         prod_cert_env = os.getenv("WIN_CSC_FILE")
         prod_pass_env = os.getenv("WIN_CSC_PASSWORD")
         if not prod_cert_env or not Path(prod_cert_env).is_file():
-            print("\n[FATAL ERROR] RELEASE_BLOCKED: Profile is PRODUCTION but valid commercial Authenticode")
+            print(
+                "\n[FATAL ERROR] RELEASE_BLOCKED: Profile is PRODUCTION but valid commercial Authenticode"
+            )
             print("certificate (WIN_CSC_FILE) was not provided.")
             print("Institutional Rule: Self-signed builds must NEVER be labeled as production.")
             sys.exit(2)
@@ -262,7 +264,8 @@ def sign_and_verify(
         "file_name": target_file.name,
         "file_path": str(target_file.resolve()),
         "profile": profile.value,
-        "is_production_certified": profile == SigningProfile.PRODUCTION and ver_info.get("status") == "Valid",
+        "is_production_certified": profile == SigningProfile.PRODUCTION
+        and ver_info.get("status") == "Valid",
         "signing_engine": engine_used,
         "timestamp_server": RFC3161_HTTPS_TIMESTAMP_SERVER,
         "pre_sign_sha256": initial_sha,
@@ -287,7 +290,9 @@ def main() -> None:
     if os.getenv("PRODUCTION_RELEASE", "").lower() in ("true", "1"):
         profile_str = "PRODUCTION"
 
-    profile = SigningProfile.PRODUCTION if profile_str == "PRODUCTION" else SigningProfile.DEVELOPMENT
+    profile = (
+        SigningProfile.PRODUCTION if profile_str == "PRODUCTION" else SigningProfile.DEVELOPMENT
+    )
 
     target_paths: list[Path] = []
     if len(sys.argv) > 1:
@@ -304,7 +309,9 @@ def main() -> None:
                     target_paths.append(p)
 
     if not target_paths:
-        print("[INFO] No binary targets specified or found in release/. Provide file paths as arguments.")
+        print(
+            "[INFO] No binary targets specified or found in release/. Provide file paths as arguments."
+        )
         sys.exit(0)
 
     reports = []
@@ -320,7 +327,15 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     report_file = out_dir / "CODE_SIGNING_REPORT.json"
     with open(report_file, "w") as f:
-        json.dump({"profile": profile.value, "timestamp": RFC3161_HTTPS_TIMESTAMP_SERVER, "results": reports}, f, indent=2)
+        json.dump(
+            {
+                "profile": profile.value,
+                "timestamp": RFC3161_HTTPS_TIMESTAMP_SERVER,
+                "results": reports,
+            },
+            f,
+            indent=2,
+        )
 
     print(f"\n[OK] Wrote code signing report to: {report_file}")
     if not all_passed:

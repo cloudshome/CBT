@@ -19,22 +19,22 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-import numpy as np  # noqa: E402
+import numpy as np
 
-from core.research.grade_e1.adverse_selection import GradeE1AdverseSelectionEngine  # noqa: E402
-from core.research.grade_e1.contracts import (  # noqa: E402
+from core.research.grade_e1.adverse_selection import GradeE1AdverseSelectionEngine
+from core.research.grade_e1.contracts import (
     FillEngineType,
     OrderSide,
     OrderStatus,
 )
-from core.research.grade_e1.dataset_registry import dataset_registry  # noqa: E402
-from core.research.grade_e1.execution_cost import (  # noqa: E402
+from core.research.grade_e1.dataset_registry import dataset_registry
+from core.research.grade_e1.execution_cost import (
     CANONICAL_FEE_TIERS,
     GradeE1ExecutionCostEngine,
 )
-from core.research.grade_e1.market_replay import GradeE1MarketReplay  # noqa: E402
-from core.research.grade_e2.adaptive_fill_engine import GradeE2AdaptiveFillEngine  # noqa: E402
-from core.research.grade_e2.contracts import PeggingMode  # noqa: E402
+from core.research.grade_e1.market_replay import GradeE1MarketReplay
+from core.research.grade_e2.adaptive_fill_engine import GradeE2AdaptiveFillEngine
+from core.research.grade_e2.contracts import PeggingMode
 
 
 def run_e2_for_dataset(dataset_id: str) -> dict[str, Any]:

@@ -14,15 +14,16 @@ if str(ROOT_DIR) not in sys.path:
 
 from core.research.shadow_ledger import ShadowLedgerEngine
 
+
 def main():
     ledger_path = ROOT_DIR / "research" / "m38_shadow_prediction_ledger.jsonl"
-    
+
     # Overwrite the old single-line stub with the new production engine
     if ledger_path.exists():
         ledger_path.unlink()
-        
+
     engine = ShadowLedgerEngine(ledger_path)
-    
+
     # Precommit an initial prospective baseline shadow record for H3 (BTC)
     p_h3 = engine.precommit_prediction(
         strategy_id="H3_OI_FLUSH_CAPITULATION_LONG_BTC",
@@ -36,9 +37,9 @@ def main():
         risk_unit_usd=2142.10,
         max_hold_bars=24,
         timestamp_utc="2026-11-05T08:00:00Z",
-        idempotency_key="GENESIS_SHADOW_H3_BTC_20261105_080000"
+        idempotency_key="GENESIS_SHADOW_H3_BTC_20261105_080000",
     )
-    
+
     # Precommit an initial prospective baseline shadow record for H5 (ETH)
     p_h5 = engine.precommit_prediction(
         strategy_id="H5_OI_COMPRESSION_BREAKDOWN_SHORT_ETH",
@@ -52,14 +53,14 @@ def main():
         risk_unit_usd=84.50,
         max_hold_bars=72,
         timestamp_utc="2026-11-05T08:00:00Z",
-        idempotency_key="GENESIS_SHADOW_H5_ETH_20261105_080000"
+        idempotency_key="GENESIS_SHADOW_H5_ETH_20261105_080000",
     )
-    
+
     is_valid, msg, count = engine.verify_ledger_integrity()
     print(f"Shadow Ledger Initialized. Verification: {is_valid} ({msg}), Records: {count}")
     summary = engine.export_summary()
     print("Summary:", summary)
 
+
 if __name__ == "__main__":
     main()
-

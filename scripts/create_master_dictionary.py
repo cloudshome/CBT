@@ -202,7 +202,7 @@ This master dictionary serves as the definitive reference manual for all algorit
 
 def main():
     print("[*] Generating CBT Master Quantitative & SMC Trading Dictionary...")
-    
+
     # 1. Write Markdown file to data/research_wiki/articles/
     WIKI_DIR.mkdir(parents=True, exist_ok=True)
     wiki_path = WIKI_DIR / f"{ARTICLE_ID}.md"
@@ -218,12 +218,36 @@ def main():
     # 3. Insert or Replace into data/research_wiki.db
     now_ms = int(time.time() * 1000)
     key_claims = [
-        {"claim_id": "DICT-SMC-01", "term": "Break of Structure (BOS)", "definition": "Candle body close beyond swing extreme confirming trend."},
-        {"claim_id": "DICT-SMC-02", "term": "Change of Character (CHoCH)", "definition": "First structural violation signaling trend reversal."},
-        {"claim_id": "DICT-SMC-03", "term": "Fair Value Gap (FVG)", "definition": "3-candle imbalance creating institutional liquidity vacuum."},
-        {"claim_id": "DICT-SMC-04", "term": "Order Block (OB)", "definition": "Last opposing candle prior to structural displacement."},
-        {"claim_id": "DICT-SMC-05", "term": "Cumulative Volume Delta (CVD)", "definition": "Running sum of aggressive buyer vs seller market orders."},
-        {"claim_id": "DICT-SMC-06", "term": "Half-Kelly Sizing", "definition": "Optimal compounding position size capped for safety."},
+        {
+            "claim_id": "DICT-SMC-01",
+            "term": "Break of Structure (BOS)",
+            "definition": "Candle body close beyond swing extreme confirming trend.",
+        },
+        {
+            "claim_id": "DICT-SMC-02",
+            "term": "Change of Character (CHoCH)",
+            "definition": "First structural violation signaling trend reversal.",
+        },
+        {
+            "claim_id": "DICT-SMC-03",
+            "term": "Fair Value Gap (FVG)",
+            "definition": "3-candle imbalance creating institutional liquidity vacuum.",
+        },
+        {
+            "claim_id": "DICT-SMC-04",
+            "term": "Order Block (OB)",
+            "definition": "Last opposing candle prior to structural displacement.",
+        },
+        {
+            "claim_id": "DICT-SMC-05",
+            "term": "Cumulative Volume Delta (CVD)",
+            "definition": "Running sum of aggressive buyer vs seller market orders.",
+        },
+        {
+            "claim_id": "DICT-SMC-06",
+            "term": "Half-Kelly Sizing",
+            "definition": "Optimal compounding position size capped for safety.",
+        },
     ]
     wikilinks = [
         "[[Break of Structure]]",
@@ -234,8 +258,16 @@ def main():
         "[[Order Book Imbalance]]",
         "[[Half-Kelly Criterion]]",
     ]
-    tags = ["TradingDictionary", "SMC", "OrderFlow", "CVD", "Microstructure", "QuantitativeFinance", "RiskManagement"]
-    
+    tags = [
+        "TradingDictionary",
+        "SMC",
+        "OrderFlow",
+        "CVD",
+        "Microstructure",
+        "QuantitativeFinance",
+        "RiskManagement",
+    ]
+
     with sqlite3.connect(WIKI_DB_PATH) as conn:
         conn.execute(
             """
@@ -275,7 +307,7 @@ def main():
         try:
             with open(MANIFEST_PATH, "r", encoding="utf-8") as f:
                 manifest = json.load(f)
-            
+
             articles = manifest.get("articles", [])
             # Check if exists
             exists = False
@@ -303,25 +335,28 @@ def main():
                     exists = True
                     break
             if not exists:
-                articles.insert(0, {
-                    "article_id": ARTICLE_ID,
-                    "title": TITLE,
-                    "category": CATEGORY,
-                    "source_url": SOURCE_URL,
-                    "source_type": SOURCE_TYPE,
-                    "provenance_id": PROVENANCE_ID,
-                    "author_or_speaker": AUTHOR,
-                    "executive_summary": "Definitive master trading dictionary bridging Smart Money Concepts with institutional quantitative microstructure.",
-                    "key_claims_json": json.dumps(key_claims),
-                    "wikilinks_json": json.dumps(wikilinks),
-                    "tags_json": json.dumps(tags),
-                    "contradictions_json": "[]",
-                    "macro_regime_implications": "Standardizes algorithmic terminology across all desks.",
-                    "full_markdown_content": MARKDOWN_CONTENT,
-                    "verification_score": VERIFICATION_SCORE,
-                    "created_at": now_ms,
-                    "updated_at": now_ms,
-                })
+                articles.insert(
+                    0,
+                    {
+                        "article_id": ARTICLE_ID,
+                        "title": TITLE,
+                        "category": CATEGORY,
+                        "source_url": SOURCE_URL,
+                        "source_type": SOURCE_TYPE,
+                        "provenance_id": PROVENANCE_ID,
+                        "author_or_speaker": AUTHOR,
+                        "executive_summary": "Definitive master trading dictionary bridging Smart Money Concepts with institutional quantitative microstructure.",
+                        "key_claims_json": json.dumps(key_claims),
+                        "wikilinks_json": json.dumps(wikilinks),
+                        "tags_json": json.dumps(tags),
+                        "contradictions_json": "[]",
+                        "macro_regime_implications": "Standardizes algorithmic terminology across all desks.",
+                        "full_markdown_content": MARKDOWN_CONTENT,
+                        "verification_score": VERIFICATION_SCORE,
+                        "created_at": now_ms,
+                        "updated_at": now_ms,
+                    },
+                )
             manifest["articles"] = articles
             manifest["stats"]["articles_count"] = len(articles)
             manifest["updated_at"] = now_ms
@@ -331,9 +366,10 @@ def main():
         except Exception as e:
             print(f"[-] Manifest update failed: {e}")
 
-    print("[SUCCESS] CBT Master Quantitative & SMC Trading Dictionary is fully installed in the Vault!")
+    print(
+        "[SUCCESS] CBT Master Quantitative & SMC Trading Dictionary is fully installed in the Vault!"
+    )
 
 
 if __name__ == "__main__":
     main()
-

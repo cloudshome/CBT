@@ -123,9 +123,7 @@ def dominance() -> dict:
             "btc_dominance": round(g["market_cap_percentage"]["btc"], 2),
             "eth_dominance": round(g["market_cap_percentage"]["eth"], 2),
             "total_market_cap_usd": g["total_market_cap"]["usd"],
-            "market_cap_change_24h_pct": round(
-                g["market_cap_change_percentage_24h_usd"], 2
-            ),
+            "market_cap_change_24h_pct": round(g["market_cap_change_percentage_24h_usd"], 2),
         }
 
     return _cached("dominance", _d)
@@ -325,9 +323,7 @@ def _safe(fn, *a, **k) -> dict:
         return {"available": False}
 
 
-def collect(
-    price_1d: float | None = None, sma200_1d: float | None = None
-) -> dict:
+def collect(price_1d: float | None = None, sma200_1d: float | None = None) -> dict:
     """Gather the full market context (cached, best-effort, parallel).
 
     All external providers run concurrently and are individually guarded, so

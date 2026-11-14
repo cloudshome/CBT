@@ -3,16 +3,17 @@ Historical Asset Inventory and Data Forensic Inspector
 Inspects all parquet, db, and other market data assets with exact timestamps,
 row counts, date coverage, gap analysis, and OHLC integrity checks.
 """
-import os
-import json
+
 import hashlib
+import json
+from datetime import UTC, datetime
 from pathlib import Path
-from datetime import datetime, timezone
+
 import pandas as pd
-import fastparquet
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 PARQUET_STORE = ROOT_DIR / "data" / "store" / "parquet" / "candles"
+
 
 def hash_file(path: Path) -> str:
     h = hashlib.sha256()
@@ -20,6 +21,7 @@ def hash_file(path: Path) -> str:
         while chunk := f.read(65536):
             h.update(chunk)
     return h.hexdigest()
+
 
 def scan_parquet_datasets():
     datasets = {}
@@ -35,7 +37,7 @@ def scan_parquet_datasets():
             if "=" in p:
                 k, v = p.split("=", 1)
                 meta[k] = v
-        
+
         key = f"{meta.get('exchange', 'binance')}_{meta.get('market', 'perp')}_{meta.get('symbol', 'UNKNOWN')}_{meta.get('timeframe', 'UNKNOWN')}"
         if key not in datasets:
             datasets[key] = {
@@ -71,7 +73,7 @@ def scan_parquet_datasets():
             if col in full_df.columns:
                 ts_col = col
                 break
-        
+
         if ts_col is None:
             ts_col = full_df.columns[0]
 
@@ -90,8 +92,8 @@ def scan_parquet_datasets():
         duplicates = full_df.duplicated(subset=["ts_ms"]).sum()
         min_ts = full_df["ts_ms"].min()
         max_ts = full_df["ts_ms"].max()
-        min_dt = datetime.fromtimestamp(min_ts / 1000, tz=timezone.utc).isoformat()
-        max_dt = datetime.fromtimestamp(max_ts / 1000, tz=timezone.utc).isoformat()
+        min_dt = datetime.fromtimestamp(min_ts / 1000, tz=UTC).isoformat()
+        max_dt = datetime.fromtimestamp(max_ts / 1000, tz=UTC).isoformat()
         total_rows = len(full_df)
 
         # OHLC validity: high >= low, high >= open, high >= close, low <= open, low <= close
@@ -99,11 +101,13 @@ def scan_parquet_datasets():
         ohlc_cols = [c for c in ["open", "high", "low", "close"] if c in full_df.columns]
         if len(ohlc_cols) == 4:
             invalid_ohlc = int(
-                ((full_df["high"] < full_df["low"]) |
-                 (full_df["high"] < full_df["open"]) |
-                 (full_df["high"] < full_df["close"]) |
-                 (full_df["low"] > full_df["open"]) |
-                 (full_df["low"] > full_df["close"])).sum()
+                (
+                    (full_df["high"] < full_df["low"])
+                    | (full_df["high"] < full_df["open"])
+                    | (full_df["high"] < full_df["close"])
+                    | (full_df["low"] > full_df["open"])
+                    | (full_df["low"] > full_df["close"])
+                ).sum()
             )
 
         # Gap analysis
@@ -128,11 +132,13 @@ def scan_parquet_datasets():
                 g_start = full_df.loc[idx - 1, "ts_ms"]
                 g_end = full_df.loc[idx, "ts_ms"]
                 missing_bars = int((g_end - g_start) / expected_step) - 1
-                gaps.append({
-                    "start": datetime.fromtimestamp(g_start / 1000, tz=timezone.utc).isoformat(),
-                    "end": datetime.fromtimestamp(g_end / 1000, tz=timezone.utc).isoformat(),
-                    "missing_bars": missing_bars
-                })
+                gaps.append(
+                    {
+                        "start": datetime.fromtimestamp(g_start / 1000, tz=UTC).isoformat(),
+                        "end": datetime.fromtimestamp(g_end / 1000, tz=UTC).isoformat(),
+                        "missing_bars": missing_bars,
+                    }
+                )
 
         # Dataset fingerprint
         dataset_content_hash = hashlib.sha256(
@@ -161,6 +167,7 @@ def scan_parquet_datasets():
         }
 
     return results
+
 
 if __name__ == "__main__":
     inventory = scan_parquet_datasets()

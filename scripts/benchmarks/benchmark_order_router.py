@@ -19,10 +19,10 @@ ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-import numpy as np  # noqa: E402
+import numpy as np
 
-from core.execution.almgren_chriss import AlmgrenChrissSlicer  # noqa: E402
-from core.execution.smart_order_router import (  # noqa: E402
+from core.execution.almgren_chriss import AlmgrenChrissSlicer
+from core.execution.smart_order_router import (
     L2DepthLevel,
     SmartOrderRouter,
     VenueOrderBook,
@@ -141,23 +141,23 @@ def main() -> None:
 
 | Metric | Latency (us) | Latency (ms) | Target Status |
 |---|---|---|---|
-| **Median (p50)** | {sor_metrics['p50_us']:.2f} us | {sor_metrics['p50_us']/1000.0:.4f} ms | {"PASS" if sor_metrics['p50_us'] < 250 else "FAIL"} (< 250 us) |
-| **90th Percentile (p90)** | {sor_metrics['p90_us']:.2f} us | {sor_metrics['p90_us']/1000.0:.4f} ms | {"PASS" if sor_metrics['p90_us'] < 500 else "FAIL"} |
-| **99th Percentile (p99)** | {sor_metrics['p99_us']:.2f} us | {sor_metrics['p99_us']/1000.0:.4f} ms | {"PASS" if sor_metrics['p99_us'] < 1000 else "FAIL"} (< 1 ms) |
-| **99.9th Percentile (p999)** | {sor_metrics['p999_us']:.2f} us | {sor_metrics['p999_us']/1000.0:.4f} ms | - |
-| **Mean** | {sor_metrics['mean_us']:.2f} us | {sor_metrics['mean_us']/1000.0:.4f} ms | {"PASS" if sor_metrics['mean_us'] < 250 else "FAIL"} |
-| **Max** | {sor_metrics['max_us']:.2f} us | {sor_metrics['max_us']/1000.0:.4f} ms | - |
+| **Median (p50)** | {sor_metrics["p50_us"]:.2f} us | {sor_metrics["p50_us"] / 1000.0:.4f} ms | {"PASS" if sor_metrics["p50_us"] < 250 else "FAIL"} (< 250 us) |
+| **90th Percentile (p90)** | {sor_metrics["p90_us"]:.2f} us | {sor_metrics["p90_us"] / 1000.0:.4f} ms | {"PASS" if sor_metrics["p90_us"] < 500 else "FAIL"} |
+| **99th Percentile (p99)** | {sor_metrics["p99_us"]:.2f} us | {sor_metrics["p99_us"] / 1000.0:.4f} ms | {"PASS" if sor_metrics["p99_us"] < 1000 else "FAIL"} (< 1 ms) |
+| **99.9th Percentile (p999)** | {sor_metrics["p999_us"]:.2f} us | {sor_metrics["p999_us"] / 1000.0:.4f} ms | - |
+| **Mean** | {sor_metrics["mean_us"]:.2f} us | {sor_metrics["mean_us"] / 1000.0:.4f} ms | {"PASS" if sor_metrics["mean_us"] < 250 else "FAIL"} |
+| **Max** | {sor_metrics["max_us"]:.2f} us | {sor_metrics["max_us"] / 1000.0:.4f} ms | - |
 
 ## 2. Almgren-Chriss Slicer Optimization Latency
 
 | Metric | Latency (us) | Latency (ms) | Target Status |
 |---|---|---|---|
-| **Median (p50)** | {slicer_metrics['p50_us']:.2f} us | {slicer_metrics['p50_us']/1000.0:.4f} ms | {"PASS" if slicer_metrics['p50_us'] < 250 else "FAIL"} (< 250 us) |
-| **90th Percentile (p90)** | {slicer_metrics['p90_us']:.2f} us | {slicer_metrics['p90_us']/1000.0:.4f} ms | {"PASS" if slicer_metrics['p90_us'] < 500 else "FAIL"} |
-| **99th Percentile (p99)** | {slicer_metrics['p99_us']:.2f} us | {slicer_metrics['p99_us']/1000.0:.4f} ms | {"PASS" if slicer_metrics['p99_us'] < 1000 else "FAIL"} (< 1 ms) |
-| **99.9th Percentile (p999)** | {slicer_metrics['p999_us']:.2f} us | {slicer_metrics['p999_us']/1000.0:.4f} ms | - |
-| **Mean** | {slicer_metrics['mean_us']:.2f} us | {slicer_metrics['mean_us']/1000.0:.4f} ms | {"PASS" if slicer_metrics['mean_us'] < 250 else "FAIL"} |
-| **Max** | {slicer_metrics['max_us']:.2f} us | {slicer_metrics['max_us']/1000.0:.4f} ms | - |
+| **Median (p50)** | {slicer_metrics["p50_us"]:.2f} us | {slicer_metrics["p50_us"] / 1000.0:.4f} ms | {"PASS" if slicer_metrics["p50_us"] < 250 else "FAIL"} (< 250 us) |
+| **90th Percentile (p90)** | {slicer_metrics["p90_us"]:.2f} us | {slicer_metrics["p90_us"] / 1000.0:.4f} ms | {"PASS" if slicer_metrics["p90_us"] < 500 else "FAIL"} |
+| **99th Percentile (p99)** | {slicer_metrics["p99_us"]:.2f} us | {slicer_metrics["p99_us"] / 1000.0:.4f} ms | {"PASS" if slicer_metrics["p99_us"] < 1000 else "FAIL"} (< 1 ms) |
+| **99.9th Percentile (p999)** | {slicer_metrics["p999_us"]:.2f} us | {slicer_metrics["p999_us"] / 1000.0:.4f} ms | - |
+| **Mean** | {slicer_metrics["mean_us"]:.2f} us | {slicer_metrics["mean_us"] / 1000.0:.4f} ms | {"PASS" if slicer_metrics["mean_us"] < 250 else "FAIL"} |
+| **Max** | {slicer_metrics["max_us"]:.2f} us | {slicer_metrics["max_us"] / 1000.0:.4f} ms | - |
 """
     report_file.write_text(md, encoding="utf-8")
     print(f"[SAVED] {report_file}")

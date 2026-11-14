@@ -138,9 +138,7 @@ def classify_styles(mtf: dict, ctx: dict, frame: dict) -> dict:
         if not conflict:
             sc.available = True
             sc.direction = ltf_dir
-            sc.confidence = int(
-                55 + min(20, abs(score) * 0.3) + (8 if vol_ratio >= 1.5 else 0)
-            )
+            sc.confidence = int(55 + min(20, abs(score) * 0.3) + (8 if vol_ratio >= 1.5 else 0))
             sc.confidence = min(sc.confidence, 88)
             sc.confidence_label = _label(sc.confidence)
             sc.horizon = "5m–15m (minutes)"
@@ -158,10 +156,8 @@ def classify_styles(mtf: dict, ctx: dict, frame: dict) -> dict:
 
     # ── Day (HTF bias + LTF trigger + structure) ─────────────────────────
     dy = styles["Day"]
-    if (
-        (htf_dir
-        and score >= 20)
-        or (htf_dir and event in ("bos_up", "choch_up", "bos_down", "choch_down"))
+    if (htf_dir and score >= 20) or (
+        htf_dir and event in ("bos_up", "choch_up", "bos_down", "choch_down")
     ):
         if htf_dir:
             dy.available = True
@@ -185,20 +181,16 @@ def classify_styles(mtf: dict, ctx: dict, frame: dict) -> dict:
     # ── Swing (HTF liquidity / discount / sweep) ─────────────────────────
     sw = styles["Swing"]
     bullish_setup = htf == "bullish" and (
-        pd_zone in ("discount", "equilibrium")
-        or (sweep and sweep.get("side") == "sellside")
+        pd_zone in ("discount", "equilibrium") or (sweep and sweep.get("side") == "sellside")
     )
     bearish_setup = htf == "bearish" and (
-        pd_zone in ("premium", "equilibrium")
-        or (sweep and sweep.get("side") == "buyside")
+        pd_zone in ("premium", "equilibrium") or (sweep and sweep.get("side") == "buyside")
     )
     if abs(score) >= 30 and (bullish_setup or bearish_setup):
         sw.available = True
         sw.direction = "BUY" if bullish_setup else "SELL"
         sw.confidence = int(
-            62
-            + min(25, abs(score) * 0.4)
-            + (12 if (sweep and sweep.get("recovered")) else 0)
+            62 + min(25, abs(score) * 0.4) + (12 if (sweep and sweep.get("recovered")) else 0)
         )
         sw.confidence = min(sw.confidence, 94)
         sw.confidence_label = _label(sw.confidence)
@@ -227,9 +219,7 @@ def classify_styles(mtf: dict, ctx: dict, frame: dict) -> dict:
     if adx >= 25 and vol_ratio >= 1.5 and trend_dir:
         mo.available = True
         mo.direction = trend_dir
-        mo.confidence = int(
-            58 + min(25, abs(score) * 0.35) + min(12, (vol_ratio - 1.5) * 8)
-        )
+        mo.confidence = int(58 + min(25, abs(score) * 0.35) + min(12, (vol_ratio - 1.5) * 8))
         mo.confidence = min(mo.confidence, 90)
         mo.confidence_label = _label(mo.confidence)
         mo.horizon = "1h–4h (trend)"
@@ -248,23 +238,14 @@ def classify_styles(mtf: dict, ctx: dict, frame: dict) -> dict:
     # ── Position (cycle + macro + deep value) ────────────────────────────
     po = styles["Position"]
     macro_ok = not macro_imminent
-    regime_ok = regime != "risk_off" or (
-        fng_val <= 25
-    )  # extreme fear can be contrarian value
+    regime_ok = regime != "risk_off" or (fng_val <= 25)  # extreme fear can be contrarian value
     cycle_ok = cycle_phase in ("early-post-halving", "expansion") or (
         cycle_phase == "pre-halving" and fng_val <= 30
     )
     deep_value = (htf == "bullish" and pd_zone == "discount" and fng_val <= 40) or (
         htf == "bearish" and pd_zone == "premium" and fng_val >= 65
     )
-    if (
-        htf_dir
-        and abs(score) >= 40
-        and cycle_ok
-        and deep_value
-        and macro_ok
-        and regime_ok
-    ):
+    if htf_dir and abs(score) >= 40 and cycle_ok and deep_value and macro_ok and regime_ok:
         po.available = True
         po.direction = htf_dir
         po.confidence = int(
@@ -297,9 +278,7 @@ def classify_styles(mtf: dict, ctx: dict, frame: dict) -> dict:
         if vol_ratio < 1.2:
             aside.append("volume is flat")
         if macro_imminent:
-            aside.append(
-                "high-impact macro event within 48h — traders often stand aside"
-            )
+            aside.append("high-impact macro event within 48h — traders often stand aside")
         if geo_elevated:
             aside.append("geopolitical headlines elevated")
 

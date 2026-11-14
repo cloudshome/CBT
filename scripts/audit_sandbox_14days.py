@@ -20,7 +20,6 @@ Permanent Constitutional Governance Invariant:
 
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
@@ -29,15 +28,12 @@ sys.path.insert(0, str(ROOT_DIR))
 
 from core.quantitative_validation import (
     REAL_CAPITAL_ENABLED,
-    Gate5State,
     QuantitativeGate5Auditor,
     generate_audit_manifest,
 )
 
 
-def evaluate_14day_burnin(
-    snapshots_dir: Path | None = None, db_path: Path | None = None
-) -> dict:
+def evaluate_14day_burnin(snapshots_dir: Path | None = None, db_path: Path | None = None) -> dict:
     """
     Evaluates trading records using the multi-layer quantitative evidence framework.
     Returns a comprehensive audit scorecard dictionary backwards-compatible with legacy callers.
@@ -92,7 +88,9 @@ def main():
     print(f"[*] Governance Invariant : REAL_CAPITAL_ENABLED = {audit['real_capital_enabled']}")
     print(f"[*] Days Observed        : {audit['days_observed']} / 14.0 days")
     print(f"[*] Total Trades Audited : {audit['shadow_closed_trades']}")
-    print(f"[*] Effective Sample N   : {audit['effective_sample_size']:.1f} (auto-correlation adjusted)")
+    print(
+        f"[*] Effective Sample N   : {audit['effective_sample_size']:.1f} (auto-correlation adjusted)"
+    )
     print(
         f"[*] Net Expectancy E[R]  : {audit['net_expectancy_r']:+.4f}R "
         f"(95% CI: [{audit['expectancy_95_ci'][0]:+.4f}R, {audit['expectancy_95_ci'][1]:+.4f}R])"
@@ -106,7 +104,9 @@ def main():
         f"[*] Max Peak-to-Trough DD: {audit['max_drawdown_pct']:.2f}% (Ceiling: 2.00%) | "
         f"Ulcer Index: {audit['ulcer_index']:.2f}"
     )
-    print(f"[*] Deflated Sharpe (DSR): {audit['deflated_sharpe_ratio']:.2f} (Confidence threshold: 0.80)")
+    print(
+        f"[*] Deflated Sharpe (DSR): {audit['deflated_sharpe_ratio']:.2f} (Confidence threshold: 0.80)"
+    )
 
     cost_stress = audit.get("cost_stress", {})
     if cost_stress:
@@ -130,7 +130,9 @@ def main():
                 print(f"    -> {rec}")
         sys.exit(1)
     else:
-        print(f"\n[SUCCESS] Strategy meets institutional criteria for state: {audit['gate_5_verdict']}.")
+        print(
+            f"\n[SUCCESS] Strategy meets institutional criteria for state: {audit['gate_5_verdict']}."
+        )
         sys.exit(0)
 
 

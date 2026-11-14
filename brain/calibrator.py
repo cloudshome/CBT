@@ -83,9 +83,7 @@ def _key_source(key: str, entry: dict | None = None) -> str:
     return _source_key(*_parse_source_key(key.partition(KEY_SEP)[2]))
 
 
-def compute_expectancy_by_type(
-    db: SignalDB, horizons: list[float] | None = None
-) -> dict:
+def compute_expectancy_by_type(db: SignalDB, horizons: list[float] | None = None) -> dict:
     """Expectancy (average R) per plan type from backtests + paper outcomes."""
     # Historical walk-forward grades and live-market paper outcomes are both
     # useful evidence, but remain separate tables so the dashboard can show
@@ -184,9 +182,7 @@ def _decided_by_key(db: SignalDB) -> dict:
             "paper_samples": r["paper_samples"] or 0,
             "win_rate": round(wins / decided, 3) if decided else None,
             "expectancy": round(r["avg_rr"] or 0.0, 3),
-            "avg_win_rr": round(r["avg_win_rr"], 3)
-            if r["avg_win_rr"] is not None
-            else None,
+            "avg_win_rr": round(r["avg_win_rr"], 3) if r["avg_win_rr"] is not None else None,
         }
     return out
 
@@ -268,9 +264,7 @@ def build_profile(
                 rows,
                 plan_type=plan_type,
                 regime=(regime or None),
-                setup_rows=setup_rows_by_type.get(
-                    profile_key(plan_type, "", src), rows
-                ),
+                setup_rows=setup_rows_by_type.get(profile_key(plan_type, "", src), rows),
                 min_decided=min_decided,
                 criteria=criteria,
                 step=step,
@@ -310,9 +304,7 @@ def build_profile(
             "source_key": src,
             "research_only": research_only,
             "expectancy": exp,
-            "expectancy_net": (
-                score_block.get("expectancy_net") if score_block else None
-            ),
+            "expectancy_net": (score_block.get("expectancy_net") if score_block else None),
             "samples": n,
             "backtest_samples": st["backtest_samples"],
             "paper_samples": st["paper_samples"],
@@ -324,16 +316,12 @@ def build_profile(
             # regime-fit × execution) + its band and per-component block.
             "strategy_score": score_val,
             "strategy_band": (score_block.get("band") if score_block else None),
-            "strategy_components": (
-                score_block.get("components") if score_block else None
-            ),
+            "strategy_components": (score_block.get("components") if score_block else None),
         }
     return profile
 
 
-def suggest_tp_rr_by_type(
-    profile: dict, regime: str = "", source_key: str = ""
-) -> dict:
+def suggest_tp_rr_by_type(profile: dict, regime: str = "", source_key: str = "") -> dict:
     """Map plan_type -> suggested TP distance in R from the profile (A2).
 
     When a regime is given, regime-specific entries win; otherwise the best-
@@ -426,9 +414,7 @@ def describe(profile: dict) -> str:
             tag = ""
         score = e.get("strategy_score")
         band = e.get("strategy_band")
-        score_bits = (
-            f"score {score:.0f}/100 {band}" if score is not None else "score n/a"
-        )
+        score_bits = f"score {score:.0f}/100 {band}" if score is not None else "score n/a"
         if e["filtered"]:
             lines.append(
                 f"  {proven} {pt:<24} FILTERED (E {e['expectancy']:+.2f}R, "

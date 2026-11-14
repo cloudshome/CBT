@@ -87,8 +87,12 @@ def evaluate_m43_r_obligations() -> dict:
     # OBL-1: Spatial Arbitrage Discovery & Spread Mathematical Rigor
     # --------------------------------------------------------------------------
     logger.info("Evaluating OBL-1: Spatial Arbitrage Discovery & Spread Mathematical Rigor...")
-    v1 = _build_snapshot("binance", VenueType.CEX_SPOT, best_bid=87980.0, best_ask=88000.0, fee_bps=5.0)
-    v2 = _build_snapshot("bybit", VenueType.CEX_PERPETUAL, best_bid=88300.0, best_ask=88320.0, fee_bps=5.0)
+    v1 = _build_snapshot(
+        "binance", VenueType.CEX_SPOT, best_bid=87980.0, best_ask=88000.0, fee_bps=5.0
+    )
+    v2 = _build_snapshot(
+        "bybit", VenueType.CEX_PERPETUAL, best_bid=88300.0, best_ask=88320.0, fee_bps=5.0
+    )
 
     opps = cross_venue_sentinel.detect_spatial_arbitrage(
         symbol="BTC/USDT",
@@ -122,18 +126,76 @@ def evaluate_m43_r_obligations() -> dict:
     # --------------------------------------------------------------------------
     logger.info("Evaluating OBL-2: Negative-Weight Cycle Detection Determinism...")
     profitable_edges = [
-        RateEdge("USDT", "BTC", "binance", VenueType.CEX_SPOT, rate=1.0 / 88000.0, fee_bps=5.0, latency_ms=15.0, depth_available=100000.0),
-        RateEdge("BTC", "ETH", "binance", VenueType.CEX_SPOT, rate=32.5, fee_bps=5.0, latency_ms=15.0, depth_available=100000.0),
-        RateEdge("ETH", "USDT", "bybit", VenueType.CEX_PERPETUAL, rate=2750.0, fee_bps=5.0, latency_ms=20.0, depth_available=100000.0),
+        RateEdge(
+            "USDT",
+            "BTC",
+            "binance",
+            VenueType.CEX_SPOT,
+            rate=1.0 / 88000.0,
+            fee_bps=5.0,
+            latency_ms=15.0,
+            depth_available=100000.0,
+        ),
+        RateEdge(
+            "BTC",
+            "ETH",
+            "binance",
+            VenueType.CEX_SPOT,
+            rate=32.5,
+            fee_bps=5.0,
+            latency_ms=15.0,
+            depth_available=100000.0,
+        ),
+        RateEdge(
+            "ETH",
+            "USDT",
+            "bybit",
+            VenueType.CEX_PERPETUAL,
+            rate=2750.0,
+            fee_bps=5.0,
+            latency_ms=20.0,
+            depth_available=100000.0,
+        ),
     ]
     unprofitable_edges = [
-        RateEdge("USDT", "BTC", "binance", VenueType.CEX_SPOT, rate=1.0 / 88000.0, fee_bps=10.0, latency_ms=15.0, depth_available=100000.0),
-        RateEdge("BTC", "ETH", "binance", VenueType.CEX_SPOT, rate=31.8, fee_bps=10.0, latency_ms=15.0, depth_available=100000.0),
-        RateEdge("ETH", "USDT", "bybit", VenueType.CEX_PERPETUAL, rate=2760.0, fee_bps=10.0, latency_ms=20.0, depth_available=100000.0),
+        RateEdge(
+            "USDT",
+            "BTC",
+            "binance",
+            VenueType.CEX_SPOT,
+            rate=1.0 / 88000.0,
+            fee_bps=10.0,
+            latency_ms=15.0,
+            depth_available=100000.0,
+        ),
+        RateEdge(
+            "BTC",
+            "ETH",
+            "binance",
+            VenueType.CEX_SPOT,
+            rate=31.8,
+            fee_bps=10.0,
+            latency_ms=15.0,
+            depth_available=100000.0,
+        ),
+        RateEdge(
+            "ETH",
+            "USDT",
+            "bybit",
+            VenueType.CEX_PERPETUAL,
+            rate=2760.0,
+            fee_bps=10.0,
+            latency_ms=20.0,
+            depth_available=100000.0,
+        ),
     ]
 
-    cycles_prof = triangular_arbitrage_engine.find_arbitrage_cycles(profitable_edges, source_currency="USDT")
-    cycles_unprof = triangular_arbitrage_engine.find_arbitrage_cycles(unprofitable_edges, source_currency="USDT")
+    cycles_prof = triangular_arbitrage_engine.find_arbitrage_cycles(
+        profitable_edges, source_currency="USDT"
+    )
+    cycles_unprof = triangular_arbitrage_engine.find_arbitrage_cycles(
+        unprofitable_edges, source_currency="USDT"
+    )
 
     obl2_passed = (
         len(cycles_prof) >= 1
@@ -148,8 +210,12 @@ def evaluate_m43_r_obligations() -> dict:
         "passed": obl2_passed,
         "details": {
             "profitable_cycles_found": len(cycles_prof),
-            "profitable_cycle_gross_bps": round(cycles_prof[0].gross_spread_bps, 2) if cycles_prof else 0.0,
-            "profitable_cycle_net_bps": round(cycles_prof[0].net_spread_bps, 2) if cycles_prof else 0.0,
+            "profitable_cycle_gross_bps": round(cycles_prof[0].gross_spread_bps, 2)
+            if cycles_prof
+            else 0.0,
+            "profitable_cycle_net_bps": round(cycles_prof[0].net_spread_bps, 2)
+            if cycles_prof
+            else 0.0,
             "unprofitable_cycles_count": len(cycles_unprof),
         },
     }
@@ -158,8 +224,12 @@ def evaluate_m43_r_obligations() -> dict:
     # OBL-3: Convex Slicing & Hybrid CEX-DEX CLMM Allocation
     # --------------------------------------------------------------------------
     logger.info("Evaluating OBL-3: Convex Slicing & Hybrid CEX-DEX CLMM Allocation...")
-    v_cex = _build_snapshot("binance", VenueType.CEX_SPOT, best_bid=88000.0, best_ask=88080.0, fee_bps=7.5)
-    v_dex = _build_snapshot("uniswap_v3", VenueType.DEX_CLMM, best_bid=88010.0, best_ask=88075.0, fee_bps=5.0)
+    v_cex = _build_snapshot(
+        "binance", VenueType.CEX_SPOT, best_bid=88000.0, best_ask=88080.0, fee_bps=7.5
+    )
+    v_dex = _build_snapshot(
+        "uniswap_v3", VenueType.DEX_CLMM, best_bid=88010.0, best_ask=88075.0, fee_bps=5.0
+    )
 
     plan = optimal_router.generate_execution_plan(
         symbol="BTC/USDT",
@@ -270,8 +340,30 @@ def evaluate_m43_r_obligations() -> dict:
         opportunity_id="opp_bad_slippage_m43_r",
         arb_type=ArbitrageType.SPATIAL_TWO_WAY,
         legs=[
-            ArbitrageLeg("l1", "binance", VenueType.CEX_SPOT, "BUY", "BTC/USDT", 88000.0, 0.1, 5.0, 10.0, slippage_bps=2.0),
-            ArbitrageLeg("l2", "bybit", VenueType.CEX_PERPETUAL, "SELL", "BTC/USDT", 88200.0, 0.1, 5.0, 10.0, slippage_bps=22.5),
+            ArbitrageLeg(
+                "l1",
+                "binance",
+                VenueType.CEX_SPOT,
+                "BUY",
+                "BTC/USDT",
+                88000.0,
+                0.1,
+                5.0,
+                10.0,
+                slippage_bps=2.0,
+            ),
+            ArbitrageLeg(
+                "l2",
+                "bybit",
+                VenueType.CEX_PERPETUAL,
+                "SELL",
+                "BTC/USDT",
+                88200.0,
+                0.1,
+                5.0,
+                10.0,
+                slippage_bps=22.5,
+            ),
         ],
         gross_spread_bps=25.0,
         net_spread_bps=15.0,
@@ -319,7 +411,10 @@ def evaluate_m43_r_obligations() -> dict:
     obl7_passed = (
         res_malformed.is_approved is False
         and res_malformed.allocated_notional_usd == 0.0
-        and ("Invalid" in str(res_malformed.rejection_reason) or "empty" in str(res_malformed.rejection_reason))
+        and (
+            "Invalid" in str(res_malformed.rejection_reason)
+            or "empty" in str(res_malformed.rejection_reason)
+        )
     )
 
     results["OBL-7"] = {
@@ -336,15 +431,18 @@ def evaluate_m43_r_obligations() -> dict:
     # --------------------------------------------------------------------------
     # OBL-8: Permanent Capital Firewall & Milestone 18 Surface Area Isolation
     # --------------------------------------------------------------------------
-    logger.info("Evaluating OBL-8: Permanent Capital Firewall & Milestone 18 Surface Area Isolation...")
-    capital_isolated = (cross_venue_sentinel.real_capital_enabled is False)
-    
+    logger.info(
+        "Evaluating OBL-8: Permanent Capital Firewall & Milestone 18 Surface Area Isolation..."
+    )
+    capital_isolated = cross_venue_sentinel.real_capital_enabled is False
+
     from core.governance.architecture_registry import (
         ArchitectureLayer,
         ModuleAuthority,
         resolve_module_authority,
         resolve_module_layer,
     )
+
     layer = resolve_module_layer("core.execution.cross_venue")
     authority = resolve_module_authority("core.execution.cross_venue")
     authority_clean = (
@@ -357,7 +455,9 @@ def evaluate_m43_r_obligations() -> dict:
         capture_output=True,
         text=True,
     )
-    m18_intact = (m18_proc.returncode == 0 and "M18 Production Pass remains ACTIVE" in m18_proc.stdout)
+    m18_intact = (
+        m18_proc.returncode == 0 and "M18 Production Pass remains ACTIVE" in m18_proc.stdout
+    )
 
     obl8_passed = capital_isolated and authority_clean and m18_intact
 
@@ -378,9 +478,9 @@ def evaluate_m43_r_obligations() -> dict:
 def main() -> int:
     start_time = time.time()
     logger.info("Starting Milestone 43-R Institutional Qualification Suite...")
-    
+
     results = evaluate_m43_r_obligations()
-    
+
     all_passed = all(obl["passed"] for obl in results.values())
     passed_count = sum(1 for obl in results.values() if obl["passed"])
     total_count = len(results)
@@ -423,12 +523,18 @@ def main() -> int:
         f.write("\n---\n\n")
         f.write("## 2. Invariant & Boundary Sign-Off\n\n")
         f.write("- **Simulation Isolation:** `REAL_CAPITAL_ENABLED = False` strictly enforced.\n")
-        f.write("- **Milestone 18 Surface Area:** Certified commit ancestor check and SHA-256 test identities verified untouched.\n")
-        f.write("- **Architecture Contract:** Registered in Layer 2 with `SIMULATION_RESEARCH_ONLY` authority.\n\n")
+        f.write(
+            "- **Milestone 18 Surface Area:** Certified commit ancestor check and SHA-256 test identities verified untouched.\n"
+        )
+        f.write(
+            "- **Architecture Contract:** Registered in Layer 2 with `SIMULATION_RESEARCH_ONLY` authority.\n\n"
+        )
     logger.info("Saved qualification dossier to %s", dossier_file)
 
     print("\n" + "=" * 65)
-    print(f"SKY MILESTONE 43-R QUALIFICATION RESULT: {'QUALIFIED [PASS]' if all_passed else 'REJECTED [FAIL]'}")
+    print(
+        f"SKY MILESTONE 43-R QUALIFICATION RESULT: {'QUALIFIED [PASS]' if all_passed else 'REJECTED [FAIL]'}"
+    )
     print(f"Passed: {passed_count}/{total_count} Obligations (Elapsed: {elapsed:.2f}s)")
     print("=" * 65)
 

@@ -151,7 +151,11 @@ Description: Crypto Brain Terminal quantitative paper trading & desk platform
         # Linux unpacked files
         for root, dirs, files in os.walk(LINUX_UNPACKED):
             rel_dir = os.path.relpath(root, LINUX_UNPACKED)
-            dest_dir = "./opt/Crypto Brain Terminal" if rel_dir == "." else f"./opt/Crypto Brain Terminal/{rel_dir.replace(os.sep, '/')}"
+            dest_dir = (
+                "./opt/Crypto Brain Terminal"
+                if rel_dir == "."
+                else f"./opt/Crypto Brain Terminal/{rel_dir.replace(os.sep, '/')}"
+            )
             for d in dirs:
                 sub_dir = f"{dest_dir}/{d}"
                 ti = tarfile.TarInfo(sub_dir)

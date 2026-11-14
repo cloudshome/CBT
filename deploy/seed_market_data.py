@@ -30,7 +30,9 @@ def seed_market_data(symbols=None, timeframes=None, candle_count: int = 200) -> 
     timeframes = timeframes or DEFAULT_TIMEFRAMES
     total_seeded = 0
 
-    logger.info(f"Seeding market data for {len(symbols)} symbols across {len(timeframes)} timeframes...")
+    logger.info(
+        f"Seeding market data for {len(symbols)} symbols across {len(timeframes)} timeframes..."
+    )
 
     for symbol in symbols:
         for tf in timeframes:

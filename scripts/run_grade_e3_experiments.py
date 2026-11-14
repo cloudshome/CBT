@@ -36,7 +36,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from core.research.grade_e3.contracts import (  # noqa: E402
+from core.research.grade_e3.contracts import (
     CancelLatencyConfig,
     FidelityAuditReport,
     L2OrderSide,
@@ -44,9 +44,9 @@ from core.research.grade_e3.contracts import (  # noqa: E402
     QueueModelType,
     TamperEvidentEvidenceBundle,
 )
-from core.research.grade_e3.dataset_ingestor import L2DatasetIngestor  # noqa: E402
-from core.research.grade_e3.l2_book_builder import DeterministicL2BookBuilder  # noqa: E402
-from core.research.grade_e3.l2_queue_engine import L2QueueMatchingEngine  # noqa: E402
+from core.research.grade_e3.dataset_ingestor import L2DatasetIngestor
+from core.research.grade_e3.l2_book_builder import DeterministicL2BookBuilder
+from core.research.grade_e3.l2_queue_engine import L2QueueMatchingEngine
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("sky.research.grade_e3.runner")

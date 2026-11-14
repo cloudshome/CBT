@@ -125,7 +125,11 @@ def evaluate_blocker_matrix(
                 "passed": gates.get("G-06", False),
                 "evidence": {
                     "verifier": "PowerShell Get-AuthenticodeSignature",
-                    "binaries_signed": ["CTB_Setup_v4.0.0.exe", "Crypto Brain Terminal 4.0.0.exe", "ctb.exe"],
+                    "binaries_signed": [
+                        "CTB_Setup_v4.0.0.exe",
+                        "Crypto Brain Terminal 4.0.0.exe",
+                        "ctb.exe",
+                    ],
                     "status_code": "PASS",
                 },
             },
@@ -143,7 +147,13 @@ def evaluate_blocker_matrix(
                 "passed": gates.get("G-08", False),
                 "evidence": {
                     "quorum_threshold": "2-of-3 Byzantine Consensus",
-                    "monitored_chains": ["Ethereum", "Arbitrum", "BinanceSmartChain", "Polygon", "Solana"],
+                    "monitored_chains": [
+                        "Ethereum",
+                        "Arbitrum",
+                        "BinanceSmartChain",
+                        "Polygon",
+                        "Solana",
+                    ],
                     "max_block_staleness_sec": 30.0,
                 },
             },
@@ -379,7 +389,13 @@ def main() -> None:
 
     # G-17: Milestone 31-R Strategy Evidence Hardening & Statistical Qualification Gate
     m31_test_ok = run_step(
-        [py_exe, "-m", "pytest", "tests/intelligence/test_milestone31_r_evidence_hardening.py", "-q"],
+        [
+            py_exe,
+            "-m",
+            "pytest",
+            "tests/intelligence/test_milestone31_r_evidence_hardening.py",
+            "-q",
+        ],
         "G-17: Milestone 31-R Evidence Ledger & Strategy Qualification Gate",
     )
     m31_decision_file = REPO_ROOT / "docs" / "research" / "M31_R_DECISION.json"
@@ -408,7 +424,9 @@ def main() -> None:
         "G-18: Milestone 32-R 336h Autonomous Testnet Burn-In Proof Obligations",
     )
     m32_dossier_file = REPO_ROOT / "docs" / "execution" / "M32_R_BURN_IN_DOSSIER.md"
-    m32_qualified = m32_dossier_file.exists() and "QUALIFIED" in m32_dossier_file.read_text(encoding="utf-8")
+    m32_qualified = m32_dossier_file.exists() and "QUALIFIED" in m32_dossier_file.read_text(
+        encoding="utf-8"
+    )
     gates["G-18"] = m32_test_ok and m32_qualified
 
     # G-19: Milestone 33 Synthetic Basis Dispersion Engine & Leg-Risk Fail-Safe Router
@@ -429,7 +447,9 @@ def main() -> None:
         or (RELEASE_DIR / "HUMAN_APPROVAL.json").exists()
     )
     if not human_approved:
-        log("G-21: WAITING — Set RELEASE_APPROVED=true or place release/HUMAN_APPROVAL.json to proceed.")
+        log(
+            "G-21: WAITING — Set RELEASE_APPROVED=true or place release/HUMAN_APPROVAL.json to proceed."
+        )
     gates["G-21"] = human_approved
 
     # G-14: Secret Leakage Audit
@@ -445,9 +465,13 @@ def main() -> None:
         print("[PASS] G-14: Zero credentials or private keys detected.")
 
     # G-15: Clean Production Builds (Frontend + Electron TS + Standalone Python Backend)
-    frontend_ok = run_step(["npm", "run", "build"], "Compiling Frontend", cwd=REPO_ROOT / "frontend")
+    frontend_ok = run_step(
+        ["npm", "run", "build"], "Compiling Frontend", cwd=REPO_ROOT / "frontend"
+    )
     electron_ts = REPO_ROOT / "electron" / "tsconfig.json"
-    electron_ok = run_step(["npx", "tsc", "-p", str(electron_ts)], "Compiling Electron Supervisor TypeScript")
+    electron_ok = run_step(
+        ["npx", "tsc", "-p", str(electron_ts)], "Compiling Electron Supervisor TypeScript"
+    )
 
     # Compile Standalone Python Backend Binary via PyInstaller
     log("Compiling Standalone Python Backend (bin/cbt_backend.exe)...")
@@ -490,12 +514,16 @@ def main() -> None:
         "uvicorn.lifespan.on",
         "cbt_backend.py",
     ]
-    pyinstaller_ok = run_step(pyinstaller_cmd, "Compiling Standalone Python Backend via PyInstaller")
+    pyinstaller_ok = run_step(
+        pyinstaller_cmd, "Compiling Standalone Python Backend via PyInstaller"
+    )
     gates["G-15"] = frontend_ok and electron_ok and pyinstaller_ok
 
     # G-16: Packaging Native Windows Binaries
     log("G-16: Executing electron-builder packaging...")
-    builder_res = subprocess.run(["npx", "electron-builder", "--win", "--x64"], shell=(os.name == "nt"))
+    builder_res = subprocess.run(
+        ["npx", "electron-builder", "--win", "--x64"], shell=(os.name == "nt")
+    )
     if builder_res.returncode != 0:
         print(f"[WARN] electron-builder returned non-zero code ({builder_res.returncode})")
 
@@ -525,14 +553,18 @@ def main() -> None:
     checksums = {}
     try:
         from scripts.generate_release_checksums import generate_checksums
+
         checksums = generate_checksums()
     except Exception as e:
         log(f"[FAIL] Checksum generation error: {e}")
         import traceback
+
         traceback.print_exc()
 
     # Installer Verification
-    installer_ok = run_step([py_exe, "scripts/verify_installer.py"], "G-16: Installer Lab Verification")
+    installer_ok = run_step(
+        [py_exe, "scripts/verify_installer.py"], "G-16: Installer Lab Verification"
+    )
     gates["G-16"] = installer_ok and (RELEASE_DIR.exists() and len(checksums) > 0)
 
     # Compile 21-Point Blocker Matrix Report

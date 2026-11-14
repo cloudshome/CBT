@@ -42,7 +42,9 @@ def find_python313() -> Path | None:
     return None
 
 
-def run_cmd(cmd: list[str], check: bool = True, cwd: Path = PROJECT_ROOT) -> subprocess.CompletedProcess:
+def run_cmd(
+    cmd: list[str], check: bool = True, cwd: Path = PROJECT_ROOT
+) -> subprocess.CompletedProcess:
     """Executes a command and echoes output."""
     print(f"[*] Executing: {' '.join(str(c) for c in cmd)}")
     res = subprocess.run(cmd, cwd=cwd, text=True, capture_output=True)
@@ -90,7 +92,9 @@ def main() -> int:
     )
     res = subprocess.run([str(venv_py), "-c", check_code], text=True, capture_output=True)
     if res.returncode != 0:
-        print("[!] Dependencies missing or ABI mismatch in .venv-m18-verify. Synchronizing packages...")
+        print(
+            "[!] Dependencies missing or ABI mismatch in .venv-m18-verify. Synchronizing packages..."
+        )
         # Populate site-packages from existing .venv or install requirements
         orig_site = PROJECT_ROOT / ".venv" / "lib" / "python3.13" / "site-packages"
         target_site = TARGET_VENV / "lib" / "python3.13" / "site-packages"

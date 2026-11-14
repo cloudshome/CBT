@@ -30,15 +30,12 @@ from __future__ import annotations
 import json
 import logging
 import math
+import sys
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 import pandas as pd
-
-import sys
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 if str(ROOT_DIR) not in sys.path:
@@ -52,6 +49,7 @@ logger = logging.getLogger("historical_discovery")
 # ------------------------------------------------------------------------------
 # Data Structures
 # ------------------------------------------------------------------------------
+
 
 @dataclass
 class TradeOutcome:
@@ -101,9 +99,11 @@ class StrategyMetrics:
 # Data Loading & Indicators
 # ------------------------------------------------------------------------------
 
+
 def load_parquet_dataset(symbol: str, timeframe: str) -> pd.DataFrame:
     """Loads all monthly partition files for a symbol and timeframe from the Parquet store."""
     from data.store import CandleStore
+
     store = CandleStore()
     df = store.read("binance", "perp", symbol, timeframe)
     if df.empty:
@@ -183,7 +183,10 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
 # Synthetic Kronos Exogenous Predictor (Point-in-Time Causal)
 # ------------------------------------------------------------------------------
 
-def compute_causal_kronos_features(df: pd.DataFrame, horizon: int = 12) -> tuple[np.ndarray, np.ndarray]:
+
+def compute_causal_kronos_features(
+    df: pd.DataFrame, horizon: int = 12
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Computes point-in-time causal directional probability and uncertainty.
     Uses rolling multi-horizon momentum, volatility ratio, and mean-reversion drift
@@ -224,6 +227,7 @@ def compute_causal_kronos_features(df: pd.DataFrame, horizon: int = 12) -> tuple
 # ------------------------------------------------------------------------------
 # Strategy Evaluator & Setup Detectors
 # ------------------------------------------------------------------------------
+
 
 class HistoricalStrategyEvaluator:
     """Replays candles and evaluates discrete setups with causal execution."""
@@ -278,7 +282,11 @@ class HistoricalStrategyEvaluator:
                 prior_sh = sh[i - 1]
                 prior_sl = sl_levels[i - 1]
                 # Bearish Sweep of Swing High: High pierced prior swing high, but Close closed below it
-                if h[i] > prior_sh and c[i] < prior_sh and (h[i] - max(o[i], c[i])) >= 0.25 * (h[i] - l[i]):
+                if (
+                    h[i] > prior_sh
+                    and c[i] < prior_sh
+                    and (h[i] - max(o[i], c[i])) >= 0.25 * (h[i] - l[i])
+                ):
                     signal_dir = "SHORT"
                     entry_p = c[i]
                     stop_p = h[i] + 0.1 * cur_atr
@@ -287,7 +295,11 @@ class HistoricalStrategyEvaluator:
                         tp_p = entry_p - (risk * target_rr)
 
                 # Bullish Sweep of Swing Low: Low pierced prior swing low, but Close closed above it
-                elif l[i] < prior_sl and c[i] > prior_sl and (min(o[i], c[i]) - l[i]) >= 0.25 * (h[i] - l[i]):
+                elif (
+                    l[i] < prior_sl
+                    and c[i] > prior_sl
+                    and (min(o[i], c[i]) - l[i]) >= 0.25 * (h[i] - l[i])
+                ):
                     signal_dir = "LONG"
                     entry_p = c[i]
                     stop_p = l[i] - 0.1 * cur_atr
@@ -302,7 +314,11 @@ class HistoricalStrategyEvaluator:
                 # Look for impulsive displacement bar followed by retest into order block
                 if i >= 3:
                     # Bullish OB: bar i-2 was down candle, bar i-1 was strong displacement up breaking swing high
-                    if c[i - 2] < o[i - 2] and (c[i - 1] - o[i - 1]) > 1.2 * atr[i - 1] and c[i - 1] > sh[i - 3]:
+                    if (
+                        c[i - 2] < o[i - 2]
+                        and (c[i - 1] - o[i - 1]) > 1.2 * atr[i - 1]
+                        and c[i - 1] > sh[i - 3]
+                    ):
                         ob_high = max(o[i - 2], c[i - 2])
                         ob_low = min(o[i - 2], c[i - 2])
                         # Current bar retesting OB
@@ -315,7 +331,11 @@ class HistoricalStrategyEvaluator:
                                 tp_p = entry_p + (risk * target_rr)
 
                     # Bearish OB
-                    elif c[i - 2] > o[i - 2] and (o[i - 1] - c[i - 1]) > 1.2 * atr[i - 1] and c[i - 1] < sl_levels[i - 3]:
+                    elif (
+                        c[i - 2] > o[i - 2]
+                        and (o[i - 1] - c[i - 1]) > 1.2 * atr[i - 1]
+                        and c[i - 1] < sl_levels[i - 3]
+                    ):
                         ob_high = max(o[i - 2], c[i - 2])
                         ob_low = min(o[i - 2], c[i - 2])
                         if h[i] >= ob_low and c[i] <= ob_high:
@@ -362,7 +382,13 @@ class HistoricalStrategyEvaluator:
                 ema50 = df.loc[i, "ema_50"]
                 ema200 = df.loc[i, "ema_200"]
                 # Bullish Pullback
-                if ema20 > ema50 and ema50 > ema200 and l[i] <= ema20 and c[i] > ema20 and c[i] > o[i]:
+                if (
+                    ema20 > ema50
+                    and ema50 > ema200
+                    and l[i] <= ema20
+                    and c[i] > ema20
+                    and c[i] > o[i]
+                ):
                     signal_dir = "LONG"
                     entry_p = c[i]
                     stop_p = min(l[i - 1], l[i]) - 0.1 * cur_atr
@@ -371,7 +397,13 @@ class HistoricalStrategyEvaluator:
                         tp_p = entry_p + (risk * target_rr)
 
                 # Bearish Pullback
-                elif ema20 < ema50 and ema50 < ema200 and h[i] >= ema20 and c[i] < ema20 and c[i] < o[i]:
+                elif (
+                    ema20 < ema50
+                    and ema50 < ema200
+                    and h[i] >= ema20
+                    and c[i] < ema20
+                    and c[i] < o[i]
+                ):
                     signal_dir = "SHORT"
                     entry_p = c[i]
                     stop_p = max(h[i - 1], h[i]) + 0.1 * cur_atr
@@ -502,7 +534,9 @@ class HistoricalStrategyEvaluator:
                         net_pnl_r_mixed=round(net_r_mixed, 3),
                         holding_bars=holding_bars,
                         market_regime=regimes[i],
-                        kronos_direction="BULLISH" if k_dir[i] == 1 else ("BEARISH" if k_dir[i] == -1 else "NEUTRAL"),
+                        kronos_direction="BULLISH"
+                        if k_dir[i] == 1
+                        else ("BEARISH" if k_dir[i] == -1 else "NEUTRAL"),
                         kronos_uncertainty=round(k_unc[i], 3),
                     )
                 )
@@ -519,6 +553,7 @@ class HistoricalStrategyEvaluator:
 # ------------------------------------------------------------------------------
 # Performance Aggregation & Statistics
 # ------------------------------------------------------------------------------
+
 
 def compute_metrics_for_trades(trades: list[TradeOutcome], model: str = "taker") -> StrategyMetrics:
     if not trades:
@@ -553,7 +588,9 @@ def compute_metrics_for_trades(trades: list[TradeOutcome], model: str = "taker")
         return round(float(pos / neg), 2) if neg > 0 else (99.0 if pos > 0 else 0.0)
 
     # Max Drawdown in R
-    active_series = net_mixed if model == "mixed" else (net_maker if model == "maker" else net_taker)
+    active_series = (
+        net_mixed if model == "mixed" else (net_maker if model == "maker" else net_taker)
+    )
     cum = np.cumsum(active_series)
     peak = np.maximum.accumulate(cum)
     dd = peak - cum
@@ -575,7 +612,9 @@ def compute_metrics_for_trades(trades: list[TradeOutcome], model: str = "taker")
         profit_factor_mixed=calc_pf(net_mixed),
         max_drawdown_r=round(max_dd, 2),
         sharpe_ratio=round(sharpe, 2),
-        cost_to_edge_ratio_taker=round(float(abs(np.mean(gross_r - net_taker)) / (abs(np.mean(gross_r)) + 1e-6)), 2),
+        cost_to_edge_ratio_taker=round(
+            float(abs(np.mean(gross_r - net_taker)) / (abs(np.mean(gross_r)) + 1e-6)), 2
+        ),
         directional_accuracy_pct=round(win_rate, 2),
     )
 
@@ -583,6 +622,7 @@ def compute_metrics_for_trades(trades: list[TradeOutcome], model: str = "taker")
 # ------------------------------------------------------------------------------
 # Main Discovery Matrix Execution
 # ------------------------------------------------------------------------------
+
 
 def run_discovery():
     logger.info("Initializing Historical Edge Discovery Matrix...")
@@ -608,7 +648,9 @@ def run_discovery():
         logger.info(f"Loading {symbol} {tf} Parquet dataset...")
         df = load_parquet_dataset(symbol, tf)
         df = compute_indicators(df)
-        logger.info(f"Loaded {len(df)} bars from {df['datetime_utc'].iloc[0]} to {df['datetime_utc'].iloc[-1]}.")
+        logger.info(
+            f"Loaded {len(df)} bars from {df['datetime_utc'].iloc[0]} to {df['datetime_utc'].iloc[-1]}."
+        )
         k_dir, k_unc = compute_causal_kronos_features(df)
 
         evaluator = HistoricalStrategyEvaluator(df, symbol, tf)
@@ -629,10 +671,14 @@ def run_discovery():
             trades_base = evaluator.run_strategy_sweep(strat, k_dir, k_unc, kronos_mode="OFF")
 
             # 2. Combined C: Strategy + Kronos Fusion
-            trades_fusion = evaluator.run_strategy_sweep(strat, k_dir, k_unc, kronos_mode="FILTER_AGREEMENT")
+            trades_fusion = evaluator.run_strategy_sweep(
+                strat, k_dir, k_unc, kronos_mode="FILTER_AGREEMENT"
+            )
 
             # 3. Control D: Strategy + Randomized Kronos
-            trades_control = evaluator.run_strategy_sweep(strat, k_dir, k_unc, kronos_mode="RANDOM_CONTROL")
+            trades_control = evaluator.run_strategy_sweep(
+                strat, k_dir, k_unc, kronos_mode="RANDOM_CONTROL"
+            )
 
             master_trade_ledger.extend(trades_fusion)
 
@@ -656,7 +702,9 @@ def run_discovery():
                     "baseline_sky": asdict(m_base),
                     "kronos_fusion": asdict(m_fusion),
                     "random_control": asdict(m_control),
-                    "delta_expectancy_maker_r": round(m_fusion.net_expectancy_maker_r - m_base.net_expectancy_maker_r, 3),
+                    "delta_expectancy_maker_r": round(
+                        m_fusion.net_expectancy_maker_r - m_base.net_expectancy_maker_r, 3
+                    ),
                     "delta_win_rate_pct": round(m_fusion.win_rate_pct - m_base.win_rate_pct, 2),
                     "delta_drawdown_r": round(m_fusion.max_drawdown_r - m_base.max_drawdown_r, 2),
                 }
@@ -669,7 +717,9 @@ def run_discovery():
     with open(results_file, "w", encoding="utf-8") as f:
         json.dump(all_results, f, indent=2)
 
-    logger.info(f"Historical edge discovery completed. {len(all_results)} experiment evaluations saved to {results_file}.")
+    logger.info(
+        f"Historical edge discovery completed. {len(all_results)} experiment evaluations saved to {results_file}."
+    )
     return all_results, master_trade_ledger
 
 

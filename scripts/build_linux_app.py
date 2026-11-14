@@ -48,7 +48,7 @@ def compute_release_checksums() -> dict[str, str]:
     """Generates SHA-256 checksums for all Linux packages in release/."""
     RELEASE_DIR.mkdir(parents=True, exist_ok=True)
     checksums: dict[str, str] = {}
-    
+
     for f in RELEASE_DIR.iterdir():
         if f.is_file() and f.suffix.lower() in (".appimage", ".deb", ".tar.gz"):
             hasher = hashlib.sha256()
@@ -98,9 +98,13 @@ def main() -> None:
     run_step([py_exe, "scripts/generate_app_icons.py"], "Compiling High-Resolution App Icons")
 
     # 4. Clean Production Builds (Frontend + Electron TS + Standalone Python Backend)
-    frontend_ok = run_step(["npm", "run", "build"], "Compiling Frontend PWA Bundle", cwd=REPO_ROOT / "frontend")
+    frontend_ok = run_step(
+        ["npm", "run", "build"], "Compiling Frontend PWA Bundle", cwd=REPO_ROOT / "frontend"
+    )
     electron_ts = REPO_ROOT / "electron" / "tsconfig.json"
-    electron_ok = run_step(["npx", "tsc", "-p", str(electron_ts)], "Compiling Electron Supervisor TypeScript")
+    electron_ok = run_step(
+        ["npx", "tsc", "-p", str(electron_ts)], "Compiling Electron Supervisor TypeScript"
+    )
 
     # Compile Standalone Python Backend Binary via PyInstaller
     log("Compiling Standalone Python Backend (bin/cbt_backend)...")
@@ -143,21 +147,25 @@ def main() -> None:
         "uvicorn.lifespan.on",
         "cbt_backend.py",
     ]
-    pyinstaller_ok = run_step(pyinstaller_cmd, "Compiling Standalone Python Backend via PyInstaller")
+    pyinstaller_ok = run_step(
+        pyinstaller_cmd, "Compiling Standalone Python Backend via PyInstaller"
+    )
     gates["G-15_clean_production_builds"] = frontend_ok and electron_ok and pyinstaller_ok
 
     # 5. Packaging Linux Binaries (tar.gz, deb, AppImage)
     log("G-16: Executing Linux packaging (tar.gz + DEB)...")
     deb_file = RELEASE_DIR / "ctb_4.0.0_amd64.deb"
     tar_file = RELEASE_DIR / "Crypto_Brain_Terminal_v4.0.0.tar.gz"
-    
+
     # Try electron-builder native targets
-    builder_res = subprocess.run(["npx", "electron-builder", "--linux", "tar.gz", "--x64"], shell=True)
-    
+    builder_res = subprocess.run(
+        ["npx", "electron-builder", "--linux", "tar.gz", "--x64"], shell=True
+    )
+
     # Build Debian package via Python DEB builder
     deb_script = REPO_ROOT / "scripts" / "build_deb_package.py"
     deb_res = subprocess.run([py_exe, str(deb_script)])
-    
+
     packaging_ok = (deb_file.exists() and deb_file.stat().st_size > 10 * 1024 * 1024) or (
         tar_file.exists() and tar_file.stat().st_size > 10 * 1024 * 1024
     )

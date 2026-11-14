@@ -15,7 +15,6 @@ import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import asdict
-from datetime import UTC, datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any
@@ -109,12 +108,7 @@ from core.execution import (
     smart_order_router,
 )
 from core.execution.live_routes import router as live_execution_router_api
-from core.execution.paper_routes import (
-    PaperCloseRequest,
-    PaperTradeRequest,
-    enforce_paper_risk_gate,
-    paper_router,
-)
+from core.execution.paper_routes import paper_router
 from core.execution.phase23_routes import router as phase23_execution_router
 from core.execution.sor_benchmarks import run_sor_microbenchmarks
 from core.execution.strategy_gateway.routes import router as strategy_gateway_router
@@ -162,7 +156,6 @@ from core.sandbox_lab import sandbox_lab
 from core.scenario_engine import scenario_engine
 from core.scenario_monitor import scenario_monitor
 from core.screener import screener_router
-from core.screener.opportunity_hunter import opportunity_hunter
 from core.sentiment_engine import sentiment_engine
 from core.setup_service import setup_router
 from core.shadow_burn_in_orchestrator import shadow_burn_in_orchestrator
@@ -284,18 +277,14 @@ async def lifespan_ctx(_app: FastAPI) -> AsyncIterator[None]:
         daemon_tasks = [
             asyncio.create_task(empirical_accumulator_loop()),
             asyncio.create_task(telegram_bot.start_polling()),
-            asyncio.create_task(
-                telegram_bot.start_continuous_broadcaster(interval_seconds=180)
-            ),
+            asyncio.create_task(telegram_bot.start_continuous_broadcaster(interval_seconds=180)),
             asyncio.create_task(autonomous_trader.start_loop()),
             asyncio.create_task(shadow_burn_in_orchestrator.start_loop()),
             asyncio.create_task(mastermind_arbiter.start_loop(interval_sec=60.0)),
             asyncio.create_task(cluster_sync_daemon.start()),
         ]
         if not trading_core_only:
-            daemon_tasks.append(
-                asyncio.create_task(research_automation_orchestrator.start_loop())
-            )
+            daemon_tasks.append(asyncio.create_task(research_automation_orchestrator.start_loop()))
             logger.info(
                 "AI Quant Sentinel FastAPI online with Autonomous Trader, Mastermind Swarm, "
                 "Burn-In Orchestrator, Telemetry Pipeline, Research Automation Orchestrator & Cluster Sync Daemon."
@@ -368,8 +357,7 @@ app.include_router(temporal_router)
 # CORS — fail closed in production: CORS_ORIGIN must be an explicit allowlist.
 _cors_origin = os.getenv("CORS_ORIGIN", "").strip()
 _is_production = any(
-    os.getenv(k, "").lower() in ("production", "prod")
-    for k in ("APP_ENV", "ENV", "NODE_ENV")
+    os.getenv(k, "").lower() in ("production", "prod") for k in ("APP_ENV", "ENV", "NODE_ENV")
 )
 if _is_production and (not _cors_origin or _cors_origin == "*"):
     raise RuntimeError(
@@ -829,14 +817,12 @@ async def telemetry_broadcaster_loop():
 
             now_ms = int(time.time() * 1000)
             open_symbols = [
-                p["symbol"]
-                for p in portfolio_shadow.get_open_positions()
-                if p.get("symbol")
+                p["symbol"] for p in portfolio_shadow.get_open_positions() if p.get("symbol")
             ]
             symbols_to_track = list(
                 dict.fromkeys(
-                    open_symbols
-                    + [
+                    [
+                        *open_symbols,
                         "BTC/USDT",
                         "ETH/USDT",
                         "SOL/USDT",
@@ -1705,9 +1691,6 @@ async def force_autonomous_trader_scan():
     }
 
 
-
-
-
 @app.post("/api/command/parse", dependencies=[Depends(require_api_key)])
 async def parse_trade_command(req: CommandParseRequest):
     result = command_executor.parse_and_execute(req.command_text)
@@ -2038,12 +2021,15 @@ async def ingest_research_text(req: ResearchIngestRequest):
     )
 
     # Link Persistence Invariant: Ensure link is permanently registered in Evidence OS
-    target_url = req.source_uri or (req.content.strip() if req.content.strip().startswith(("http://", "https://")) else None)
+    target_url = req.source_uri or (
+        req.content.strip() if req.content.strip().startswith(("http://", "https://")) else None
+    )
     if target_url:
         try:
             from core.knowledge_os.universal_ingestor import (
                 universal_ingestor as evidence_universal_ingestor,
             )
+
             evidence_universal_ingestor.ingest_url(
                 url=target_url,
                 options={"author": req.author_creator, "title": req.title},
@@ -2758,7 +2744,7 @@ async def get_orderbook_imbalance(
 
 @app.get("/api/dossier")
 @app.get("/api/institutional/dossier")
-async def get_asset_dossier(
+async def get_institutional_asset_dossier(
     symbol: str = Query("BTCUSDT"),
 ):
     candles = data_streamer.get_candles(symbol, "15m", limit=100)
@@ -3622,7 +3608,7 @@ async def get_vault_status():
     Public / diagnostic status for API credential vault and live execution gates.
     Strictly free of plaintext API keys, secrets, encryption keys, or headers.
     """
-    kill_active, kill_state = live_kill_switch.is_active()
+    _kill_active, kill_state = live_kill_switch.is_active()
     return {
         "status": "OPERATIONAL",
         "live_execution_enabled": live_execution_router.is_live_execution_enabled(),
@@ -4159,7 +4145,9 @@ async def get_mastermind_swarm_status() -> dict[str, Any]:
     from core.mastermind.mastermind_arbiter import mastermind_arbiter
     from core.portfolio_shadow import portfolio_shadow
 
-    accounting = portfolio_shadow.get_portfolio_accounting(starting_capital=mastermind_arbiter.account_equity_usd)
+    accounting = portfolio_shadow.get_portfolio_accounting(
+        starting_capital=mastermind_arbiter.account_equity_usd
+    )
     all_specs = mastermind_arbiter.get_all_specialists()
     specialist_cards = [
         {
@@ -4172,7 +4160,9 @@ async def get_mastermind_swarm_status() -> dict[str, Any]:
 
     return {
         "status": "ONLINE",
-        "account_equity_usd": accounting.get("virtual_equity", mastermind_arbiter.account_equity_usd),
+        "account_equity_usd": accounting.get(
+            "virtual_equity", mastermind_arbiter.account_equity_usd
+        ),
         "total_realized_pnl": accounting.get("total_realized_pnl", 0.0),
         "open_positions_count": len(portfolio_shadow.get_open_positions()),
         "specialists_count": len(specialist_cards),
@@ -4271,11 +4261,13 @@ async def deploy_mastermind_specialist(payload: dict[str, Any]) -> dict[str, Any
 # NOUS RESEARCH HERMES AGENT (v0.22+) INTEGRATION ROUTES
 # ==============================================================================
 
+
 @app.get("/api/v1/hermes/status")
 @app.get("/api/hermes/status")
 async def get_hermes_agent_status() -> dict[str, Any]:
     """Retrieve operational status, model, and gateway details of Nous Hermes Agent."""
     from core.cognitive_brain.hermes_agent_bridge import hermes_bridge
+
     return await hermes_bridge.get_status()
 
 
@@ -4293,9 +4285,13 @@ async def query_hermes_agent(payload: dict[str, Any]) -> dict[str, Any]:
     provider = payload.get("provider")
     timeout = float(payload.get("timeout", 60.0))
 
-    res = await hermes_bridge.ask_hermes(query=query, model=model, provider=provider, timeout=timeout)
+    res = await hermes_bridge.ask_hermes(
+        query=query, model=model, provider=provider, timeout=timeout
+    )
     if not res.get("success", False):
-        raise HTTPException(status_code=502, detail=res.get("error", "Hermes Agent execution failed"))
+        raise HTTPException(
+            status_code=502, detail=res.get("error", "Hermes Agent execution failed")
+        )
     return res
 
 
@@ -4322,6 +4318,5 @@ async def hermes_market_critique(payload: dict[str, Any]) -> dict[str, Any]:
 
 if __name__ == "__main__":
     import uvicorn
-
 
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=False)

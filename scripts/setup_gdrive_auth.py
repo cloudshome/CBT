@@ -20,6 +20,7 @@ sys.path.insert(0, str(ROOT_DIR))
 
 try:
     import dotenv
+
     dotenv.load_dotenv(ROOT_DIR / ".env")
 except ImportError:
     pass
@@ -52,23 +53,26 @@ def check_status() -> None:
     print(f"[*] Target User Account  : {target_email}")
 
     service_account_file = (
-        os.getenv("GDRIVE_SERVICE_ACCOUNT_FILE")
-        or "credentials/gdrive_service_account.json"
+        os.getenv("GDRIVE_SERVICE_ACCOUNT_FILE") or "credentials/gdrive_service_account.json"
     )
-    oauth_token_file = (
-        os.getenv("GDRIVE_OAUTH_TOKEN_FILE")
-        or "credentials/gdrive_token.json"
-    )
+    oauth_token_file = os.getenv("GDRIVE_OAUTH_TOKEN_FILE") or "credentials/gdrive_token.json"
     client_secret_file = (
-        os.getenv("GDRIVE_CLIENT_SECRET_FILE")
-        or "credentials/gdrive_client_secret.json"
+        os.getenv("GDRIVE_CLIENT_SECRET_FILE") or "credentials/gdrive_client_secret.json"
     )
-    root_folder_id = _clean_folder_id(os.getenv("GDRIVE_ROOT_FOLDER_ID")) or "(not set - will use root)"
+    root_folder_id = (
+        _clean_folder_id(os.getenv("GDRIVE_ROOT_FOLDER_ID")) or "(not set - will use root)"
+    )
 
     print(f"[*] Root Folder ID       : {root_folder_id}")
-    print(f"[*] Service Account File : {service_account_file} -> {'EXISTS' if Path(service_account_file).exists() else 'NOT FOUND'}")
-    print(f"[*] OAuth Token File     : {oauth_token_file} -> {'EXISTS' if Path(oauth_token_file).exists() else 'NOT FOUND'}")
-    print(f"[*] OAuth Client Secrets : {client_secret_file} -> {'EXISTS' if Path(client_secret_file).exists() else 'NOT FOUND'}")
+    print(
+        f"[*] Service Account File : {service_account_file} -> {'EXISTS' if Path(service_account_file).exists() else 'NOT FOUND'}"
+    )
+    print(
+        f"[*] OAuth Token File     : {oauth_token_file} -> {'EXISTS' if Path(oauth_token_file).exists() else 'NOT FOUND'}"
+    )
+    print(
+        f"[*] OAuth Client Secrets : {client_secret_file} -> {'EXISTS' if Path(client_secret_file).exists() else 'NOT FOUND'}"
+    )
 
     from core.autonomous_research.storage.drive_backend import get_default_drive_backend
 
@@ -83,9 +87,13 @@ def check_status() -> None:
         print("    OPTION A (Recommended for 24/7 background): Service Account")
         print("      1. Place your Google Cloud service account JSON at:")
         print(f"         {service_account_file}")
-        print("      2. In Google Drive (ypelectronics11@gmail.com), create a folder (e.g. 'SKY_ARCHIVE')")
+        print(
+            "      2. In Google Drive (ypelectronics11@gmail.com), create a folder (e.g. 'SKY_ARCHIVE')"
+        )
         print("      3. Share that folder with your service account email as 'Editor'.")
-        print("      4. Add GDRIVE_ROOT_FOLDER_ID=<folder_id_from_url> and GDRIVE_USER_EMAIL=ypelectronics11@gmail.com to .env")
+        print(
+            "      4. Add GDRIVE_ROOT_FOLDER_ID=<folder_id_from_url> and GDRIVE_USER_EMAIL=ypelectronics11@gmail.com to .env"
+        )
         print("\n    OPTION B: Direct OAuth2 Login (Browser authorization)")
         print("      1. Download OAuth 2.0 Client ID (Desktop App) JSON to:")
         print(f"         {client_secret_file}")
@@ -128,13 +136,9 @@ def run_oauth_login() -> None:
         return
 
     client_secret_file = (
-        os.getenv("GDRIVE_CLIENT_SECRET_FILE")
-        or "credentials/gdrive_client_secret.json"
+        os.getenv("GDRIVE_CLIENT_SECRET_FILE") or "credentials/gdrive_client_secret.json"
     )
-    token_file = (
-        os.getenv("GDRIVE_OAUTH_TOKEN_FILE")
-        or "credentials/gdrive_token.json"
-    )
+    token_file = os.getenv("GDRIVE_OAUTH_TOKEN_FILE") or "credentials/gdrive_token.json"
 
     if not Path(client_secret_file).exists():
         print(f"[!] Error: Client secret file '{client_secret_file}' not found.")
@@ -180,7 +184,9 @@ def test_upload() -> None:
         return
 
     print("[*] Creating temporary probe file...")
-    test_content = f"CTB Live Google Drive Probe\nTimestamp: {time.time()}\nTarget: {DEFAULT_TARGET_EMAIL}\n"
+    test_content = (
+        f"CTB Live Google Drive Probe\nTimestamp: {time.time()}\nTarget: {DEFAULT_TARGET_EMAIL}\n"
+    )
     with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
         f.write(test_content)
         temp_path = Path(f.name)
@@ -207,9 +213,15 @@ def test_upload() -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="CTB Google Drive Setup & Diagnostics")
-    parser.add_argument("--status", action="store_true", help="Check current Google Drive connection status")
-    parser.add_argument("--login", action="store_true", help="Run OAuth2 login flow for personal Google account")
-    parser.add_argument("--test-upload", action="store_true", help="Perform a test file upload to live Google Drive")
+    parser.add_argument(
+        "--status", action="store_true", help="Check current Google Drive connection status"
+    )
+    parser.add_argument(
+        "--login", action="store_true", help="Run OAuth2 login flow for personal Google account"
+    )
+    parser.add_argument(
+        "--test-upload", action="store_true", help="Perform a test file upload to live Google Drive"
+    )
 
     args = parser.parse_args()
 

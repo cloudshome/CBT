@@ -192,7 +192,7 @@ def optimize_database(db_path: Path, vacuum_threshold_mb: float = 500.0) -> dict
         reclaimed_kb = max(0.0, round((size_before_bytes - size_after_bytes) / 1024, 2))
 
         logger.info(
-            f"Optimized {db_path.name}: {round(size_before_bytes/1024, 1)} KB -> {round(size_after_bytes/1024, 1)} KB (Reclaimed {reclaimed_kb} KB, vacuum={vacuum_executed})"
+            f"Optimized {db_path.name}: {round(size_before_bytes / 1024, 1)} KB -> {round(size_after_bytes / 1024, 1)} KB (Reclaimed {reclaimed_kb} KB, vacuum={vacuum_executed})"
         )
         return {
             "database": db_path.name,
@@ -244,8 +244,12 @@ def run_maintenance(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="SKY / CTB Database Growth Management & Vacuum Tool")
-    parser.add_argument("--data-dir", default=os.getenv("DATA_DIR", "data"), help="Path to data directory")
+    parser = argparse.ArgumentParser(
+        description="SKY / CTB Database Growth Management & Vacuum Tool"
+    )
+    parser.add_argument(
+        "--data-dir", default=os.getenv("DATA_DIR", "data"), help="Path to data directory"
+    )
     parser.add_argument(
         "--vacuum-threshold-mb",
         type=float,

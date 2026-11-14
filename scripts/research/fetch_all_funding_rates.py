@@ -1,15 +1,15 @@
-import requests
-import time
 import json
+import time
 from pathlib import Path
+
 import pandas as pd
-import numpy as np
+import requests
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 url = "https://fapi.binance.com/fapi/v1/fundingRate"
 
 start_ts = 1640995200000  # 2022-01-01 00:00:00 UTC
-end_ts = 1792454400000    # 2026-10-20 00:00:00 UTC
+end_ts = 1792454400000  # 2026-10-20 00:00:00 UTC
 
 results = {}
 
@@ -31,50 +31,62 @@ for sym in ["BTCUSDT", "ETHUSDT"]:
         if len(data) < 1000:
             break
         time.sleep(0.1)
-    
+
     df = pd.DataFrame(all_records)
     df["funding_time"] = df["fundingTime"].astype(int)
     df["funding_rate"] = df["fundingRate"].astype(float)
     df = df.drop_duplicates(subset=["funding_time"]).sort_values("funding_time")
-    
+
     min_dt = pd.to_datetime(df["funding_time"].min(), unit="ms", utc=True)
     max_dt = pd.to_datetime(df["funding_time"].max(), unit="ms", utc=True)
-    
+
     print(f"{sym}: Fetched {len(df)} funding records in {round(time.time() - t0, 2)}s!")
     print(f"  Range: {min_dt} to {max_dt}")
-    
+
     # Store dataframe to parquet in data/store/derivatives/
     # Partition by symbol, year, month
     df["dt"] = pd.to_datetime(df["funding_time"], unit="ms", utc=True)
     df["year"] = df["dt"].dt.year
     df["month"] = df["dt"].dt.strftime("%m")
-    
+
     saved_files = []
     for (yr, mo), grp in df.groupby(["year", "month"]):
-        out_dir = ROOT / "data" / "store" / "derivatives" / "exchange=binance" / "market=perp" / f"symbol={sym}" / "metric=funding_rate" / f"year={yr}" / f"month={mo}"
+        out_dir = (
+            ROOT
+            / "data"
+            / "store"
+            / "derivatives"
+            / "exchange=binance"
+            / "market=perp"
+            / f"symbol={sym}"
+            / "metric=funding_rate"
+            / f"year={yr}"
+            / f"month={mo}"
+        )
         out_dir.mkdir(parents=True, exist_ok=True)
         out_file = out_dir / "part-000.parquet"
-        
+
         # Schema: ts, exchange, market, symbol, metric, value, ingested_at
-        p_df = pd.DataFrame({
-            "ts": grp["funding_time"].values,
-            "exchange": "binance",
-            "market": "perp",
-            "symbol": sym,
-            "metric": "funding_rate",
-            "value": grp["funding_rate"].values,
-            "ingested_at": int(time.time() * 1000)
-        })
+        p_df = pd.DataFrame(
+            {
+                "ts": grp["funding_time"].values,
+                "exchange": "binance",
+                "market": "perp",
+                "symbol": sym,
+                "metric": "funding_rate",
+                "value": grp["funding_rate"].values,
+                "ingested_at": int(time.time() * 1000),
+            }
+        )
         p_df.to_parquet(out_file, index=False)
         saved_files.append(out_file)
-    
+
     print(f"  Saved {len(saved_files)} monthly partitions for {sym} funding_rate.")
     results[sym] = {
         "count": len(df),
         "min_dt": str(min_dt),
         "max_dt": str(max_dt),
-        "partitions": len(saved_files)
+        "partitions": len(saved_files),
     }
 
 print("\nSummary:", json.dumps(results, indent=2))
-

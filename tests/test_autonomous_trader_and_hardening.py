@@ -191,7 +191,9 @@ async def test_autonomous_trader_emits_open_event():
     risk_manager.reset_lockout()
     cooldown_governor.reset()
 
-    trader = AutonomousTrader(active_symbols=["BTC/USDT"], max_open_positions=3)
+    trader = AutonomousTrader(
+        active_symbols=["BTC/USDT"], max_open_positions=3, scan_timeframes=["15m"]
+    )
 
     with (
         patch(

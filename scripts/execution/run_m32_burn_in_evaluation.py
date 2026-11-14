@@ -22,14 +22,14 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from core.execution.strategy_gateway.ensemble_allocator import (  # noqa: E402
+from core.execution.strategy_gateway.ensemble_allocator import (
     AllocationConstraintMatrix,
     AllocatorMode,
 )
-from core.execution.testnet.burn_in_evaluator import M32RBurnInEvaluator  # noqa: E402
-from core.execution.testnet.campaign_daemon_integrator import CampaignDaemonIntegrator  # noqa: E402
-from core.execution.testnet.daemon_orchestrator import HealthDimensionReport  # noqa: E402
-from core.intelligence.forward_validation import (  # noqa: E402
+from core.execution.testnet.burn_in_evaluator import M32RBurnInEvaluator
+from core.execution.testnet.campaign_daemon_integrator import CampaignDaemonIntegrator
+from core.execution.testnet.daemon_orchestrator import HealthDimensionReport
+from core.intelligence.forward_validation import (
     DenominatorBreakdown,
     FeedQualityEvidence,
     M31REvidenceBundle,
@@ -176,8 +176,12 @@ def run_burn_in_harness() -> int:
 
     logger.info("============================================================")
     logger.info("MILESTONE 32-R BURN-IN VERDICT: %s", decision.status.value)
-    logger.info("Effective Qualified Hours: %.1fh / %.1fh (%.1f%%)",
-                decision.effective_qualified_hours, decision.total_wall_clock_hours, decision.qualification_ratio * 100)
+    logger.info(
+        "Effective Qualified Hours: %.1fh / %.1fh (%.1f%%)",
+        decision.effective_qualified_hours,
+        decision.total_wall_clock_hours,
+        decision.qualification_ratio * 100,
+    )
     logger.info("Rationale: %s", decision.rationale)
     logger.info("============================================================")
 

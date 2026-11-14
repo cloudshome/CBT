@@ -75,6 +75,7 @@ class AutonomousTrader:
         scan_interval_sec: float = 30.0,
         account_equity_usd: float = 10_000.0,
         max_open_positions: int = 6,
+        scan_timeframes: list[str] | None = None,
     ):
         self.active_symbols = active_symbols or [
             "BTC/USDT",
@@ -82,6 +83,7 @@ class AutonomousTrader:
             "SOL/USDT",
             "XAU/USD",
         ]
+        self.scan_timeframes = scan_timeframes or ["15m", "1h"]
         self.scan_interval_sec = float(
             os.getenv("AUTONOMOUS_SCAN_INTERVAL_SEC", str(scan_interval_sec))
         )
@@ -173,7 +175,7 @@ class AutonomousTrader:
 
         # Strictly locked to Tier-1 Institutional Assets (BTC, ETH, SOL, BNB, GOLD)
         scan_symbols = list(self.active_symbols)
-        scan_timeframes = ["15m", "1h"]
+        scan_timeframes = list(self.scan_timeframes)
 
         for tf_scan in scan_timeframes:
             for sym in scan_symbols:

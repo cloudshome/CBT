@@ -41,14 +41,18 @@ if str(ROOT_DIR) not in sys.path:
 
 # Ensure invocation automatically uses local virtualenv if present
 venv_py = ROOT_DIR / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
-if venv_py.exists() and sys.executable != str(venv_py) and os.environ.get("_CBT_RUNNER_WRAPPED") != "1":
+if (
+    venv_py.exists()
+    and sys.executable != str(venv_py)
+    and os.environ.get("_CBT_RUNNER_WRAPPED") != "1"
+):
     os.environ["_CBT_RUNNER_WRAPPED"] = "1"
     os.execv(str(venv_py), [str(venv_py), *sys.argv])
 
-import numpy as np  # noqa: E402
-import pandas as pd  # noqa: E402
+import numpy as np
+import pandas as pd
 
-from core.research.shadow_ledger import ShadowLedgerEngine, ShadowPredictionRecord  # noqa: E402
+from core.research.shadow_ledger import ShadowLedgerEngine, ShadowPredictionRecord
 
 logging.basicConfig(
     level=logging.INFO,
@@ -130,7 +134,9 @@ class ProcessLock:
             try:
                 self.file_obj.seek(0)
                 self.file_obj.truncate(0)
-                self.file_obj.write(f"pid={os.getpid()}\nstarted_utc={datetime.now(UTC).isoformat()}\n")
+                self.file_obj.write(
+                    f"pid={os.getpid()}\nstarted_utc={datetime.now(UTC).isoformat()}\n"
+                )
                 self.file_obj.flush()
             except Exception:
                 # If write fails (e.g. ENOSPC), release lock and re-raise genuine error
@@ -257,20 +263,22 @@ def evaluate_signals_on_bar(
             entry_p = float(row["close"])  # Estimated next open
             sl = entry_p - 1.0 * atr
             tp = entry_p + 2.0 * atr
-            signals.append({
-                "strategy_id": "H3_OI_FLUSH_CAPITULATION_LONG_BTC",
-                "strategy_fingerprint": fp,
-                "symbol": "BTCUSDT",
-                "timeframe": "1h",
-                "direction": "LONG",
-                "entry_price": round(entry_p, 2),
-                "stop_loss_price": round(sl, 2),
-                "take_profit_price": round(tp, 2),
-                "risk_unit_usd": round(1.0 * atr, 2),
-                "max_hold_bars": 24,
-                "timestamp_utc": ts_iso,
-                "idempotency_key": f"SHADOW_H3_BTC_{row['ts']}",
-            })
+            signals.append(
+                {
+                    "strategy_id": "H3_OI_FLUSH_CAPITULATION_LONG_BTC",
+                    "strategy_fingerprint": fp,
+                    "symbol": "BTCUSDT",
+                    "timeframe": "1h",
+                    "direction": "LONG",
+                    "entry_price": round(entry_p, 2),
+                    "stop_loss_price": round(sl, 2),
+                    "take_profit_price": round(tp, 2),
+                    "risk_unit_usd": round(1.0 * atr, 2),
+                    "max_hold_bars": 24,
+                    "timestamp_utc": ts_iso,
+                    "idempotency_key": f"SHADOW_H3_BTC_{row['ts']}",
+                }
+            )
 
     # 2. H5: ETH Open Interest Compression Breakdown SHORT
     if symbol == "ETHUSDT":
@@ -283,20 +291,22 @@ def evaluate_signals_on_bar(
             entry_p = float(row["close"])
             sl = entry_p + 1.0 * atr
             tp = entry_p - 2.5 * atr
-            signals.append({
-                "strategy_id": "H5_OI_COMPRESSION_BREAKDOWN_SHORT_ETH",
-                "strategy_fingerprint": fp,
-                "symbol": "ETHUSDT",
-                "timeframe": "1h",
-                "direction": "SHORT",
-                "entry_price": round(entry_p, 2),
-                "stop_loss_price": round(sl, 2),
-                "take_profit_price": round(tp, 2),
-                "risk_unit_usd": round(1.0 * atr, 2),
-                "max_hold_bars": 72,
-                "timestamp_utc": ts_iso,
-                "idempotency_key": f"SHADOW_H5_ETH_{row['ts']}",
-            })
+            signals.append(
+                {
+                    "strategy_id": "H5_OI_COMPRESSION_BREAKDOWN_SHORT_ETH",
+                    "strategy_fingerprint": fp,
+                    "symbol": "ETHUSDT",
+                    "timeframe": "1h",
+                    "direction": "SHORT",
+                    "entry_price": round(entry_p, 2),
+                    "stop_loss_price": round(sl, 2),
+                    "take_profit_price": round(tp, 2),
+                    "risk_unit_usd": round(1.0 * atr, 2),
+                    "max_hold_bars": 72,
+                    "timestamp_utc": ts_iso,
+                    "idempotency_key": f"SHADOW_H5_ETH_{row['ts']}",
+                }
+            )
 
         # 3. HTF_OB: ETH Order Block Retest LONG
         cfg_ob = manifest.get("candidates", {}).get("HTF_OB_ETH", {})
@@ -304,26 +314,33 @@ def evaluate_signals_on_bar(
         c2, o2 = df["close"].iloc[latest_idx - 2], df["open"].iloc[latest_idx - 2]
         c1, o1 = df["close"].iloc[latest_idx - 1], df["open"].iloc[latest_idx - 1]
         atr1 = df["atr_14"].iloc[latest_idx - 1]
-        is_ob = (c2 < o2) and ((c1 - o1) > (1.2 * atr1)) and (row["low"] <= max(o2, c2)) and (row["close"] >= min(o2, c2))
+        is_ob = (
+            (c2 < o2)
+            and ((c1 - o1) > (1.2 * atr1))
+            and (row["low"] <= max(o2, c2))
+            and (row["close"] >= min(o2, c2))
+        )
         if is_ob:
             atr = float(row["atr_14"])
             entry_p = float(row["close"])
             sl = entry_p - 1.0 * atr
             tp = entry_p + 2.0 * atr
-            signals.append({
-                "strategy_id": "HTF_OB_ETH_RETEST_LONG",
-                "strategy_fingerprint": fp_ob,
-                "symbol": "ETHUSDT",
-                "timeframe": "1h",
-                "direction": "LONG",
-                "entry_price": round(entry_p, 2),
-                "stop_loss_price": round(sl, 2),
-                "take_profit_price": round(tp, 2),
-                "risk_unit_usd": round(1.0 * atr, 2),
-                "max_hold_bars": 48,
-                "timestamp_utc": ts_iso,
-                "idempotency_key": f"SHADOW_HTF_OB_ETH_{row['ts']}",
-            })
+            signals.append(
+                {
+                    "strategy_id": "HTF_OB_ETH_RETEST_LONG",
+                    "strategy_fingerprint": fp_ob,
+                    "symbol": "ETHUSDT",
+                    "timeframe": "1h",
+                    "direction": "LONG",
+                    "entry_price": round(entry_p, 2),
+                    "stop_loss_price": round(sl, 2),
+                    "take_profit_price": round(tp, 2),
+                    "risk_unit_usd": round(1.0 * atr, 2),
+                    "max_hold_bars": 48,
+                    "timestamp_utc": ts_iso,
+                    "idempotency_key": f"SHADOW_HTF_OB_ETH_{row['ts']}",
+                }
+            )
 
     return signals
 
@@ -403,7 +420,9 @@ class ProspectiveShadowRunner:
                 # Finalization filter: A 1h bar starting at ts is only finalized when ts + 3600_000 <= current_ts_ms
                 df_final = df[df["ts"] + 3600_000 <= current_ts_ms]
                 if df_final.empty:
-                    logger.info(f"[{sym}] No finalized 1h candles found at {cycle_start}. Skipping.")
+                    logger.info(
+                        f"[{sym}] No finalized 1h candles found at {cycle_start}. Skipping."
+                    )
                     continue
 
                 last_processed = self.state.get("last_processed_candle_ts", {}).get(sym)
@@ -544,34 +563,42 @@ class ProspectiveShadowRunner:
         ]
 
         for r in audit_recs[-15:]:
-            net_r_str = f"{r['realized_net_r']:+.2f}R" if r["realized_net_r"] is not None else "PENDING"
+            net_r_str = (
+                f"{r['realized_net_r']:+.2f}R" if r["realized_net_r"] is not None else "PENDING"
+            )
             lines.append(
                 f"| {r['sequence_id']} | `{r['strategy_id']}` | {r['symbol']} | {r['direction']} | `{r['lifecycle_state']}` | "
                 f"${r['entry_precommitted_price']:,.2f} | TP:${r['take_profit_price']:,.2f} / SL:${r['stop_loss_price']:,.2f} | "
                 f"{r['mfe_r']:.2f}R | {r['mae_r']:.2f}R | **{net_r_str}** | `{r['record_sha256'][:16]}...` |"
             )
 
-        lines.extend([
-            "",
-            "---",
-            "",
-            "## 3. Institutional Safeguards Verified",
-            "",
-            "- [x] **Append-Only Immutability:** Operating with cryptographic SHA-256 parent chaining (`prev_record_sha256`).",
-            "- [x] **Zero Real-Capital Risk:** Zero execution router imports or exchange trade dispatch capabilities.",
-            "- [x] **Precommitted Boundaries:** Entry price, stop loss, and take profit fixed strictly before outcome evaluation.",
-            "- [x] **Excursion Tracking:** Continuous MFE and MAE recording across every bar.",
-            "- [x] **Idempotency Guarantee:** Duplicate timestamp prediction keys automatically rejected.",
-        ])
+        lines.extend(
+            [
+                "",
+                "---",
+                "",
+                "## 3. Institutional Safeguards Verified",
+                "",
+                "- [x] **Append-Only Immutability:** Operating with cryptographic SHA-256 parent chaining (`prev_record_sha256`).",
+                "- [x] **Zero Real-Capital Risk:** Zero execution router imports or exchange trade dispatch capabilities.",
+                "- [x] **Precommitted Boundaries:** Entry price, stop loss, and take profit fixed strictly before outcome evaluation.",
+                "- [x] **Excursion Tracking:** Continuous MFE and MAE recording across every bar.",
+                "- [x] **Idempotency Guarantee:** Duplicate timestamp prediction keys automatically rejected.",
+            ]
+        )
 
         with open(OUTPUT_AUDIT_REPORT, "w", encoding="utf-8") as f:
             f.write("\n".join(lines))
 
-        logger.info(f"[PASS] Shadow audit report emitted to: {OUTPUT_AUDIT_REPORT.relative_to(ROOT_DIR)}")
+        logger.info(
+            f"[PASS] Shadow audit report emitted to: {OUTPUT_AUDIT_REPORT.relative_to(ROOT_DIR)}"
+        )
 
     def run_daemon(self, poll_interval_seconds: int = 3600) -> None:
         """Runs the continuous prospective shadow daemon."""
-        logger.info(f"Starting continuous Prospective Shadow Daemon (interval={poll_interval_seconds}s)...")
+        logger.info(
+            f"Starting continuous Prospective Shadow Daemon (interval={poll_interval_seconds}s)..."
+        )
         while True:
             try:
                 self.poll_cycle()
@@ -583,9 +610,15 @@ class ProspectiveShadowRunner:
 
 def main():
     parser = argparse.ArgumentParser(description="Prospective Shadow Prediction Ledger Runner")
-    parser.add_argument("--poll-once", action="store_true", help="Execute single evaluation cycle and exit")
-    parser.add_argument("--daemon", action="store_true", help="Run continuously as background daemon")
-    parser.add_argument("--interval", type=int, default=3600, help="Polling interval in seconds for daemon")
+    parser.add_argument(
+        "--poll-once", action="store_true", help="Execute single evaluation cycle and exit"
+    )
+    parser.add_argument(
+        "--daemon", action="store_true", help="Run continuously as background daemon"
+    )
+    parser.add_argument(
+        "--interval", type=int, default=3600, help="Polling interval in seconds for daemon"
+    )
     args = parser.parse_args()
 
     with ProcessLock() as lock:

@@ -12,8 +12,6 @@ Usage:
 """
 
 import argparse
-import json
-import os
 import sys
 from pathlib import Path
 
@@ -23,6 +21,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 try:
     import dotenv
+
     dotenv.load_dotenv(REPO_ROOT / ".env")
 except ImportError:
     pass
@@ -36,13 +35,20 @@ def main() -> int:
     )
     group = parser.add_mutually_exclusive_group(required=False)
     group.add_argument(
-        "--status", action="store_true", default=True, help="Display Drive sync telemetry and status"
+        "--status",
+        action="store_true",
+        default=True,
+        help="Display Drive sync telemetry and status",
     )
     group.add_argument(
-        "--upload", action="store_true", help="Scan local directories and upload new/changed heavy files to Drive"
+        "--upload",
+        action="store_true",
+        help="Scan local directories and upload new/changed heavy files to Drive",
     )
     group.add_argument(
-        "--download", action="store_true", help="Download missing heavy files recorded in manifest from Drive"
+        "--download",
+        action="store_true",
+        help="Download missing heavy files recorded in manifest from Drive",
     )
     parser.add_argument(
         "--force", action="store_true", help="Force re-upload or re-download even if matching"
@@ -94,9 +100,13 @@ def main() -> int:
         print(f"  Storage Tier      : {status['storage_tier']}")
         print(f"  Target Account    : {status['target_account']}")
         print(f"  Connected Account : {status['connected_account']}")
-        print(f"  Live Drive Active : {'YES' if status['is_live_google_drive'] else 'NO (Simulated Local Mode)'}")
+        print(
+            f"  Live Drive Active : {'YES' if status['is_live_google_drive'] else 'NO (Simulated Local Mode)'}"
+        )
         print(f"  Synced Files      : {status['total_synced_files']}")
-        print(f"  Synced Volume     : {status['total_synced_mb']} MB ({status['total_synced_gb']} GB)")
+        print(
+            f"  Synced Volume     : {status['total_synced_mb']} MB ({status['total_synced_gb']} GB)"
+        )
         print(f"  Manifest Path     : {status['manifest_file']}")
         print(f"  Monitored Folders : {', '.join(status['monitored_folders'])}")
         print("=" * 60)
@@ -105,4 +115,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

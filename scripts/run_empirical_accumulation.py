@@ -45,17 +45,17 @@ def simulate_synthetic_trades_for_regime(
         "HIGH_VOLATILITY_EXPANSION": 0.58,
     }
     base_p = win_rate_map.get(regime, 0.55)
-    
+
     samples_added = 0
     now = int(datetime.datetime.now(datetime.UTC).timestamp() * 1000)
-    
+
     for i in range(count):
         is_win = (hash(f"{symbol}_{concept}_{regime}_{i}") % 100) / 100.0 < base_p
         r_multiple = round(2.0 if is_win else -1.0, 2)
         entry_p = 60000.0 + (i * 10)
         exit_p = entry_p * (1.02 if is_win else 0.99)
         pnl = 200.0 if is_win else -100.0
-        
+
         empirical_accumulator.store_sample(
             symbol=symbol,
             timeframe="15m",
@@ -109,6 +109,7 @@ def run_batch_accumulation(symbols: list[str], concepts: list[str]) -> dict[str,
 
 def asdict_safe(obj: Any) -> dict[str, Any]:
     from dataclasses import asdict
+
     try:
         return asdict(obj)
     except Exception:
@@ -118,10 +119,14 @@ def asdict_safe(obj: Any) -> dict[str, Any]:
 def main():
     parser = argparse.ArgumentParser(description="SKY / CTB Empirical Evidence Accumulation Tool")
     parser.add_argument("--symbols", nargs="+", default=["BTC/USDT", "ETH/USDT", "PAXG/USDT"])
-    parser.add_argument("--concepts", nargs="+", default=["SETUP_A_SWEEP_MSS", "SETUP_B_FVG_CONTINUATION"])
+    parser.add_argument(
+        "--concepts", nargs="+", default=["SETUP_A_SWEEP_MSS", "SETUP_B_FVG_CONTINUATION"]
+    )
     args = parser.parse_args()
 
-    logger.info(f"Starting Empirical Accumulation across {args.symbols} for concepts {args.concepts}...")
+    logger.info(
+        f"Starting Empirical Accumulation across {args.symbols} for concepts {args.concepts}..."
+    )
     res = run_batch_accumulation(args.symbols, args.concepts)
     logger.info(f"Accumulation completed. Total trade samples stored: {res['samples_added']}")
 
