@@ -517,10 +517,11 @@ class CapitalGovernor:
                 )
                 conn.commit()
 
-            audit_bus.record_event(
+            audit_bus.emit_event(
                 event_type="CAPITAL_ESCALATION_DECISION",
-                module="capital_governor",
-                severity="HIGH" if approved_tier != previous_tier else "INFO",
+                symbol=strategy_id or "PORTFOLIO",
+                reason=f"Capital decision {decision_id}: {decision_type} to {approved_tier}",
+                severity="WARNING" if approved_tier != previous_tier else "INFO",
                 details={
                     "decision_id": decision_id,
                     "strategy_id": strategy_id,

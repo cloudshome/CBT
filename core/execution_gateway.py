@@ -91,8 +91,15 @@ class ExecutionGateway:
                 LiveOrderRequest,
                 live_execution_router,
             )
+            from core.portfolio_shadow import portfolio_shadow
 
             side = "BUY" if direction.upper() == "LONG" else "SELL"
+            acct = portfolio_shadow.get_portfolio_accounting()
+            open_pos = portfolio_shadow.get_open_positions()
+            curr_eq = float(acct.get("virtual_equity", 100_000.0))
+            d_realized = float(acct.get("daily_realized_pnl", 0.0))
+            d_unrealized = float(acct.get("total_unrealized_pnl", 0.0))
+
             req = LiveOrderRequest(
                 exchange="BINANCE_FUTURES",
                 environment="PRODUCTION",
@@ -101,6 +108,12 @@ class ExecutionGateway:
                 order_type="MARKET" if "MARKET" in order_type.upper() else "LIMIT",
                 quantity=units,
                 price=target_price if "LIMIT" in order_type.upper() else None,
+                reference_price=target_price,
+                account_equity_usd=curr_eq,
+                daily_realized_pnl_usd=d_realized,
+                daily_unrealized_pnl_usd=d_unrealized,
+                current_open_positions_count=len(open_pos),
+                max_open_positions_cap=3,
                 client_order_id=order_id,
             )
             routes = [OrderRoute("BINANCE_FUTURES_LIVE", units, 100.0, 0.0)]
@@ -109,10 +122,10 @@ class ExecutionGateway:
                     receipt = pool.submit(
                         asyncio.run, live_execution_router.execute_live_order(req)
                     ).result(timeout=10.0)
-                status = receipt.order_status
+                status = receipt.status
                 executed_price = receipt.executed_price or target_price
-                final_units = receipt.executed_quantity or units
-                msg = f"LIVE PRODUCTION order executed via live_router: {receipt.client_order_id} ({receipt.order_status})"
+                final_units = receipt.executed_qty or units
+                msg = f"LIVE PRODUCTION order executed via live_router: {receipt.client_order_id} ({receipt.status})"
             except Exception as exc:
                 logger.error("Live router execution failed: %s", exc)
                 status = "REJECTED_LIVE"

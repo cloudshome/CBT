@@ -324,9 +324,16 @@ class NativeDeskIntelligenceBridge:
         # Extract primary FVG (unmitigated, closest to price)
         primary_fvg = None
         primary_ob = None
-        fvg_list = [p for p in smc_patterns if "FVG" in p.pattern_type]
+        fvg_list = [
+            p
+            for p in smc_patterns
+            if "FVG" in p.pattern_type and getattr(p, "status", "ACTIVE") == "ACTIVE"
+        ]
         ob_list = [
-            p for p in smc_patterns if "OB" in p.pattern_type or "ORDER_BLOCK" in p.pattern_type
+            p
+            for p in smc_patterns
+            if ("OB" in p.pattern_type or "ORDER_BLOCK" in p.pattern_type)
+            and getattr(p, "status", "ACTIVE") == "ACTIVE"
         ]
 
         if fvg_list:

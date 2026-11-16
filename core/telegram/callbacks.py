@@ -259,16 +259,26 @@ class TelegramCallbackRouter:
 
     def build_live_execution_keyboard(self, confirm_id: str, cancel_id: str) -> dict[str, Any]:
         """Builds 2-step ADMIN confirmation keyboard for live execution."""
+        confirm_cb = (
+            confirm_id
+            if confirm_id.startswith("CONFIRM_LIVE_EXEC_")
+            else f"CONFIRM_LIVE_EXEC_{confirm_id}"
+        )
+        cancel_cb = (
+            cancel_id
+            if cancel_id.startswith("CANCEL_LIVE_EXEC_")
+            else f"CANCEL_LIVE_EXEC_{cancel_id}"
+        )
         return {
             "inline_keyboard": [
                 [
                     {
                         "text": "🚨 CONFIRM LIVE EXECUTION",
-                        "callback_data": f"CONFIRM_LIVE_EXEC_{confirm_id}",
+                        "callback_data": confirm_cb,
                     },
                     {
                         "text": "❌ CANCEL LIVE",
-                        "callback_data": f"CANCEL_LIVE_EXEC_{cancel_id}",
+                        "callback_data": cancel_cb,
                     },
                 ]
             ]

@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from core.telegram.audit import TelegramAuditLogger
-from core.telegram.rbac import TelegramUserIdentity
+from core.telegram.rbac import TelegramRole, TelegramUserIdentity
 
 logger = logging.getLogger("sky.telegram.tool_gateway")
 
@@ -164,7 +164,10 @@ class TelegramToolGateway:
         ):
             from core.telegram.rbac import TelegramRole
 
-            if identity.role != TelegramRole.ADMIN:
+            if not (
+                identity.role == TelegramRole.ADMIN
+                or identity.role.can_access(TelegramRole.RISK_ADMIN)
+            ):
                 TelegramAuditLogger.log_command_execution(
                     identity=identity,
                     command=tool_name,
@@ -1591,6 +1594,15 @@ class TelegramToolGateway:
         """
         Phase 1: Plans the position close and requests confirmation.
         """
+        if not identity.role.can_access(TelegramRole.TRADER):
+            return ToolResult(
+                success=False,
+                tool_name="plan_close_position",
+                tool_class=ToolClass.CLASS_C_ACTION,
+                output_text="⛔ **PERMISSION DENIED:** Only authorized Traders or Admins may close positions.",
+                error="Permission denied: Closing positions requires TRADER privilege",
+            )
+
         from core.portfolio_shadow import portfolio_shadow
 
         positions = portfolio_shadow.get_open_positions()
@@ -1706,30 +1718,184 @@ class TelegramToolGateway:
         elif pending.tool_name == "close_paper_trade":
             from core.portfolio_shadow import portfolio_shadow
 
-            res = portfolio_shadow.close_position(pending.args["symbol"])
+            open_positions = portfolio_shadow.get_open_positions()
+            target_pos = None
+            req_pos_id = pending.args.get("position_id")
+            req_sym = pending.args.get("symbol")
+
+            if req_pos_id:
+                for p in open_positions:
+                    if p.get("position_id") == req_pos_id:
+                        target_pos = p
+                        break
+            if not target_pos and req_sym:
+                for p in open_positions:
+                    if p.get("symbol") == req_sym:
+                        target_pos = p
+                        break
+
+            if not target_pos:
+                return ToolResult(
+                    success=False,
+                    tool_name="confirm_action",
+                    tool_class=ToolClass.CLASS_C_ACTION,
+                    output_text=f"⚠️ No open position found matching {req_pos_id or req_sym}.",
+                    error="Position not found",
+                )
+
+            pos_id = target_pos["position_id"]
+            sym = target_pos.get("symbol", req_sym)
+            ok = portfolio_shadow.close_position(pos_id, exit_reason="TELEGRAM_CONFIRMED_CLOSE")
+
+            realized_pnl = 0.0
+            from core.database import db_manager
+
+            with db_manager.get_trading_conn() as conn:
+                cur = conn.execute(
+                    "SELECT realized_pnl FROM shadow_positions WHERE position_id = ?;",
+                    (pos_id,),
+                )
+                closed_row = cur.fetchone()
+                if closed_row and closed_row["realized_pnl"] is not None:
+                    realized_pnl = float(closed_row["realized_pnl"])
+
+            details_dict = {
+                "symbol": sym,
+                "position_id": pos_id,
+                "realized_pnl": realized_pnl,
+                "success": ok,
+            }
             TelegramAuditLogger.log_command_execution(
                 identity=identity,
                 command="close_paper_trade",
                 args=json.dumps(pending.args),
                 risk_result="PASS",
-                execution_result="EXECUTED",
-                details=res,
+                execution_result="EXECUTED" if ok else "FAILED",
+                details=details_dict,
             )
             text = (
                 f"✅ **TWO-PHASE CONFIRMATION EXECUTED: POSITION CLOSED**\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"• **Asset:** `{pending.args['symbol']}`\n"
-                f"• **Realized PnL:** `${res.get('realized_pnl', 0.0):+,.2f}`\n"
+                f"• **Asset:** `{sym}`\n"
+                f"• **Realized PnL:** `${realized_pnl:+,.2f}`\n"
                 f"• **Status:** Closed and booked into Shadow Equity\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"🔒 _Transaction recorded in audit ledger._"
             )
             return ToolResult(
-                success=True,
+                success=ok,
                 tool_name="confirm_action",
                 tool_class=ToolClass.CLASS_C_ACTION,
                 output_text=text,
-                data=res,
+                data=details_dict,
+            )
+
+        elif pending.tool_name == "execute_live_order":
+            from core.telegram.rbac import TelegramRole
+
+            if not (
+                identity.role == TelegramRole.ADMIN
+                or identity.role.can_access(TelegramRole.RISK_ADMIN)
+            ):
+                TelegramAuditLogger.log_command_execution(
+                    identity=identity,
+                    command="execute_live_order",
+                    args=json.dumps(pending.args),
+                    risk_result="ROLE_REJECTED",
+                    execution_result="BLOCKED",
+                    details={"reason": "Only Telegram ADMINs can execute live orders."},
+                )
+                return ToolResult(
+                    success=False,
+                    tool_name="confirm_action",
+                    tool_class=ToolClass.CLASS_D_LIVE_CONFIRM_REQUIRED,
+                    output_text="⛔ **PERMISSION DENIED:** Only authorized Telegram ADMINs may execute live orders.",
+                    error="Permission denied",
+                )
+
+            from core.data_streamer import data_streamer
+            from core.execution.live_router import (
+                LiveOrderRequest,
+                live_execution_router,
+            )
+            from core.market_providers import market_gateway
+            from core.portfolio_shadow import portfolio_shadow
+
+            args = pending.args
+            sym = args.get("symbol", "BTC/USDT")
+            side = "BUY" if str(args.get("direction", "LONG")).upper() == "LONG" else "SELL"
+
+            live_price = None
+            try:
+                t = await market_gateway.get_ticker(sym)
+                if isinstance(t, dict):
+                    live_price = float(t.get("price") or 0.0)
+                elif hasattr(t, "price"):
+                    live_price = float(getattr(t, "price", 0.0) or 0.0)
+            except Exception:
+                live_price = None
+
+            if not live_price or live_price <= 0:
+                live_price = float(data_streamer._last_known_prices.get(sym) or 0.0)
+            if not live_price or live_price <= 0:
+                live_price = (
+                    70000.0
+                    if "BTC" in sym
+                    else (3000.0 if "ETH" in sym else (150.0 if "SOL" in sym else 100.0))
+                )
+
+            notional = float(args.get("notional_usd", 10.0))
+            raw_qty = args.get("quantity") or args.get("size")
+            calc_qty = float(raw_qty) if raw_qty else max(0.001, round(notional / live_price, 4))
+
+            acct = portfolio_shadow.get_portfolio_accounting()
+            open_pos = portfolio_shadow.get_open_positions()
+
+            req = LiveOrderRequest(
+                exchange=args.get("exchange", "BINANCE_FUTURES"),
+                environment=args.get("environment", "PRODUCTION"),
+                symbol=sym,
+                side=side,
+                order_type=args.get("order_type", "MARKET"),
+                quantity=calc_qty,
+                price=live_price,
+                reference_price=live_price,
+                stop_loss=float(args.get("stop_loss") or 0.0) or None,
+                take_profit=float(args.get("take_profit") or 0.0) or None,
+                account_equity_usd=float(acct.get("virtual_equity", 100_000.0)),
+                daily_realized_pnl_usd=float(acct.get("daily_realized_pnl", 0.0)),
+                daily_unrealized_pnl_usd=float(acct.get("total_unrealized_pnl", 0.0)),
+                current_open_positions_count=len(open_pos),
+                max_open_positions_cap=3,
+                client_order_id=f"TG_CONF_{pending.token[:8]}",
+            )
+            receipt = await live_execution_router.execute_live_order(
+                req, operator_id=f"TG_ADMIN_{identity.user_id}"
+            )
+            details_dict = receipt.to_safe_dict()
+            TelegramAuditLogger.log_command_execution(
+                identity=identity,
+                command="execute_live_order",
+                args=json.dumps(pending.args),
+                risk_result="PASS",
+                execution_result="EXECUTED",
+                details=details_dict,
+            )
+            text = (
+                f"✅ **LIVE PRODUCTION ORDER DISPATCHED**\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"• **Client Order ID:** `{receipt.client_order_id}`\n"
+                f"• **Status:** `{receipt.status}`\n"
+                f"• **Venue:** `{receipt.exchange} [{receipt.environment}]`\n"
+                f"• **Executed Qty:** `{receipt.executed_qty}`\n"
+                f"• **Latency:** `{receipt.latency_ms:.1f}ms`"
+            )
+            return ToolResult(
+                success=True,
+                tool_name="confirm_action",
+                tool_class=ToolClass.CLASS_D_LIVE_CONFIRM_REQUIRED,
+                output_text=text,
+                data=details_dict,
             )
 
         return ToolResult(

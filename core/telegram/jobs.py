@@ -306,13 +306,25 @@ class ScheduledAlertDigestManager:
         if hour == 8 and self._last_morning_date != today_str:
             self._last_morning_date = today_str
             try:
-                msg = await bot_instance.generate_morning_briefing()
-                await bot_instance.broadcast_to_subscribers(msg)
-                dispatched["morning"] = True
-                logger.info(
-                    "Consolidated morning briefing dispatched at %s",
-                    now_bd.strftime("%H:%M BST"),
+                gen_fn = getattr(
+                    bot_instance,
+                    "generate_morning_briefing_text",
+                    getattr(bot_instance, "generate_morning_briefing", None),
                 )
+                if gen_fn:
+                    msg = await gen_fn()
+                    send_fn = getattr(
+                        bot_instance,
+                        "send_morning_briefing",
+                        getattr(bot_instance, "broadcast_to_subscribers", None),
+                    )
+                    if send_fn:
+                        await send_fn(msg)
+                    dispatched["morning"] = True
+                    logger.info(
+                        "Consolidated morning briefing dispatched at %s",
+                        now_bd.strftime("%H:%M BST"),
+                    )
             except Exception as e:
                 logger.warning("Morning briefing dispatch error: %s", e)
 
@@ -320,13 +332,25 @@ class ScheduledAlertDigestManager:
         if hour == 20 and self._last_evening_date != today_str:
             self._last_evening_date = today_str
             try:
-                msg = await bot_instance.generate_evening_review()
-                await bot_instance.broadcast_to_subscribers(msg)
-                dispatched["evening"] = True
-                logger.info(
-                    "Consolidated evening review dispatched at %s",
-                    now_bd.strftime("%H:%M BST"),
+                gen_fn = getattr(
+                    bot_instance,
+                    "generate_evening_review_text",
+                    getattr(bot_instance, "generate_evening_review", None),
                 )
+                if gen_fn:
+                    msg = await gen_fn()
+                    send_fn = getattr(
+                        bot_instance,
+                        "send_evening_review",
+                        getattr(bot_instance, "broadcast_to_subscribers", None),
+                    )
+                    if send_fn:
+                        await send_fn(msg)
+                    dispatched["evening"] = True
+                    logger.info(
+                        "Consolidated evening review dispatched at %s",
+                        now_bd.strftime("%H:%M BST"),
+                    )
             except Exception as e:
                 logger.warning("Evening review dispatch error: %s", e)
 
@@ -334,13 +358,29 @@ class ScheduledAlertDigestManager:
         if hour == 22 and self._last_learning_date != today_str:
             self._last_learning_date = today_str
             try:
-                msg = await bot_instance.generate_ai_learned_synthesis()
-                await bot_instance.broadcast_to_subscribers(msg)
-                dispatched["learning"] = True
-                logger.info(
-                    "Consolidated daily AI learning synthesis dispatched at %s",
-                    now_bd.strftime("%H:%M BST"),
+                gen_fn = getattr(
+                    bot_instance,
+                    "generate_what_ai_learned_today_text",
+                    getattr(
+                        bot_instance,
+                        "generate_ai_learned_synthesis",
+                        getattr(bot_instance, "generate_what_ai_learned_today", None),
+                    ),
                 )
+                if gen_fn:
+                    msg = await gen_fn()
+                    send_fn = getattr(
+                        bot_instance,
+                        "send_what_ai_learned_today",
+                        getattr(bot_instance, "broadcast_to_subscribers", None),
+                    )
+                    if send_fn:
+                        await send_fn(msg)
+                    dispatched["learning"] = True
+                    logger.info(
+                        "Consolidated daily AI learning synthesis dispatched at %s",
+                        now_bd.strftime("%H:%M BST"),
+                    )
             except Exception as e:
                 logger.warning("Daily AI learning synthesis dispatch error: %s", e)
 

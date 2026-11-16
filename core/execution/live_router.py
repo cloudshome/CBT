@@ -138,6 +138,7 @@ class LiveOrderRequest:
     client_order_id: str | None = None
     correlation_id: str | None = None
     reference_time_ms: int | None = None
+    reference_price: float | None = None
 
 
 @dataclass
@@ -159,6 +160,18 @@ class LiveExecutionReceipt:
     audit_event_id: str
     message: str
     requires_reconciliation: bool = False
+
+    @property
+    def order_status(self) -> str:
+        return self.status
+
+    @property
+    def executed_quantity(self) -> float:
+        return self.executed_qty
+
+    @property
+    def total_latency_ms(self) -> float:
+        return self.latency_ms
 
     def to_safe_dict(self) -> dict[str, Any]:
         """Returns receipt strictly free of secrets."""
@@ -243,13 +256,20 @@ class LiveExecutionRouter:
         environment: str,
     ) -> BaseExchangeConnector:
         """Instantiates connector using securely decrypted vault credentials."""
+        ex_upper = exchange.upper().strip()
         cred = credential_vault.get_credential(exchange, environment)
+        if (not cred or not cred.is_active) and ex_upper in (
+            "BINANCE_FUTURES",
+            "BINANCE_USDTM",
+            "BINANCE_PERP",
+            "BINANCE_SPOT",
+        ):
+            cred = credential_vault.get_credential("BINANCE", environment)
         if not cred or not cred.is_active:
             raise LiveCredentialUnavailableError(
                 f"No active credential found in vault for {exchange} [{environment}]."
             )
 
-        ex_upper = exchange.upper().strip()
         if ex_upper in ("BINANCE_FUTURES", "BINANCE_USDTM", "BINANCE_PERP"):
             return BinanceFuturesConnector(
                 environment=environment,
@@ -329,7 +349,14 @@ class LiveExecutionRouter:
         # ---------------------------------------------------------------------
         exch_upper = req.exchange.upper().strip()
         env_upper = req.environment.upper().strip()
-        if exch_upper not in ("BINANCE", "BYBIT"):
+        if exch_upper not in (
+            "BINANCE",
+            "BINANCE_SPOT",
+            "BINANCE_FUTURES",
+            "BINANCE_USDTM",
+            "BINANCE_PERP",
+            "BYBIT",
+        ):
             msg = f"UNSUPPORTED_EXCHANGE: Venue '{exch_upper}' is not supported."
             self._emit_rejection_audit(cid, req, "UNSUPPORTED_EXCHANGE", msg)
             raise ValueError(msg)
@@ -340,6 +367,13 @@ class LiveExecutionRouter:
             raise LiveEnvironmentMismatchError(msg)
 
         cred = credential_vault.get_credential(exch_upper, env_upper)
+        if (not cred or not cred.is_active) and exch_upper in (
+            "BINANCE_FUTURES",
+            "BINANCE_USDTM",
+            "BINANCE_PERP",
+            "BINANCE_SPOT",
+        ):
+            cred = credential_vault.get_credential("BINANCE", env_upper)
         if not cred or not cred.is_active:
             msg = f"CREDENTIAL_UNAVAILABLE: No active vault credentials for {exch_upper} [{env_upper}]."
             self._emit_rejection_audit(cid, req, "CREDENTIAL_UNAVAILABLE", msg)
@@ -379,7 +413,15 @@ class LiveExecutionRouter:
         # ---------------------------------------------------------------------
         # GATE 10: HalfKellySizer Invalidation & Payoff Primacy
         # ---------------------------------------------------------------------
-        est_entry = req.price or 1.0
+        ref_p = req.price or getattr(req, "reference_price", None)
+        if not ref_p:
+            try:
+                from core.data_streamer import data_streamer
+
+                ref_p = data_streamer._last_known_prices.get(req.symbol)
+            except Exception:
+                ref_p = None
+        est_entry = ref_p or 1.0
         est_sl = req.stop_loss or (
             est_entry * 0.98 if req.side.upper() == "BUY" else est_entry * 1.02
         )
@@ -460,7 +502,7 @@ class LiveExecutionRouter:
         # GATE 18: Exchange Endpoint Health
         # ---------------------------------------------------------------------
         vitals = api_health_guard.get_all_vitals()
-        exch_key = "Binance_REST" if exch_upper == "BINANCE" else "Bybit_V5"
+        exch_key = "Binance_REST" if exch_upper.startswith("BINANCE") else "Bybit_V5"
         for v in vitals:
             if v["endpoint_name"] == exch_key and v["status"] == "OFFLINE":
                 msg = f"EXCHANGE_OFFLINE: {exch_key} is marked OFFLINE by APIHealthGuard."
@@ -608,15 +650,44 @@ class LiveExecutionRouter:
         connector = self._get_connector(exch_upper, env_upper)
         idempotency_store.mark_dispatched(cid)
 
+        dispatch_price = None if req.order_type.upper() == "MARKET" else req.price
+        child_sl_id = None
+        child_tp_id = None
+
         try:
-            order_result = await connector.place_order(
-                symbol=req.symbol,
-                side=req.side,
-                order_type=req.order_type,
-                quantity=req.quantity,
-                price=req.price,
-                client_order_id=cid,
-            )
+            if (
+                hasattr(connector, "place_bracket_order")
+                and (req.stop_loss or req.take_profit)
+                and exch_upper in ("BINANCE_FUTURES", "BINANCE_USDTM", "BINANCE_PERP")
+            ):
+                bracket_res = await connector.place_bracket_order(
+                    symbol=req.symbol,
+                    side=req.side,
+                    quantity=req.quantity,
+                    order_type=req.order_type,
+                    price=dispatch_price,
+                    stop_loss_price=req.stop_loss,
+                    take_profit_price=req.take_profit,
+                    client_order_id=cid,
+                )
+                order_result = bracket_res["parent_order"]
+                if bracket_res.get("stop_loss_order") and isinstance(
+                    bracket_res["stop_loss_order"], dict
+                ):
+                    child_sl_id = bracket_res["stop_loss_order"].get("order_id")
+                if bracket_res.get("take_profit_order") and isinstance(
+                    bracket_res["take_profit_order"], dict
+                ):
+                    child_tp_id = bracket_res["take_profit_order"].get("order_id")
+            else:
+                order_result = await connector.place_order(
+                    symbol=req.symbol,
+                    side=req.side,
+                    order_type=req.order_type,
+                    quantity=req.quantity,
+                    price=dispatch_price,
+                    client_order_id=cid,
+                )
 
             t_end = time.perf_counter()
             total_latency_ms = round((t_end - t_start) * 1000.0, 2)
@@ -651,6 +722,12 @@ class LiveExecutionRouter:
             )
 
             # Record success in Audit Bus
+            details_dict = asdict(order_result)
+            if child_sl_id:
+                details_dict["stop_loss_order_id"] = child_sl_id
+            if child_tp_id:
+                details_dict["take_profit_order_id"] = child_tp_id
+
             audit_bus.emit_event(
                 event_type="LIVE_ORDER_FILLED"
                 if order_result.status == "FILLED"
@@ -658,7 +735,7 @@ class LiveExecutionRouter:
                 symbol=req.symbol,
                 severity="INFO",
                 reason=f"Order {cid} confirmed by {exch_upper}: status={order_result.status}, exch_id={order_result.exchange_order_id}",
-                details=asdict(order_result),
+                details=details_dict,
             )
 
             return LiveExecutionReceipt(

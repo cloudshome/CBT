@@ -162,10 +162,20 @@ class LiveExecutionGatekeeper:
             )
 
         # 5. Single trade constitutional 1.5% equity cap check
-        max_allowed_notional = total_equity * self.single_trade_equity_cap_pct
-        sizing_passed = (
-            order_notional_usd <= max_allowed_notional * 1.05
-        )  # 5% buffer for market moves
+        if entry_price > 0 and stop_loss_price and stop_loss_price > 0:
+            stop_dist_pct = abs(entry_price - stop_loss_price) / entry_price
+            order_risk_usd = order_notional_usd * stop_dist_pct
+            max_allowed_notional = (total_equity * self.single_trade_equity_cap_pct) / max(
+                stop_dist_pct, 1e-6
+            )
+            sizing_passed = order_risk_usd <= (
+                total_equity * self.single_trade_equity_cap_pct * 1.05
+            )
+        else:
+            max_allowed_notional = total_equity * self.single_trade_equity_cap_pct
+            sizing_passed = (
+                order_notional_usd <= max_allowed_notional * 1.05
+            )  # 5% buffer for market moves
         checks["single_trade_cap_conformed"] = sizing_passed
         if not sizing_passed:
             reasons.append(
@@ -177,15 +187,15 @@ class LiveExecutionGatekeeper:
         if environment.upper() == "TESTNET":
             live_env_enabled = True
         else:
-            live_env_enabled = os.getenv("LIVE_TRADING_ENABLED", "false").lower() in (
+            live_env_enabled = os.getenv("LIVE_EXECUTION_ENABLED", "false").lower() in (
                 "true",
                 "1",
                 "yes",
-            )
+            ) or os.getenv("LIVE_TRADING_ENABLED", "false").lower() in ("true", "1", "yes")
         checks["live_trading_authorized"] = live_env_enabled
         if not live_env_enabled:
             reasons.append(
-                "LIVE_TRADING_ENABLED environment flag is not set to true. Execution blocked."
+                "LIVE_EXECUTION_ENABLED / LIVE_TRADING_ENABLED environment flag is not set to true. Execution blocked."
             )
 
         # 7. Capital Governor Dual-Constraint Check (when strategy_id is specified)
@@ -238,12 +248,17 @@ class LiveExecutionGatekeeper:
 
         # 9. Tail Risk Engine Circuit Breaker
         try:
+            from core.execution.tail_dislocation_helper import (
+                compute_live_tail_and_dislocation_inputs,
+            )
             from core.tail_risk_engine import tail_risk_engine
 
+            btc_r, eth_r, gold_r, q_list = compute_live_tail_and_dislocation_inputs("BTC/USDT")
+
             tail_status = tail_risk_engine.evaluate_tail_risk(
-                btc_returns=[],
-                eth_returns=[],
-                gold_returns=[],
+                btc_returns=btc_r,
+                eth_returns=eth_r,
+                gold_returns=gold_r,
                 current_book_depth_usd=100_000.0,
                 rolling_median_depth_usd=100_000.0,
             )
@@ -262,7 +277,9 @@ class LiveExecutionGatekeeper:
         try:
             from core.venue_dislocation import venue_dislocation_monitor
 
-            disloc_status = venue_dislocation_monitor.update_and_check(symbol="BTCUSDT", quotes=[])
+            disloc_status = venue_dislocation_monitor.update_and_check(
+                symbol="BTCUSDT", quotes=q_list
+            )
             disloc_clear = disloc_status.action_recommended != "SUSPEND_AGGRESSIVE_MARKET_ORDERS"
             checks["venue_dislocation_clear"] = disloc_clear
             if not disloc_clear:
@@ -278,9 +295,12 @@ class LiveExecutionGatekeeper:
         # Publish audit event
         audit_event_id = None
         try:
-            audit_event_id = audit_bus.publish_event(
+            ev = audit_bus.emit_event(
                 event_type="LIVE_PREFLIGHT_VERDICT",
-                payload={
+                symbol=exchange_upper,
+                reason="Gatekeeper preflight evaluation",
+                severity="INFO" if all_passed else "WARNING",
+                details={
                     "exchange": exchange_upper,
                     "order_notional_usd": order_notional_usd,
                     "max_allowed_notional_usd": max_allowed_notional,
@@ -289,6 +309,7 @@ class LiveExecutionGatekeeper:
                     "reasons": reasons,
                 },
             )
+            audit_event_id = ev.event_id if ev else None
         except Exception as e:
             logger.debug(f"Audit bus logging error: {e}")
 

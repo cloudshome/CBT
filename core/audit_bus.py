@@ -125,6 +125,64 @@ class AuditBus:
         logger.info(f"Audit [{ev.severity}] {ev.event_type} on {ev.symbol}: {ev.reason}")
         return ev
 
+    def record_event(
+        self,
+        event_type: str | AuditEvent,
+        symbol: str = "SYSTEM",
+        reason: str = "",
+        severity: str = "INFO",
+        details: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> AuditEvent:
+        """Compatibility wrapper for callers using record_event."""
+        if isinstance(event_type, AuditEvent):
+            ev = event_type
+            self._memory_ring.append(ev)
+            if len(self._memory_ring) > self._memory_buffer_size:
+                self._memory_ring.pop(0)
+            try:
+                with db_manager.get_trading_conn() as conn:
+                    conn.execute(
+                        """
+                        INSERT INTO system_audit_events (
+                            event_id, timestamp, event_type, symbol, severity, reason, details_json, software_version
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            ev.event_id,
+                            ev.timestamp,
+                            ev.event_type,
+                            ev.symbol,
+                            ev.severity,
+                            ev.reason,
+                            json.dumps(ev.details),
+                            ev.software_version,
+                        ),
+                    )
+                    conn.commit()
+            except Exception as e:
+                logger.error(f"Failed to record audit event {ev.event_id}: {e}")
+            logger.info(f"Audit [{ev.severity}] {ev.event_type} on {ev.symbol}: {ev.reason}")
+            return ev
+
+        sym = (
+            symbol
+            if symbol != "SYSTEM"
+            else kwargs.get("module", kwargs.get("strategy_id", "SYSTEM"))
+        )
+        r = reason or kwargs.get("reason", f"{event_type} recorded")
+        d = dict(details) if details else {}
+        for k, v in kwargs.items():
+            if k not in ("module", "strategy_id", "reason"):
+                d[k] = v
+        return self.emit_event(
+            event_type=event_type,
+            symbol=str(sym),
+            reason=str(r),
+            severity=severity,
+            details=d,
+        )
+
     def publish_event(
         self,
         event_type: str,

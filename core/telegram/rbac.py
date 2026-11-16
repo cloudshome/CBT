@@ -28,6 +28,7 @@ class TelegramRole(enum.StrEnum):
     TRADER = "TRADER"
     RISK_ADMIN = "RISK_ADMIN"
     SUPER_ADMIN = "SUPER_ADMIN"
+    ADMIN = "SUPER_ADMIN"
 
     @property
     def level(self) -> int:
@@ -201,6 +202,9 @@ class TelegramRBACRegistry:
             )
         return is_granted, identity
 
+    authenticate_user = resolve_user
+
 
 # Global RBAC Singleton
 rbac_registry = TelegramRBACRegistry()
+telegram_rbac = rbac_registry

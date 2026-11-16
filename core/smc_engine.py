@@ -78,6 +78,7 @@ class SMCEngine:
         timeframe: str,
         candles: list[dict[str, Any]],
         current_regime: str = "TRENDING_BULL",
+        active_only: bool = False,
     ) -> list[SMCPattern]:
         """
         Scans a candlestick series for valid SMC patterns and attaches empirical expectancy.
@@ -89,6 +90,9 @@ class SMCEngine:
         patterns.extend(self._scan_fvgs(symbol, timeframe, candles, current_regime))
         patterns.extend(self._scan_order_blocks(symbol, timeframe, candles, current_regime))
         patterns.extend(self._scan_liquidity_sweeps(symbol, timeframe, candles, current_regime))
+
+        if active_only:
+            patterns = [p for p in patterns if p.status == "ACTIVE"]
 
         return patterns
 
@@ -116,22 +120,29 @@ class SMCEngine:
                 gap_size = c_curr["low"] - c_prev2["high"]
                 if gap_size > (c_mid["open"] * 0.0005):  # Filter out trivial micro-gaps
                     exp_r = self._get_expectancy(SMCPatternType.BULLISH_FVG.value, regime)
+                    top_p = round(c_curr["low"], 2)
+                    bot_p = round(c_prev2["high"], 2)
+                    status = "ACTIVE"
+                    for fwd in candles[i + 1 :]:
+                        if float(fwd["low"]) <= bot_p:
+                            status = "MITIGATED"
+                            break
                     fvgs.append(
                         SMCPattern(
                             pattern_type=SMCPatternType.BULLISH_FVG,
                             symbol=symbol,
                             timeframe=timeframe,
                             timestamp=c_curr["timestamp"],
-                            top_price=round(c_curr["low"], 2),
-                            bottom_price=round(c_prev2["high"], 2),
-                            mid_price=round((c_curr["low"] + c_prev2["high"]) / 2.0, 2),
-                            invalidation_level=round(c_prev2["high"], 2),
+                            top_price=top_p,
+                            bottom_price=bot_p,
+                            mid_price=round((top_p + bot_p) / 2.0, 2),
+                            invalidation_level=bot_p,
                             strength=round(
                                 min(1.0, gap_size / (c_mid["high"] - c_mid["low"] + 1e-5)), 2
                             ),
                             conditional_expectancy_r=round(exp_r, 2),
                             is_favorable=exp_r > 0.50,
-                            status="ACTIVE",
+                            status=status,
                             meta={"gap_size": round(gap_size, 2)},
                         )
                     )
@@ -141,22 +152,29 @@ class SMCEngine:
                 gap_size = c_prev2["low"] - c_curr["high"]
                 if gap_size > (c_mid["open"] * 0.0005):
                     exp_r = self._get_expectancy(SMCPatternType.BEARISH_FVG.value, regime)
+                    top_p = round(c_prev2["low"], 2)
+                    bot_p = round(c_curr["high"], 2)
+                    status = "ACTIVE"
+                    for fwd in candles[i + 1 :]:
+                        if float(fwd["high"]) >= top_p:
+                            status = "MITIGATED"
+                            break
                     fvgs.append(
                         SMCPattern(
                             pattern_type=SMCPatternType.BEARISH_FVG,
                             symbol=symbol,
                             timeframe=timeframe,
                             timestamp=c_curr["timestamp"],
-                            top_price=round(c_prev2["low"], 2),
-                            bottom_price=round(c_curr["high"], 2),
-                            mid_price=round((c_prev2["low"] + c_curr["high"]) / 2.0, 2),
-                            invalidation_level=round(c_prev2["low"], 2),
+                            top_price=top_p,
+                            bottom_price=bot_p,
+                            mid_price=round((top_p + bot_p) / 2.0, 2),
+                            invalidation_level=top_p,
                             strength=round(
                                 min(1.0, gap_size / (c_mid["high"] - c_mid["low"] + 1e-5)), 2
                             ),
                             conditional_expectancy_r=round(exp_r, 2),
                             is_favorable=exp_r > 0.50,
-                            status="ACTIVE",
+                            status=status,
                             meta={"gap_size": round(gap_size, 2)},
                         )
                     )
@@ -185,6 +203,12 @@ class SMCEngine:
 
             if is_down and impulse_up and break_high:
                 exp_r = self._get_expectancy(SMCPatternType.BULLISH_OB.value, regime)
+                inval_level = round(ob_candle["low"], 2)
+                status = "ACTIVE"
+                for fwd in candles[i + 1 :]:
+                    if float(fwd["close"]) < ob_candle["low"]:
+                        status = "INVALIDATED"
+                        break
                 obs.append(
                     SMCPattern(
                         pattern_type=SMCPatternType.BULLISH_OB,
@@ -194,11 +218,11 @@ class SMCEngine:
                         top_price=round(ob_candle["high"], 2),
                         bottom_price=round(ob_candle["low"], 2),
                         mid_price=round((ob_candle["high"] + ob_candle["low"]) / 2.0, 2),
-                        invalidation_level=round(ob_candle["low"], 2),
+                        invalidation_level=inval_level,
                         strength=0.85,
                         conditional_expectancy_r=round(exp_r, 2),
                         is_favorable=exp_r > 0.50,
-                        status="ACTIVE",
+                        status=status,
                         meta={"candle_index": i - 2},
                     )
                 )
@@ -212,6 +236,12 @@ class SMCEngine:
 
             if is_up and impulse_down and break_low:
                 exp_r = self._get_expectancy(SMCPatternType.BEARISH_OB.value, regime)
+                inval_level = round(ob_candle["high"], 2)
+                status = "ACTIVE"
+                for fwd in candles[i + 1 :]:
+                    if float(fwd["close"]) > ob_candle["high"]:
+                        status = "INVALIDATED"
+                        break
                 obs.append(
                     SMCPattern(
                         pattern_type=SMCPatternType.BEARISH_OB,
@@ -221,11 +251,11 @@ class SMCEngine:
                         top_price=round(ob_candle["high"], 2),
                         bottom_price=round(ob_candle["low"], 2),
                         mid_price=round((ob_candle["high"] + ob_candle["low"]) / 2.0, 2),
-                        invalidation_level=round(ob_candle["high"], 2),
+                        invalidation_level=inval_level,
                         strength=0.85,
                         conditional_expectancy_r=round(exp_r, 2),
                         is_favorable=exp_r > 0.50,
-                        status="ACTIVE",
+                        status=status,
                         meta={"candle_index": i - 2},
                     )
                 )

@@ -2785,7 +2785,10 @@ class TelegramBotDispatcher:
             from core.telegram.rbac import telegram_rbac
 
             user_identity = telegram_rbac.authenticate_user(user_id)
-            if user_identity.role != TelegramRole.ADMIN:
+            if not (
+                user_identity.role == TelegramRole.ADMIN
+                or user_identity.role.can_access(TelegramRole.RISK_ADMIN)
+            ):
                 await self.answer_callback_query(
                     cb_id,
                     "⛔ Denied: Only Telegram ADMIN can execute live orders.",
@@ -2804,22 +2807,52 @@ class TelegramBotDispatcher:
                 )
                 return {"status": "EXPIRED"}
 
+            from core.data_streamer import data_streamer
             from core.execution.live_router import (
                 LiveOrderRequest,
                 live_execution_router,
             )
+            from core.market_providers import market_gateway
+            from core.portfolio_shadow import portfolio_shadow
 
             args = pending.args
+            sym = args.get("symbol", "BTC/USDT")
+            live_price = None
+            try:
+                t = await market_gateway.get_ticker(sym)
+                if isinstance(t, dict):
+                    live_price = float(t.get("price") or 0.0)
+                elif hasattr(t, "price"):
+                    live_price = float(getattr(t, "price", 0.0) or 0.0)
+            except Exception:
+                live_price = None
+
+            if not live_price or live_price <= 0:
+                live_price = float(data_streamer._last_known_prices.get(sym) or 0.0)
+            if not live_price or live_price <= 0:
+                live_price = (
+                    70000.0
+                    if "BTC" in sym
+                    else (3000.0 if "ETH" in sym else (150.0 if "SOL" in sym else 100.0))
+                )
+
+            notional = float(args.get("notional_usd", 10.0))
+            calc_qty = max(0.001, round(notional / live_price, 4))
+            acct = portfolio_shadow.get_portfolio_accounting()
+            equity_val = float(acct.get("virtual_equity", 100_000.0))
+
             req = LiveOrderRequest(
                 exchange="BINANCE_FUTURES",
                 environment="PRODUCTION",
-                symbol=args.get("symbol", "BTC/USDT"),
+                symbol=sym,
                 side=("BUY" if args.get("direction", "LONG").upper() == "LONG" else "SELL"),
                 order_type="MARKET",
-                quantity=max(
-                    0.001,
-                    round(float(args.get("notional_usd", 10.0)) / 70000.0, 4),
-                ),
+                quantity=calc_qty,
+                price=live_price,
+                reference_price=live_price,
+                stop_loss=float(args.get("stop_loss") or 0.0) or None,
+                take_profit=float(args.get("take_profit") or 0.0) or None,
+                account_equity_usd=equity_val,
                 client_order_id=f"TG_LIVE_{pending_id}",
             )
             try:
@@ -2830,10 +2863,10 @@ class TelegramBotDispatcher:
                     f"✅ **LIVE PRODUCTION ORDER DISPATCHED**\n"
                     f"━━━━━━━━━━━━━━━━━━━━━━\n"
                     f"• **Client Order ID:** `{receipt.client_order_id}`\n"
-                    f"• **Status:** `{receipt.order_status}`\n"
+                    f"• **Status:** `{receipt.status}`\n"
                     f"• **Venue:** `{receipt.exchange} [{receipt.environment}]`\n"
-                    f"• **Executed Qty:** `{receipt.executed_quantity}`\n"
-                    f"• **Latency:** `{receipt.total_latency_ms:.1f}ms`"
+                    f"• **Executed Qty:** `{receipt.executed_qty}`\n"
+                    f"• **Latency:** `{receipt.latency_ms:.1f}ms`"
                 )
                 await self.send_message(exec_msg, chat_id=chat_id)
                 await self.answer_callback_query(cb_id, "Live order executed!")

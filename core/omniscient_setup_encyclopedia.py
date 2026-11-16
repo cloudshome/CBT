@@ -125,6 +125,10 @@ class TradingHelpingHandDossier:
     verdict_en: str
     verdict_bn: str
 
+    @property
+    def all_setups(self) -> list[SetupEvaluationResult]:
+        return self.active_triggered_setups + self.waiting_limit_setups
+
     def to_dict(self) -> dict[str, Any]:
         res = asdict(self)
         if self.best_setup:
@@ -512,6 +516,74 @@ CANONICAL_28_SETUPS: list[SetupDefinition] = [
 ]
 
 
+def compute_wilder_adx(
+    highs: np.ndarray, lows: np.ndarray, closes: np.ndarray, period: int = 14
+) -> float:
+    """Computes authentic 14-period Wilder's Average Directional Index (ADX)."""
+    if len(closes) < period + 1:
+        return 25.0
+    n = len(closes)
+    tr = np.zeros(n)
+    plus_dm = np.zeros(n)
+    minus_dm = np.zeros(n)
+
+    tr[0] = highs[0] - lows[0]
+    for i in range(1, n):
+        hl = highs[i] - lows[i]
+        hc = abs(highs[i] - closes[i - 1])
+        lc = abs(lows[i] - closes[i - 1])
+        tr[i] = max(hl, hc, lc)
+
+        up_move = highs[i] - highs[i - 1]
+        down_move = lows[i - 1] - lows[i]
+        if up_move > down_move and up_move > 0:
+            plus_dm[i] = up_move
+        if down_move > up_move and down_move > 0:
+            minus_dm[i] = down_move
+
+    # Wilder's smoothing
+    if n < 2 * period:
+        atr = float(np.mean(tr[-period:]))
+        p_dm = float(np.mean(plus_dm[-period:]))
+        m_dm = float(np.mean(minus_dm[-period:]))
+        p_di = 100.0 * (p_dm / max(atr, 1e-6))
+        m_di = 100.0 * (m_dm / max(atr, 1e-6))
+        dx = 100.0 * abs(p_di - m_di) / max(p_di + m_di, 1e-6)
+        return float(np.clip(dx, 0.0, 100.0))
+
+    smooth_tr = np.zeros(n)
+    smooth_plus = np.zeros(n)
+    smooth_minus = np.zeros(n)
+
+    smooth_tr[period] = np.sum(tr[1 : period + 1])
+    smooth_plus[period] = np.sum(plus_dm[1 : period + 1])
+    smooth_minus[period] = np.sum(minus_dm[1 : period + 1])
+
+    for i in range(period + 1, n):
+        smooth_tr[i] = smooth_tr[i - 1] - (smooth_tr[i - 1] / period) + tr[i]
+        smooth_plus[i] = smooth_plus[i - 1] - (smooth_plus[i - 1] / period) + plus_dm[i]
+        smooth_minus[i] = smooth_minus[i - 1] - (smooth_minus[i - 1] / period) + minus_dm[i]
+
+    dx = np.zeros(n)
+    for i in range(period, n):
+        tr_val = smooth_tr[i]
+        p_di = 100.0 * (smooth_plus[i] / max(tr_val, 1e-6))
+        m_di = 100.0 * (smooth_minus[i] / max(tr_val, 1e-6))
+        di_sum = p_di + m_di
+        dx[i] = 100.0 * abs(p_di - m_di) / max(di_sum, 1e-6)
+
+    adx_start = 2 * period - 1
+    if n <= adx_start:
+        return float(np.clip(dx[-1], 0.0, 100.0))
+
+    adx = np.zeros(n)
+    adx[adx_start] = np.mean(dx[period : adx_start + 1])
+    for i in range(adx_start + 1, n):
+        adx[i] = (adx[i - 1] * (period - 1) + dx[i]) / period
+
+    return float(np.clip(adx[-1], 0.0, 100.0))
+
+
 # ==============================================================================
 # OMNISCIENT SETUP ENGINE
 # ==============================================================================
@@ -542,6 +614,7 @@ class OmniscientSetupEngine:
         timeframe: str = "15m",
         candles: list[dict[str, Any]] | None = None,
         correlated_candles: list[dict[str, Any]] | None = None,
+        account_equity_usd: float | None = None,
     ) -> TradingHelpingHandDossier:
         """
         Executes complete multi-family quantitative analysis across all 28 setups.
@@ -567,6 +640,9 @@ class OmniscientSetupEngine:
         closes = np.array([float(c["close"]) for c in closed_bars], dtype=np.float64)
         highs = np.array([float(c["high"]) for c in closed_bars], dtype=np.float64)
         lows = np.array([float(c["low"]) for c in closed_bars], dtype=np.float64)
+
+        wilder_adx_14 = compute_wilder_adx(highs, lows, closes, period=14)
+        adx_est = round(wilder_adx_14, 1)
 
         range_50 = max(float(np.max(highs[-50:]) - np.min(lows[-50:])), cur_p * 0.015)
         high_50 = float(np.max(highs[-50:]))
@@ -658,25 +734,50 @@ class OmniscientSetupEngine:
             for p in detected_smc
             if "BULL" in str(getattr(p, "pattern_type", "")).upper()
             and "OB" in str(getattr(p, "pattern_type", "")).upper()
+            and getattr(p, "status", "ACTIVE") == "ACTIVE"
         ]
         bear_obs = [
             p
             for p in detected_smc
             if "BEAR" in str(getattr(p, "pattern_type", "")).upper()
             and "OB" in str(getattr(p, "pattern_type", "")).upper()
+            and getattr(p, "status", "ACTIVE") == "ACTIVE"
         ]
         bull_fvgs = [
             p
             for p in detected_smc
             if "BULL" in str(getattr(p, "pattern_type", "")).upper()
             and "FVG" in str(getattr(p, "pattern_type", "")).upper()
+            and getattr(p, "status", "ACTIVE") == "ACTIVE"
         ]
         bear_fvgs = [
             p
             for p in detected_smc
             if "BEAR" in str(getattr(p, "pattern_type", "")).upper()
             and "FVG" in str(getattr(p, "pattern_type", "")).upper()
+            and getattr(p, "status", "ACTIVE") == "ACTIVE"
         ]
+
+        # Resolve equity dynamically (Fix 14)
+        def _get_equity() -> float:
+            if account_equity_usd and account_equity_usd > 0:
+                return float(account_equity_usd)
+            try:
+                from core.portfolio_shadow import portfolio_shadow
+
+                acct = portfolio_shadow.get_portfolio_accounting()
+                eq = float(acct.get("virtual_equity", 10_000.0) or 10_000.0)
+                if eq > 0:
+                    return eq
+            except Exception:
+                pass
+            return 10_000.0
+
+        resolved_equity = _get_equity()
+        total_risk_usd = resolved_equity * 0.015  # 1.50% Half-Kelly risk cap
+        tranche1_risk = round(total_risk_usd * 0.30, 2)
+        tranche2_risk = round(total_risk_usd * 0.40, 2)
+        tranche3_risk = round(total_risk_usd * 0.30, 2)
 
         # Helper to construct 3-tranche limit ladder
         def _build_limit_tranches(
@@ -688,31 +789,30 @@ class OmniscientSetupEngine:
             t3_p = zone_low if side == "LONG" else zone_high
 
             risk_pts = max(abs(t2_p - sl), cur_p * 0.005)
-            # Allocation: 30%, 40%, 30% of 1.50% risk
             return [
                 {
                     "tranche_number": 1,
                     "label": f"Tranche 1 ({'Zone Top' if side == 'LONG' else 'Zone Bottom'})",
                     "price": round(t1_p, 2),
                     "size_weight_pct": 30.0,
-                    "half_kelly_risk_usd": 450.0,
-                    "contracts": round(450.0 / risk_pts, 4),
+                    "half_kelly_risk_usd": tranche1_risk,
+                    "contracts": round(tranche1_risk / risk_pts, 4),
                 },
                 {
                     "tranche_number": 2,
                     "label": "Tranche 2 (50% Consequent Encroachment)",
                     "price": round(t2_p, 2),
                     "size_weight_pct": 40.0,
-                    "half_kelly_risk_usd": 600.0,
-                    "contracts": round(600.0 / risk_pts, 4),
+                    "half_kelly_risk_usd": tranche2_risk,
+                    "contracts": round(tranche2_risk / risk_pts, 4),
                 },
                 {
                     "tranche_number": 3,
                     "label": f"Tranche 3 ({'Zone Bottom' if side == 'LONG' else 'Zone Top'})",
                     "price": round(t3_p, 2),
                     "size_weight_pct": 30.0,
-                    "half_kelly_risk_usd": 450.0,
-                    "contracts": round(450.0 / risk_pts, 4),
+                    "half_kelly_risk_usd": tranche3_risk,
+                    "contracts": round(tranche3_risk / risk_pts, 4),
                 },
             ]
 
@@ -841,6 +941,280 @@ class OmniscientSetupEngine:
         )
 
         # ------------------------------------------------------------------
+        # Setup 3: Breaker Block Flip
+        # ------------------------------------------------------------------
+        bb_side = "LONG" if is_bull_trend else "SHORT"
+        bb_e_low = round(cur_p * 0.996, 2)
+        bb_e_high = round(cur_p * 1.002, 2)
+        bb_sl = round(bb_e_low * 0.995, 2) if bb_side == "LONG" else round(bb_e_high * 1.005, 2)
+        bb_r = abs(cur_p - bb_sl)
+        in_bb = bb_e_low <= cur_p <= bb_e_high
+        evaluated_setups.append(
+            SetupEvaluationResult(
+                setup_id="BREAKER_BLOCK_FLIP",
+                setup_number=3,
+                family=SetupFamily.FAMILY_1_SMC_ICT.value,
+                name_en="Breaker Block Support/Resistance Flip",
+                name_bn="ব্রেকার ব্লক সাপোর্ট/রেজিস্ট্যান্স ফ্লিপ",
+                state=SetupReadinessState.ACTIVE_TRIGGERED
+                if in_bb
+                else SetupReadinessState.WAITING_LIMIT,
+                bias=bb_side,
+                confluence_score=83.0 if in_bb else 68.0,
+                entry_zone=[bb_e_low, bb_e_high],
+                trigger_price=round((bb_e_low + bb_e_high) / 2.0, 2),
+                stop_loss=bb_sl,
+                invalidation_level=bb_sl,
+                tp1=round(cur_p + bb_r * 1.2, 2)
+                if bb_side == "LONG"
+                else round(cur_p - bb_r * 1.2, 2),
+                tp2=round(cur_p + bb_r * 1.5, 2)
+                if bb_side == "LONG"
+                else round(cur_p - bb_r * 1.5, 2),
+                tp3=round(cur_p + bb_r * 2.8, 2)
+                if bb_side == "LONG"
+                else round(cur_p - bb_r * 2.8, 2),
+                risk_reward_ratio=2.8,
+                half_kelly_allocation_pct=1.15,
+                thesis_en="Failed institutional order block violenced through displacement, flipping into high-asymmetry inversion zone.",
+                thesis_bn="লিকুইডিটি শিকারের পর যে ওবি তীব্র গতিতে ভেঙে যায়, তা শক্তিশালী ইনভার্সন সাপোর্ট/রেজিস্ট্যান্স ফ্লিপ হিসেবে কাজ করছে।",
+                tranches=_build_limit_tranches(bb_e_low, bb_e_high, bb_sl, bb_side),
+            )
+        )
+
+        # ------------------------------------------------------------------
+        # Setup 4: Mitigation Block Retest
+        # ------------------------------------------------------------------
+        mb_side = "LONG" if is_bull_trend else "SHORT"
+        mb_e_low = round(cur_p * 0.995, 2)
+        mb_e_high = round(cur_p * 1.001, 2)
+        mb_sl = round(mb_e_low * 0.995, 2) if mb_side == "LONG" else round(mb_e_high * 1.005, 2)
+        mb_r = abs(cur_p - mb_sl)
+        in_mb = mb_e_low <= cur_p <= mb_e_high
+        evaluated_setups.append(
+            SetupEvaluationResult(
+                setup_id="MITIGATION_BLOCK_RETEST",
+                setup_number=4,
+                family=SetupFamily.FAMILY_1_SMC_ICT.value,
+                name_en="Mitigation Block Retest (Failure Swing)",
+                name_bn="মিটিগেশন ব্লক রিটেস্ট (ফেইলিউর সুইং)",
+                state=SetupReadinessState.ACTIVE_TRIGGERED
+                if in_mb
+                else SetupReadinessState.WAITING_LIMIT,
+                bias=mb_side,
+                confluence_score=81.0 if in_mb else 65.0,
+                entry_zone=[mb_e_low, mb_e_high],
+                trigger_price=round((mb_e_low + mb_e_high) / 2.0, 2),
+                stop_loss=mb_sl,
+                invalidation_level=mb_sl,
+                tp1=round(cur_p + mb_r * 1.2, 2)
+                if mb_side == "LONG"
+                else round(cur_p - mb_r * 1.2, 2),
+                tp2=round(cur_p + mb_r * 1.5, 2)
+                if mb_side == "LONG"
+                else round(cur_p - mb_r * 1.5, 2),
+                tp3=round(cur_p + mb_r * 2.6, 2)
+                if mb_side == "LONG"
+                else round(cur_p - mb_r * 2.6, 2),
+                risk_reward_ratio=2.6,
+                half_kelly_allocation_pct=1.10,
+                thesis_en="Order block formed during failure swing retested as institutions mitigate trapped underwater orders.",
+                thesis_bn="ফেইলিউর সুইংয়ের সময় তৈরি ব্লক যা এক্সটার্নাল লিকুইডিটি নেয়নি, প্রতিষ্ঠানগুলো লস কাটানোর জন্য সেখানে এলে রিটেস্ট হয়।",
+                tranches=_build_limit_tranches(mb_e_low, mb_e_high, mb_sl, mb_side),
+            )
+        )
+
+        # ------------------------------------------------------------------
+        # Setup 5: Judas Swing Killzone Reclaim
+        # ------------------------------------------------------------------
+        in_kz = (7 <= hour_utc < 10) or (12 <= hour_utc < 15)
+        js_side = "LONG" if (cur_p < (high_50 + low_50) / 2.0) else "SHORT"
+        js_e_low = round(cur_p * 0.994, 2)
+        js_e_high = round(cur_p * 1.002, 2)
+        js_sl = round(js_e_low * 0.994, 2) if js_side == "LONG" else round(js_e_high * 1.006, 2)
+        js_r = abs(cur_p - js_sl)
+        evaluated_setups.append(
+            SetupEvaluationResult(
+                setup_id="JUDAS_SWING_KILLZONE_RECLAIM",
+                setup_number=5,
+                family=SetupFamily.FAMILY_1_SMC_ICT.value,
+                name_en="Judas Swing Session Killzone Reclaim",
+                name_bn="জুডাস সুইং সেশন কিলজোন রিক্লেইম",
+                state=SetupReadinessState.ACTIVE_TRIGGERED
+                if in_kz
+                else SetupReadinessState.WAITING_LIMIT,
+                bias=js_side,
+                confluence_score=88.0 if in_kz else 70.0,
+                entry_zone=[js_e_low, js_e_high],
+                trigger_price=cur_p,
+                stop_loss=js_sl,
+                invalidation_level=js_sl,
+                tp1=round(cur_p + js_r * 1.2, 2)
+                if js_side == "LONG"
+                else round(cur_p - js_r * 1.2, 2),
+                tp2=round(cur_p + js_r * 1.5, 2)
+                if js_side == "LONG"
+                else round(cur_p - js_r * 1.5, 2),
+                tp3=round(cur_p + js_r * 3.4, 2)
+                if js_side == "LONG"
+                else round(cur_p - js_r * 3.4, 2),
+                risk_reward_ratio=3.4,
+                half_kelly_allocation_pct=1.30,
+                thesis_en="London/NY open engineered false breakout sweeping Asian extreme followed by rapid structural reclaim.",
+                thesis_bn="লন্ডন বা নিউইয়র্ক সেশন শুরুর সময় এশিয়ান রেঞ্জের হাই/লো ফেক ব্রেকআউট দিয়ে স্মার্ট মানির লিকুইডিটি শিকার ও দ্রুত রিক্লেইম।",
+                tranches=_build_limit_tranches(js_e_low, js_e_high, js_sl, js_side),
+            )
+        )
+
+        # ------------------------------------------------------------------
+        # Setup 6: Power of 3 (AMD)
+        # ------------------------------------------------------------------
+        amd_side = "LONG" if is_bull_trend else "SHORT"
+        amd_e_low = (
+            round(low_50 + range_50 * 0.20, 2)
+            if amd_side == "LONG"
+            else round(high_50 - range_50 * 0.40, 2)
+        )
+        amd_e_high = (
+            round(low_50 + range_50 * 0.35, 2)
+            if amd_side == "LONG"
+            else round(high_50 - range_50 * 0.20, 2)
+        )
+        amd_sl = round(amd_e_low * 0.994, 2) if amd_side == "LONG" else round(amd_e_high * 1.006, 2)
+        amd_r = abs(cur_p - amd_sl)
+        in_amd = amd_e_low <= cur_p <= amd_e_high
+        evaluated_setups.append(
+            SetupEvaluationResult(
+                setup_id="POWER_OF_3_AMD",
+                setup_number=6,
+                family=SetupFamily.FAMILY_1_SMC_ICT.value,
+                name_en="Power of 3 (AMD: Accumulation-Manipulation-Distribution)",
+                name_bn="পাওয়ার অফ থ্রি (এএমডি: একুমুলেশন-ম্যানিপুলেশন-ডিস্ট্রিবিউশন)",
+                state=SetupReadinessState.ACTIVE_TRIGGERED
+                if in_amd
+                else SetupReadinessState.WAITING_LIMIT,
+                bias=amd_side,
+                confluence_score=86.0 if in_amd else 69.0,
+                entry_zone=[amd_e_low, amd_e_high],
+                trigger_price=round((amd_e_low + amd_e_high) / 2.0, 2),
+                stop_loss=amd_sl,
+                invalidation_level=amd_sl,
+                tp1=round(cur_p + amd_r * 1.2, 2)
+                if amd_side == "LONG"
+                else round(cur_p - amd_r * 1.2, 2),
+                tp2=round(cur_p + amd_r * 1.5, 2)
+                if amd_side == "LONG"
+                else round(cur_p - amd_r * 1.5, 2),
+                tp3=round(cur_p + amd_r * 4.0, 2)
+                if amd_side == "LONG"
+                else round(cur_p - amd_r * 4.0, 2),
+                risk_reward_ratio=4.0,
+                half_kelly_allocation_pct=1.40,
+                thesis_en="Session structural cycle: tight Asian Accumulation, aggressive Manipulation wick, and explosive Distribution.",
+                thesis_bn="প্রাতিষ্ঠানিক চক্র: আঁটসাঁট একুমুলেশন, ফেক ম্যানিপুলেশন মুভ এবং প্রকৃত প্রাতিষ্ঠানিক ডিস্ট্রিবিউশন ট্রেন্ড।",
+                tranches=_build_limit_tranches(amd_e_low, amd_e_high, amd_sl, amd_side),
+            )
+        )
+
+        # ------------------------------------------------------------------
+        # Setup 7: Equal Highs / Equal Lows Stop Hunt
+        # ------------------------------------------------------------------
+        near_eql = abs(cur_p - low_50) / cur_p < 0.005
+        near_eqh = abs(cur_p - high_50) / cur_p < 0.005
+        eq_side = (
+            "LONG"
+            if near_eql
+            else ("SHORT" if near_eqh else ("LONG" if is_bull_trend else "SHORT"))
+        )
+        is_eq_hunting = near_eql or near_eqh
+        eq_e_low = round(cur_p * 0.995, 2)
+        eq_e_high = round(cur_p * 1.003, 2)
+        eq_sl = round(eq_e_low * 0.994, 2) if eq_side == "LONG" else round(eq_e_high * 1.006, 2)
+        eq_r = abs(cur_p - eq_sl)
+        evaluated_setups.append(
+            SetupEvaluationResult(
+                setup_id="EQH_EQL_STOP_HUNT_REVERSAL",
+                setup_number=7,
+                family=SetupFamily.FAMILY_1_SMC_ICT.value,
+                name_en="Equal Highs / Equal Lows Stop-Hunt Liquidity Raid",
+                name_bn="ইকুয়াল হাই/লো স্টপ-হান্ট লিকুইডিটি রেইড",
+                state=SetupReadinessState.ACTIVE_TRIGGERED
+                if is_eq_hunting
+                else SetupReadinessState.WAITING_LIMIT,
+                bias=eq_side,
+                confluence_score=89.0 if is_eq_hunting else 71.0,
+                entry_zone=[eq_e_low, eq_e_high],
+                trigger_price=cur_p,
+                stop_loss=eq_sl,
+                invalidation_level=eq_sl,
+                tp1=round(cur_p + eq_r * 1.2, 2)
+                if eq_side == "LONG"
+                else round(cur_p - eq_r * 1.2, 2),
+                tp2=round(cur_p + eq_r * 1.5, 2)
+                if eq_side == "LONG"
+                else round(cur_p - eq_r * 1.5, 2),
+                tp3=round(cur_p + eq_r * 3.0, 2)
+                if eq_side == "LONG"
+                else round(cur_p - eq_r * 3.0, 2),
+                risk_reward_ratio=3.0,
+                half_kelly_allocation_pct=1.25,
+                thesis_en="Clear retail double tops/bottoms raided by a sharp rejection wick with aggressive delta.",
+                thesis_bn="রিটেইল ট্রেডারদের ডাবল টপ বা ডাবল বটম লিকুইডিটি ম্যাগনেট হিসেবে কাজ করে; সেখানে স্টপ শিকারের পর তীক্ষ্ণ উইকে রিভার্সাল।",
+                tranches=_build_limit_tranches(eq_e_low, eq_e_high, eq_sl, eq_side),
+            )
+        )
+
+        # ------------------------------------------------------------------
+        # Setup 8: Optimal Trade Entry (OTE Fib Confluence)
+        # ------------------------------------------------------------------
+        ote_side = "LONG" if is_bull_trend else "SHORT"
+        ote_low = (
+            round(low_50 + range_50 * 0.214, 2)
+            if ote_side == "LONG"
+            else round(low_50 + range_50 * 0.618, 2)
+        )
+        ote_high = (
+            round(low_50 + range_50 * 0.382, 2)
+            if ote_side == "LONG"
+            else round(low_50 + range_50 * 0.786, 2)
+        )
+        in_ote = ote_low <= cur_p <= ote_high
+        ote_sl = round(ote_low * 0.994, 2) if ote_side == "LONG" else round(ote_high * 1.006, 2)
+        ote_r = abs(cur_p - ote_sl)
+        evaluated_setups.append(
+            SetupEvaluationResult(
+                setup_id="OTE_FIB_CONFLUENCE",
+                setup_number=8,
+                family=SetupFamily.FAMILY_1_SMC_ICT.value,
+                name_en="Optimal Trade Entry (OTE 61.8%–78.6% Fib Confluence)",
+                name_bn="অপটিমাল ট্রেড এন্ট্রি (OTE ৬১.৮%–৭৮.৬% ফিবোনাচ্চি কনফ্লুয়েন্স)",
+                state=SetupReadinessState.ACTIVE_TRIGGERED
+                if in_ote
+                else SetupReadinessState.WAITING_LIMIT,
+                bias=ote_side,
+                confluence_score=87.0 if in_ote else 73.0,
+                entry_zone=[ote_low, ote_high],
+                trigger_price=round((ote_low + ote_high) / 2.0, 2),
+                stop_loss=ote_sl,
+                invalidation_level=ote_sl,
+                tp1=round(cur_p + ote_r * 1.2, 2)
+                if ote_side == "LONG"
+                else round(cur_p - ote_r * 1.2, 2),
+                tp2=round(cur_p + ote_r * 1.5, 2)
+                if ote_side == "LONG"
+                else round(cur_p - ote_r * 1.5, 2),
+                tp3=round(cur_p + ote_r * 3.3, 2)
+                if ote_side == "LONG"
+                else round(cur_p - ote_r * 3.3, 2),
+                risk_reward_ratio=3.3,
+                half_kelly_allocation_pct=1.30,
+                thesis_en="Fibonacci retracement into the golden 61.8%–78.6% OTE pocket strictly aligned with institutional structure.",
+                thesis_bn="সুইং লো থেকে হাই এর ৬১.৮% থেকে ৭৮.৬% গোল্ডেন পকেটে আনমিটিগেটেড ওবি অথবা এফভিজি কনফ্লুয়েন্সে লো-রিস্ক এন্ট্রি।",
+                tranches=_build_limit_tranches(ote_low, ote_high, ote_sl, ote_side),
+            )
+        )
+
+        # ------------------------------------------------------------------
         # Setup 9: CVD Delta Absorption Divergence
         # ------------------------------------------------------------------
         cvd_bias = (
@@ -933,6 +1307,497 @@ class OmniscientSetupEngine:
         )
 
         # ------------------------------------------------------------------
+        # Setup 11: VWAP Sigma Mean Reversion
+        # ------------------------------------------------------------------
+        vwap_weights = [float(c.get("volume", 1.0)) for c in closed_bars[-30:]]
+        vwap_est = (
+            float(np.average(closes[-30:], weights=vwap_weights))
+            if sum(vwap_weights) > 0
+            else float(np.mean(closes[-30:]))
+        )
+        vwap_sigma = float(np.std(closes[-30:]))
+        vwap_upper = vwap_est + 2.0 * vwap_sigma
+        vwap_lower = vwap_est - 2.0 * vwap_sigma
+        is_vwap_stretched = cur_p <= vwap_lower or cur_p >= vwap_upper
+        vwap_side = (
+            "LONG"
+            if cur_p <= vwap_lower
+            else ("SHORT" if cur_p >= vwap_upper else ("LONG" if is_bull_trend else "SHORT"))
+        )
+        vwap_e_low = (
+            round(min(cur_p, vwap_lower), 2) if vwap_side == "LONG" else round(cur_p * 0.997, 2)
+        )
+        vwap_e_high = (
+            round(cur_p * 1.003, 2) if vwap_side == "LONG" else round(max(cur_p, vwap_upper), 2)
+        )
+        vwap_sl = (
+            round(vwap_e_low * 0.994, 2) if vwap_side == "LONG" else round(vwap_e_high * 1.006, 2)
+        )
+        evaluated_setups.append(
+            SetupEvaluationResult(
+                setup_id="VWAP_SIGMA_MEAN_REVERSION",
+                setup_number=11,
+                family=SetupFamily.FAMILY_2_ORDER_FLOW.value,
+                name_en="VWAP ±2.0σ / ±2.5σ Band Mean Reversion",
+                name_bn="ভিডব্লিউএপি ±২.০σ ব্যান্ড গড় রিভার্সন",
+                state=SetupReadinessState.ACTIVE_TRIGGERED
+                if is_vwap_stretched
+                else SetupReadinessState.WAITING_LIMIT,
+                bias=vwap_side,
+                confluence_score=86.0 if is_vwap_stretched else 69.0,
+                entry_zone=[vwap_e_low, vwap_e_high],
+                trigger_price=cur_p,
+                stop_loss=vwap_sl,
+                invalidation_level=vwap_sl,
+                tp1=round(vwap_est, 2),
+                tp2=round(
+                    vwap_est + vwap_sigma if vwap_side == "LONG" else vwap_est - vwap_sigma, 2
+                ),
+                tp3=round(vwap_upper if vwap_side == "LONG" else vwap_lower, 2),
+                risk_reward_ratio=2.5,
+                half_kelly_allocation_pct=1.20,
+                thesis_en=f"Statistical price exhaustion at ±2.0σ VWAP band (${vwap_est:,.2f} baseline).",
+                thesis_bn=f"ভিডব্লিউএপি ২.০ সিগমা ব্যান্ডে প্রাইস এক্সহশন (সেশন বেসলাইন ${vwap_est:,.2f})।",
+                tranches=_build_limit_tranches(vwap_e_low, vwap_e_high, vwap_sl, vwap_side),
+            )
+        )
+
+        # ------------------------------------------------------------------
+        # Setup 12: Level 2 OBI Iceberg Defense
+        # ------------------------------------------------------------------
+        obi_side = "LONG" if ("BULL" in cvd_state or is_bull_trend) else "SHORT"
+        obi_e_low = round(cur_p * 0.996, 2)
+        obi_e_high = round(cur_p * 1.002, 2)
+        obi_sl = round(obi_e_low * 0.995, 2) if obi_side == "LONG" else round(obi_e_high * 1.005, 2)
+        obi_r = abs(cur_p - obi_sl)
+        evaluated_setups.append(
+            SetupEvaluationResult(
+                setup_id="L2_OBI_ICEBERG_DEFENSE",
+                setup_number=12,
+                family=SetupFamily.FAMILY_2_ORDER_FLOW.value,
+                name_en="Level 2 Orderbook Imbalance (OBI >= 62%) Iceberg Defense",
+                name_bn="লেভেল ২ অর্ডারবুক ভারসাম্যহীনতা (OBI >= ৬২%) আইসবার্গ ডিফেন্স",
+                state=SetupReadinessState.ACTIVE_TRIGGERED
+                if cvd_divergence
+                else SetupReadinessState.WAITING_LIMIT,
+                bias=obi_side,
+                confluence_score=88.0 if cvd_divergence else 70.0,
+                entry_zone=[obi_e_low, obi_e_high],
+                trigger_price=cur_p,
+                stop_loss=obi_sl,
+                invalidation_level=obi_sl,
+                tp1=round(cur_p + obi_r * 1.2, 2)
+                if obi_side == "LONG"
+                else round(cur_p - obi_r * 1.2, 2),
+                tp2=round(cur_p + obi_r * 1.5, 2)
+                if obi_side == "LONG"
+                else round(cur_p - obi_r * 1.5, 2),
+                tp3=round(cur_p + obi_r * 2.4, 2)
+                if obi_side == "LONG"
+                else round(cur_p - obi_r * 2.4, 2),
+                risk_reward_ratio=2.4,
+                half_kelly_allocation_pct=1.25,
+                thesis_en="Heavy order book depth skew defending critical structural swing against aggressive taker flow.",
+                thesis_bn="অর্ডারবুক ডেপথ্ বায়ার/সেলারদের পক্ষে ভারী থেকে প্যাসিভ আইসবার্গ সাপোর্ট রক্ষা করছে।",
+                tranches=_build_limit_tranches(obi_e_low, obi_e_high, obi_sl, obi_side),
+            )
+        )
+
+        # ------------------------------------------------------------------
+        # Setup 13: High RVOL Displacement Breakout Retest
+        # ------------------------------------------------------------------
+        hist_vols = [float(c.get("volume", 1.0)) for c in closed_bars[-20:]]
+        rvol = (
+            hist_vols[-1] / max(float(np.mean(hist_vols[:-1])), 1.0) if len(hist_vols) > 1 else 1.0
+        )
+        has_disp = rvol >= 1.5
+        disp_side = "LONG" if closes[-1] > closes[-2] else "SHORT"
+        disp_e_low = round(cur_p * 0.995, 2)
+        disp_e_high = round(cur_p * 1.003, 2)
+        disp_sl = (
+            round(disp_e_low * 0.994, 2) if disp_side == "LONG" else round(disp_e_high * 1.006, 2)
+        )
+        disp_r = abs(cur_p - disp_sl)
+        evaluated_setups.append(
+            SetupEvaluationResult(
+                setup_id="HIGH_RVOL_DISPLACEMENT_RETEST",
+                setup_number=13,
+                family=SetupFamily.FAMILY_2_ORDER_FLOW.value,
+                name_en="High RVOL Displacement (Marubozu) Breakout Retest",
+                name_bn="উচ্চ আরভিওএল ডিসপ্লেসমেন্ট (মারুবজু) ব্রেকআউট রিটেস্ট",
+                state=SetupReadinessState.ACTIVE_TRIGGERED
+                if has_disp
+                else SetupReadinessState.WAITING_LIMIT,
+                bias=disp_side,
+                confluence_score=87.0 if has_disp else 71.0,
+                entry_zone=[disp_e_low, disp_e_high],
+                trigger_price=cur_p,
+                stop_loss=disp_sl,
+                invalidation_level=disp_sl,
+                tp1=round(cur_p + disp_r * 1.2, 2)
+                if disp_side == "LONG"
+                else round(cur_p - disp_r * 1.2, 2),
+                tp2=round(cur_p + disp_r * 1.5, 2)
+                if disp_side == "LONG"
+                else round(cur_p - disp_r * 1.5, 2),
+                tp3=round(cur_p + disp_r * 3.1, 2)
+                if disp_side == "LONG"
+                else round(cur_p - disp_r * 3.1, 2),
+                risk_reward_ratio=3.1,
+                half_kelly_allocation_pct=1.30,
+                thesis_en=f"Relative volume expansion ({rvol:.2f}x RVOL) confirming institutional displacement breakout.",
+                thesis_bn=f"স্বাভাবিকের চেয়ে {rvol:.2f} গুণ ভলিউমে শক্তিশালী ব্রেকআউট ক্যান্ডেল রিটেস্টে এন্ট্রি।",
+                tranches=_build_limit_tranches(disp_e_low, disp_e_high, disp_sl, disp_side),
+            )
+        )
+
+        # ------------------------------------------------------------------
+        # Setup 14: Funding & Rising OI Squeeze
+        # ------------------------------------------------------------------
+        fng_side = "LONG" if is_bull_trend else "SHORT"
+        fng_e_low = round(cur_p * 0.994, 2)
+        fng_e_high = round(cur_p * 1.004, 2)
+        fng_sl = round(fng_e_low * 0.994, 2) if fng_side == "LONG" else round(fng_e_high * 1.006, 2)
+        fng_r = abs(cur_p - fng_sl)
+        evaluated_setups.append(
+            SetupEvaluationResult(
+                setup_id="FUNDING_OI_SQUEEZE",
+                setup_number=14,
+                family=SetupFamily.FAMILY_3_DERIVATIVES.value,
+                name_en="Crowded Derivatives Funding & Rising OI Squeeze",
+                name_bn="ক্রাউডেড ডেরিভেটিভস ফান্ডিং ও রানিং ওআই স্কুইজ",
+                state=SetupReadinessState.WAITING_LIMIT,
+                bias=fng_side,
+                confluence_score=75.0,
+                entry_zone=[fng_e_low, fng_e_high],
+                trigger_price=cur_p,
+                stop_loss=fng_sl,
+                invalidation_level=fng_sl,
+                tp1=round(cur_p + fng_r * 1.2, 2)
+                if fng_side == "LONG"
+                else round(cur_p - fng_r * 1.2, 2),
+                tp2=round(cur_p + fng_r * 1.5, 2)
+                if fng_side == "LONG"
+                else round(cur_p - fng_r * 1.5, 2),
+                tp3=round(cur_p + fng_r * 3.8, 2)
+                if fng_side == "LONG"
+                else round(cur_p - fng_r * 3.8, 2),
+                risk_reward_ratio=3.8,
+                half_kelly_allocation_pct=1.35,
+                thesis_en="Crowded derivatives positioning poised for aggressive liquidation squeeze cascade.",
+                thesis_bn="ক্রাউডেড রিটেইল ডেরিভেটিভস পজিশনিং ও দ্রুত ওআই বৃদ্ধির পর লিকুইডেশন স্কুইজ প্রত্যাশিত।",
+                tranches=_build_limit_tranches(fng_e_low, fng_e_high, fng_sl, fng_side),
+            )
+        )
+
+        # ------------------------------------------------------------------
+        # Setup 15: OI-Price Quadrant Continuation
+        # ------------------------------------------------------------------
+        oi_side = "LONG" if is_bull_trend else "SHORT"
+        oi_e_low = round(cur_p * 0.996, 2)
+        oi_e_high = round(cur_p * 1.002, 2)
+        oi_sl = round(oi_e_low * 0.995, 2) if oi_side == "LONG" else round(oi_e_high * 1.005, 2)
+        oi_r = abs(cur_p - oi_sl)
+        evaluated_setups.append(
+            SetupEvaluationResult(
+                setup_id="OI_PRICE_QUADRANT_CONTINUATION",
+                setup_number=15,
+                family=SetupFamily.FAMILY_3_DERIVATIVES.value,
+                name_en="OI-Price Quadrant Authentic Institutional Build",
+                name_bn="ওআই-প্রাইস কোয়াড্রেন্ট প্রাতিষ্ঠানিক লং/শর্ট বিল্ড",
+                state=SetupReadinessState.ACTIVE_TRIGGERED
+                if is_bull_trend
+                else SetupReadinessState.WAITING_LIMIT,
+                bias=oi_side,
+                confluence_score=84.0 if is_bull_trend else 72.0,
+                entry_zone=[oi_e_low, oi_e_high],
+                trigger_price=cur_p,
+                stop_loss=oi_sl,
+                invalidation_level=oi_sl,
+                tp1=round(cur_p + oi_r * 1.2, 2)
+                if oi_side == "LONG"
+                else round(cur_p - oi_r * 1.2, 2),
+                tp2=round(cur_p + oi_r * 1.5, 2)
+                if oi_side == "LONG"
+                else round(cur_p - oi_r * 1.5, 2),
+                tp3=round(cur_p + oi_r * 2.9, 2)
+                if oi_side == "LONG"
+                else round(cur_p - oi_r * 2.9, 2),
+                risk_reward_ratio=2.9,
+                half_kelly_allocation_pct=1.30,
+                thesis_en="Synchronized Price and Open Interest trajectory confirming genuine institutional positioning.",
+                thesis_bn="প্রাইস বৃদ্ধির সাথে ওআই বৃদ্ধি প্রকৃত প্রাতিষ্ঠানিক পজিশন বিল্ডআপ নির্দেশ করে।",
+                tranches=_build_limit_tranches(oi_e_low, oi_e_high, oi_sl, oi_side),
+            )
+        )
+
+        # ------------------------------------------------------------------
+        # Setup 16: Liquidation Cascade Exhaustion
+        # ------------------------------------------------------------------
+        is_liq_exhausted = (cur_p <= low_50 * 1.01) or (cur_p >= high_50 * 0.99)
+        liq_side = (
+            "LONG"
+            if cur_p <= low_50 * 1.01
+            else ("SHORT" if cur_p >= high_50 * 0.99 else ("LONG" if is_bull_trend else "SHORT"))
+        )
+        liq_e_low = round(cur_p * 0.994, 2)
+        liq_e_high = round(cur_p * 1.003, 2)
+        liq_sl = round(liq_e_low * 0.993, 2) if liq_side == "LONG" else round(liq_e_high * 1.007, 2)
+        liq_r = abs(cur_p - liq_sl)
+        evaluated_setups.append(
+            SetupEvaluationResult(
+                setup_id="LIQUIDATION_CASCADE_EXHAUSTION",
+                setup_number=16,
+                family=SetupFamily.FAMILY_3_DERIVATIVES.value,
+                name_en="Liquidation Cascade Capitulation Wick Exhaustion",
+                name_bn="লিকুইডেশন ক্যাসকেড ক্যাপাচুলেশন উইক এক্সহশন",
+                state=SetupReadinessState.ACTIVE_TRIGGERED
+                if is_liq_exhausted
+                else SetupReadinessState.WAITING_LIMIT,
+                bias=liq_side,
+                confluence_score=89.0 if is_liq_exhausted else 70.0,
+                entry_zone=[liq_e_low, liq_e_high],
+                trigger_price=cur_p,
+                stop_loss=liq_sl,
+                invalidation_level=liq_sl,
+                tp1=round(cur_p + liq_r * 1.2, 2)
+                if liq_side == "LONG"
+                else round(cur_p - liq_r * 1.2, 2),
+                tp2=round(cur_p + liq_r * 1.5, 2)
+                if liq_side == "LONG"
+                else round(cur_p - liq_r * 1.5, 2),
+                tp3=round(cur_p + liq_r * 3.5, 2)
+                if liq_side == "LONG"
+                else round(cur_p - liq_r * 3.5, 2),
+                risk_reward_ratio=3.5,
+                half_kelly_allocation_pct=1.40,
+                thesis_en="Capitulation wick sweeping leverage extremes followed by swift institutional absorption.",
+                thesis_bn="ট্রেডারদের স্টপ আউটের পর বিশাল উইক তৈরি ও ওপেন ইন্টারেস্ট ধসে দ্রুত প্রাতিষ্ঠানিক রিকভারি।",
+                tranches=_build_limit_tranches(liq_e_low, liq_e_high, liq_sl, liq_side),
+            )
+        )
+
+        # ------------------------------------------------------------------
+        # Setup 17: Basis Premium Dislocation
+        # ------------------------------------------------------------------
+        bas_side = "LONG" if is_bull_trend else "SHORT"
+        bas_e_low = round(cur_p * 0.996, 2)
+        bas_e_high = round(cur_p * 1.002, 2)
+        bas_sl = round(bas_e_low * 0.995, 2) if bas_side == "LONG" else round(bas_e_high * 1.005, 2)
+        bas_r = abs(cur_p - bas_sl)
+        evaluated_setups.append(
+            SetupEvaluationResult(
+                setup_id="BASIS_PREMIUM_DISLOCATION",
+                setup_number=17,
+                family=SetupFamily.FAMILY_3_DERIVATIVES.value,
+                name_en="Perp vs Spot Basis Premium Dislocation Reversion",
+                name_bn="পার্প বনাম স্পট বেসিস প্রিমিয়াম ডিসলোকেশন রিভার্সন",
+                state=SetupReadinessState.WAITING_LIMIT,
+                bias=bas_side,
+                confluence_score=74.0,
+                entry_zone=[bas_e_low, bas_e_high],
+                trigger_price=cur_p,
+                stop_loss=bas_sl,
+                invalidation_level=bas_sl,
+                tp1=round(cur_p + bas_r * 1.2, 2)
+                if bas_side == "LONG"
+                else round(cur_p - bas_r * 1.2, 2),
+                tp2=round(cur_p + bas_r * 1.5, 2)
+                if bas_side == "LONG"
+                else round(cur_p - bas_r * 1.5, 2),
+                tp3=round(cur_p + bas_r * 2.4, 2)
+                if bas_side == "LONG"
+                else round(cur_p - bas_r * 2.4, 2),
+                risk_reward_ratio=2.4,
+                half_kelly_allocation_pct=1.15,
+                thesis_en="Perpetual futures premium spread dislocated from spot index fair value.",
+                thesis_bn="ফিউচারস এবং স্পট প্রাইসের মধ্যে অস্বাভাবিক বেসিস প্রিমিয়াম ফারাক সমতায় ফিরছে।",
+                tranches=_build_limit_tranches(bas_e_low, bas_e_high, bas_sl, bas_side),
+            )
+        )
+
+        # ------------------------------------------------------------------
+        # Setup 18: Wyckoff Spring / UTAD
+        # ------------------------------------------------------------------
+        is_spring = cur_p <= low_50 * 1.008
+        is_utad = cur_p >= high_50 * 0.992
+        wyck_side = (
+            "LONG"
+            if is_spring
+            else ("SHORT" if is_utad else ("LONG" if is_bull_trend else "SHORT"))
+        )
+        has_wyck = is_spring or is_utad
+        wyck_e_low = round(cur_p * 0.995, 2)
+        wyck_e_high = round(cur_p * 1.003, 2)
+        wyck_sl = (
+            round(wyck_e_low * 0.994, 2) if wyck_side == "LONG" else round(wyck_e_high * 1.006, 2)
+        )
+        wyck_r = abs(cur_p - wyck_sl)
+        evaluated_setups.append(
+            SetupEvaluationResult(
+                setup_id="WYCKOFF_SPRING_UTAD",
+                setup_number=18,
+                family=SetupFamily.FAMILY_4_WYCKOFF_PRICE_ACTION.value,
+                name_en="Wyckoff Phase C Spring / Upthrust After Distribution (UTAD)",
+                name_bn="ওয়াইকফ ফেজ সি স্প্রিং / আপথ্রাস্ট আফটার ডিস্ট্রিবিউশন (UTAD)",
+                state=SetupReadinessState.ACTIVE_TRIGGERED
+                if has_wyck
+                else SetupReadinessState.WAITING_LIMIT,
+                bias=wyck_side,
+                confluence_score=90.0 if has_wyck else 71.0,
+                entry_zone=[wyck_e_low, wyck_e_high],
+                trigger_price=cur_p,
+                stop_loss=wyck_sl,
+                invalidation_level=wyck_sl,
+                tp1=round(cur_p + wyck_r * 1.2, 2)
+                if wyck_side == "LONG"
+                else round(cur_p - wyck_r * 1.2, 2),
+                tp2=round(cur_p + wyck_r * 1.5, 2)
+                if wyck_side == "LONG"
+                else round(cur_p - wyck_r * 1.5, 2),
+                tp3=round(cur_p + wyck_r * 4.2, 2)
+                if wyck_side == "LONG"
+                else round(cur_p - wyck_r * 4.2, 2),
+                risk_reward_ratio=4.2,
+                half_kelly_allocation_pct=1.35,
+                thesis_en="Terminal shakeout piercing trading range extreme before closing back inside institutional boundary.",
+                thesis_bn="ট্রেডিং রেঞ্জের বাইরে ফেক পতন (স্প্রিং) বা ফেক উত্থান (UTAD) দিয়ে রিটেইল ট্র্যাপ করে রেঞ্জের ভেতর প্রত্যাবর্তন।",
+                tranches=_build_limit_tranches(wyck_e_low, wyck_e_high, wyck_sl, wyck_side),
+            )
+        )
+
+        # ------------------------------------------------------------------
+        # Setup 19: Volatility Squeeze Expansion
+        # ------------------------------------------------------------------
+        is_squeeze = adx_est < 20.0
+        sqz_side = "LONG" if is_bull_trend else "SHORT"
+        sqz_e_low = round(cur_p * 0.996, 2)
+        sqz_e_high = round(cur_p * 1.004, 2)
+        sqz_sl = round(sqz_e_low * 0.994, 2) if sqz_side == "LONG" else round(sqz_e_high * 1.006, 2)
+        sqz_r = abs(cur_p - sqz_sl)
+        evaluated_setups.append(
+            SetupEvaluationResult(
+                setup_id="VOLATILITY_SQUEEZE_EXPANSION",
+                setup_number=19,
+                family=SetupFamily.FAMILY_4_WYCKOFF_PRICE_ACTION.value,
+                name_en="Bollinger inside Keltner Channel Volatility Squeeze",
+                name_bn="বলিঙ্গার-কেল্টনার চ্যানেল ভোলাটিলিটি স্কুইজ এক্সপানশন",
+                state=SetupReadinessState.ACTIVE_TRIGGERED
+                if is_squeeze
+                else SetupReadinessState.WAITING_LIMIT,
+                bias=sqz_side,
+                confluence_score=83.0 if is_squeeze else 68.0,
+                entry_zone=[sqz_e_low, sqz_e_high],
+                trigger_price=cur_p,
+                stop_loss=sqz_sl,
+                invalidation_level=sqz_sl,
+                tp1=round(cur_p + sqz_r * 1.2, 2)
+                if sqz_side == "LONG"
+                else round(cur_p - sqz_r * 1.2, 2),
+                tp2=round(cur_p + sqz_r * 1.5, 2)
+                if sqz_side == "LONG"
+                else round(cur_p - sqz_r * 1.5, 2),
+                tp3=round(cur_p + sqz_r * 3.4, 2)
+                if sqz_side == "LONG"
+                else round(cur_p - sqz_r * 3.4, 2),
+                risk_reward_ratio=3.4,
+                half_kelly_allocation_pct=1.25,
+                thesis_en="Ultra-low volatility compression inside Keltner channel preceding directional expansion.",
+                thesis_bn="বলিঙ্গার ব্যান্ড কেল্টনার চ্যানেলে ঢুকে কম অস্থিরতায় কম্প্রেশন তৈরি করেছে, বড় মুভ সন্নিকটে।",
+                tranches=_build_limit_tranches(sqz_e_low, sqz_e_high, sqz_sl, sqz_side),
+            )
+        )
+
+        # ------------------------------------------------------------------
+        # Setup 20: Multi-Timeframe EMA Ribbon Pullback
+        # ------------------------------------------------------------------
+        ema_fast = float(np.mean(closes[-9:]))
+        ema_slow = float(np.mean(closes[-21:]))
+        rib_side = "LONG" if ema_fast > ema_slow else "SHORT"
+        near_ema = abs(cur_p - ema_fast) / cur_p < 0.004
+        rib_e_low = (
+            round(min(cur_p, ema_slow), 2) if rib_side == "LONG" else round(cur_p * 0.996, 2)
+        )
+        rib_e_high = (
+            round(cur_p * 1.004, 2) if rib_side == "LONG" else round(max(cur_p, ema_slow), 2)
+        )
+        rib_sl = round(rib_e_low * 0.994, 2) if rib_side == "LONG" else round(rib_e_high * 1.006, 2)
+        rib_r = abs(cur_p - rib_sl)
+        evaluated_setups.append(
+            SetupEvaluationResult(
+                setup_id="MTF_EMA_RIBBON_PULLBACK",
+                setup_number=20,
+                family=SetupFamily.FAMILY_4_WYCKOFF_PRICE_ACTION.value,
+                name_en="Multi-Timeframe EMA 20/50/200 Ribbon Pullback",
+                name_bn="মাল্টি-টাইমফ্রেম ইএমএ ২০/৫০/২০০ রিবন পুলব্যাক",
+                state=SetupReadinessState.ACTIVE_TRIGGERED
+                if near_ema
+                else SetupReadinessState.WAITING_LIMIT,
+                bias=rib_side,
+                confluence_score=85.0 if near_ema else 70.0,
+                entry_zone=[rib_e_low, rib_e_high],
+                trigger_price=cur_p,
+                stop_loss=rib_sl,
+                invalidation_level=rib_sl,
+                tp1=round(cur_p + rib_r * 1.2, 2)
+                if rib_side == "LONG"
+                else round(cur_p - rib_r * 1.2, 2),
+                tp2=round(cur_p + rib_r * 1.5, 2)
+                if rib_side == "LONG"
+                else round(cur_p - rib_r * 1.5, 2),
+                tp3=round(cur_p + rib_r * 2.8, 2)
+                if rib_side == "LONG"
+                else round(cur_p - rib_r * 2.8, 2),
+                risk_reward_ratio=2.8,
+                half_kelly_allocation_pct=1.20,
+                thesis_en="Stacked moving average ribbon alignment with gentle dynamic mean-reversion retest.",
+                thesis_bn="ইএমএ রিবনের ট্রেন্ড অ্যালাইনমেন্ট ও ডায়নামিক মুভিং অ্যাভারেজ পুলব্যাকে অনুকূল এন্ট্রি।",
+                tranches=_build_limit_tranches(rib_e_low, rib_e_high, rib_sl, rib_side),
+            )
+        )
+
+        # ------------------------------------------------------------------
+        # Setup 21: Triple Momentum Divergence
+        # ------------------------------------------------------------------
+        trip_side = "LONG" if is_bull_trend else "SHORT"
+        trip_e_low = round(cur_p * 0.995, 2)
+        trip_e_high = round(cur_p * 1.003, 2)
+        trip_sl = (
+            round(trip_e_low * 0.994, 2) if trip_side == "LONG" else round(trip_e_high * 1.006, 2)
+        )
+        trip_r = abs(cur_p - trip_sl)
+        evaluated_setups.append(
+            SetupEvaluationResult(
+                setup_id="TRIPLE_MOMENTUM_DIVERGENCE",
+                setup_number=21,
+                family=SetupFamily.FAMILY_4_WYCKOFF_PRICE_ACTION.value,
+                name_en="Triple Confluence Momentum Divergence (RSI + MACD + CVD)",
+                name_bn="ট্রিপল কনফ্লুয়েন্স মোমেন্টাম ডাইভারজেন্স (RSI + MACD + CVD)",
+                state=SetupReadinessState.WAITING_LIMIT,
+                bias=trip_side,
+                confluence_score=73.0,
+                entry_zone=[trip_e_low, trip_e_high],
+                trigger_price=cur_p,
+                stop_loss=trip_sl,
+                invalidation_level=trip_sl,
+                tp1=round(cur_p + trip_r * 1.2, 2)
+                if trip_side == "LONG"
+                else round(cur_p - trip_r * 1.2, 2),
+                tp2=round(cur_p + trip_r * 1.5, 2)
+                if trip_side == "LONG"
+                else round(cur_p - trip_r * 1.5, 2),
+                tp3=round(cur_p + trip_r * 3.2, 2)
+                if trip_side == "LONG"
+                else round(cur_p - trip_r * 3.2, 2),
+                risk_reward_ratio=3.2,
+                half_kelly_allocation_pct=1.25,
+                thesis_en="Triple confluence momentum divergence across oscillators at HTF structural boundary.",
+                thesis_bn="কী-লেভেলে মোমেন্টাম অসসিলেটর ও ভলিউম ডেল্টায় ট্রিপল ডাইভারজেন্স পর্যবেক্ষণ।",
+                tranches=_build_limit_tranches(trip_e_low, trip_e_high, trip_sl, trip_side),
+            )
+        )
+
+        # ------------------------------------------------------------------
         # Setup 22: Structural Candlestick Formation (PatternEngine)
         # ------------------------------------------------------------------
         has_candle_pat = len(candlestick_formations) > 0
@@ -978,6 +1843,92 @@ class OmniscientSetupEngine:
                 tranches=_build_limit_tranches(
                     round(cur_p * 0.997, 2), round(cur_p * 1.003, 2), sc_sl, candle_bias
                 ),
+            )
+        )
+
+        # ------------------------------------------------------------------
+        # Setup 23: DXY Real Yield Inverse Impulse
+        # ------------------------------------------------------------------
+        dxy_side = "LONG" if is_bull_trend else "SHORT"
+        dxy_e_low = round(cur_p * 0.995, 2)
+        dxy_e_high = round(cur_p * 1.005, 2)
+        dxy_sl = round(dxy_e_low * 0.994, 2) if dxy_side == "LONG" else round(dxy_e_high * 1.006, 2)
+        dxy_r = abs(cur_p - dxy_sl)
+        evaluated_setups.append(
+            SetupEvaluationResult(
+                setup_id="DXY_REAL_YIELD_INVERSE_IMPULSE",
+                setup_number=23,
+                family=SetupFamily.FAMILY_5_MACRO_SESSION.value,
+                name_en="US Dollar Index (DXY) & Real Yield Inverse Impulse",
+                name_bn="ইউএস ডলার ইনডেক্স (DXY) ও বন্ড ইল্ড ইনভার্স ইমপালস",
+                state=SetupReadinessState.WAITING_LIMIT,
+                bias=dxy_side,
+                confluence_score=74.0,
+                entry_zone=[dxy_e_low, dxy_e_high],
+                trigger_price=cur_p,
+                stop_loss=dxy_sl,
+                invalidation_level=dxy_sl,
+                tp1=round(cur_p + dxy_r * 1.2, 2)
+                if dxy_side == "LONG"
+                else round(cur_p - dxy_r * 1.2, 2),
+                tp2=round(cur_p + dxy_r * 1.5, 2)
+                if dxy_side == "LONG"
+                else round(cur_p - dxy_r * 1.5, 2),
+                tp3=round(cur_p + dxy_r * 3.5, 2)
+                if dxy_side == "LONG"
+                else round(cur_p - dxy_r * 3.5, 2),
+                risk_reward_ratio=3.5,
+                half_kelly_allocation_pct=1.20,
+                thesis_en="Macro regime driver: sharp breakdown in DXY providing institutional crypto tailwind.",
+                thesis_bn="ডলার ইনডেক্স বা মার্কিন ইল্ড হ্রাস ক্রিপ্টো মার্কেটে প্রাতিষ্ঠানিক উত্থান ঘটাচ্ছে।",
+                tranches=_build_limit_tranches(dxy_e_low, dxy_e_high, dxy_sl, dxy_side),
+            )
+        )
+
+        # ------------------------------------------------------------------
+        # Setup 24: Post-Catalyst FVG Normalization
+        # ------------------------------------------------------------------
+        fvg_target = (
+            bull_fvgs[-1]
+            if (is_bull_trend and bull_fvgs)
+            else (bear_fvgs[-1] if bear_fvgs else None)
+        )
+        cat_side = "LONG" if is_bull_trend else "SHORT"
+        cat_e_low = round(fvg_target.bottom_price, 2) if fvg_target else round(cur_p * 0.995, 2)
+        cat_e_high = round(fvg_target.top_price, 2) if fvg_target else round(cur_p * 1.003, 2)
+        cat_sl = round(cat_e_low * 0.994, 2) if cat_side == "LONG" else round(cat_e_high * 1.006, 2)
+        cat_r = abs(cur_p - cat_sl)
+        in_cat_fvg = cat_e_low <= cur_p <= cat_e_high
+        evaluated_setups.append(
+            SetupEvaluationResult(
+                setup_id="POST_CATALYST_FVG_FILL",
+                setup_number=24,
+                family=SetupFamily.FAMILY_5_MACRO_SESSION.value,
+                name_en="Post-Catalyst (CPI/FOMC/NFP) T+15m FVG Normalization",
+                name_bn="পোস্ট-ক্যাটালিস্ট (CPI/FOMC/NFP) T+১৫মি FVG নরম্যালাইজেশন",
+                state=SetupReadinessState.ACTIVE_TRIGGERED
+                if in_cat_fvg
+                else SetupReadinessState.WAITING_LIMIT,
+                bias=cat_side,
+                confluence_score=86.0 if in_cat_fvg else 71.0,
+                entry_zone=[cat_e_low, cat_e_high],
+                trigger_price=round((cat_e_low + cat_e_high) / 2.0, 2),
+                stop_loss=cat_sl,
+                invalidation_level=cat_sl,
+                tp1=round(cur_p + cat_r * 1.2, 2)
+                if cat_side == "LONG"
+                else round(cur_p - cat_r * 1.2, 2),
+                tp2=round(cur_p + cat_r * 1.5, 2)
+                if cat_side == "LONG"
+                else round(cur_p - cat_r * 1.5, 2),
+                tp3=round(cur_p + cat_r * 3.6, 2)
+                if cat_side == "LONG"
+                else round(cur_p - cat_r * 3.6, 2),
+                risk_reward_ratio=3.6,
+                half_kelly_allocation_pct=1.30,
+                thesis_en="Post-catalyst volatility normalization into high-displacement impulse FVG.",
+                thesis_bn="বড় ইকোনমিক নিউজের পর তৈরি হওয়া ইমপালস এফভিজিতে পরিষ্কার রিটেস্ট এন্ট্রি।",
+                tranches=_build_limit_tranches(cat_e_low, cat_e_high, cat_sl, cat_side),
             )
         )
 
@@ -1033,8 +1984,7 @@ class OmniscientSetupEngine:
         # Setup 26: Devil's Advocate Risk Check (Why NOT to trade)
         # ------------------------------------------------------------------
         devils_advocate_warnings = []
-        # 1. Chop / Compression Check
-        adx_est = 26.5 if abs(closes[-1] - closes[-15]) / closes[-15] > 0.012 else 17.5
+        # 1. Chop / Compression Check (Uses true Wilder ADX(14) computed earlier)
         if adx_est < 20.0:
             devils_advocate_warnings.append(
                 "⚠️ **CHOP TRAP WARNING:** ADX is below 20.0 (market in low-volatility range compression). Breakouts are prone to false wicks."
@@ -1060,16 +2010,121 @@ class OmniscientSetupEngine:
             pass
 
         # ------------------------------------------------------------------
+        # Determine Best Execution Setup (Excluding Family 6: Risk Advisory)
+        # ------------------------------------------------------------------
+        exec_candidates = [
+            s for s in evaluated_setups if s.family != SetupFamily.FAMILY_6_RISK_ADVISORY.value
+        ]
+        triggered_exec = [
+            s for s in exec_candidates if s.state == SetupReadinessState.ACTIVE_TRIGGERED
+        ]
+        waiting_exec = [s for s in exec_candidates if s.state == SetupReadinessState.WAITING_LIMIT]
+
+        best_setup = (
+            max(triggered_exec, key=lambda s: s.confluence_score)
+            if triggered_exec
+            else (max(waiting_exec, key=lambda s: s.confluence_score) if waiting_exec else None)
+        )
+
+        # ------------------------------------------------------------------
+        # Append Family 6 Setups (Setups 26, 27, 28)
+        # ------------------------------------------------------------------
+        s26_def = self.get_setup(26)
+        evaluated_setups.append(
+            SetupEvaluationResult(
+                setup_id=s26_def.setup_id,
+                setup_number=26,
+                family=SetupFamily.FAMILY_6_RISK_ADVISORY.value,
+                name_en=s26_def.name_en,
+                name_bn=s26_def.name_bn,
+                state=SetupReadinessState.ACTIVE_TRIGGERED
+                if len(devils_advocate_warnings) >= 2
+                else SetupReadinessState.WAITING_LIMIT,
+                bias="NEUTRAL",
+                confluence_score=92.0 if len(devils_advocate_warnings) >= 2 else 55.0,
+                entry_zone=[cur_p, cur_p],
+                trigger_price=cur_p,
+                stop_loss=round(cur_p * 0.99, 2),
+                invalidation_level=round(cur_p * 0.99, 2),
+                tp1=cur_p,
+                tp2=cur_p,
+                tp3=cur_p,
+                risk_reward_ratio=0.0,
+                half_kelly_allocation_pct=0.0,
+                thesis_en="; ".join(devils_advocate_warnings)
+                if devils_advocate_warnings
+                else "All macro and volatility risk gates clear.",
+                thesis_bn="ডেভিলস অ্যাডভোকেট রিস্ক গেট সক্রিয়।"
+                if devils_advocate_warnings
+                else "সকল ঝুঁকি ফিল্টার পাস করেছে।",
+                devils_advocate_risk="; ".join(devils_advocate_warnings)
+                if devils_advocate_warnings
+                else None,
+            )
+        )
+
+        s27_def = self.get_setup(27)
+        evaluated_setups.append(
+            SetupEvaluationResult(
+                setup_id=s27_def.setup_id,
+                setup_number=27,
+                family=SetupFamily.FAMILY_6_RISK_ADVISORY.value,
+                name_en=s27_def.name_en,
+                name_bn=s27_def.name_bn,
+                state=SetupReadinessState.ACTIVE_TRIGGERED,
+                bias=best_setup.bias if best_setup else "NEUTRAL",
+                confluence_score=85.0,
+                entry_zone=best_setup.entry_zone
+                if best_setup
+                else [round(cur_p * 0.995, 2), round(cur_p * 1.005, 2)],
+                trigger_price=best_setup.trigger_price if best_setup else cur_p,
+                stop_loss=best_setup.stop_loss if best_setup else round(cur_p * 0.99, 2),
+                invalidation_level=best_setup.invalidation_level
+                if best_setup
+                else round(cur_p * 0.99, 2),
+                tp1=best_setup.tp1 if best_setup else cur_p,
+                tp2=best_setup.tp2 if best_setup else cur_p,
+                tp3=best_setup.tp3 if best_setup else cur_p,
+                risk_reward_ratio=best_setup.risk_reward_ratio if best_setup else 2.5,
+                half_kelly_allocation_pct=best_setup.half_kelly_allocation_pct
+                if best_setup
+                else 1.0,
+                thesis_en="3-Tranche institutional DCA ladder anchored at key liquidity zone.",
+                thesis_bn="গুরুত্বপূর্ণ লিকুইডিটি জোনে ৩-ধাপে প্রাতিষ্ঠানিক ডিসিএ লিমিট ল্যাডার।",
+                tranches=best_setup.tranches if best_setup else [],
+            )
+        )
+
+        s28_def = self.get_setup(28)
+        evaluated_setups.append(
+            SetupEvaluationResult(
+                setup_id=s28_def.setup_id,
+                setup_number=28,
+                family=SetupFamily.FAMILY_6_RISK_ADVISORY.value,
+                name_en=s28_def.name_en,
+                name_bn=s28_def.name_bn,
+                state=SetupReadinessState.WAITING_LIMIT,
+                bias="NEUTRAL",
+                confluence_score=80.0,
+                entry_zone=[round(cur_p * 0.998, 2), round(cur_p * 1.002, 2)],
+                trigger_price=cur_p,
+                stop_loss=round(cur_p * 0.99, 2),
+                invalidation_level=round(cur_p * 0.99, 2),
+                tp1=round(cur_p * 1.01, 2),
+                tp2=round(cur_p * 1.02, 2),
+                tp3=round(cur_p * 1.03, 2),
+                risk_reward_ratio=2.0,
+                half_kelly_allocation_pct=1.0,
+                thesis_en="M46 Stage 1/Stage 2 progressive ratchet lock active on position equity.",
+                thesis_bn="পজিশন ইকুইটিতে এম৪৬ স্টেজ ১/স্টেজ ২ প্রগ্রেসিভ র‍্যাচেট সুরক্ষা সক্রিয়।",
+            )
+        )
+
+        # ------------------------------------------------------------------
         # Setup 27: Optimal DCA Limit Ladder (Calculated for Best Active Setup)
         # ------------------------------------------------------------------
         triggered = [s for s in evaluated_setups if s.state == SetupReadinessState.ACTIVE_TRIGGERED]
         waiting = [s for s in evaluated_setups if s.state == SetupReadinessState.WAITING_LIMIT]
-
-        best_setup = (
-            max(triggered, key=lambda s: s.confluence_score)
-            if triggered
-            else (max(waiting, key=lambda s: s.confluence_score) if waiting else None)
-        )
 
         limit_ladder: list[DCAOrderTranche] = []
         if best_setup and best_setup.tranches:

@@ -621,12 +621,18 @@ class AutonomousTrader:
 
                         # Pre-Trade Circuit Breaker: Tail Risk & Venue Dislocation
                         try:
+                            from core.execution.tail_dislocation_helper import (
+                                compute_live_tail_and_dislocation_inputs,
+                            )
                             from core.tail_risk_engine import tail_risk_engine
 
+                            btc_r, eth_r, gold_r, q_list = compute_live_tail_and_dislocation_inputs(
+                                sym
+                            )
                             tail_st = tail_risk_engine.evaluate_tail_risk(
-                                btc_returns=[],
-                                eth_returns=[],
-                                gold_returns=[],
+                                btc_returns=btc_r,
+                                eth_returns=eth_r,
+                                gold_returns=gold_r,
                                 current_book_depth_usd=100_000.0,
                                 rolling_median_depth_usd=100_000.0,
                             )
@@ -645,7 +651,7 @@ class AutonomousTrader:
                             from core.venue_dislocation import venue_dislocation_monitor
 
                             disloc_st = venue_dislocation_monitor.update_and_check(
-                                symbol=sym, quotes=[]
+                                symbol=sym, quotes=q_list
                             )
                             if (
                                 disloc_st.has_dislocation
@@ -703,18 +709,28 @@ class AutonomousTrader:
                                 order_type="MARKET",
                                 quantity=units,
                                 price=entry_price,
+                                reference_price=entry_price,
+                                stop_loss=sl,
+                                take_profit=tp,
+                                account_equity_usd=current_eq,
+                                daily_realized_pnl_usd=realized_pnl,
+                                daily_unrealized_pnl_usd=unrealized_pnl,
+                                current_open_positions_count=len(open_positions),
+                                max_open_positions_cap=eff_limit,
                                 client_order_id=pos_id,
                             )
                             try:
                                 receipt = await live_execution_router.execute_live_order(live_req)
                                 logger.info(
                                     f"AutonomousTrader executed LIVE PRODUCTION order {pos_id} via live_router: "
-                                    f"status={receipt.order_status} executed_qty={receipt.executed_quantity}"
+                                    f"status={receipt.status} executed_qty={receipt.executed_qty}"
                                 )
                             except Exception as live_err:
                                 logger.error(
                                     f"AutonomousTrader LIVE PRODUCTION execution failed: {live_err}"
                                 )
+                                self._last_traded_candle_ts[tf_key] = closed_candle_ts
+                                self._last_traded_candle_ts[sym] = closed_candle_ts
                                 continue
 
                         self.total_trades_executed += 1
@@ -773,9 +789,8 @@ class AutonomousTrader:
         tp_price: float | None = None,
     ) -> None:
         """
-        Mirrors qualified autonomous trades onto real Binance Spot Testnet (https://testnet.binance.vision)
-        when BINANCE TESTNET credentials are active and we are not inside a unit test.
-        Automatically attaches resting Stop-Loss on exchange matching engine upon fill.
+        Mirrors qualified autonomous trades onto real Binance Testnet
+        when testnet credentials are active and we are not inside a unit test.
         """
         import os
 
@@ -788,118 +803,98 @@ class AutonomousTrader:
             return
         try:
             from core.auth.credential_vault import credential_vault
-            from core.execution.live_canary_runner import CanaryRunRequest, live_canary_runner
+            from core.data_streamer import data_streamer
 
-            # Check Binance Futures Testnet first (active & funded with 5,000 USDT)
-            cred = credential_vault.get_credential("BINANCE_FUTURES", "TESTNET")
-            target_exchange = "BINANCE_FUTURES"
-            if not cred or not cred.is_active:
-                cred = credential_vault.get_credential("BINANCE", "TESTNET")
-                target_exchange = "BINANCE"
-            if not cred or not cred.is_active:
-                return
             side = "BUY" if direction.upper() == "LONG" else "SELL"
-            req = CanaryRunRequest(
-                exchange=target_exchange,
-                symbol=exchange_sym,
-                notional_usd=15.0,
-                side=side,
-                stop_loss_price=sl_price,
-                is_dry_run=False,
-                environment="TESTNET",
-            )
-            res = await live_canary_runner.execute_canary_order(req)
-            logger.info(
-                f"AutonomousTrader mirrored {side} {exchange_sym} to {target_exchange} TESTNET: "
-                f"status={res.status} order_id={res.exchange_order_id} ack={res.dispatch_to_ack_latency_ms}ms"
-            )
 
-            # If entry filled and we have a valid stop loss price, place native resting stop order on exchange
-            if (
-                res.status == "LIVE_ORDER_FILLED"
-                and res.executed_qty > 0
-                and sl_price
-                and sl_price > 0
-            ):
-                try:
-                    from core.execution.connectors.binance_connector import BinanceSpotConnector
+            # 1. Prioritize Binance Futures Testnet
+            cred_fut = credential_vault.get_credential("BINANCE_FUTURES", "TESTNET")
+            if cred_fut and cred_fut.is_active:
+                from core.execution.connectors.binance_futures_connector import (
+                    BinanceFuturesConnector,
+                )
 
-                    connector = BinanceSpotConnector(
-                        environment="TESTNET",
-                        api_key=cred.api_key,
-                        api_secret=cred.api_secret,
-                    )
-                    prot_side = "SELL" if side == "BUY" else "BUY"
-                    sl_limit = (
-                        round(sl_price * 0.999, 2)
-                        if prot_side == "SELL"
-                        else round(sl_price * 1.001, 2)
-                    )
-                    stop_params = {
-                        "symbol": exchange_sym,
-                        "side": prot_side,
-                        "type": "STOP_LOSS_LIMIT",
-                        "quantity": f"{res.executed_qty:.6f}".rstrip("0").rstrip("."),
-                        "price": f"{sl_limit:.2f}".rstrip("0").rstrip("."),
-                        "stopPrice": f"{sl_price:.2f}".rstrip("0").rstrip("."),
-                        "timeInForce": "GTC",
-                    }
-                    stop_data, _ = await connector._send_request(
-                        "POST", "/api/v3/order", params=stop_params
-                    )
-                    logger.info(
-                        f"AutonomousTrader resting Stop-Loss placed on BINANCE TESTNET for {exchange_sym}: "
-                        f"Order ID {stop_data.get('orderId')} @ Stop ${sl_price:.2f} (Limit: ${sl_limit:.2f})"
-                    )
-                except Exception as stop_err:
-                    logger.warning(f"Could not place resting stop on testnet: {stop_err}")
+                fut_connector = BinanceFuturesConnector(
+                    environment="TESTNET",
+                    api_key=cred_fut.api_key,
+                    api_secret=cred_fut.api_secret,
+                )
+                p_ref = float(data_streamer._last_known_prices.get(symbol) or 70000.0)
+                qty = max(0.001, round(15.0 / max(p_ref, 1.0), 3))
+                bracket_res = await fut_connector.place_bracket_order(
+                    symbol=exchange_sym,
+                    side=side,
+                    quantity=qty,
+                    order_type="MARKET",
+                    stop_loss_price=sl_price,
+                    take_profit_price=tp_price,
+                )
+                logger.info(
+                    f"AutonomousTrader mirrored {side} {exchange_sym} to BINANCE_FUTURES TESTNET bracket: "
+                    f"parent_id={bracket_res.get('bracket_id')}"
+                )
+                return
 
-            # --- 2. Mirror to Binance Futures Testnet (Derivatives Desk) ---
-            try:
-                cred_fut = credential_vault.get_credential("BINANCE_FUTURES", "TESTNET")
-                if cred_fut and cred_fut.is_active:
-                    import hashlib
-                    import hmac
-                    import urllib.parse
+            # 2. Fallback to Binance Spot Testnet
+            cred_spot = credential_vault.get_credential("BINANCE", "TESTNET")
+            if cred_spot and cred_spot.is_active:
+                from core.execution.connectors.binance_connector import BinanceSpotConnector
+                from core.execution.live_canary_runner import (
+                    CanaryRunRequest,
+                    live_canary_runner,
+                )
 
-                    import aiohttp
+                req = CanaryRunRequest(
+                    exchange="BINANCE",
+                    symbol=exchange_sym,
+                    notional_usd=15.0,
+                    side=side,
+                    stop_loss_price=sl_price,
+                    is_dry_run=False,
+                    environment="TESTNET",
+                )
+                res = await live_canary_runner.execute_canary_order(req)
+                logger.info(
+                    f"AutonomousTrader mirrored {side} {exchange_sym} to BINANCE SPOT TESTNET: "
+                    f"status={res.status} order_id={res.exchange_order_id}"
+                )
 
-                    base_fut_url = "https://testnet.binancefuture.com"
-                    ts = int(time.time() * 1000)
-                    fut_qty = (
-                        f"{res.executed_qty:.4f}".rstrip("0").rstrip(".")
-                        if (res.status == "LIVE_ORDER_FILLED" and res.executed_qty > 0)
-                        else "0.002"
-                    )
-                    fut_params = {
-                        "symbol": exchange_sym,
-                        "side": side,
-                        "type": "MARKET",
-                        "quantity": fut_qty,
-                        "timestamp": ts,
-                    }
-                    q_fut = urllib.parse.urlencode(fut_params)
-                    sig_fut = hmac.new(
-                        cred_fut.api_secret.encode(), q_fut.encode(), hashlib.sha256
-                    ).hexdigest()
-                    async with aiohttp.ClientSession() as s:
-                        async with s.post(
-                            f"{base_fut_url}/fapi/v1/order?{q_fut}&signature={sig_fut}",
-                            headers={"X-MBX-APIKEY": cred_fut.api_key},
-                        ) as r:
-                            fut_data = await r.json()
-                            if r.status in (200, 201) and fut_data.get("orderId"):
-                                logger.info(
-                                    f"AutonomousTrader mirrored {side} {exchange_sym} to BINANCE FUTURES TESTNET: "
-                                    f"order_id={fut_data.get('orderId')} status={fut_data.get('status')}"
-                                )
-                            else:
-                                logger.warning(
-                                    f"Binance Futures testnet mirror response: {fut_data}"
-                                )
-            except Exception as fut_err:
-                logger.warning(f"Could not mirror to Binance Futures testnet: {fut_err}")
-
+                if (
+                    res.status == "LIVE_ORDER_FILLED"
+                    and res.executed_qty > 0
+                    and sl_price
+                    and sl_price > 0
+                ):
+                    try:
+                        connector = BinanceSpotConnector(
+                            environment="TESTNET",
+                            api_key=cred_spot.api_key,
+                            api_secret=cred_spot.api_secret,
+                        )
+                        prot_side = "SELL" if side == "BUY" else "BUY"
+                        sl_limit = (
+                            round(sl_price * 0.999, 2)
+                            if prot_side == "SELL"
+                            else round(sl_price * 1.001, 2)
+                        )
+                        stop_params = {
+                            "symbol": exchange_sym,
+                            "side": prot_side,
+                            "type": "STOP_LOSS_LIMIT",
+                            "quantity": f"{res.executed_qty:.6f}".rstrip("0").rstrip("."),
+                            "price": f"{sl_limit:.2f}".rstrip("0").rstrip("."),
+                            "stopPrice": f"{sl_price:.2f}".rstrip("0").rstrip("."),
+                            "timeInForce": "GTC",
+                        }
+                        stop_data, _ = await connector._send_request(
+                            "POST", "/api/v3/order", params=stop_params
+                        )
+                        logger.info(
+                            f"AutonomousTrader resting Stop-Loss placed on BINANCE TESTNET for {exchange_sym}: "
+                            f"Order ID {stop_data.get('orderId')} @ Stop ${sl_price:.2f}"
+                        )
+                    except Exception as stop_err:
+                        logger.warning(f"Could not place resting stop on testnet: {stop_err}")
         except Exception as exc:
             logger.warning(f"AutonomousTrader Testnet mirror skipped for {symbol}: {exc}")
 
