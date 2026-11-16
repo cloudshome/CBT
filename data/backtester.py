@@ -677,6 +677,9 @@ def _aggregate(graded: list[GradedPlan]) -> dict:
             "fee_r": 0.0,
             "slip_r": 0.0,
             "funding_r": 0.0,
+            "profit_factor_net": 0.0,
+            "stage1_locks": 0,
+            "stage2_locks": 0,
         }
     executed = [g for g in graded if g.outcome != "NOT_TRIGGERED"]
     wins = [g for g in executed if g.outcome in WIN_SET]
@@ -704,6 +707,19 @@ def _aggregate(graded: list[GradedPlan]) -> dict:
     avg_slip = round(sum(slip_vals) / len(slip_vals), 4) if slip_vals else 0.0
     avg_funding = round(sum(fund_vals) / len(fund_vals), 4) if fund_vals else 0.0
 
+    pos_rr_sum = sum(r for r in rr_net_vals if r > 0)
+    neg_rr_abs_sum = abs(sum(r for r in rr_net_vals if r < 0))
+    profit_factor_net = (
+        round(pos_rr_sum / neg_rr_abs_sum, 3) if (neg_rr_abs_sum > 0 and pos_rr_sum > 0) else 0.0
+    )
+
+    stage1_locks = sum(
+        1 for g in executed if g.outcome == "PARTIAL_WIN" and 0.05 <= g.rr_achieved <= 0.30
+    )
+    stage2_locks = sum(
+        1 for g in executed if g.outcome == "PARTIAL_WIN" and 0.70 <= g.rr_achieved <= 1.05
+    )
+
     return {
         "executed": len(executed),
         "wins": len(wins),
@@ -720,6 +736,9 @@ def _aggregate(graded: list[GradedPlan]) -> dict:
         "fee_r": avg_fee,
         "slip_r": avg_slip,
         "funding_r": avg_funding,
+        "profit_factor_net": profit_factor_net,
+        "stage1_locks": stage1_locks,
+        "stage2_locks": stage2_locks,
     }
 
 
@@ -745,6 +764,7 @@ def run_backtest(
     maker_reclaim: bool = False,
     progressive_ratchet: bool = False,
     enable_stage1: bool = True,
+    ratchet_mode: str = "m47",
 ) -> dict:
     """Walk the engine over history and grade every plan at every horizon."""
     symbol = normalize_symbol(symbol)
@@ -821,6 +841,7 @@ def run_backtest(
                         maker_reclaim=maker_reclaim,
                         progressive_ratchet=progressive_ratchet,
                         enable_stage1=enable_stage1,
+                        ratchet_mode=ratchet_mode,
                     )
                 )
 
@@ -904,6 +925,13 @@ def run_backtest_on_store(
     min_bars: int = BACKTEST_MIN_BARS,
     step: int = BACKTEST_STEP,
     min_confidence: int = 55,
+    ladder_parity: bool = False,
+    strict_a_plus_only: bool = False,
+    payoff_asymmetry: bool = False,
+    maker_reclaim: bool = False,
+    progressive_ratchet: bool = False,
+    enable_stage1: bool = True,
+    ratchet_mode: str = "m47",
 ) -> dict:
     """P10.11 — backtest that reads from the stored Parquet series.
 
@@ -918,7 +946,41 @@ def run_backtest_on_store(
     from data.store import CandleStore
 
     store = CandleStore()
-    df = store.read(exchange, market, symbol, timeframe)
+    target_market = market
+    target_symbol = symbol
+    df = store.read(exchange, target_market, target_symbol, timeframe)
+
+    # Automatic fallback from perp to spot if perp empty
+    if df.empty and target_market == "perp":
+        df_spot = store.read(exchange, "spot", target_symbol, timeframe)
+        if not df_spot.empty:
+            df = df_spot
+            target_market = "spot"
+
+    # Automatic fallback for Gold: XAUUSD <-> PAXGUSDT
+    if df.empty and target_symbol.upper() in ("XAUUSD", "XAU/USD"):
+        for fallback_sym in ("PAXGUSDT", "PAXG/USDT"):
+            for mkt in (target_market, "spot", "perp"):
+                df_fb = store.read(exchange, mkt, fallback_sym, timeframe)
+                if not df_fb.empty:
+                    df = df_fb
+                    target_symbol = fallback_sym
+                    target_market = mkt
+                    break
+            if not df.empty:
+                break
+    elif df.empty and target_symbol.upper() in ("PAXGUSDT", "PAXG/USDT"):
+        for fallback_sym in ("XAUUSD", "XAU/USD"):
+            for mkt in (target_market, "spot", "perp"):
+                df_fb = store.read(exchange, mkt, fallback_sym, timeframe)
+                if not df_fb.empty:
+                    df = df_fb
+                    target_symbol = fallback_sym
+                    target_market = mkt
+                    break
+            if not df.empty:
+                break
+
     if df.empty:
         return {
             "ok": False,
@@ -942,22 +1004,29 @@ def run_backtest_on_store(
         df = df.reset_index(drop=True)
     result = run_backtest(
         df,
-        symbol=symbol,
+        symbol=target_symbol,
         timeframe=timeframe,
         horizons=horizons,
         min_bars=min_bars,
         step=step,
         min_confidence=min_confidence,
+        ladder_parity=ladder_parity,
+        strict_a_plus_only=strict_a_plus_only,
+        payoff_asymmetry=payoff_asymmetry,
+        maker_reclaim=maker_reclaim,
+        progressive_ratchet=progressive_ratchet,
+        enable_stage1=enable_stage1,
+        ratchet_mode=ratchet_mode,
     )
     # P12.11 — report the provenance of the series that was actually graded,
     # read off the stored frame itself rather than assumed from arguments.
     from data.provenance import provenance_of_frame, source_key
 
     prov_exchange, prov_market, prov_price_type = provenance_of_frame(
-        df, exchange=exchange, market=market
+        df, exchange=exchange, market=target_market
     )
     conditioned_exp = query_conditioned_expectancy(
-        symbol=symbol,
+        symbol=target_symbol,
         timeframe=timeframe,
         factor_column="regime",
         graded=result.get("graded", []),
@@ -967,7 +1036,9 @@ def run_backtest_on_store(
         **result,
         "conditioned_expectancy": conditioned_exp,
         "store_source": True,
-        "store_path": store._series_dir(exchange, market, symbol, timeframe).as_posix(),
+        "store_path": store._series_dir(
+            exchange, target_market, target_symbol, timeframe
+        ).as_posix(),
         "bars_read": len(df),
         "exchange": prov_exchange,
         "market": prov_market,

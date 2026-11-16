@@ -1,0 +1,259 @@
+{
+  "meta": {
+    "milestone": "M55",
+    "title": "2020-Present Multi-Year Ingestion & Full-Store M47 Walk-Forward Backtest",
+    "generated_at": "2026-11-16T08:29:21.766371+00:00",
+    "execution_model": "impact",
+    "ratchet_mode": "m47",
+    "timeframe": "1h",
+    "period": "2020-01-01 to Present"
+  },
+  "ingestion_summary": {
+    "BTCUSDT": {
+      "1h": 59904,
+      "4h": 14976,
+      "1d": 2496,
+      "15m": 239616
+    },
+    "ETHUSDT": {
+      "1h": 59904,
+      "4h": 14976,
+      "1d": 2496,
+      "15m": 239616
+    },
+    "SOLUSDT": {
+      "1h": 53609,
+      "4h": 13403,
+      "1d": 2234,
+      "15m": 214436
+    },
+    "PAXGUSDT": {
+      "1h": 54113,
+      "4h": 13533,
+      "1d": 2256,
+      "15m": 216435
+    }
+  },
+  "symbols": {
+    "BTCUSDT": {
+      "bars_stored": 59904,
+      "date_range": {
+        "start": "2020-01-01 00:00:00",
+        "end": "2026-10-31 23:00:00"
+      },
+      "step_stride": 49,
+      "runtime_seconds": 75.04,
+      "full_store": {
+        "trades": 302,
+        "win_rate_net": 0.583,
+        "expectancy_net": 0.399,
+        "profit_factor_net": 1.846,
+        "stage1_locks": 71,
+        "stage2_locks": 18,
+        "sharpe": 0.2472,
+        "dsr": 0.9988
+      },
+      "splits": {
+        "train_50pct": {
+          "trades": 151,
+          "win_rate_net": 0.603,
+          "expectancy_net": 0.566,
+          "profit_factor_net": 2.274,
+          "stage1_locks": 34,
+          "stage2_locks": 7,
+          "sharpe": 0.3325,
+          "dsr": 0.9973
+        },
+        "val_25pct": {
+          "trades": 75,
+          "win_rate_net": 0.507,
+          "expectancy_net": 0.312,
+          "profit_factor_net": 1.566,
+          "stage1_locks": 8,
+          "stage2_locks": 7,
+          "sharpe": 0.1928,
+          "dsr": 0.5688
+        },
+        "sealed_oos_25pct": {
+          "trades": 76,
+          "win_rate_net": 0.618,
+          "expectancy_net": 0.153,
+          "profit_factor_net": 1.342,
+          "stage1_locks": 29,
+          "stage2_locks": 4,
+          "sharpe": 0.1095,
+          "dsr": 0.2814
+        }
+      }
+    },
+    "ETHUSDT": {
+      "bars_stored": 59904,
+      "date_range": {
+        "start": "2020-01-01 00:00:00",
+        "end": "2026-10-31 23:00:00"
+      },
+      "step_stride": 49,
+      "runtime_seconds": 73.57,
+      "full_store": {
+        "trades": 305,
+        "win_rate_net": 0.508,
+        "expectancy_net": 0.099,
+        "profit_factor_net": 1.179,
+        "stage1_locks": 67,
+        "stage2_locks": 21,
+        "sharpe": 0.0683,
+        "dsr": 0.3632
+      },
+      "splits": {
+        "train_50pct": {
+          "trades": 152,
+          "win_rate_net": 0.52,
+          "expectancy_net": 0.2,
+          "profit_factor_net": 1.38,
+          "stage1_locks": 30,
+          "stage2_locks": 9,
+          "sharpe": 0.1346,
+          "dsr": 0.5631
+        },
+        "val_25pct": {
+          "trades": 76,
+          "win_rate_net": 0.5,
+          "expectancy_net": 0.142,
+          "profit_factor_net": 1.243,
+          "stage1_locks": 13,
+          "stage2_locks": 7,
+          "sharpe": 0.0913,
+          "dsr": 0.2246
+        },
+        "sealed_oos_25pct": {
+          "trades": 77,
+          "win_rate_net": 0.494,
+          "expectancy_net": -0.142,
+          "profit_factor_net": 0.751,
+          "stage1_locks": 24,
+          "stage2_locks": 5,
+          "sharpe": -0.1137,
+          "dsr": 0.0062
+        }
+      }
+    },
+    "SOLUSDT": {
+      "bars_stored": 53609,
+      "date_range": {
+        "start": "2020-09-14 07:00:00",
+        "end": "2026-10-31 23:00:00"
+      },
+      "step_stride": 44,
+      "runtime_seconds": 22.85,
+      "full_store": {
+        "trades": 260,
+        "win_rate_net": 0.562,
+        "expectancy_net": 0.305,
+        "profit_factor_net": 1.63,
+        "stage1_locks": 61,
+        "stage2_locks": 13,
+        "sharpe": 0.1971,
+        "dsr": 0.9658
+      },
+      "splits": {
+        "train_50pct": {
+          "trades": 130,
+          "win_rate_net": 0.523,
+          "expectancy_net": 0.25,
+          "profit_factor_net": 1.483,
+          "stage1_locks": 29,
+          "stage2_locks": 3,
+          "sharpe": 0.161,
+          "dsr": 0.642
+        },
+        "val_25pct": {
+          "trades": 65,
+          "win_rate_net": 0.554,
+          "expectancy_net": 0.133,
+          "profit_factor_net": 1.27,
+          "stage1_locks": 20,
+          "stage2_locks": 3,
+          "sharpe": 0.0926,
+          "dsr": 0.2116
+        },
+        "sealed_oos_25pct": {
+          "trades": 65,
+          "win_rate_net": 0.646,
+          "expectancy_net": 0.588,
+          "profit_factor_net": 2.435,
+          "stage1_locks": 12,
+          "stage2_locks": 7,
+          "sharpe": 0.3605,
+          "dsr": 0.9353
+        }
+      }
+    },
+    "PAXGUSDT": {
+      "bars_stored": 54113,
+      "date_range": {
+        "start": "2020-08-28 12:00:00",
+        "end": "2026-10-31 23:00:00"
+      },
+      "step_stride": 45,
+      "runtime_seconds": 20.38,
+      "full_store": {
+        "trades": 310,
+        "win_rate_net": 0.497,
+        "expectancy_net": 0.011,
+        "profit_factor_net": 1.017,
+        "stage1_locks": 60,
+        "stage2_locks": 23,
+        "sharpe": 0.007,
+        "dsr": 0.0734
+      },
+      "splits": {
+        "train_50pct": {
+          "trades": 155,
+          "win_rate_net": 0.426,
+          "expectancy_net": -0.133,
+          "profit_factor_net": 0.821,
+          "stage1_locks": 18,
+          "stage2_locks": 16,
+          "sharpe": -0.0859,
+          "dsr": 0.0047
+        },
+        "val_25pct": {
+          "trades": 77,
+          "win_rate_net": 0.558,
+          "expectancy_net": 0.084,
+          "profit_factor_net": 1.146,
+          "stage1_locks": 21,
+          "stage2_locks": 5,
+          "sharpe": 0.0539,
+          "dsr": 0.1368
+        },
+        "sealed_oos_25pct": {
+          "trades": 78,
+          "win_rate_net": 0.577,
+          "expectancy_net": 0.226,
+          "profit_factor_net": 1.414,
+          "stage1_locks": 21,
+          "stage2_locks": 2,
+          "sharpe": 0.1391,
+          "dsr": 0.3816
+        }
+      }
+    }
+  },
+  "pooled_portfolio": {
+    "total_trades_full": 1177,
+    "full_expectancy_net": 0.198,
+    "full_profit_factor_net": 1.365,
+    "full_win_rate_net": 0.536,
+    "total_stage1_locks": 259,
+    "total_stage2_locks": 75,
+    "sealed_oos_trades": 296,
+    "sealed_oos_expectancy_net": 0.191,
+    "sealed_oos_profit_factor_net": 1.384,
+    "sealed_oos_win_rate_net": 0.581,
+    "sealed_oos_sharpe": 0.1278,
+    "sealed_oos_dsr": 0.7686,
+    "sealed_oos_stage1_locks": 86,
+    "sealed_oos_stage2_locks": 18
+  }
+}
