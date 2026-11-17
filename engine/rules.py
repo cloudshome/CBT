@@ -86,6 +86,15 @@ def _confidence(score: ScoreBreakdown) -> tuple[int, str]:
     return score.confidence_pct, score.confidence
 
 
+SYMBOL_MIN_SL_PCT: dict[str, float] = {
+    "BTCUSDT": 0.30,
+    "ETHUSDT": 0.55,  # 55 bps floor so 3.5 bps half-spread + fee drag stays < 0.14R
+    "SOLUSDT": 0.45,
+    "PAXGUSDT": 0.35,
+    "XAUUSD": 0.35,
+}
+
+
 def _sl_buffer(price: float, atr: float, side: str, min_pct: float = 0.3) -> float:
     """Structural stop: at least ATR * 1.5 but never less than min_pct% away."""
     raw = max(atr * 1.5, price * min_pct / 100)
@@ -108,6 +117,8 @@ def build_plans(
 ) -> list[Plan]:
     price = f["price"]
     atr = f.get("atr") or price * 0.003
+    sym_clean = str(f.get("symbol") or "").replace("/", "").replace("_", "").upper()
+    min_sl_pct = SYMBOL_MIN_SL_PCT.get(sym_clean, 0.30)
     plans: list[Plan] = []
 
     def _is_primary(plan_type: str) -> bool:
@@ -120,7 +131,7 @@ def build_plans(
     # ── 1. Immediate entries (strong confluence right now) ───────────────
     if bull.confidence_pct >= min_confidence:
         rr = _tp_rr_for("Immediate Buy", default_rr, tp_rr_by_type)
-        sl = _sl_buffer(price, atr, "BUY")
+        sl = _sl_buffer(price, atr, "BUY", min_pct=min_sl_pct)
         tps = [
             round(price + (price - sl) * rr, 2),
             round(price + (price - sl) * rr * 1.5, 2),
@@ -144,7 +155,7 @@ def build_plans(
         )
     if bear.confidence_pct >= min_confidence:
         rr = _tp_rr_for("Immediate Sell", default_rr, tp_rr_by_type)
-        sl = _sl_buffer(price, atr, "SELL")
+        sl = _sl_buffer(price, atr, "SELL", min_pct=min_sl_pct)
         tps = [
             round(price - (sl - price) * rr, 2),
             round(price - (sl - price) * rr * 1.5, 2),
@@ -182,7 +193,7 @@ def build_plans(
         source = "discount zone / swing low"
     if pull_level and pull_level < price:
         rr = _tp_rr_for("Buy Pullback", default_rr, tp_rr_by_type)
-        sl = _sl_buffer(pull_level, atr, "BUY")
+        sl = _sl_buffer(pull_level, atr, "BUY", min_pct=min_sl_pct)
         tps = [
             round(pull_level + (pull_level - sl) * rr, 2),
             round(price + (price - sl) * rr * 1.2, 2),
@@ -223,7 +234,7 @@ def build_plans(
         source_s = "premium zone / swing high"
     if pull_s and pull_s > price:
         rr = _tp_rr_for("Sell Pullback", default_rr, tp_rr_by_type)
-        sl = _sl_buffer(pull_s, atr, "SELL")
+        sl = _sl_buffer(pull_s, atr, "SELL", min_pct=min_sl_pct)
         tps = [
             round(pull_s - (sl - pull_s) * rr, 2),
             round(price - (sl - price) * rr * 1.2, 2),
@@ -254,7 +265,7 @@ def build_plans(
     if swing_high and swing_high > price and price > (swing_high * 0.985):
         rr = _tp_rr_for("Breakout Buy", default_rr, tp_rr_by_type)
         entry = round(swing_high * 1.0005, 2)
-        sl = _sl_buffer(swing_high, atr, "BUY")
+        sl = _sl_buffer(swing_high, atr, "BUY", min_pct=min_sl_pct)
         tps = [
             round(entry + (entry - sl) * rr, 2),
             round(entry + (entry - sl) * rr * 1.5, 2),
@@ -289,7 +300,7 @@ def build_plans(
     if sweep.get("side") == "buyside":
         rr = _tp_rr_for("Sweep Reversal Sell", default_rr, tp_rr_by_type)
         entry = price
-        sl = _sl_buffer(price, atr, "SELL")
+        sl = _sl_buffer(price, atr, "SELL", min_pct=min_sl_pct)
         tps = [
             round(price - (sl - price) * rr, 2),
             round(price - (sl - price) * rr * 1.5, 2),
@@ -319,7 +330,7 @@ def build_plans(
     elif sweep.get("side") == "sellside":
         rr = _tp_rr_for("Sweep Reversal Buy", default_rr, tp_rr_by_type)
         entry = price
-        sl = _sl_buffer(price, atr, "BUY")
+        sl = _sl_buffer(price, atr, "BUY", min_pct=min_sl_pct)
         tps = [
             round(price + (price - sl) * rr, 2),
             round(price + (price - sl) * rr * 1.5, 2),
@@ -350,7 +361,7 @@ def build_plans(
     # ── 6. FVG retest (unfilled gap in trade direction) ──────────────────
     if fvg_level and fvg_level < price and bull.confidence_pct >= 45:
         rr = _tp_rr_for("FVG Retest Buy", default_rr, tp_rr_by_type)
-        sl = _sl_buffer(fvg_level, atr, "BUY")
+        sl = _sl_buffer(fvg_level, atr, "BUY", min_pct=min_sl_pct)
         tps = [
             round(fvg_level + (fvg_level - sl) * rr, 2),
             round(price + (price - sl) * rr * 1.1, 2),
@@ -377,7 +388,7 @@ def build_plans(
         )
     if fvg_s and fvg_s > price and bear.confidence_pct >= 45:
         rr = _tp_rr_for("FVG Retest Sell", default_rr, tp_rr_by_type)
-        sl = _sl_buffer(fvg_s, atr, "SELL")
+        sl = _sl_buffer(fvg_s, atr, "SELL", min_pct=min_sl_pct)
         tps = [
             round(fvg_s - (sl - fvg_s) * rr, 2),
             round(price - (sl - price) * rr * 1.1, 2),

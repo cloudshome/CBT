@@ -129,11 +129,14 @@ def _evaluate(
     progressive_ratchet: bool = False,
     enable_stage1: bool = True,
     ratchet_mode: str = "m47",
+    smt_snap: Any | None = None,
 ) -> GradedPlan:
     """Grade one plan produced at bar i over `horizon_bars` future bars."""
     entry = plan.get("entry")
     sl = plan.get("stop_loss")
-    tps = plan.get("take_profits") or []
+    tps = plan.get("take_profits") or (
+        [plan["take_profit"]] if plan.get("take_profit") is not None else []
+    )
     tp1 = tps[0] if len(tps) > 0 else None
     tp2 = tps[1] if len(tps) > 1 else None
     side = plan.get("action")
@@ -164,7 +167,32 @@ def _evaluate(
         return gp
 
     risk = abs(entry - sl)
+    sym_clean = (
+        str(df.attrs.get("symbol") or plan.get("symbol") or "")
+        .replace("/", "")
+        .replace("_", "")
+        .upper()
+    )
+
     if strict_a_plus_only:
+        # Enforce minimum structural stop distance for ETH (50 bps)
+        if sym_clean in ("ETHUSDT", "ETHUSD"):
+            stop_dist_pct = risk / max(entry, 1e-6)
+            if stop_dist_pct < 0.0050:
+                gp.outcome = "NOT_TRIGGERED"
+                return gp
+
+        # Cross-Asset ETH/BTC RS & SMT Regime evaluation
+        if smt_snap is not None and sym_clean in ("ETHUSDT", "ETHUSD"):
+            from engine.smt_regime import evaluate_eth_plan_under_smt_regime
+
+            allowed, _veto_reason = evaluate_eth_plan_under_smt_regime(
+                plan, regime, smt_snap, strict_a_plus_only=True
+            )
+            if not allowed:
+                gp.outcome = "NOT_TRIGGERED"
+                return gp
+
         # Grade A+ requires high-conviction institutional confidence (confidence >= 65)
         if gp.confidence_pct < 65:
             gp.outcome = "NOT_TRIGGERED"
@@ -765,6 +793,8 @@ def run_backtest(
     progressive_ratchet: bool = False,
     enable_stage1: bool = True,
     ratchet_mode: str = "m47",
+    reference_df: pd.DataFrame | None = None,
+    eth_btc_regime_filter: bool = True,
 ) -> dict:
     """Walk the engine over history and grade every plan at every horizon."""
     symbol = normalize_symbol(symbol)
@@ -777,6 +807,19 @@ def run_backtest(
     if strict_a_plus_only:
         ladder_parity = True
         min_confidence = max(min_confidence, 65)
+
+    # Precompute cross-asset ETH/BTC regime table if applicable
+    sym_clean = normalize_symbol(symbol).replace("/", "").replace("_", "").upper()
+    smt_table = {}
+    if (
+        eth_btc_regime_filter
+        and sym_clean in ("ETHUSDT", "ETHUSD")
+        and reference_df is not None
+        and not reference_df.empty
+    ):
+        from engine.smt_regime import precompute_eth_btc_regime_table
+
+        smt_table = precompute_eth_btc_regime_table(df, reference_df)
 
     # P13.4 — precompute the indicator columns once over the whole series,
     # then walk with windowed per-bar analysis instead of re-running the full
@@ -809,6 +852,7 @@ def run_backtest(
             min_confidence=min_confidence,
         )
         bar_ts = int(df.iloc[i]["ts"])
+        smt_snap = smt_table.get(bar_ts) if smt_table else None
         sig = out.best_signal or {}
         hist_score = compute_historical(
             bull_score=out.bull_score.score if out.bull_score else 0.0,
@@ -842,6 +886,7 @@ def run_backtest(
                         progressive_ratchet=progressive_ratchet,
                         enable_stage1=enable_stage1,
                         ratchet_mode=ratchet_mode,
+                        smt_snap=smt_snap,
                     )
                 )
 
@@ -932,6 +977,8 @@ def run_backtest_on_store(
     progressive_ratchet: bool = False,
     enable_stage1: bool = True,
     ratchet_mode: str = "m47",
+    reference_df: pd.DataFrame | None = None,
+    eth_btc_regime_filter: bool = True,
 ) -> dict:
     """P10.11 — backtest that reads from the stored Parquet series.
 
@@ -1002,6 +1049,18 @@ def run_backtest_on_store(
         df = df.tail(bars).reset_index(drop=True)
     else:
         df = df.reset_index(drop=True)
+    # Automatic reference series loading for ETH/BTC regime filtering
+    if reference_df is None and eth_btc_regime_filter:
+        clean_target = normalize_symbol(target_symbol).replace("/", "").replace("_", "").upper()
+        if clean_target in ("ETHUSDT", "ETHUSD"):
+            ref_cand = store.read(exchange, target_market, "BTCUSDT", timeframe)
+            if ref_cand.empty:
+                ref_cand = store.read(
+                    exchange, "spot" if target_market == "perp" else "perp", "BTCUSDT", timeframe
+                )
+            if not ref_cand.empty:
+                reference_df = ref_cand
+
     result = run_backtest(
         df,
         symbol=target_symbol,
@@ -1017,6 +1076,8 @@ def run_backtest_on_store(
         progressive_ratchet=progressive_ratchet,
         enable_stage1=enable_stage1,
         ratchet_mode=ratchet_mode,
+        reference_df=reference_df,
+        eth_btc_regime_filter=eth_btc_regime_filter,
     )
     # P12.11 — report the provenance of the series that was actually graded,
     # read off the stored frame itself rather than assumed from arguments.

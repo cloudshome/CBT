@@ -106,6 +106,7 @@ class DeterministicAssetEligibilityGate:
         desk: str = "MAIN_SOVEREIGN",
         ai_opportunity_score: float | None = None,
         mtf_alignment: str | None = None,
+        eth_btc_regime_aligned: bool | None = None,
     ) -> AssetEligibilityDecision:
         clean_sym = symbol.replace("/", "").replace("_", "").upper()
         raw_sym = symbol.upper()
@@ -140,6 +141,19 @@ class DeterministicAssetEligibilityGate:
                             f"Asset '{symbol}' is restricted to PAPER_ONLY_OBSERVATION: "
                             f"requires mtf_alignment == 'ALIGNED' for Tier-1 Canary execution "
                             f"(currently '{mtf_alignment or 'NONE'}'). Only ALIGNED setups permitted."
+                        ),
+                        desk=desk,
+                        ai_override_attempted=bool(ai_opportunity_score is not None),
+                    )
+            elif clean_sym in ("ETHUSDT", "ETHUSD"):
+                if eth_btc_regime_aligned is False:
+                    return AssetEligibilityDecision(
+                        symbol=symbol,
+                        status=AssetEligibilityStatus.REJECTED_TIER1_CANARY_RESTRICTED,
+                        is_eligible=False,
+                        rationale=(
+                            f"Asset '{symbol}' is restricted: ETH/BTC relative strength is counter-regime "
+                            f"(eth_btc_regime_aligned is False). Requires SMT confirmation or RS alignment."
                         ),
                         desk=desk,
                         ai_override_attempted=bool(ai_opportunity_score is not None),
@@ -225,14 +239,24 @@ class DeterministicAssetEligibilityGate:
             ai_override_attempted=False,
         )
 
-    def is_tier1_canary_eligible(self, symbol: str, mtf_alignment: str | None = None) -> bool:
+    def is_tier1_canary_eligible(
+        self,
+        symbol: str,
+        mtf_alignment: str | None = None,
+        eth_btc_regime_aligned: bool | None = None,
+    ) -> bool:
         """
         Returns True if symbol is on Tier-1 Canary Whitelist.
-        BTC and ETH are unconditionally whitelisted.
+        BTC is unconditionally whitelisted.
+        ETH is whitelisted unless eth_btc_regime_aligned is explicitly False.
         SOL is whitelisted strictly when mtf_alignment == 'ALIGNED'.
         """
         clean_sym = symbol.replace("/", "").replace("_", "").upper()
-        if any(clean_sym == t.replace("/", "").replace("_", "") for t in TIER1_CANARY_WHITELIST):
+        if clean_sym in ("ETHUSDT", "ETHUSD"):
+            if eth_btc_regime_aligned is False:
+                return False
+            return True
+        if clean_sym in ("BTCUSDT", "BTCUSD"):
             return True
         if clean_sym in ("SOLUSDT", "SOLUSD"):
             return (mtf_alignment or "").strip().upper() == "ALIGNED"

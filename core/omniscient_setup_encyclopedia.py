@@ -2009,6 +2009,40 @@ class OmniscientSetupEngine:
         except Exception:
             pass
 
+        # 4. Cross-Asset ETH/BTC Relative Strength & Regime Warning
+        if clean_sym in ("ETH/USDT", "ETHUSDT"):
+            try:
+                import pandas as pd
+
+                from engine.smt_regime import precompute_eth_btc_regime_table
+
+                eth_df = pd.DataFrame(closed_bars)
+                btc_df = pd.DataFrame(correlated_candles) if correlated_candles else pd.DataFrame()
+                if not btc_df.empty and len(btc_df) >= 30 and len(eth_df) >= 30:
+                    tbl = precompute_eth_btc_regime_table(eth_df, btc_df)
+                    if tbl:
+                        last_ts = int(eth_df.iloc[-1]["ts"]) if "ts" in eth_df.columns else None
+                        last_snap = tbl.get(last_ts) if last_ts else list(tbl.values())[-1]
+                        if last_snap:
+                            if last_snap.regime == "ETH_UNDERPERFORMING":
+                                devils_advocate_warnings.append(
+                                    "⚠️ **ETH/BTC UNDERPERFORMANCE:** ETH is in sustained relative weakness vs BTC (EMA20 < EMA50). Longs require SMT confirmation or RS reclaim."
+                                )
+                                # Demote active counter-RS longs to WAITING_LIMIT
+                                for s in evaluated_setups:
+                                    if (
+                                        s.bias == "LONG"
+                                        and s.state == SetupReadinessState.ACTIVE_TRIGGERED
+                                    ):
+                                        has_bull_smt = (
+                                            s.smt_divergence
+                                            and "BULL" in str(s.smt_divergence).upper()
+                                        )
+                                        if not has_bull_smt:
+                                            s.state = SetupReadinessState.WAITING_LIMIT
+            except Exception as e:
+                logger.debug(f"[Omniscient] ETH/BTC regime check error: {e}")
+
         # ------------------------------------------------------------------
         # Determine Best Execution Setup (Excluding Family 6: Risk Advisory)
         # ------------------------------------------------------------------
