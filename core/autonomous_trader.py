@@ -83,7 +83,10 @@ class AutonomousTrader:
             "SOL/USDT",
             "XAU/USD",
         ]
-        self.scan_timeframes = scan_timeframes or ["15m", "1h"]
+        env_tfs = os.getenv("AUTONOMOUS_SCAN_TIMEFRAMES", "15m,1h,4h")
+        self.scan_timeframes = scan_timeframes or [
+            t.strip() for t in env_tfs.split(",") if t.strip()
+        ]
         self.scan_interval_sec = float(
             os.getenv("AUTONOMOUS_SCAN_INTERVAL_SEC", str(scan_interval_sec))
         )
@@ -181,13 +184,14 @@ class AutonomousTrader:
             for sym in scan_symbols:
                 try:
                     # 2. Fetch/Refresh Live MTF Candlesticks from market gateway
+                    fetch_limit = 260 if tf_scan == "15m" else (220 if tf_scan == "1h" else 160)
                     try:
                         candles_tf = await data_streamer.fetch_external_ohlcv(
-                            sym, tf_scan, limit=60
+                            sym, tf_scan, limit=fetch_limit
                         )
                     except Exception as ex:
                         logger.debug(f"Falling back to local cache for {sym} {tf_scan}: {ex}")
-                        candles_tf = data_streamer.get_candles(sym, tf_scan, limit=60)
+                        candles_tf = data_streamer.get_candles(sym, tf_scan, limit=fetch_limit)
 
                     if not candles_tf or len(candles_tf) < 15:
                         continue
@@ -204,7 +208,10 @@ class AutonomousTrader:
                     closed_candle_ts = int(last_closed_candle["timestamp"])
 
                     tf_key = f"{sym}:{tf_scan}"
-                    if self._last_traded_candle_ts.get(tf_key) == closed_candle_ts:
+                    if (
+                        self._last_traded_candle_ts.get(tf_key) == closed_candle_ts
+                        or self._last_traded_candle_ts.get(sym) == closed_candle_ts
+                    ):
                         continue
 
                     tf_map: dict[str, list[dict[str, Any]]] = {tf_scan: candles_tf}
@@ -318,6 +325,52 @@ class AutonomousTrader:
                             )
                             continue
 
+                        # M57 Live Multi-Timeframe A+ Gate (Trend, RS+SMT, Chop Filter)
+                        from core.risk.m57_live_gate import (
+                            build_horizon_style_tag,
+                            evaluate_live_m57_gate,
+                            get_m57_min_stop_pct,
+                        )
+
+                        clean_sym = sym.replace("/", "").replace("_", "").upper()
+                        btc_candles_tf = None
+                        if clean_sym in ("ETHUSDT", "ETHUSD"):
+                            btc_candles_tf = data_streamer.get_candles(
+                                "BTC/USDT", tf_scan, limit=fetch_limit
+                            )
+                            if not btc_candles_tf or len(btc_candles_tf) < 30:
+                                try:
+                                    fresh_btc = await data_streamer.fetch_external_ohlcv(
+                                        "BTC/USDT", tf_scan, limit=fetch_limit
+                                    )
+                                    if fresh_btc:
+                                        btc_candles_tf = fresh_btc
+                                except Exception as ex_b:
+                                    logger.debug(
+                                        f"Could not fetch BTC candles for ETH SMT gate: {ex_b}"
+                                    )
+
+                        m57_eval = evaluate_live_m57_gate(
+                            symbol=sym,
+                            timeframe=tf_scan,
+                            direction=decision_out.decision.value,
+                            candles_tf=candles_tf,
+                            btc_candles_tf=btc_candles_tf,
+                            confluence_score=float(
+                                getattr(setup, "confluence_score", 75.0) or 75.0
+                            ),
+                            regime_name=regime_name,
+                            setup_type_str=st_val,
+                            entry_price=cur_price,
+                            stop_loss=getattr(setup, "invalidation_sl", None),
+                            take_profit=getattr(setup, "target_tp", None),
+                        )
+                        if not m57_eval["allowed"]:
+                            logger.info(
+                                f"AutonomousTrader M57 Gate: Skipping {sym} ({tf_scan}): {m57_eval['reason']}"
+                            )
+                            continue
+
                         # Tier-1 Canary Asset Eligibility Gate (BTC, ETH, and ALIGNED SOL)
                         from core.risk.asset_eligibility_gate import (
                             DeterministicAssetEligibilityGate,
@@ -328,7 +381,10 @@ class AutonomousTrader:
                         )
                         gate = DeterministicAssetEligibilityGate()
                         elig = gate.evaluate_symbol_eligibility(
-                            sym, desk="TIER1_CANARY", mtf_alignment=mtf_align
+                            sym,
+                            desk="TIER1_CANARY",
+                            mtf_alignment=mtf_align,
+                            eth_btc_regime_aligned=m57_eval["eth_btc_regime_aligned"],
                         )
                         if not elig.is_eligible:
                             logger.info(
@@ -445,8 +501,9 @@ class AutonomousTrader:
                             else (cur_price * 0.015)
                         )
 
-                        # Fix 5: Strict Minimum Stop Distance Floor (at least 1.2x ATR or 0.45% from entry)
-                        min_sl_dist = max(1.2 * atr_val, entry_price * 0.0045)
+                        # Fix 5: Strict Minimum Stop Distance Floor (at least 1.2x ATR or M57 symbol/timeframe floor)
+                        min_stop_pct = get_m57_min_stop_pct(sym, tf_scan)
+                        min_sl_dist = max(1.2 * atr_val, entry_price * min_stop_pct)
                         min_sl_dist = min(
                             min_sl_dist, entry_price * 0.030
                         )  # Bound within 3.0% to prevent ceiling breach
@@ -560,8 +617,7 @@ class AutonomousTrader:
                             stop_loss=sl,
                             timeframe=tf_scan,
                         )
-                        asset_prefix = sym.split("/")[0].upper() if "/" in sym else sym.upper()
-                        style_tag = f"[{asset_prefix}_{style_code}]"
+                        style_tag = build_horizon_style_tag(sym, style_code, tf_scan)
 
                         # Prevent duplicate positions of the exact same style sub-book on this asset
                         if any(

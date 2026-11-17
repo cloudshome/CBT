@@ -162,6 +162,8 @@ class PortfolioShadowManager:
         zone_id: str | None = None,
         book_id: str = "MAIN_SOVEREIGN",
         confluence_score: float | None = None,
+        enforce_m57_stop_floor: bool = False,
+        timeframe: str | None = None,
     ) -> str:
         # Multi-Book Institutional Asset Firewall
         is_test_env = "test" in os.environ.get("TRADING_LOGS_DB_PATH", "").lower() or bool(
@@ -233,6 +235,25 @@ class PortfolioShadowManager:
                 f"Risk Gate Rejection: Reward-to-Risk ratio ({tp_pct / max(sl_pct, 1e-6):.2f}R) is below minimum institutional hurdle (1.0R)."
             )
 
+        # M57 Spread-Aware Minimum Stop Floor Guard
+        if enforce_m57_stop_floor or os.getenv("ENFORCE_M57_STOP_FLOOR") == "1":
+            from core.risk.m57_live_gate import get_m57_min_stop_pct
+
+            tf_eff = timeframe or (
+                "4h"
+                if (
+                    (style_tag and "4H" in style_tag.upper())
+                    or (entry_reason and "4H" in entry_reason.upper())
+                )
+                else "15m"
+            )
+            min_floor_pct = get_m57_min_stop_pct(symbol, tf_eff)
+            if sl_pct < (min_floor_pct - 1e-6):
+                raise ValueError(
+                    f"M57 Stop Distance Floor Rejection: {symbol} ({tf_eff}) stop-loss distance "
+                    f"({sl_pct * 100:.3f}%) is below minimum spread-aware floor ({min_floor_pct * 100:.2f}%)."
+                )
+
         self._ensure_columns_exist()
         now = int(time.time() * 1000)
         # Millisecond timestamp alone collides when two same-symbol positions are
@@ -294,9 +315,9 @@ class PortfolioShadowManager:
                         eff_clean = eff_style.strip("[]").upper()
                         for _, _, ex_reason, _, _, _ in existing_sym_positions:
                             ex_str = str(ex_reason or "")
+                            existing_tags = re.findall(r"\[([A-Z0-9_]+)\]", ex_str.upper())
                             if ex_str and (
-                                eff_style.upper() in ex_str.upper()
-                                or f"[{eff_clean}]" in ex_str.upper()
+                                eff_clean in existing_tags or f"[{eff_clean}]" in ex_str.upper()
                             ):
                                 conn.rollback()
                                 raise ValueError(
