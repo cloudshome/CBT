@@ -24,6 +24,7 @@ import json
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -130,6 +131,7 @@ def _evaluate(
     enable_stage1: bool = True,
     ratchet_mode: str = "m47",
     smt_snap: Any | None = None,
+    ind: pd.DataFrame | None = None,
 ) -> GradedPlan:
     """Grade one plan produced at bar i over `horizon_bars` future bars."""
     entry = plan.get("entry")
@@ -175,12 +177,52 @@ def _evaluate(
     )
 
     if strict_a_plus_only:
-        # Enforce minimum structural stop distance for ETH (50 bps)
+        tf_str = str(df.attrs.get("timeframe") or "").lower()
+        stop_dist_pct = risk / max(entry, 1e-6)
+
+        # Enforce minimum structural stop distance (50 bps on 1h/4h, 55 bps on 15m for ETH)
         if sym_clean in ("ETHUSDT", "ETHUSD"):
-            stop_dist_pct = risk / max(entry, 1e-6)
-            if stop_dist_pct < 0.0050:
+            min_stop_floor = 0.0055 if tf_str == "15m" else 0.0050
+            if stop_dist_pct < min_stop_floor:
                 gp.outcome = "NOT_TRIGGERED"
                 return gp
+        elif tf_str == "15m":
+            if stop_dist_pct < 0.0045:
+                gp.outcome = "NOT_TRIGGERED"
+                return gp
+
+        # 15m Tactical Day filters: reject market chasing immediate taker orders & require macro trend
+        if tf_str == "15m":
+            plan_type = str(plan.get("type", ""))
+            if plan_type in ("Immediate Buy", "Immediate Sell"):
+                gp.outcome = "NOT_TRIGGERED"
+                return gp
+            if ind is not None and len(ind) > i and len(df) >= 250:
+                row_ind = ind.iloc[i]
+                c_val = float(row_ind.get("close", 0.0) or 0.0)
+                e50 = float(row_ind.get("ema_50", 0.0) or 0.0)
+                e200 = float(row_ind.get("ema_200", 0.0) or 0.0)
+                adx_val = float(row_ind.get("adx", 0.0) or 0.0)
+                if e200 > 0.0 and e50 > 0.0:
+                    if is_buy:
+                        if not (c_val >= e200 and e50 >= e200 and adx_val >= 22.0):
+                            gp.outcome = "NOT_TRIGGERED"
+                            return gp
+                    else:
+                        if not (c_val <= e200 and e50 <= e200 and adx_val >= 22.0):
+                            gp.outcome = "NOT_TRIGGERED"
+                            return gp
+
+        # 4h Structural Swing filters: reject chop/compression traps unless high confidence
+        if tf_str == "4h" and len(df) >= 150:
+            reg_up = str(regime or "").upper()
+            is_chop = any(k in reg_up for k in ("LIQUIDITY_TRAP_CHOP", "VOLATILITY_COMPRESSION"))
+            if is_chop:
+                pt = str(plan.get("type", ""))
+                is_sweep_pullback = any(k in pt for k in ("Sweep", "Pullback"))
+                if not (is_sweep_pullback and gp.confidence_pct >= 72):
+                    gp.outcome = "NOT_TRIGGERED"
+                    return gp
 
         # Cross-Asset ETH/BTC RS & SMT Regime evaluation
         if smt_snap is not None and sym_clean in ("ETHUSDT", "ETHUSD"):
@@ -819,7 +861,7 @@ def run_backtest(
     ):
         from engine.smt_regime import precompute_eth_btc_regime_table
 
-        smt_table = precompute_eth_btc_regime_table(df, reference_df)
+        smt_table = precompute_eth_btc_regime_table(df, reference_df, timeframe=timeframe)
 
     # P13.4 — precompute the indicator columns once over the whole series,
     # then walk with windowed per-bar analysis instead of re-running the full
@@ -887,6 +929,7 @@ def run_backtest(
                         enable_stage1=enable_stage1,
                         ratchet_mode=ratchet_mode,
                         smt_snap=smt_snap,
+                        ind=ind,
                     )
                 )
 

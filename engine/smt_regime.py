@@ -143,6 +143,7 @@ def precompute_eth_btc_regime_table(
     btc_df: pd.DataFrame,
     smt_lookback: int = 20,
     smt_recent: int = 5,
+    timeframe: str = "1h",
 ) -> dict[int, EthBtcRegimeSnapshot]:
     """Precomputes point-in-time ETH/BTC relative-strength metrics and SMT signals.
 
@@ -151,6 +152,8 @@ def precompute_eth_btc_regime_table(
     """
     if eth_df.empty or btc_df.empty or len(eth_df) < 30 or len(btc_df) < 30:
         return {}
+
+    tf_str = str(eth_df.attrs.get("timeframe") or timeframe).lower()
 
     # Copy and ensure ascending sort by ts
     e_df = eth_df.sort_values("ts").reset_index(drop=True).copy()
@@ -181,7 +184,11 @@ def precompute_eth_btc_regime_table(
     ratios = np.full(n_eth, np.nan, dtype=np.float64)
     valid_mask = np.zeros(n_eth, dtype=bool)
 
-    max_stale_ms = 4 * 3600 * 1000  # 4 hours max latency between feeds
+    # Timeframe-aware staleness threshold
+    tf_ms = {"15m": 900_000, "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000}.get(
+        tf_str, 3_600_000
+    )
+    max_stale_ms = max(4 * 3600 * 1000, 3 * tf_ms)
 
     for i in range(n_eth):
         j = matched_indices[i]
@@ -192,30 +199,67 @@ def precompute_eth_btc_regime_table(
                 valid_mask[i] = True
 
     if not np.any(valid_mask):
-        raise ValueError("Reference BTC candle is stale (> 4h) or unmatched across series.")
+        raise ValueError(
+            f"Reference BTC candle is stale (> {max_stale_ms // 3600000}h) or unmatched across series."
+        )
+
+    # Timeframe-aware EMA & ROC / Z-score window scaling
+    if tf_str == "15m" and n_eth >= 250:
+        span_fast = 80
+        span_mid = 200
+        span_slow = 800
+        roc_window = 96  # 24 hours of 15m bars
+        z_window = 192  # 48 hours of 15m bars
+    elif tf_str == "4h" and n_eth >= 150:
+        span_fast = 14
+        span_mid = 35
+        span_slow = 120
+        roc_window = 12  # 48 hours of 4h bars
+        z_window = 30  # 5 days of 4h bars
+    else:
+        span_fast = 20
+        span_mid = 50
+        span_slow = 200
+        roc_window = 24
+        z_window = 48
 
     # Compute causal EMAs and rolling metrics over R
     s_r = pd.Series(ratios).ffill().bfill()
-    ema20 = s_r.ewm(span=20, adjust=False).mean().to_numpy()
-    ema50 = s_r.ewm(span=50, adjust=False).mean().to_numpy()
-    ema200 = s_r.ewm(span=200, adjust=False).mean().to_numpy()
+    ema20 = s_r.ewm(span=span_fast, adjust=False).mean().to_numpy()
+    ema50 = s_r.ewm(span=span_mid, adjust=False).mean().to_numpy()
+    ema200 = s_r.ewm(span=span_slow, adjust=False).mean().to_numpy()
 
-    # 24-bar ROC on ratio
-    roc24 = np.zeros(n_eth, dtype=np.float64)
-    for i in range(24, n_eth):
-        prev = s_r.iloc[i - 24]
-        curr = s_r.iloc[i]
-        if prev > 0:
-            roc24[i] = ((curr - prev) / prev) * 100.0
+    # ROC on ratio
+    roc_series = np.zeros(n_eth, dtype=np.float64)
+    if n_eth >= roc_window:
+        prev = s_r.shift(roc_window).to_numpy()
+        curr = s_r.to_numpy()
+        roc_series = np.where(prev > 0, ((curr - prev) / prev) * 100.0, 0.0)
 
-    # 48-bar rolling Z-score
-    roll_mean48 = s_r.rolling(window=48, min_periods=5).mean().to_numpy()
-    roll_std48 = s_r.rolling(window=48, min_periods=5).std().fillna(0.0).to_numpy()
-    zscore48 = np.where(
-        roll_std48 > 1e-8,
-        (s_r.to_numpy() - roll_mean48) / np.maximum(roll_std48, 1e-8),
+    # Rolling Z-score
+    roll_mean = s_r.rolling(window=z_window, min_periods=5).mean().to_numpy()
+    roll_std = s_r.rolling(window=z_window, min_periods=5).std().fillna(0.0).to_numpy()
+    zscore = np.where(
+        roll_std > 1e-8,
+        (s_r.to_numpy() - roll_mean) / np.maximum(roll_std, 1e-8),
         0.0,
     )
+
+    # Precompute rolling lookback windows for point-in-time SMT divergence (O(N) vectorization)
+    e_lows_s = pd.Series(e_lows)
+    e_highs_s = pd.Series(e_highs)
+    b_lows_s = pd.Series(b_lows)
+    b_highs_s = pd.Series(b_highs)
+
+    eth_prev_l_arr = e_lows_s.rolling(15).min().shift(5).to_numpy()
+    eth_rec_l_arr = e_lows_s.rolling(5).min().to_numpy()
+    eth_prev_h_arr = e_highs_s.rolling(15).max().shift(5).to_numpy()
+    eth_rec_h_arr = e_highs_s.rolling(5).max().to_numpy()
+
+    btc_prev_l_arr = b_lows_s.rolling(15).min().shift(5).to_numpy()
+    btc_rec_l_arr = b_lows_s.rolling(5).min().to_numpy()
+    btc_prev_h_arr = b_highs_s.rolling(15).max().shift(5).to_numpy()
+    btc_rec_h_arr = b_highs_s.rolling(5).max().to_numpy()
 
     out_table: dict[int, EthBtcRegimeSnapshot] = {}
 
@@ -231,22 +275,22 @@ def precompute_eth_btc_regime_table(
         e20 = float(ema20[i])
         e50 = float(ema50[i])
         e200 = float(ema200[i])
-        roc = float(roc24[i])
-        z48 = float(zscore48[i])
+        roc = float(roc_series[i])
+        z48 = float(zscore[i])
 
         # Point-in-Time SMT Divergence
         smt_sig = None
         if i >= 19 and j >= 19:
             # Lookback = 20 bars: prior 15 bars [k-19 : k-4] vs recent 5 bars [k-4 : k+1]
-            eth_prev_l = np.min(e_lows[i - 19 : i - 4])
-            eth_rec_l = np.min(e_lows[i - 4 : i + 1])
-            eth_prev_h = np.max(e_highs[i - 19 : i - 4])
-            eth_rec_h = np.max(e_highs[i - 4 : i + 1])
+            eth_prev_l = eth_prev_l_arr[i]
+            eth_rec_l = eth_rec_l_arr[i]
+            eth_prev_h = eth_prev_h_arr[i]
+            eth_rec_h = eth_rec_h_arr[i]
 
-            btc_prev_l = np.min(b_lows[j - 19 : j - 4])
-            btc_rec_l = np.min(b_lows[j - 4 : j + 1])
-            btc_prev_h = np.max(b_highs[j - 19 : j - 4])
-            btc_rec_h = np.max(b_highs[j - 4 : j + 1])
+            btc_prev_l = btc_prev_l_arr[j]
+            btc_rec_l = btc_rec_l_arr[j]
+            btc_prev_h = btc_prev_h_arr[j]
+            btc_rec_h = btc_rec_h_arr[j]
 
             is_bull_smt = (btc_rec_l < btc_prev_l and eth_rec_l >= eth_prev_l * 1.0002) or (
                 eth_rec_h > eth_prev_h * 1.0005 and btc_rec_h <= btc_prev_h and roc > 0.25

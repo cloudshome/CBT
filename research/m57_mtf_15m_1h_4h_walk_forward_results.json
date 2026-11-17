@@ -1,0 +1,775 @@
+{
+  "milestone": "M57",
+  "title": "Multi-Timeframe (15m Tactical Day vs. 4h Structural Swing) Walk-Forward Backtest & Cross-Horizon Regime Synthesis",
+  "timestamp_utc": "2026-11-17T09:26:47.846186+00:00",
+  "total_runtime_seconds": 822.25,
+  "total_active_trading_bars": 1194521,
+  "governance_invariants": {
+    "real_capital_enabled": false,
+    "execution_model": "impact",
+    "impact_k": 0.4,
+    "causal_point_in_time": true
+  },
+  "timeframe_specifications": {
+    "15m": {
+      "name": "Tactical Day",
+      "forward_horizon_hours": 3.0,
+      "step": 16,
+      "min_bars": 250,
+      "bars_in_store": 910103
+    },
+    "1h": {
+      "name": "Primary Swing",
+      "forward_horizon_hours": 6.0,
+      "step": 16,
+      "min_bars": 30,
+      "bars_in_store": 227530
+    },
+    "4h": {
+      "name": "Structural Swing",
+      "forward_horizon_hours": 24.0,
+      "step": 2,
+      "min_bars": 120,
+      "bars_in_store": 56888
+    }
+  },
+  "per_symbol_results": {
+    "BTCUSDT_15m": {
+      "symbol": "BTCUSDT",
+      "timeframe": "15m",
+      "bars_stored": 239616,
+      "runtime_seconds": 415.7,
+      "full_store": {
+        "trades": 388,
+        "win_rate_net": 0.57,
+        "expectancy_net": 0.1365,
+        "profit_factor_net": 1.2713,
+        "stage1_locks": 97,
+        "stage2_locks": 44,
+        "sharpe": 0.098,
+        "dsr": 0.6632
+      },
+      "splits": {
+        "train_50pct": {
+          "trades": 231,
+          "win_rate_net": 0.55,
+          "expectancy_net": 0.1081,
+          "profit_factor_net": 1.2074,
+          "stage1_locks": 56,
+          "stage2_locks": 26,
+          "sharpe": 0.0768,
+          "dsr": 0.3541
+        },
+        "val_25pct": {
+          "trades": 96,
+          "win_rate_net": 0.562,
+          "expectancy_net": 0.0863,
+          "profit_factor_net": 1.1666,
+          "stage1_locks": 24,
+          "stage2_locks": 11,
+          "sharpe": 0.0631,
+          "dsr": 0.1723
+        },
+        "sealed_oos_25pct": {
+          "trades": 61,
+          "win_rate_net": 0.656,
+          "expectancy_net": 0.3233,
+          "profit_factor_net": 1.7841,
+          "stage1_locks": 17,
+          "stage2_locks": 7,
+          "sharpe": 0.2329,
+          "dsr": 0.6229
+        }
+      }
+    },
+    "ETHUSDT_15m": {
+      "symbol": "ETHUSDT",
+      "timeframe": "15m",
+      "bars_stored": 239616,
+      "runtime_seconds": 311.79,
+      "full_store": {
+        "trades": 95,
+        "win_rate_net": 0.516,
+        "expectancy_net": -0.0225,
+        "profit_factor_net": 0.9604,
+        "stage1_locks": 24,
+        "stage2_locks": 9,
+        "sharpe": -0.0164,
+        "dsr": 0.0416
+      },
+      "splits": {
+        "train_50pct": {
+          "trades": 53,
+          "win_rate_net": 0.547,
+          "expectancy_net": 0.0115,
+          "profit_factor_net": 1.022,
+          "stage1_locks": 16,
+          "stage2_locks": 4,
+          "sharpe": 0.0086,
+          "dsr": 0.0652
+        },
+        "val_25pct": {
+          "trades": 18,
+          "win_rate_net": 0.389,
+          "expectancy_net": -0.2921,
+          "profit_factor_net": 0.5974,
+          "stage1_locks": 3,
+          "stage2_locks": 2,
+          "sharpe": -0.213,
+          "dsr": 0.0097
+        },
+        "sealed_oos_25pct": {
+          "trades": 24,
+          "win_rate_net": 0.542,
+          "expectancy_net": 0.1045,
+          "profit_factor_net": 1.1905,
+          "stage1_locks": 5,
+          "stage2_locks": 3,
+          "sharpe": 0.0711,
+          "dsr": 0.1103
+        }
+      }
+    },
+    "SOLUSDT_15m": {
+      "symbol": "SOLUSDT",
+      "timeframe": "15m",
+      "bars_stored": 214436,
+      "runtime_seconds": 242.41,
+      "full_store": {
+        "trades": 428,
+        "win_rate_net": 0.54,
+        "expectancy_net": 0.1238,
+        "profit_factor_net": 1.2377,
+        "stage1_locks": 108,
+        "stage2_locks": 30,
+        "sharpe": 0.0853,
+        "dsr": 0.5973
+      },
+      "splits": {
+        "train_50pct": {
+          "trades": 198,
+          "win_rate_net": 0.576,
+          "expectancy_net": 0.2278,
+          "profit_factor_net": 1.4736,
+          "stage1_locks": 54,
+          "stage2_locks": 15,
+          "sharpe": 0.1529,
+          "dsr": 0.7575
+        },
+        "val_25pct": {
+          "trades": 119,
+          "win_rate_net": 0.496,
+          "expectancy_net": -0.1424,
+          "profit_factor_net": 0.7657,
+          "stage1_locks": 33,
+          "stage2_locks": 6,
+          "sharpe": -0.1081,
+          "dsr": 0.0036
+        },
+        "sealed_oos_25pct": {
+          "trades": 111,
+          "win_rate_net": 0.523,
+          "expectancy_net": 0.2237,
+          "profit_factor_net": 1.4488,
+          "stage1_locks": 21,
+          "stage2_locks": 9,
+          "sharpe": 0.1494,
+          "dsr": 0.5216
+        }
+      }
+    },
+    "PAXGUSDT_15m": {
+      "symbol": "PAXGUSDT",
+      "timeframe": "15m",
+      "bars_stored": 216435,
+      "runtime_seconds": 186.87,
+      "full_store": {
+        "trades": 24,
+        "win_rate_net": 0.625,
+        "expectancy_net": 0.1728,
+        "profit_factor_net": 1.3718,
+        "stage1_locks": 8,
+        "stage2_locks": 2,
+        "sharpe": 0.1205,
+        "dsr": 0.1656
+      },
+      "splits": {
+        "train_50pct": {
+          "trades": 17,
+          "win_rate_net": 0.529,
+          "expectancy_net": -0.1581,
+          "profit_factor_net": 0.7278,
+          "stage1_locks": 5,
+          "stage2_locks": 2,
+          "sharpe": -0.1259,
+          "dsr": 0.0203
+        },
+        "val_25pct": {
+          "trades": 3,
+          "win_rate_net": 1.0,
+          "expectancy_net": 1.9893,
+          "profit_factor_net": 0.0,
+          "stage1_locks": 1,
+          "stage2_locks": 0,
+          "sharpe": 0.0,
+          "dsr": 0.0
+        },
+        "sealed_oos_25pct": {
+          "trades": 4,
+          "win_rate_net": 0.75,
+          "expectancy_net": 0.2167,
+          "profit_factor_net": 1.6731,
+          "stage1_locks": 2,
+          "stage2_locks": 0,
+          "sharpe": 0.0,
+          "dsr": 0.0
+        }
+      }
+    },
+    "BTCUSDT_1h": {
+      "symbol": "BTCUSDT",
+      "timeframe": "1h",
+      "bars_stored": 59904,
+      "runtime_seconds": 183.16,
+      "full_store": {
+        "trades": 318,
+        "win_rate_net": 0.623,
+        "expectancy_net": 0.4862,
+        "profit_factor_net": 2.184,
+        "stage1_locks": 75,
+        "stage2_locks": 6,
+        "sharpe": 0.3229,
+        "dsr": 1.0
+      },
+      "splits": {
+        "train_50pct": {
+          "trades": 156,
+          "win_rate_net": 0.596,
+          "expectancy_net": 0.3742,
+          "profit_factor_net": 1.8408,
+          "stage1_locks": 39,
+          "stage2_locks": 3,
+          "sharpe": 0.2511,
+          "dsr": 0.959
+        },
+        "val_25pct": {
+          "trades": 86,
+          "win_rate_net": 0.663,
+          "expectancy_net": 0.7384,
+          "profit_factor_net": 3.1465,
+          "stage1_locks": 16,
+          "stage2_locks": 3,
+          "sharpe": 0.4777,
+          "dsr": 0.9977
+        },
+        "sealed_oos_25pct": {
+          "trades": 76,
+          "win_rate_net": 0.632,
+          "expectancy_net": 0.4306,
+          "profit_factor_net": 2.0368,
+          "stage1_locks": 20,
+          "stage2_locks": 0,
+          "sharpe": 0.2916,
+          "dsr": 0.8537
+        }
+      }
+    },
+    "ETHUSDT_1h": {
+      "symbol": "ETHUSDT",
+      "timeframe": "1h",
+      "bars_stored": 59904,
+      "runtime_seconds": 109.06,
+      "full_store": {
+        "trades": 72,
+        "win_rate_net": 0.667,
+        "expectancy_net": 0.5015,
+        "profit_factor_net": 2.3685,
+        "stage1_locks": 19,
+        "stage2_locks": 7,
+        "sharpe": 0.3465,
+        "dsr": 0.9352
+      },
+      "splits": {
+        "train_50pct": {
+          "trades": 31,
+          "win_rate_net": 0.548,
+          "expectancy_net": 0.5899,
+          "profit_factor_net": 2.2212,
+          "stage1_locks": 1,
+          "stage2_locks": 3,
+          "sharpe": 0.3578,
+          "dsr": 0.6674
+        },
+        "val_25pct": {
+          "trades": 17,
+          "win_rate_net": 0.765,
+          "expectancy_net": 0.4272,
+          "profit_factor_net": 2.5712,
+          "stage1_locks": 8,
+          "stage2_locks": 2,
+          "sharpe": 0.3153,
+          "dsr": 0.4362
+        },
+        "sealed_oos_25pct": {
+          "trades": 24,
+          "win_rate_net": 0.75,
+          "expectancy_net": 0.4399,
+          "profit_factor_net": 2.5557,
+          "stage1_locks": 10,
+          "stage2_locks": 2,
+          "sharpe": 0.3453,
+          "dsr": 0.5755
+        }
+      }
+    },
+    "SOLUSDT_1h": {
+      "symbol": "SOLUSDT",
+      "timeframe": "1h",
+      "bars_stored": 53609,
+      "runtime_seconds": 67.44,
+      "full_store": {
+        "trades": 253,
+        "win_rate_net": 0.589,
+        "expectancy_net": 0.3494,
+        "profit_factor_net": 1.7674,
+        "stage1_locks": 59,
+        "stage2_locks": 11,
+        "sharpe": 0.2352,
+        "dsr": 0.9912
+      },
+      "splits": {
+        "train_50pct": {
+          "trades": 117,
+          "win_rate_net": 0.624,
+          "expectancy_net": 0.4872,
+          "profit_factor_net": 2.1807,
+          "stage1_locks": 29,
+          "stage2_locks": 5,
+          "sharpe": 0.3172,
+          "dsr": 0.9802
+        },
+        "val_25pct": {
+          "trades": 54,
+          "win_rate_net": 0.426,
+          "expectancy_net": -0.1091,
+          "profit_factor_net": 0.8258,
+          "stage1_locks": 11,
+          "stage2_locks": 1,
+          "sharpe": -0.0805,
+          "dsr": 0.0163
+        },
+        "sealed_oos_25pct": {
+          "trades": 82,
+          "win_rate_net": 0.646,
+          "expectancy_net": 0.4549,
+          "profit_factor_net": 2.1265,
+          "stage1_locks": 19,
+          "stage2_locks": 5,
+          "sharpe": 0.3131,
+          "dsr": 0.9113
+        }
+      }
+    },
+    "PAXGUSDT_1h": {
+      "symbol": "PAXGUSDT",
+      "timeframe": "1h",
+      "bars_stored": 54113,
+      "runtime_seconds": 61.44,
+      "full_store": {
+        "trades": 203,
+        "win_rate_net": 0.547,
+        "expectancy_net": 0.0251,
+        "profit_factor_net": 1.0436,
+        "stage1_locks": 50,
+        "stage2_locks": 13,
+        "sharpe": 0.0176,
+        "dsr": 0.0928
+      },
+      "splits": {
+        "train_50pct": {
+          "trades": 84,
+          "win_rate_net": 0.464,
+          "expectancy_net": -0.1564,
+          "profit_factor_net": 0.7769,
+          "stage1_locks": 17,
+          "stage2_locks": 4,
+          "sharpe": -0.1074,
+          "dsr": 0.0061
+        },
+        "val_25pct": {
+          "trades": 33,
+          "win_rate_net": 0.545,
+          "expectancy_net": -0.126,
+          "profit_factor_net": 0.7892,
+          "stage1_locks": 10,
+          "stage2_locks": 1,
+          "sharpe": -0.096,
+          "dsr": 0.0179
+        },
+        "sealed_oos_25pct": {
+          "trades": 86,
+          "win_rate_net": 0.628,
+          "expectancy_net": 0.2603,
+          "profit_factor_net": 1.5844,
+          "stage1_locks": 23,
+          "stage2_locks": 8,
+          "sharpe": 0.1823,
+          "dsr": 0.5695
+        }
+      }
+    },
+    "BTCUSDT_4h": {
+      "symbol": "BTCUSDT",
+      "timeframe": "4h",
+      "bars_stored": 14976,
+      "runtime_seconds": 265.98,
+      "full_store": {
+        "trades": 444,
+        "win_rate_net": 0.646,
+        "expectancy_net": 0.6452,
+        "profit_factor_net": 2.7157,
+        "stage1_locks": 98,
+        "stage2_locks": 18,
+        "sharpe": 0.4148,
+        "dsr": 1.0
+      },
+      "splits": {
+        "train_50pct": {
+          "trades": 179,
+          "win_rate_net": 0.615,
+          "expectancy_net": 0.65,
+          "profit_factor_net": 2.6012,
+          "stage1_locks": 32,
+          "stage2_locks": 4,
+          "sharpe": 0.4069,
+          "dsr": 1.0
+        },
+        "val_25pct": {
+          "trades": 142,
+          "win_rate_net": 0.683,
+          "expectancy_net": 0.7875,
+          "profit_factor_net": 3.3147,
+          "stage1_locks": 28,
+          "stage2_locks": 6,
+          "sharpe": 0.5082,
+          "dsr": 1.0
+        },
+        "sealed_oos_25pct": {
+          "trades": 123,
+          "win_rate_net": 0.65,
+          "expectancy_net": 0.4737,
+          "profit_factor_net": 2.2673,
+          "stage1_locks": 38,
+          "stage2_locks": 8,
+          "sharpe": 0.3172,
+          "dsr": 0.9874
+        }
+      }
+    },
+    "ETHUSDT_4h": {
+      "symbol": "ETHUSDT",
+      "timeframe": "4h",
+      "bars_stored": 14976,
+      "runtime_seconds": 135.23,
+      "full_store": {
+        "trades": 85,
+        "win_rate_net": 0.706,
+        "expectancy_net": 0.8292,
+        "profit_factor_net": 3.6624,
+        "stage1_locks": 19,
+        "stage2_locks": 6,
+        "sharpe": 0.5326,
+        "dsr": 0.9996
+      },
+      "splits": {
+        "train_50pct": {
+          "trades": 50,
+          "win_rate_net": 0.74,
+          "expectancy_net": 0.9491,
+          "profit_factor_net": 4.4902,
+          "stage1_locks": 11,
+          "stage2_locks": 5,
+          "sharpe": 0.6082,
+          "dsr": 0.9961
+        },
+        "val_25pct": {
+          "trades": 18,
+          "win_rate_net": 0.667,
+          "expectancy_net": 0.7194,
+          "profit_factor_net": 2.9945,
+          "stage1_locks": 4,
+          "stage2_locks": 0,
+          "sharpe": 0.4523,
+          "dsr": 0.6231
+        },
+        "sealed_oos_25pct": {
+          "trades": 17,
+          "win_rate_net": 0.647,
+          "expectancy_net": 0.5929,
+          "profit_factor_net": 2.5787,
+          "stage1_locks": 4,
+          "stage2_locks": 1,
+          "sharpe": 0.3777,
+          "dsr": 0.5072
+        }
+      }
+    },
+    "SOLUSDT_4h": {
+      "symbol": "SOLUSDT",
+      "timeframe": "4h",
+      "bars_stored": 13403,
+      "runtime_seconds": 90.21,
+      "full_store": {
+        "trades": 413,
+        "win_rate_net": 0.54,
+        "expectancy_net": 0.2503,
+        "profit_factor_net": 1.5161,
+        "stage1_locks": 92,
+        "stage2_locks": 18,
+        "sharpe": 0.1708,
+        "dsr": 0.9833
+      },
+      "splits": {
+        "train_50pct": {
+          "trades": 210,
+          "win_rate_net": 0.576,
+          "expectancy_net": 0.2847,
+          "profit_factor_net": 1.6418,
+          "stage1_locks": 56,
+          "stage2_locks": 12,
+          "sharpe": 0.1987,
+          "dsr": 0.9349
+        },
+        "val_25pct": {
+          "trades": 98,
+          "win_rate_net": 0.51,
+          "expectancy_net": 0.2551,
+          "profit_factor_net": 1.4959,
+          "stage1_locks": 20,
+          "stage2_locks": 1,
+          "sharpe": 0.1625,
+          "dsr": 0.563
+        },
+        "sealed_oos_25pct": {
+          "trades": 105,
+          "win_rate_net": 0.495,
+          "expectancy_net": 0.1772,
+          "profit_factor_net": 1.3278,
+          "stage1_locks": 16,
+          "stage2_locks": 5,
+          "sharpe": 0.1229,
+          "dsr": 0.3921
+        }
+      }
+    },
+    "PAXGUSDT_4h": {
+      "symbol": "PAXGUSDT",
+      "timeframe": "4h",
+      "bars_stored": 13533,
+      "runtime_seconds": 95.3,
+      "full_store": {
+        "trades": 356,
+        "win_rate_net": 0.565,
+        "expectancy_net": 0.2274,
+        "profit_factor_net": 1.45,
+        "stage1_locks": 87,
+        "stage2_locks": 14,
+        "sharpe": 0.1534,
+        "dsr": 0.9269
+      },
+      "splits": {
+        "train_50pct": {
+          "trades": 131,
+          "win_rate_net": 0.504,
+          "expectancy_net": -0.0409,
+          "profit_factor_net": 0.929,
+          "stage1_locks": 36,
+          "stage2_locks": 2,
+          "sharpe": -0.0304,
+          "dsr": 0.0277
+        },
+        "val_25pct": {
+          "trades": 90,
+          "win_rate_net": 0.611,
+          "expectancy_net": 0.2153,
+          "profit_factor_net": 1.4798,
+          "stage1_locks": 28,
+          "stage2_locks": 5,
+          "sharpe": 0.1558,
+          "dsr": 0.4872
+        },
+        "sealed_oos_25pct": {
+          "trades": 135,
+          "win_rate_net": 0.593,
+          "expectancy_net": 0.4958,
+          "profit_factor_net": 2.0464,
+          "stage1_locks": 23,
+          "stage2_locks": 7,
+          "sharpe": 0.3046,
+          "dsr": 0.983
+        }
+      }
+    }
+  },
+  "eth_multi_timeframe_oos_summary": {
+    "15m": {
+      "unfiltered": {
+        "trades": 124,
+        "win_rate_net": 0.565,
+        "expectancy_net": 0.2528,
+        "profit_factor_net": 1.4847,
+        "stage1_locks": 21,
+        "stage2_locks": 15,
+        "sharpe": 0.1674,
+        "dsr": 0.6409
+      },
+      "filtered": {
+        "trades": 24,
+        "win_rate_net": 0.542,
+        "expectancy_net": 0.1045,
+        "profit_factor_net": 1.1905,
+        "stage1_locks": 5,
+        "stage2_locks": 3,
+        "sharpe": 0.0711,
+        "dsr": 0.1103
+      },
+      "expectancy_net": 0.1045
+    },
+    "1h": {
+      "filtered": {
+        "trades": 24,
+        "win_rate_net": 0.75,
+        "expectancy_net": 0.4399,
+        "profit_factor_net": 2.5557,
+        "stage1_locks": 10,
+        "stage2_locks": 2,
+        "sharpe": 0.3453,
+        "dsr": 0.5755
+      },
+      "expectancy_net": 0.4399
+    },
+    "4h": {
+      "unfiltered": {
+        "trades": 99,
+        "win_rate_net": 0.606,
+        "expectancy_net": 0.3914,
+        "profit_factor_net": 1.9341,
+        "stage1_locks": 24,
+        "stage2_locks": 7,
+        "sharpe": 0.2698,
+        "dsr": 0.8984
+      },
+      "filtered": {
+        "trades": 17,
+        "win_rate_net": 0.647,
+        "expectancy_net": 0.5929,
+        "profit_factor_net": 2.5787,
+        "stage1_locks": 4,
+        "stage2_locks": 1,
+        "sharpe": 0.3777,
+        "dsr": 0.5072
+      },
+      "expectancy_net": 0.5929
+    }
+  },
+  "pooled_timeframe_portfolios": {
+    "15m": {
+      "full_store": {
+        "trades": 935,
+        "win_rate_net": 0.552,
+        "expectancy_net": 0.1155,
+        "profit_factor_net": 1.2234,
+        "stage1_locks": 237,
+        "stage2_locks": 85,
+        "sharpe": 0.0814,
+        "dsr": 0.8397
+      },
+      "sealed_oos": {
+        "trades": 200,
+        "win_rate_net": 0.57,
+        "expectancy_net": 0.2397,
+        "profit_factor_net": 1.5048,
+        "stage1_locks": 45,
+        "stage2_locks": 19,
+        "sharpe": 0.1654,
+        "dsr": 0.8043
+      }
+    },
+    "1h": {
+      "full_store": {
+        "trades": 846,
+        "win_rate_net": 0.598,
+        "expectancy_net": 0.3359,
+        "profit_factor_net": 1.7305,
+        "stage1_locks": 203,
+        "stage2_locks": 37,
+        "sharpe": 0.2261,
+        "dsr": 1.0
+      },
+      "sealed_oos": {
+        "trades": 268,
+        "win_rate_net": 0.646,
+        "expectancy_net": 0.3842,
+        "profit_factor_net": 1.9381,
+        "stage1_locks": 72,
+        "stage2_locks": 15,
+        "sharpe": 0.2684,
+        "dsr": 0.9987
+      }
+    },
+    "4h": {
+      "full_store": {
+        "trades": 1298,
+        "win_rate_net": 0.594,
+        "expectancy_net": 0.417,
+        "profit_factor_net": 1.9436,
+        "stage1_locks": 296,
+        "stage2_locks": 56,
+        "sharpe": 0.2741,
+        "dsr": 1.0
+      },
+      "sealed_oos": {
+        "trades": 380,
+        "win_rate_net": 0.587,
+        "expectancy_net": 0.4049,
+        "profit_factor_net": 1.889,
+        "stage1_locks": 81,
+        "stage2_locks": 21,
+        "sharpe": 0.2642,
+        "dsr": 0.9999
+      }
+    }
+  },
+  "unified_multi_horizon_portfolio": {
+    "sealed_oos": {
+      "trades": 848,
+      "win_rate_net": 0.601,
+      "expectancy_net": 0.3594,
+      "profit_factor_net": 1.8067,
+      "stage1_locks": 198,
+      "stage2_locks": 55,
+      "sharpe": 0.2426,
+      "dsr": 1.0
+    },
+    "cpcv": {
+      "folds_count": 15,
+      "median_oos_sharpe": 0.2448,
+      "annualized_median_sharpe": 11.4684,
+      "cpcv_passed": true
+    }
+  },
+  "hurdles": {
+    "hurdle_m57_1_passed": true,
+    "hurdle_m57_1_desc": "15m Tactical Day Pooled OOS E[R_net] >= +0.1500R and PF_net >= 1.2500",
+    "hurdle_m57_2_passed": true,
+    "hurdle_m57_2_desc": "4h Structural Swing Pooled OOS E[R_net] >= +0.1500R and PF_net >= 1.2500",
+    "hurdle_m57_3_passed": true,
+    "hurdle_m57_3_desc": "ETHUSDT Multi-Timeframe OOS Protection: E[R_net] >= 0.000R across 15m, 1h, 4h",
+    "hurdle_m57_4_passed": true,
+    "hurdle_m57_4_desc": "Combined Multi-Horizon (15m + 1h + 4h) OOS decided trades N >= 350",
+    "hurdle_m57_5_passed": true,
+    "hurdle_m57_5_desc": "Combined Multi-Horizon CP-2: E[R_net] >= +0.2500R, PF_net >= 1.4500, DSR >= 0.9500, CPCV Sharpe >= 1.0"
+  },
+  "all_hurdles_passed": true,
+  "certification_status": "CERTIFIED_PASS"
+}
