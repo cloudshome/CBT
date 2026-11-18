@@ -826,6 +826,139 @@ class AutonomousTrader:
                             sym, direction_str, sl_price=sl, tp_price=tp
                         )
 
+                    # 4b. Secondary Evaluation: Certified M57/M60 Signal Engine (Rules & Plans)
+                    # If SKY orchestrator did not execute a trade on this symbol, evaluate certified signal engine
+                    # for qualified A+ plans (min_confidence >= 65, rr >= 2.0). All candidates route strictly through
+                    # CentralTradingMind and the Master Risk Gate; no bypass is permitted.
+                    if not executed_actions or all(a["symbol"] != sym for a in executed_actions):
+                        try:
+                            import pandas as pd
+
+                            from engine.signal_engine import analyze_frame
+
+                            df_scan = pd.DataFrame(candles_tf)
+                            if len(df_scan) >= 30:
+                                df_scan["ts"] = df_scan["timestamp"]
+                                brain_out = analyze_frame(
+                                    df_scan, symbol=sym, timeframe=tf_scan, min_confidence=65
+                                )
+                                if brain_out and brain_out.plans:
+                                    eligible_plans = [
+                                        p
+                                        for p in brain_out.plans
+                                        if getattr(p, "confidence", 0) >= 65
+                                        and getattr(p, "rr", 0.0) >= 2.0
+                                        and getattr(p, "entry", None) is not None
+                                        and getattr(p, "stop", None) is not None
+                                        and getattr(p, "tp", None) is not None
+                                    ]
+                                    if eligible_plans:
+                                        best_plan = max(
+                                            eligible_plans,
+                                            key=lambda p: (
+                                                getattr(p, "confidence", 0),
+                                                getattr(p, "rr", 0.0),
+                                            ),
+                                        )
+                                        plan_dir = (
+                                            "LONG"
+                                            if best_plan.action.upper() in ("BUY", "LONG")
+                                            else "SHORT"
+                                        )
+
+                                        can_enter_p, _cd_reason_p = (
+                                            cooldown_governor.evaluate_entry_clearance(sym)
+                                        )
+                                        if can_enter_p:
+                                            p_entry = float(best_plan.entry)
+                                            p_sl = float(best_plan.stop)
+                                            p_tp = float(best_plan.tp)
+
+                                            # Conservative sizing: 1.0% equity cap
+                                            plan_risk_usd = current_eq * 0.010
+                                            plan_units = plan_risk_usd / max(
+                                                abs(p_entry - p_sl), 0.001
+                                            )
+                                            if sym.upper() in ("BTCUSDT", "BTCUSD"):
+                                                plan_units = round(plan_units, 4)
+                                            elif sym.upper() in ("ETHUSDT", "ETHUSD"):
+                                                plan_units = round(plan_units, 3)
+                                            else:
+                                                plan_units = round(plan_units, 2)
+
+                                            data_streamer._last_known_prices[sym] = p_entry
+                                            from core.central_mind import (
+                                                CentralTradingMind,
+                                                TradeProposal,
+                                            )
+
+                                            mind = (
+                                                getattr(self, "central_mind", None)
+                                                or CentralTradingMind()
+                                            )
+                                            prop_thesis = (
+                                                f"[M57_RULE_ENGINE] {best_plan.type} | "
+                                                f"Conf: {best_plan.confidence}% | RR: {best_plan.rr}R"
+                                            )
+                                            prop_plan = TradeProposal(
+                                                origin="M57_RULE_ENGINE",
+                                                symbol=sym,
+                                                direction=plan_dir,
+                                                style=best_plan.type.upper().replace(" ", "_"),
+                                                planned_entry=p_entry,
+                                                stop_loss=p_sl,
+                                                take_profit=p_tp,
+                                                thesis=prop_thesis,
+                                                requested_size=plan_units,
+                                                confluence_score=float(best_plan.confidence),
+                                                expected_value_r=round(
+                                                    (best_plan.confidence / 100.0 * best_plan.rr)
+                                                    - (1.0 - best_plan.confidence / 100.0)
+                                                    - 0.16,
+                                                    3,
+                                                ),
+                                            )
+                                            verdict_p = mind.evaluate_and_route(prop_plan)
+                                            if verdict_p.is_approved:
+                                                pos_id_p = (
+                                                    verdict_p.executed_position_id
+                                                    or f"POS_{sym}_{int(time.time() * 1000)}"
+                                                )
+                                                self.total_trades_executed += 1
+                                                self._last_traded_candle_ts[tf_key] = (
+                                                    closed_candle_ts
+                                                )
+                                                self._last_traded_candle_ts[sym] = closed_candle_ts
+                                                action_record_p = {
+                                                    "position_id": pos_id_p,
+                                                    "symbol": sym,
+                                                    "direction": plan_dir,
+                                                    "size": plan_units,
+                                                    "entry_price": p_entry,
+                                                    "stop_loss": p_sl,
+                                                    "take_profit": p_tp,
+                                                    "net_ev_r": prop_plan.expected_value_r,
+                                                    "kelly_fraction": 0.010,
+                                                    "style": best_plan.type.upper().replace(
+                                                        " ", "_"
+                                                    ),
+                                                    "desk": "M57_RULE_DESK",
+                                                    "timestamp": int(time.time() * 1000),
+                                                }
+                                                executed_actions.append(action_record_p)
+                                                audit_bus.emit_event(
+                                                    event_type="AUTONOMOUS_PAPER_TRADE_OPENED",
+                                                    symbol=sym,
+                                                    reason=f"Opened {plan_dir} M57 rule paper trade {pos_id_p}",
+                                                    severity="INFO",
+                                                    details=action_record_p,
+                                                )
+                                                logger.info(
+                                                    f"AutonomousTrader executed {plan_dir} M57 rule plan on {sym}: {pos_id_p} (Size: {plan_units})"
+                                                )
+                        except Exception as m57_err:
+                            logger.debug(f"M57 Signal Engine adapter fallback for {sym}: {m57_err}")
+
                 except Exception as e:
                     logger.error(f"AutonomousTrader scan error for {sym}: {e}")
 

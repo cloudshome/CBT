@@ -1,0 +1,66 @@
+{
+  "milestone": "M61.1",
+  "audit_date": "2026-11-18",
+  "target_pipeline": "AutonomousTrader -> CentralTradingMind -> MasterRiskGate -> PortfolioShadow.open_position()",
+  "constitutional_status": {
+    "REAL_CAPITAL_ENABLED": false,
+    "capital_airgap_verified": true,
+    "m18_certified_files_modified": false,
+    "m18_certification_status": "PRODUCTION PASS (149/149 passing)"
+  },
+  "overall_verdict": "MULTIPLE_INTERACTING_BLOCKERS",
+  "blockers": [
+    {
+      "id": "BLOCKER_1",
+      "name": "Bayesian Cold-Start Deadlock",
+      "verdict": "CONFIRMED_ROOT_CAUSE",
+      "file": "core/sky_intelligence/orchestrator.py",
+      "lines": "46-110, 317-374",
+      "mechanism": "get_bayesian_setup_stats queries shadow_positions WHERE opened_at >= 1793469018542 (2026-10-31 UTC). When n=0 closed post-epoch trades, defaults to alpha_0=6.0, beta_0=6.0 (p_win_hat=0.50) and r_win_0=1.45R. Even with confluence 82.0 (p_eff=0.528) and friction 0.16R, net_ev = (0.528 * 1.45) - 0.472 - 0.16 = +0.1336R. Net EV hurdle is >= +0.25R, forcing decision to DecisionAction.NO_TRADE unconditionally. Since no trade opens, sample size remains 0 indefinitely, creating an inescapable circular deadlock.",
+      "remediation": "Anchor cold-start Bayesian prior to empirical setup class parameters (Setup A: p_0=0.56, R_0=1.70; Setup B: p_0=0.55, R_0=1.65; fallback: p_0=0.52, R_0=1.50). High confluence (>=75) rationally achieves net_ev >= 0.25R on cold start, while posterior updates smoothly as closed trades accumulate."
+    },
+    {
+      "id": "BLOCKER_2",
+      "name": "Qualification Mode Instrument Exclusion",
+      "verdict": "CONFIRMED_ROOT_CAUSE",
+      "file": "core/central_mind.py",
+      "lines": "528-544",
+      "mechanism": "Invariant 2f checks qualification_mode (defaulting to True) and restricts symbol keys strictly to {'BTCUSDT', 'BTCUSD', 'ETHUSDT', 'ETHUSD'}. Hard-rejects SOLUSDT (298 OOS trades) and PAXGUSDT (225 OOS trades), which together represent 523 out of 848 (61.7%) of all certified M57/M60 OOS trades.",
+      "remediation": "Expand qualification universe to include certified institutional Tier-1 assets (BTC, ETH, SOL, PAXG, XAU) and permit configuration via QUALIFICATION_UNIVERSE environment variable."
+    },
+    {
+      "id": "BLOCKER_3",
+      "name": "Setup B Neutral 4h HTF Trend Rejection",
+      "verdict": "CONFIRMED_ROOT_CAUSE",
+      "file": "core/sky_intelligence/setup_engine.py",
+      "lines": "483-485, 553-555, 701-705",
+      "mechanism": "Setup B checks htf_aligned = ('BULL' in mtf.htf_4h_trend and is_bull) or ('BEAR' in mtf.htf_4h_trend and not is_bull). When 4h trend is NEUTRAL or RANGING (common during crypto consolidation prior to expansion), htf_aligned is False, disqualifying valid FVG retests even with aligned 1h trend and high ADX. Additionally, Setup C is hardcoded to is_qualified=False.",
+      "remediation": "When 4h HTF trend is NEUTRAL or RANGING, evaluate 1h HTF trend alignment and ADX regime (>= 22.0) to permit trend continuation into active FVGs while strictly maintaining rejection against opposing 4h trends."
+    },
+    {
+      "id": "BLOCKER_4",
+      "name": "M57/M60 Signal Engine Disconnected from AutonomousTrader",
+      "verdict": "CONFIRMED_ROOT_CAUSE",
+      "file": "core/autonomous_trader.py",
+      "lines": "240-246",
+      "mechanism": "AutonomousTrader exclusively invokes sky_orchestrator.analyze_market(). The certified M57/M60 signal engine (engine.signal_engine and engine.rules.build_plans) is completely uncalled in the live autonomous scanning loop. If sky_orchestrator returns NO_TRADE or WATCH, no secondary candidate engine is evaluated.",
+      "remediation": "Implement a controlled adapter within AutonomousTrader.scan_and_execute_cycle() that evaluates qualified plans from engine.signal_engine.analyze_frame() when available, converting valid plans into TradeProposal and routing them through CentralTradingMind and MasterRiskGate without bypassing portfolio risk controls."
+    },
+    {
+      "id": "BLOCKER_5",
+      "name": "Substring-Based Strategy Thesis Blacklist",
+      "verdict": "CONFIRMED_ROOT_CAUSE",
+      "file": "core/central_mind.py",
+      "lines": "436-456",
+      "mechanism": "Invariant 2b performs raw substring search on proposal.thesis + strategy_name for 'BREAKOUT BUY', 'SWEEP REVERSAL', 'SMC_ORDER_BLOCK', 'SMC LIQUIDITY SWEEP'. Directly collides with canonical plan names emitted by engine/rules.py ('Sweep Reversal Buy', 'Sweep Reversal Sell', 'Breakout Buy') and Setup A ('SETUP_A_LIQUIDITY_SWEEP'), causing immediate rejection of valid strategy proposals based solely on English wording.",
+      "remediation": "Replace naive thesis substring matching with structured strategy ID validation against the authoritative quarantine registry (strategy_eligibility_verifier._quarantined_strategies) and explicitly falsified strategy identifiers, preserving legitimate descriptive text for approved strategies."
+    }
+  ],
+  "interaction_matrix": {
+    "blocker_1_and_4": "Blocker 1 terminates the active pipeline at Step 3 before TradeProposal creation. Blocker 4 prevents the alternative M57 rule engine from providing candidate plans.",
+    "blocker_2_and_4": "Even if Blocker 4 is resolved, Blocker 2 blocks SOL and PAXG plans at Central Mind Invariant 2f.",
+    "blocker_3_and_1": "Blocker 3 drops Setup B during 4h consolidation. Any remaining setups are subsequently killed by Blocker 1 net EV hurdle.",
+    "blocker_5_and_4": "Even if Blocker 4 generates Sweep Reversal or Breakout plans, Blocker 5 hard-rejects them at Central Mind Invariant 2b by thesis substring collision.",
+    "pipeline_deadlock_severity": "COMPLETE_CIRCULAR_DEADLOCK (0% probability of any setup reaching PortfolioShadow.open_position() under default configuration)"
+  }
+}

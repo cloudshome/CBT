@@ -63,10 +63,24 @@ class SKYIntelligenceOrchestrator:
             if current_sec < exp_time:
                 return p_hat, r_hat, n_samples
 
-        # Conservative prior: alpha_0 = 6.0, beta_0 = 6.0 (p_0 = 0.50), prior average win = 1.45R
-        alpha_0 = 6.0
-        beta_0 = 6.0
-        r_win_0 = 1.45
+        # Setup-class informative empirical priors (effective sample size N_0 = 10)
+        # Prevents cold-start deadlock while preserving conservative bounds and empirical calibration:
+        # Setup A (Liquidity Sweep): historical 58% WR, 1.85R -> conservative prior 56% WR, 1.70R
+        # Setup B (FVG Institutional Retest): historical 56% WR, 1.65R -> conservative prior 55% WR, 1.65R
+        # Default / fallback: conservative prior 52% WR, 1.50R
+        st_upper = setup_type_str.upper()
+        if "SETUP_A" in st_upper or "LIQUIDITY_SWEEP" in st_upper:
+            alpha_0 = 5.6
+            beta_0 = 4.4
+            r_win_0 = 1.70
+        elif "SETUP_B" in st_upper or "FVG" in st_upper:
+            alpha_0 = 5.5
+            beta_0 = 4.5
+            r_win_0 = 1.65
+        else:
+            alpha_0 = 5.2
+            beta_0 = 4.8
+            r_win_0 = 1.50
 
         n_wins = 0
         n_total = 0

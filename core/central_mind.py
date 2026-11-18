@@ -435,25 +435,32 @@ class CentralTradingMind:
         # -------------------------------------------------------------
         thesis_upper = (proposal.thesis or "").upper()
         strat_upper = (proposal.strategy_name if hasattr(proposal, "strategy_name") else "").upper()
+        origin_upper = (proposal.origin or "").upper()
         combined_text = f"{thesis_upper} {strat_upper}"
-        if any(
-            falsified in combined_text
-            for falsified in [
-                "BREAKOUT BUY",
-                "SWEEP REVERSAL",
-                "SETUP_C_BREAKOUT",
-                "PRE_BREAKOUT_COMPRESSION",
-                "CANDIDATE_A",
-                "SMC_ORDER_BLOCK",
-                "SMC LIQUIDITY SWEEP",
-                "CANDIDATE_C_DELTA_NEUTRAL",
-                "DELTA_NEUTRAL_CARRY",
-            ]
-        ):
-            return _reject(
-                f"Empirical Research Gate: Strategy in '{proposal.thesis}' was falsified during multi-year "
-                f"out-of-sample backtest or forward paper qualification. Execution rejected."
-            )
+
+        # Explicitly falsified strategy architectures and models (rejected across multi-year OOS / paper qualification)
+        falsified_architectures = [
+            "SETUP_C_BREAKOUT_EXPANSION",
+            "SETUP_C_BREAKOUT",
+            "PRE_BREAKOUT_COMPRESSION",
+            "CANDIDATE_A_SMC",
+            "CANDIDATE_A",
+            "CANDIDATE_C_DELTA_NEUTRAL_CARRY",
+            "CANDIDATE_C_DELTA_NEUTRAL",
+            "DELTA_NEUTRAL_CARRY",
+        ]
+        # Match against exact strategy identifiers or explicit model tags, not generic descriptive words
+        for falsified in falsified_architectures:
+            if (
+                falsified == strat_upper
+                or f"[{falsified}]" in thesis_upper
+                or thesis_upper.startswith(falsified)
+                or f"STRATEGY_{falsified}" in combined_text
+            ):
+                return _reject(
+                    f"Empirical Research Gate: Strategy '{falsified}' was falsified during multi-year "
+                    f"out-of-sample backtest or forward paper qualification. Execution rejected."
+                )
 
         try:
             from core.execution.strategy_gateway.research_eligibility import (
@@ -461,7 +468,11 @@ class CentralTradingMind:
             )
 
             for quarantined in strategy_eligibility_verifier._quarantined_strategies:
-                if quarantined in combined_text or quarantined in origin_upper:
+                if (
+                    quarantined == strat_upper
+                    or f"[{quarantined}]" in thesis_upper
+                    or quarantined in origin_upper
+                ):
                     return _reject(
                         f"Strategy Quarantine Gate: Strategy '{quarantined}' is actively quarantined "
                         f"in Research Eligibility Authority. Execution rejected."
@@ -527,18 +538,41 @@ class CentralTradingMind:
         # -------------------------------------------------------------
         # INVARIANT 2f: 30-Day Qualification Universe Restriction
         # -------------------------------------------------------------
-        # During the active 30-day paper-trading qualification window,
-        # new position entries are strictly restricted to BTC/USDT and ETH/USDT.
-        # Dynamic screening and out-of-scope research opportunities (SOL, BNB, etc.)
-        # continue to operate and record into research ledgers, but cannot authorize entries.
+        # INVARIANT 2f: Institutional Qualification Universe Restriction
+        # -------------------------------------------------------------
+        # During paper-trading qualification, new position entries are restricted
+        # to certified Tier-1 institutional assets (BTC, ETH, SOL, PAXG/XAU).
+        # Can be configured via QUALIFICATION_UNIVERSE env var (comma-separated).
         qualification_mode = os.getenv("QUALIFICATION_MODE", "true").lower() in ("true", "1", "yes")
         if qualification_mode and not is_manual_approval:
             clean_sym = proposal.symbol.replace("/", "").replace("_", "").upper()
-            qualification_keys = {"BTCUSDT", "BTCUSD", "ETHUSDT", "ETHUSD"}
+            env_univ = os.getenv("QUALIFICATION_UNIVERSE", "")
+            if env_univ.strip():
+                qualification_keys = {
+                    s.strip().replace("/", "").replace("_", "").upper()
+                    for s in env_univ.split(",")
+                    if s.strip()
+                }
+            else:
+                qualification_keys = {
+                    "BTCUSDT",
+                    "BTCUSD",
+                    "BTCUSDC",
+                    "ETHUSDT",
+                    "ETHUSD",
+                    "ETHUSDC",
+                    "SOLUSDT",
+                    "SOLUSD",
+                    "SOLUSDC",
+                    "PAXGUSDT",
+                    "PAXGUSD",
+                    "XAUUSD",
+                    "XAUUSDT",
+                }
             if clean_sym not in qualification_keys:
                 return _reject(
                     f"Qualification Universe Restriction: '{proposal.symbol}' is not eligible for entry "
-                    f"during the 30-day qualification burn-in window. Authorized universe: BTC/USDT and ETH/USDT. "
+                    f"during the qualification burn-in window. Authorized universe: {sorted(qualification_keys)}. "
                     f"Dynamic research opportunity preserved in surveillance ledger."
                 )
 

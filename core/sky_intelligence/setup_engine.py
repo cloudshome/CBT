@@ -479,10 +479,23 @@ class SetupEngine:
         is_bull = latest_fvg.fvg_type == FVGType.BULLISH
         direction = DecisionAction.LONG if is_bull else DecisionAction.SHORT
 
-        # Check alignment with HTF
-        htf_aligned = ("BULL" in mtf.htf_4h_trend and is_bull) or (
+        # Check alignment with HTF (4h primary, with 1h directional momentum validation when 4h is neutral/ranging)
+        is_4h_opposing = ("BEAR" in mtf.htf_4h_trend and is_bull) or (
+            "BULL" in mtf.htf_4h_trend and not is_bull
+        )
+        is_4h_concordant = ("BULL" in mtf.htf_4h_trend and is_bull) or (
             "BEAR" in mtf.htf_4h_trend and not is_bull
         )
+        adx_val = getattr(regime, "adx", getattr(regime, "trend_strength_adx", 25.0))
+        trend_1h = getattr(mtf, "htf_1h_trend", getattr(mtf, "mtf_1h_state", ""))
+        is_1h_concordant = ("BULL" in trend_1h and is_bull) or ("BEAR" in trend_1h and not is_bull)
+        if is_4h_opposing:
+            htf_aligned = False
+        elif is_4h_concordant:
+            htf_aligned = True
+        else:
+            # 4h is NEUTRAL or RANGING: permitted if intermediate 1h trend is concordant and directional ADX >= 22.0
+            htf_aligned = is_1h_concordant and (adx_val >= 22.0)
 
         # Gate 1: Strict Regime Compatibility (Trend continuation setup requires trending market)
         adx_val = getattr(regime, "adx", getattr(regime, "trend_strength_adx", 25.0))
