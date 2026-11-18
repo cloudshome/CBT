@@ -47,9 +47,7 @@ def classify_market_regime(df: pd.DataFrame, features: dict) -> dict:
     lows = tail["low"].astype(float).values
     opens = tail["open"].astype(float).values
     closes = tail["close"].astype(float).values
-    volumes = (
-        tail["volume"].astype(float).values if "volume" in tail else np.ones(len(tail))
-    )
+    volumes = tail["volume"].astype(float).values if "volume" in tail else np.ones(len(tail))
 
     ranges = np.maximum(highs - lows, 1e-9)
     bodies = np.abs(closes - opens)
@@ -76,9 +74,9 @@ def classify_market_regime(df: pd.DataFrame, features: dict) -> dict:
         fake_breakout_down = True
 
     # Low-volume breakout warning
-    volume_exhaustion = (
-        last_h > np.max(highs[:-1]) or last_l < np.min(lows[:-1])
-    ) and (last_v < avg_v * 0.7)
+    volume_exhaustion = (last_h > np.max(highs[:-1]) or last_l < np.min(lows[:-1])) and (
+        last_v < avg_v * 0.7
+    )
     fake_breakout = fake_breakout_up or fake_breakout_down or volume_exhaustion
 
     # 2. Liquidity Void / Imbalance spike

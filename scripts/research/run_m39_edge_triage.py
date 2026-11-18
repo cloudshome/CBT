@@ -212,7 +212,7 @@ We conducted an unsparing, zero-trust quantitative triage across the system's to
 
 ## 2. The 5 Mandatory Quantitative Hurdles Matrix
 
-| Candidate Strategy | 2a: OOS Sample ($N \ge 100$) | 2b: Zero-Lookahead Causality | 2c: CPCV Median OOS Sharpe ($>0$) | 2d: Deflated Sharpe Ratio ($>0.95$) | 2e: Tier-2 Friction Survival | Governance Classification |
+| Candidate Strategy | 2a: OOS Sample ($N \\ge 100$) | 2b: Zero-Lookahead Causality | 2c: CPCV Median OOS Sharpe ($>0$) | 2d: Deflated Sharpe Ratio ($>0.95$) | 2e: Tier-2 Friction Survival | Governance Classification |
 |:---|:---:|:---:|:---:|:---:|:---:|:---|
 | **Candidate A: SMC Order Block / FVG** | ❌ $N=96$ | ✅ PASS | ❌ $-0.18$ | ❌ $DSR=0.000$ | ❌ $-0.039R$ | `REJECTED_NO_OOS_EDGE` |
 | **Candidate B: Derivatives OI Squeeze** | ❌ $N=8$ | ✅ PASS | ✅ $+0.32$ | ❌ $DSR=0.240$ | ✅ $+0.340R$ | `RESEARCH_CANDIDATE_UNDERPOWERED` |

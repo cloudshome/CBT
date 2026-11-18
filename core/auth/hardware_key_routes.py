@@ -88,7 +88,7 @@ async def get_hardware_key_status(session_id: str = Query("desktop_session")):
     }
 
 
-@hardware_key_router.post("/register/options")
+@hardware_key_router.post("/register/options", dependencies=[Depends(require_api_key)])
 async def get_registration_options_endpoint(req: RegisterOptionsRequest):
     """Issues WebAuthn registration options with single-use challenge."""
     try:
@@ -143,7 +143,7 @@ async def verify_registration_endpoint(req: RegisterVerifyRequest):
         ) from exc
 
 
-@hardware_key_router.post("/authenticate/options")
+@hardware_key_router.post("/authenticate/options", dependencies=[Depends(require_api_key)])
 async def get_authentication_options_endpoint(req: AuthenticateOptionsRequest):
     """Issues WebAuthn assertion challenge for Live Execution Clearance."""
     try:
@@ -217,7 +217,7 @@ async def verify_authentication_endpoint(req: AuthenticateVerifyRequest, request
         ) from exc
 
 
-@hardware_key_router.post("/clearance/revoke")
+@hardware_key_router.post("/clearance/revoke", dependencies=[Depends(require_api_key)])
 async def revoke_clearance_endpoint(req: RevokeClearanceRequest):
     """Revokes active Live Clearance session immediately."""
     count = hardware_key_manager.revoke_clearance(

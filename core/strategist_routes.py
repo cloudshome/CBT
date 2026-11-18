@@ -10,9 +10,10 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from core.auth import require_api_key
 from core.autonomous_quant_strategist import autonomous_quant_strategist
 from core.research.concept_evaluation import regime_orchestration_advisor
 from core.research.concept_registry import REAL_CAPITAL_ENABLED, concept_registry
@@ -147,7 +148,7 @@ async def get_league_quarantine() -> dict[str, Any]:
     }
 
 
-@strategist_router.post("/daemon/toggle")
+@strategist_router.post("/daemon/toggle", dependencies=[Depends(require_api_key)])
 async def toggle_daemon(request: DaemonToggleRequest) -> dict[str, Any]:
     """Toggles the background research exploration daemon."""
     active = autonomous_quant_strategist.toggle_daemon(request.enable)
@@ -244,7 +245,7 @@ async def get_trading_concept_detail(concept_id: str) -> dict[str, Any]:
     }
 
 
-@strategist_router.post("/concepts/transition")
+@strategist_router.post("/concepts/transition", dependencies=[Depends(require_api_key)])
 async def transition_trading_concept(request: ConceptTransitionRequest) -> dict[str, Any]:
     """Requests an evidence-gated lifecycle state transition for a concept."""
     try:
@@ -266,7 +267,7 @@ async def transition_trading_concept(request: ConceptTransitionRequest) -> dict[
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@strategist_router.post("/concepts/demotion-check")
+@strategist_router.post("/concepts/demotion-check", dependencies=[Depends(require_api_key)])
 async def check_concept_demotion(request: ConceptDemotionCheckRequest) -> dict[str, Any]:
     """Evaluates online drift/degradation triggers and applies automatic demotion/quarantine."""
     try:
@@ -297,7 +298,7 @@ async def get_agent_arena_leaderboard() -> dict[str, Any]:
     return agent_concept_arena.get_leaderboard()
 
 
-@strategist_router.post("/arena/tournament-round")
+@strategist_router.post("/arena/tournament-round", dependencies=[Depends(require_api_key)])
 async def trigger_arena_tournament_round(
     bars_count: int = Query(default=350, ge=100, le=2000),
     deploy_to_paper: bool = Query(default=False),

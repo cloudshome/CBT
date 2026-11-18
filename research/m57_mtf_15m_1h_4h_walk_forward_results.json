@@ -1,8 +1,8 @@
 {
   "milestone": "M57",
   "title": "Multi-Timeframe (15m Tactical Day vs. 4h Structural Swing) Walk-Forward Backtest & Cross-Horizon Regime Synthesis",
-  "timestamp_utc": "2026-11-17T09:26:47.846186+00:00",
-  "total_runtime_seconds": 822.25,
+  "timestamp_utc": "2026-11-18T06:36:15.518745+00:00",
+  "total_runtime_seconds": 1118.36,
   "total_active_trading_bars": 1194521,
   "governance_invariants": {
     "real_capital_enabled": false,
@@ -38,7 +38,7 @@
       "symbol": "BTCUSDT",
       "timeframe": "15m",
       "bars_stored": 239616,
-      "runtime_seconds": 415.7,
+      "runtime_seconds": 587.36,
       "full_store": {
         "trades": 388,
         "win_rate_net": 0.57,
@@ -47,7 +47,9 @@
         "stage1_locks": 97,
         "stage2_locks": 44,
         "sharpe": 0.098,
-        "dsr": 0.6632
+        "dsr": 0.6632,
+        "dsr_100_trials": 0.2964,
+        "p_value_100_trials": 0.7036
       },
       "splits": {
         "train_50pct": {
@@ -58,7 +60,9 @@
           "stage1_locks": 56,
           "stage2_locks": 26,
           "sharpe": 0.0768,
-          "dsr": 0.3541
+          "dsr": 0.3541,
+          "dsr_100_trials": 0.0917,
+          "p_value_100_trials": 0.9083
         },
         "val_25pct": {
           "trades": 96,
@@ -68,7 +72,9 @@
           "stage1_locks": 24,
           "stage2_locks": 11,
           "sharpe": 0.0631,
-          "dsr": 0.1723
+          "dsr": 0.1723,
+          "dsr_100_trials": 0.0286,
+          "p_value_100_trials": 0.9714
         },
         "sealed_oos_25pct": {
           "trades": 61,
@@ -78,7 +84,9 @@
           "stage1_locks": 17,
           "stage2_locks": 7,
           "sharpe": 0.2329,
-          "dsr": 0.6229
+          "dsr": 0.6229,
+          "dsr_100_trials": 0.2601,
+          "p_value_100_trials": 0.7399
         }
       }
     },
@@ -86,7 +94,7 @@
       "symbol": "ETHUSDT",
       "timeframe": "15m",
       "bars_stored": 239616,
-      "runtime_seconds": 311.79,
+      "runtime_seconds": 431.64,
       "full_store": {
         "trades": 95,
         "win_rate_net": 0.516,
@@ -95,7 +103,9 @@
         "stage1_locks": 24,
         "stage2_locks": 9,
         "sharpe": -0.0164,
-        "dsr": 0.0416
+        "dsr": 0.0416,
+        "dsr_100_trials": 0.0036,
+        "p_value_100_trials": 0.9964
       },
       "splits": {
         "train_50pct": {
@@ -106,7 +116,9 @@
           "stage1_locks": 16,
           "stage2_locks": 4,
           "sharpe": 0.0086,
-          "dsr": 0.0652
+          "dsr": 0.0652,
+          "dsr_100_trials": 0.0068,
+          "p_value_100_trials": 0.9932
         },
         "val_25pct": {
           "trades": 18,
@@ -116,7 +128,9 @@
           "stage1_locks": 3,
           "stage2_locks": 2,
           "sharpe": -0.213,
-          "dsr": 0.0097
+          "dsr": 0.0097,
+          "dsr_100_trials": 0.0005,
+          "p_value_100_trials": 0.9995
         },
         "sealed_oos_25pct": {
           "trades": 24,
@@ -126,7 +140,9 @@
           "stage1_locks": 5,
           "stage2_locks": 3,
           "sharpe": 0.0711,
-          "dsr": 0.1103
+          "dsr": 0.1103,
+          "dsr_100_trials": 0.0146,
+          "p_value_100_trials": 0.9854
         }
       }
     },
@@ -134,7 +150,7 @@
       "symbol": "SOLUSDT",
       "timeframe": "15m",
       "bars_stored": 214436,
-      "runtime_seconds": 242.41,
+      "runtime_seconds": 301.39,
       "full_store": {
         "trades": 428,
         "win_rate_net": 0.54,
@@ -143,7 +159,9 @@
         "stage1_locks": 108,
         "stage2_locks": 30,
         "sharpe": 0.0853,
-        "dsr": 0.5973
+        "dsr": 0.5973,
+        "dsr_100_trials": 0.239,
+        "p_value_100_trials": 0.761
       },
       "splits": {
         "train_50pct": {
@@ -154,7 +172,9 @@
           "stage1_locks": 54,
           "stage2_locks": 15,
           "sharpe": 0.1529,
-          "dsr": 0.7575
+          "dsr": 0.7575,
+          "dsr_100_trials": 0.3983,
+          "p_value_100_trials": 0.6017
         },
         "val_25pct": {
           "trades": 119,
@@ -164,7 +184,9 @@
           "stage1_locks": 33,
           "stage2_locks": 6,
           "sharpe": -0.1081,
-          "dsr": 0.0036
+          "dsr": 0.0036,
+          "dsr_100_trials": 0.0001,
+          "p_value_100_trials": 0.9999
         },
         "sealed_oos_25pct": {
           "trades": 111,
@@ -174,7 +196,9 @@
           "stage1_locks": 21,
           "stage2_locks": 9,
           "sharpe": 0.1494,
-          "dsr": 0.5216
+          "dsr": 0.5216,
+          "dsr_100_trials": 0.1836,
+          "p_value_100_trials": 0.8164
         }
       }
     },
@@ -182,7 +206,7 @@
       "symbol": "PAXGUSDT",
       "timeframe": "15m",
       "bars_stored": 216435,
-      "runtime_seconds": 186.87,
+      "runtime_seconds": 296.27,
       "full_store": {
         "trades": 24,
         "win_rate_net": 0.625,
@@ -191,7 +215,9 @@
         "stage1_locks": 8,
         "stage2_locks": 2,
         "sharpe": 0.1205,
-        "dsr": 0.1656
+        "dsr": 0.1656,
+        "dsr_100_trials": 0.027,
+        "p_value_100_trials": 0.973
       },
       "splits": {
         "train_50pct": {
@@ -202,7 +228,9 @@
           "stage1_locks": 5,
           "stage2_locks": 2,
           "sharpe": -0.1259,
-          "dsr": 0.0203
+          "dsr": 0.0203,
+          "dsr_100_trials": 0.0013,
+          "p_value_100_trials": 0.9987
         },
         "val_25pct": {
           "trades": 3,
@@ -212,7 +240,9 @@
           "stage1_locks": 1,
           "stage2_locks": 0,
           "sharpe": 0.0,
-          "dsr": 0.0
+          "dsr": 0.0,
+          "dsr_100_trials": 0.0,
+          "p_value_100_trials": 1.0
         },
         "sealed_oos_25pct": {
           "trades": 4,
@@ -222,7 +252,9 @@
           "stage1_locks": 2,
           "stage2_locks": 0,
           "sharpe": 0.0,
-          "dsr": 0.0
+          "dsr": 0.0,
+          "dsr_100_trials": 0.0,
+          "p_value_100_trials": 1.0
         }
       }
     },
@@ -230,7 +262,7 @@
       "symbol": "BTCUSDT",
       "timeframe": "1h",
       "bars_stored": 59904,
-      "runtime_seconds": 183.16,
+      "runtime_seconds": 195.48,
       "full_store": {
         "trades": 318,
         "win_rate_net": 0.623,
@@ -239,7 +271,9 @@
         "stage1_locks": 75,
         "stage2_locks": 6,
         "sharpe": 0.3229,
-        "dsr": 1.0
+        "dsr": 1.0,
+        "dsr_100_trials": 0.9998,
+        "p_value_100_trials": 0.0002
       },
       "splits": {
         "train_50pct": {
@@ -250,7 +284,9 @@
           "stage1_locks": 39,
           "stage2_locks": 3,
           "sharpe": 0.2511,
-          "dsr": 0.959
+          "dsr": 0.959,
+          "dsr_100_trials": 0.7832,
+          "p_value_100_trials": 0.2168
         },
         "val_25pct": {
           "trades": 86,
@@ -260,7 +296,9 @@
           "stage1_locks": 16,
           "stage2_locks": 3,
           "sharpe": 0.4777,
-          "dsr": 0.9977
+          "dsr": 0.9977,
+          "dsr_100_trials": 0.9697,
+          "p_value_100_trials": 0.0303
         },
         "sealed_oos_25pct": {
           "trades": 76,
@@ -270,7 +308,9 @@
           "stage1_locks": 20,
           "stage2_locks": 0,
           "sharpe": 0.2916,
-          "dsr": 0.8537
+          "dsr": 0.8537,
+          "dsr_100_trials": 0.5383,
+          "p_value_100_trials": 0.4617
         }
       }
     },
@@ -278,7 +318,7 @@
       "symbol": "ETHUSDT",
       "timeframe": "1h",
       "bars_stored": 59904,
-      "runtime_seconds": 109.06,
+      "runtime_seconds": 116.58,
       "full_store": {
         "trades": 72,
         "win_rate_net": 0.667,
@@ -287,7 +327,9 @@
         "stage1_locks": 19,
         "stage2_locks": 7,
         "sharpe": 0.3465,
-        "dsr": 0.9352
+        "dsr": 0.9352,
+        "dsr_100_trials": 0.7122,
+        "p_value_100_trials": 0.2878
       },
       "splits": {
         "train_50pct": {
@@ -298,7 +340,9 @@
           "stage1_locks": 1,
           "stage2_locks": 3,
           "sharpe": 0.3578,
-          "dsr": 0.6674
+          "dsr": 0.6674,
+          "dsr_100_trials": 0.3004,
+          "p_value_100_trials": 0.6996
         },
         "val_25pct": {
           "trades": 17,
@@ -308,7 +352,9 @@
           "stage1_locks": 8,
           "stage2_locks": 2,
           "sharpe": 0.3153,
-          "dsr": 0.4362
+          "dsr": 0.4362,
+          "dsr_100_trials": 0.1321,
+          "p_value_100_trials": 0.8679
         },
         "sealed_oos_25pct": {
           "trades": 24,
@@ -318,7 +364,9 @@
           "stage1_locks": 10,
           "stage2_locks": 2,
           "sharpe": 0.3453,
-          "dsr": 0.5755
+          "dsr": 0.5755,
+          "dsr_100_trials": 0.222,
+          "p_value_100_trials": 0.778
         }
       }
     },
@@ -326,7 +374,7 @@
       "symbol": "SOLUSDT",
       "timeframe": "1h",
       "bars_stored": 53609,
-      "runtime_seconds": 67.44,
+      "runtime_seconds": 71.76,
       "full_store": {
         "trades": 253,
         "win_rate_net": 0.589,
@@ -335,7 +383,9 @@
         "stage1_locks": 59,
         "stage2_locks": 11,
         "sharpe": 0.2352,
-        "dsr": 0.9912
+        "dsr": 0.9912,
+        "dsr_100_trials": 0.9221,
+        "p_value_100_trials": 0.0779
       },
       "splits": {
         "train_50pct": {
@@ -346,7 +396,9 @@
           "stage1_locks": 29,
           "stage2_locks": 5,
           "sharpe": 0.3172,
-          "dsr": 0.9802
+          "dsr": 0.9802,
+          "dsr_100_trials": 0.8646,
+          "p_value_100_trials": 0.1354
         },
         "val_25pct": {
           "trades": 54,
@@ -356,7 +408,9 @@
           "stage1_locks": 11,
           "stage2_locks": 1,
           "sharpe": -0.0805,
-          "dsr": 0.0163
+          "dsr": 0.0163,
+          "dsr_100_trials": 0.001,
+          "p_value_100_trials": 0.999
         },
         "sealed_oos_25pct": {
           "trades": 82,
@@ -366,7 +420,9 @@
           "stage1_locks": 19,
           "stage2_locks": 5,
           "sharpe": 0.3131,
-          "dsr": 0.9113
+          "dsr": 0.9113,
+          "dsr_100_trials": 0.6527,
+          "p_value_100_trials": 0.3473
         }
       }
     },
@@ -374,7 +430,7 @@
       "symbol": "PAXGUSDT",
       "timeframe": "1h",
       "bars_stored": 54113,
-      "runtime_seconds": 61.44,
+      "runtime_seconds": 66.96,
       "full_store": {
         "trades": 203,
         "win_rate_net": 0.547,
@@ -383,7 +439,9 @@
         "stage1_locks": 50,
         "stage2_locks": 13,
         "sharpe": 0.0176,
-        "dsr": 0.0928
+        "dsr": 0.0928,
+        "dsr_100_trials": 0.0113,
+        "p_value_100_trials": 0.9887
       },
       "splits": {
         "train_50pct": {
@@ -394,7 +452,9 @@
           "stage1_locks": 17,
           "stage2_locks": 4,
           "sharpe": -0.1074,
-          "dsr": 0.0061
+          "dsr": 0.0061,
+          "dsr_100_trials": 0.0003,
+          "p_value_100_trials": 0.9997
         },
         "val_25pct": {
           "trades": 33,
@@ -404,7 +464,9 @@
           "stage1_locks": 10,
           "stage2_locks": 1,
           "sharpe": -0.096,
-          "dsr": 0.0179
+          "dsr": 0.0179,
+          "dsr_100_trials": 0.0011,
+          "p_value_100_trials": 0.9989
         },
         "sealed_oos_25pct": {
           "trades": 86,
@@ -414,7 +476,9 @@
           "stage1_locks": 23,
           "stage2_locks": 8,
           "sharpe": 0.1823,
-          "dsr": 0.5695
+          "dsr": 0.5695,
+          "dsr_100_trials": 0.2174,
+          "p_value_100_trials": 0.7826
         }
       }
     },
@@ -422,7 +486,7 @@
       "symbol": "BTCUSDT",
       "timeframe": "4h",
       "bars_stored": 14976,
-      "runtime_seconds": 265.98,
+      "runtime_seconds": 369.65,
       "full_store": {
         "trades": 444,
         "win_rate_net": 0.646,
@@ -431,7 +495,9 @@
         "stage1_locks": 98,
         "stage2_locks": 18,
         "sharpe": 0.4148,
-        "dsr": 1.0
+        "dsr": 1.0,
+        "dsr_100_trials": 1.0,
+        "p_value_100_trials": 0.0
       },
       "splits": {
         "train_50pct": {
@@ -442,7 +508,9 @@
           "stage1_locks": 32,
           "stage2_locks": 4,
           "sharpe": 0.4069,
-          "dsr": 1.0
+          "dsr": 1.0,
+          "dsr_100_trials": 0.999,
+          "p_value_100_trials": 0.001
         },
         "val_25pct": {
           "trades": 142,
@@ -452,7 +520,9 @@
           "stage1_locks": 28,
           "stage2_locks": 6,
           "sharpe": 0.5082,
-          "dsr": 1.0
+          "dsr": 1.0,
+          "dsr_100_trials": 0.9998,
+          "p_value_100_trials": 0.0002
         },
         "sealed_oos_25pct": {
           "trades": 123,
@@ -462,7 +532,9 @@
           "stage1_locks": 38,
           "stage2_locks": 8,
           "sharpe": 0.3172,
-          "dsr": 0.9874
+          "dsr": 0.9874,
+          "dsr_100_trials": 0.8999,
+          "p_value_100_trials": 0.1001
         }
       }
     },
@@ -470,7 +542,7 @@
       "symbol": "ETHUSDT",
       "timeframe": "4h",
       "bars_stored": 14976,
-      "runtime_seconds": 135.23,
+      "runtime_seconds": 137.13,
       "full_store": {
         "trades": 85,
         "win_rate_net": 0.706,
@@ -479,7 +551,9 @@
         "stage1_locks": 19,
         "stage2_locks": 6,
         "sharpe": 0.5326,
-        "dsr": 0.9996
+        "dsr": 0.9996,
+        "dsr_100_trials": 0.9922,
+        "p_value_100_trials": 0.0078
       },
       "splits": {
         "train_50pct": {
@@ -490,7 +564,9 @@
           "stage1_locks": 11,
           "stage2_locks": 5,
           "sharpe": 0.6082,
-          "dsr": 0.9961
+          "dsr": 0.9961,
+          "dsr_100_trials": 0.9555,
+          "p_value_100_trials": 0.0445
         },
         "val_25pct": {
           "trades": 18,
@@ -500,7 +576,9 @@
           "stage1_locks": 4,
           "stage2_locks": 0,
           "sharpe": 0.4523,
-          "dsr": 0.6231
+          "dsr": 0.6231,
+          "dsr_100_trials": 0.2603,
+          "p_value_100_trials": 0.7397
         },
         "sealed_oos_25pct": {
           "trades": 17,
@@ -510,7 +588,9 @@
           "stage1_locks": 4,
           "stage2_locks": 1,
           "sharpe": 0.3777,
-          "dsr": 0.5072
+          "dsr": 0.5072,
+          "dsr_100_trials": 0.1741,
+          "p_value_100_trials": 0.8259
         }
       }
     },
@@ -518,7 +598,7 @@
       "symbol": "SOLUSDT",
       "timeframe": "4h",
       "bars_stored": 13403,
-      "runtime_seconds": 90.21,
+      "runtime_seconds": 92.83,
       "full_store": {
         "trades": 413,
         "win_rate_net": 0.54,
@@ -527,7 +607,9 @@
         "stage1_locks": 92,
         "stage2_locks": 18,
         "sharpe": 0.1708,
-        "dsr": 0.9833
+        "dsr": 0.9833,
+        "dsr_100_trials": 0.8793,
+        "p_value_100_trials": 0.1207
       },
       "splits": {
         "train_50pct": {
@@ -538,7 +620,9 @@
           "stage1_locks": 56,
           "stage2_locks": 12,
           "sharpe": 0.1987,
-          "dsr": 0.9349
+          "dsr": 0.9349,
+          "dsr_100_trials": 0.7115,
+          "p_value_100_trials": 0.2885
         },
         "val_25pct": {
           "trades": 98,
@@ -548,7 +632,9 @@
           "stage1_locks": 20,
           "stage2_locks": 1,
           "sharpe": 0.1625,
-          "dsr": 0.563
+          "dsr": 0.563,
+          "dsr_100_trials": 0.2126,
+          "p_value_100_trials": 0.7874
         },
         "sealed_oos_25pct": {
           "trades": 105,
@@ -558,7 +644,9 @@
           "stage1_locks": 16,
           "stage2_locks": 5,
           "sharpe": 0.1229,
-          "dsr": 0.3921
+          "dsr": 0.3921,
+          "dsr_100_trials": 0.1094,
+          "p_value_100_trials": 0.8906
         }
       }
     },
@@ -566,7 +654,7 @@
       "symbol": "PAXGUSDT",
       "timeframe": "4h",
       "bars_stored": 13533,
-      "runtime_seconds": 95.3,
+      "runtime_seconds": 192.45,
       "full_store": {
         "trades": 356,
         "win_rate_net": 0.565,
@@ -575,7 +663,9 @@
         "stage1_locks": 87,
         "stage2_locks": 14,
         "sharpe": 0.1534,
-        "dsr": 0.9269
+        "dsr": 0.9269,
+        "dsr_100_trials": 0.6905,
+        "p_value_100_trials": 0.3095
       },
       "splits": {
         "train_50pct": {
@@ -586,7 +676,9 @@
           "stage1_locks": 36,
           "stage2_locks": 2,
           "sharpe": -0.0304,
-          "dsr": 0.0277
+          "dsr": 0.0277,
+          "dsr_100_trials": 0.002,
+          "p_value_100_trials": 0.998
         },
         "val_25pct": {
           "trades": 90,
@@ -596,7 +688,9 @@
           "stage1_locks": 28,
           "stage2_locks": 5,
           "sharpe": 0.1558,
-          "dsr": 0.4872
+          "dsr": 0.4872,
+          "dsr_100_trials": 0.1615,
+          "p_value_100_trials": 0.8385
         },
         "sealed_oos_25pct": {
           "trades": 135,
@@ -606,7 +700,9 @@
           "stage1_locks": 23,
           "stage2_locks": 7,
           "sharpe": 0.3046,
-          "dsr": 0.983
+          "dsr": 0.983,
+          "dsr_100_trials": 0.8777,
+          "p_value_100_trials": 0.1223
         }
       }
     }
@@ -621,7 +717,9 @@
         "stage1_locks": 21,
         "stage2_locks": 15,
         "sharpe": 0.1674,
-        "dsr": 0.6409
+        "dsr": 0.6409,
+        "dsr_100_trials": 0.2759,
+        "p_value_100_trials": 0.7241
       },
       "filtered": {
         "trades": 24,
@@ -631,7 +729,9 @@
         "stage1_locks": 5,
         "stage2_locks": 3,
         "sharpe": 0.0711,
-        "dsr": 0.1103
+        "dsr": 0.1103,
+        "dsr_100_trials": 0.0146,
+        "p_value_100_trials": 0.9854
       },
       "expectancy_net": 0.1045
     },
@@ -644,7 +744,9 @@
         "stage1_locks": 10,
         "stage2_locks": 2,
         "sharpe": 0.3453,
-        "dsr": 0.5755
+        "dsr": 0.5755,
+        "dsr_100_trials": 0.222,
+        "p_value_100_trials": 0.778
       },
       "expectancy_net": 0.4399
     },
@@ -657,7 +759,9 @@
         "stage1_locks": 24,
         "stage2_locks": 7,
         "sharpe": 0.2698,
-        "dsr": 0.8984
+        "dsr": 0.8984,
+        "dsr_100_trials": 0.6242,
+        "p_value_100_trials": 0.3758
       },
       "filtered": {
         "trades": 17,
@@ -667,7 +771,9 @@
         "stage1_locks": 4,
         "stage2_locks": 1,
         "sharpe": 0.3777,
-        "dsr": 0.5072
+        "dsr": 0.5072,
+        "dsr_100_trials": 0.1741,
+        "p_value_100_trials": 0.8259
       },
       "expectancy_net": 0.5929
     }
@@ -682,7 +788,9 @@
         "stage1_locks": 237,
         "stage2_locks": 85,
         "sharpe": 0.0814,
-        "dsr": 0.8397
+        "dsr": 0.8397,
+        "dsr_100_trials": 0.5148,
+        "p_value_100_trials": 0.4852
       },
       "sealed_oos": {
         "trades": 200,
@@ -692,7 +800,9 @@
         "stage1_locks": 45,
         "stage2_locks": 19,
         "sharpe": 0.1654,
-        "dsr": 0.8043
+        "dsr": 0.8043,
+        "dsr_100_trials": 0.4606,
+        "p_value_100_trials": 0.5394
       }
     },
     "1h": {
@@ -704,7 +814,9 @@
         "stage1_locks": 203,
         "stage2_locks": 37,
         "sharpe": 0.2261,
-        "dsr": 1.0
+        "dsr": 1.0,
+        "dsr_100_trials": 1.0,
+        "p_value_100_trials": 0.0
       },
       "sealed_oos": {
         "trades": 268,
@@ -714,7 +826,9 @@
         "stage1_locks": 72,
         "stage2_locks": 15,
         "sharpe": 0.2684,
-        "dsr": 0.9987
+        "dsr": 0.9987,
+        "dsr_100_trials": 0.9796,
+        "p_value_100_trials": 0.0204
       }
     },
     "4h": {
@@ -726,7 +840,9 @@
         "stage1_locks": 296,
         "stage2_locks": 56,
         "sharpe": 0.2741,
-        "dsr": 1.0
+        "dsr": 1.0,
+        "dsr_100_trials": 1.0,
+        "p_value_100_trials": 0.0
       },
       "sealed_oos": {
         "trades": 380,
@@ -736,7 +852,9 @@
         "stage1_locks": 81,
         "stage2_locks": 21,
         "sharpe": 0.2642,
-        "dsr": 0.9999
+        "dsr": 0.9999,
+        "dsr_100_trials": 0.9983,
+        "p_value_100_trials": 0.0017
       }
     }
   },
@@ -749,12 +867,16 @@
       "stage1_locks": 198,
       "stage2_locks": 55,
       "sharpe": 0.2426,
-      "dsr": 1.0
+      "dsr": 1.0,
+      "dsr_100_trials": 1.0,
+      "p_value_100_trials": 0.0
     },
     "cpcv": {
       "folds_count": 15,
       "median_oos_sharpe": 0.2448,
       "annualized_median_sharpe": 11.4684,
+      "empirical_freq_annualized_median_sharpe": 5.4672,
+      "time_series_cpcv_annualized_sharpe": 4.9938,
       "cpcv_passed": true
     }
   },

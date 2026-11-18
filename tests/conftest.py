@@ -165,9 +165,18 @@ def _init_test_subsystem_schemas() -> None:
         ),
         (
             "youtube_discovery",
-            lambda: __import__(
-                "core.youtube.discovery", fromlist=["youtube_discovery"]
-            ).youtube_discovery._init_crawl_memory(),
+            lambda: (
+                __import__(
+                    "core.youtube.discovery", fromlist=["youtube_discovery"]
+                ).youtube_discovery._init_crawl_memory()
+                if getattr(
+                    __import__("core.youtube.discovery", fromlist=["youtube_discovery"]),
+                    "youtube_discovery",
+                    None,
+                )
+                is not None
+                else None
+            ),
         ),
         (
             "telegram_rbac",

@@ -1,8 +1,11 @@
 # SKY / CBT — Shadow Ledger Accounting & Reconciliation Report
 
 **Audit Status:** `VERIFIED_ZERO_DRIFT`  
-**Audit Timestamp:** `2026-11-16T06:41:40.571806+00:00`  
+**Audit Timestamp:** `2026-11-18T06:39:38.144511+00:00`  
 **Tolerance Level:** `< $0.001`  
+**Database Path:** `C:\Users\azims\AppData\Local\Temp\tmp_jt_t0bl\trading_logs_test.db`  
+**Database Size:** `520,192 bytes`  
+**Database SHA-256:** `993d4a963fb2b2dc7564b2abd8fbfb2100105eefac7a2c9afa9cf705721899de`  
 **Governance Guard:** `REAL_CAPITAL_ENABLED = False` (Isolated Paper/Simulation Sandbox)  
 
 ---

@@ -310,4 +310,3 @@ TRADING_CORE_ONLY = os.getenv("TRADING_CORE_ONLY", "true").strip().lower() in (
 def is_trading_core_only() -> bool:
     """Returns True if runtime is isolated to trading core execution and market telemetry."""
     return TRADING_CORE_ONLY
-

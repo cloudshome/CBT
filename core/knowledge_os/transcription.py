@@ -22,7 +22,11 @@ from pathlib import Path
 from typing import Any
 
 import requests
-import yt_dlp
+
+try:
+    import yt_dlp
+except ImportError:
+    yt_dlp = None  # type: ignore[assignment]
 
 logger = logging.getLogger("sky.transcription")
 
@@ -84,6 +88,10 @@ class SubtitlesExtractorProvider(BaseTranscriptionProvider):
             "no_warnings": True,
             "noplaylist": True,
         }
+        if yt_dlp is None:
+            return TranscriptResult(
+                success=False, text="", provider="SUBTITLES_YTDLP", error="yt_dlp not installed"
+            )
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
@@ -254,6 +262,8 @@ class SocialVideoAudioExtractor:
             "extract_flat": False,
         }
 
+        if yt_dlp is None:
+            return False, None, {"error": "yt_dlp not installed"}
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
@@ -294,6 +304,10 @@ class SocialVideoAudioExtractor:
             "no_warnings": True,
             "noplaylist": True,
         }
+        if yt_dlp is None:
+            return TranscriptResult(
+                success=False, text="", provider="SUBTITLES_YTDLP", error="yt_dlp not installed"
+            )
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)

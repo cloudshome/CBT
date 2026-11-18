@@ -548,6 +548,13 @@ def normalize_bybit_permissions(raw: dict[str, Any]) -> CredentialPermissionProf
     )
 
 
+def _is_prod_env() -> bool:
+    return any(
+        os.getenv(k, "").strip().lower() in ("production", "prod")
+        for k in ("APP_ENV", "ENVIRONMENT", "ENV", "NODE_ENV")
+    )
+
+
 class CredentialVault:
     """
     Authenticated AES-256-GCM Private API Credential Store with optional Cloud KMS / HSM Enclave.
@@ -614,8 +621,7 @@ class CredentialVault:
             return True
         if os.getenv("VAULT_MASTER_KEY") or os.getenv("VAULT_PASSPHRASE"):
             return True
-        app_env = os.getenv("APP_ENV", os.getenv("ENVIRONMENT", "development")).lower()
-        return app_env != "production"
+        return not _is_prod_env()
 
     def _derive_key(self, salt: bytes) -> bytes:
         """
@@ -646,8 +652,14 @@ class CredentialVault:
                 logger.debug(
                     "VAULT_MASTER_KEY was not valid base64; treating it as a raw passphrase."
                 )
-            # Raw string: derive via SHA-256
-            return hashlib.sha256(env_master.encode("utf-8")).digest()
+            # Raw passphrase string in VAULT_MASTER_KEY: derive via salted PBKDF2 (600,000 iterations)
+            return hashlib.pbkdf2_hmac(
+                "sha256",
+                env_master.encode("utf-8"),
+                salt,
+                PBKDF2_ITERATIONS,
+                dklen=KEY_LENGTH_BYTES,
+            )
 
         # 2. Check Passphrase derivation via PBKDF2
         env_passphrase = os.getenv("VAULT_PASSPHRASE", "").strip()
@@ -661,8 +673,7 @@ class CredentialVault:
             )
 
         # 3. Environment check
-        app_env = os.getenv("APP_ENV", os.getenv("ENVIRONMENT", "development")).lower()
-        if app_env == "production":
+        if _is_prod_env():
             raise VaultConfigurationError(
                 "Production Security Guard: VAULT_MASTER_KEY or VAULT_PASSPHRASE must be configured in production."
             )

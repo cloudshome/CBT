@@ -18,7 +18,10 @@ import re
 import urllib.parse
 from typing import Any
 
-import yt_dlp
+try:
+    import yt_dlp
+except ImportError:
+    yt_dlp = None  # type: ignore[assignment]
 from youtube_transcript_api import YouTubeTranscriptApi
 
 logger = logging.getLogger("ai_quant_sentinel.youtube_extractor")
@@ -160,6 +163,10 @@ class YouTubeResearchExtractor:
             "view_count": 0,
             "upload_date": "",
         }
+
+        if yt_dlp is None:
+            logger.warning("yt_dlp is not installed; skipping metadata extraction.")
+            return meta
 
         try:
             with yt_dlp.YoutubeDL(self._ydl_opts) as ydl:

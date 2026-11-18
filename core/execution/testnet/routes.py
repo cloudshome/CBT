@@ -18,9 +18,10 @@ import logging
 import time
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from core.auth import require_api_key
 from core.execution.testnet.campaign_orchestrator import (
     CampaignOrchestrator,
     CampaignState,
@@ -286,7 +287,11 @@ async def get_burnin_report(
     }
 
 
-@router.post("/campaign/start", response_model=CampaignActionResponse)
+@router.post(
+    "/campaign/start",
+    response_model=CampaignActionResponse,
+    dependencies=[Depends(require_api_key)],
+)
 async def start_campaign() -> CampaignActionResponse:
     """Initializes and activates the campaign."""
     orchestrator = get_orchestrator()
@@ -306,7 +311,11 @@ async def start_campaign() -> CampaignActionResponse:
     )
 
 
-@router.post("/campaign/pause", response_model=CampaignActionResponse)
+@router.post(
+    "/campaign/pause",
+    response_model=CampaignActionResponse,
+    dependencies=[Depends(require_api_key)],
+)
 async def pause_campaign() -> CampaignActionResponse:
     """Safely requests campaign pause and drains in-flight slices."""
     orchestrator = get_orchestrator()
@@ -319,7 +328,11 @@ async def pause_campaign() -> CampaignActionResponse:
     )
 
 
-@router.post("/campaign/resume", response_model=CampaignActionResponse)
+@router.post(
+    "/campaign/resume",
+    response_model=CampaignActionResponse,
+    dependencies=[Depends(require_api_key)],
+)
 async def resume_campaign() -> CampaignActionResponse:
     """Safely resumes campaign after open-order audit."""
     orchestrator = get_orchestrator()
@@ -332,7 +345,11 @@ async def resume_campaign() -> CampaignActionResponse:
     )
 
 
-@router.post("/campaign/panic", response_model=CampaignActionResponse)
+@router.post(
+    "/campaign/panic",
+    response_model=CampaignActionResponse,
+    dependencies=[Depends(require_api_key)],
+)
 async def panic_cancel_campaign() -> CampaignActionResponse:
     """Triggers immediate emergency panic cancellation."""
     orchestrator = get_orchestrator()

@@ -52,9 +52,7 @@ def _positional_align(returns: dict[str, pd.Series]) -> pd.DataFrame:
     n = min(len(r) for r in returns.values())
     if n <= 0:
         return pd.DataFrame()
-    return pd.DataFrame(
-        {sym: r.tail(n).reset_index(drop=True) for sym, r in returns.items()}
-    )
+    return pd.DataFrame({sym: r.tail(n).reset_index(drop=True) for sym, r in returns.items()})
 
 
 def aligned_returns(
@@ -119,11 +117,7 @@ def correlation_report(
     corr = obs.corr()
     matrix = {
         s1: {
-            s2: (
-                round(float(corr.loc[s1, s2]), 3)
-                if pd.notna(corr.loc[s1, s2])
-                else None
-            )
+            s2: (round(float(corr.loc[s1, s2]), 3) if pd.notna(corr.loc[s1, s2]) else None)
             for s2 in corr.columns
         }
         for s1 in corr.index
@@ -178,9 +172,7 @@ def correlation_report(
             )
 
     if obs.isna().any().any():
-        warnings.append(
-            "NaNs detected in aligned returns — matrix computed on pairwise data"
-        )
+        warnings.append("NaNs detected in aligned returns — matrix computed on pairwise data")
 
     return {
         "available": True,

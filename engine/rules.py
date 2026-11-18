@@ -44,9 +44,7 @@ class Plan:
             "type": self.type,
             "action": self.action,
             "condition": self.condition,
-            "trigger_level": round(self.trigger_level, 2)
-            if self.trigger_level
-            else None,
+            "trigger_level": round(self.trigger_level, 2) if self.trigger_level else None,
             "entry": round(self.entry, 2) if self.entry else None,
             "stop_loss": round(self.stop_loss, 2) if self.stop_loss else None,
             "take_profits": [round(tp, 2) for tp in self.take_profits],
@@ -59,9 +57,7 @@ class Plan:
         }
 
 
-def _tp_rr_for(
-    plan_type: str, default_rr: float, tp_rr_by_type: dict | None
-) -> float:
+def _tp_rr_for(plan_type: str, default_rr: float, tp_rr_by_type: dict | None) -> float:
     """Per-setup take-profit distance in R (decision A2). Falls back to the
     engine default when no measured profile exists yet."""
     if tp_rr_by_type and plan_type in tp_rr_by_type:
@@ -422,9 +418,7 @@ def build_plans(
 
         kept: list[Plan] = []
         for p in plans:
-            conf, filtered = apply_calibration(
-                p.confidence_pct, p.type, calibration, regime=regime
-            )
+            conf, filtered = apply_calibration(p.confidence_pct, p.type, calibration, regime=regime)
             if filtered:
                 continue
             if conf != p.confidence_pct:

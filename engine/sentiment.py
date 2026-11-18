@@ -272,11 +272,7 @@ def compute(payload: dict) -> dict:
 
     # 6. fear & greed — 5%
     fng = context.get("fear_greed") or {}
-    fng_raw = (
-        _clamp((_num(fng.get("value"), 50.0) - 50.0) * 2.0)
-        if fng.get("available")
-        else 0.0
-    )
+    fng_raw = _clamp((_num(fng.get("value"), 50.0) - 50.0) * 2.0) if fng.get("available") else 0.0
     _part(
         "fear & greed",
         0.05,
@@ -400,9 +396,7 @@ class SentimentClock:
         persistence = self.tick(ts_ms, direction)
         strength = min(abs(score) / 100.0, 1.0) if direction != "neutral" else 0.0
         persistence_frac = min(persistence / self.deep_after_min, 1.0)
-        intensity = (
-            _depth(strength, persistence_frac) if direction != "neutral" else 0.0
-        )
+        intensity = _depth(strength, persistence_frac) if direction != "neutral" else 0.0
         return {
             "score": float(score),
             "bucket": bucket(score) if direction != "neutral" else "slate",
@@ -436,9 +430,7 @@ def record(symbol: str, timeframe: str, result: dict) -> bool:
         return False
 
 
-def history(
-    symbol: str, timeframe: str, minutes: int = _HISTORY_WINDOW_MIN
-) -> list[dict]:
+def history(symbol: str, timeframe: str, minutes: int = _HISTORY_WINDOW_MIN) -> list[dict]:
     """Recent persisted readings, oldest first."""
     try:
         from data.database import SignalDB
@@ -449,9 +441,7 @@ def history(
         return []
 
 
-def duration_of(
-    rows: list[dict], direction: str, now_ms: int | None = None
-) -> float:
+def duration_of(rows: list[dict], direction: str, now_ms: int | None = None) -> float:
     """Minutes the current direction has held UNINTERRUPTED, walking back
     through the history. Gaps longer than ``GAP_CAP_MIN`` don't count —
     the desk only knows the market held the condition while it watched it.

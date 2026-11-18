@@ -17,7 +17,10 @@ import re
 import time
 import urllib.parse
 
-import yt_dlp
+try:
+    import yt_dlp
+except ImportError:
+    yt_dlp = None  # type: ignore[assignment]
 
 from core.database import db_manager
 from core.youtube.models import DiscoveredVideo, YouTubeSource, YouTubeSourceType
@@ -244,6 +247,10 @@ class YouTubeDiscoveryEngine:
         }
 
         discovered: list[DiscoveredVideo] = []
+
+        if yt_dlp is None:
+            logger.warning("yt_dlp is not installed; skipping YouTube crawl extraction.")
+            return []
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:

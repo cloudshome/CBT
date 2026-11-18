@@ -87,6 +87,8 @@ class BinanceFuturesConnector(BaseExchangeConnector):
         t_start = time.perf_counter()
 
         own_session = self._external_session is None
+        if own_session and self.environment == "PRODUCTION":
+            self.assert_outbound_socket_allowed()
         session = self._external_session or aiohttp.ClientSession(
             timeout=aiohttp.ClientTimeout(total=self.timeout_sec)
         )

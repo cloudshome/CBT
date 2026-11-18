@@ -56,9 +56,7 @@ def add_adx(df: pd.DataFrame, period: int = 14) -> pd.DataFrame:
     minus_dm = np.where((down > up) & (down > 0), down, 0.0)
     tr = np.maximum(
         out.high - out.low,
-        np.maximum(
-            (out.high - out.close.shift()).abs(), (out.low - out.close.shift()).abs()
-        ),
+        np.maximum((out.high - out.close.shift()).abs(), (out.low - out.close.shift()).abs()),
     )
     atr = pd.Series(tr, index=out.index).ewm(alpha=1 / period, adjust=False).mean()
     plus_di = (
@@ -68,9 +66,7 @@ def add_adx(df: pd.DataFrame, period: int = 14) -> pd.DataFrame:
     )
     minus_di = (
         100
-        * pd.Series(minus_dm, index=out.index)
-        .ewm(alpha=1 / period, adjust=False)
-        .mean()
+        * pd.Series(minus_dm, index=out.index).ewm(alpha=1 / period, adjust=False).mean()
         / atr.replace(0, np.nan)
     )
     dx = 100 * (plus_di - minus_di).abs() / (plus_di + minus_di).replace(0, np.nan)
@@ -88,9 +84,7 @@ def add_macd(df: pd.DataFrame, fast=12, slow=26, signal=9) -> pd.DataFrame:
     return out
 
 
-def add_supertrend(
-    df: pd.DataFrame, period: int = 10, multiplier: float = 3.0
-) -> pd.DataFrame:
+def add_supertrend(df: pd.DataFrame, period: int = 10, multiplier: float = 3.0) -> pd.DataFrame:
     """Supertrend with explicit arrays (no look-ahead bias)."""
     out = df.copy()
     hl2 = (out.high + out.low) / 2
@@ -103,14 +97,10 @@ def add_supertrend(
     st = np.zeros(len(out))
     for i in range(1, len(out)):
         fu[i] = (
-            upper.iloc[i]
-            if (upper.iloc[i] < fu[i - 1] or close[i - 1] > fu[i - 1])
-            else fu[i - 1]
+            upper.iloc[i] if (upper.iloc[i] < fu[i - 1] or close[i - 1] > fu[i - 1]) else fu[i - 1]
         )
         fl[i] = (
-            lower.iloc[i]
-            if (lower.iloc[i] > fl[i - 1] or close[i - 1] < fl[i - 1])
-            else fl[i - 1]
+            lower.iloc[i] if (lower.iloc[i] > fl[i - 1] or close[i - 1] < fl[i - 1]) else fl[i - 1]
         )
         bull[i] = (close[i] >= fl[i]) if bull[i - 1] else (close[i] > fu[i])
         st[i] = fl[i] if bull[i] else fu[i]
@@ -191,9 +181,7 @@ def add_atr(df: pd.DataFrame, period: int = 14) -> pd.DataFrame:
     return out
 
 
-def add_bollinger(
-    df: pd.DataFrame, period: int = 20, mult: float = 2.0
-) -> pd.DataFrame:
+def add_bollinger(df: pd.DataFrame, period: int = 20, mult: float = 2.0) -> pd.DataFrame:
     out = df.copy()
     mid = sma(out.close, period)
     std = out.close.rolling(period).std()
@@ -221,9 +209,7 @@ def add_volume_features(df: pd.DataFrame, volume_ma=20) -> pd.DataFrame:
     return out
 
 
-def add_session_vwap(
-    df: pd.DataFrame, session_hours: int | None = None
-) -> pd.DataFrame:
+def add_session_vwap(df: pd.DataFrame, session_hours: int | None = None) -> pd.DataFrame:
     """VWAP anchored on the daily session (UTC). Bars are grouped by calendar
     date derived from the epoch-millisecond 'ts' column; each session's VWAP
     runs from the first bar of the session forward.
@@ -245,16 +231,14 @@ def add_session_vwap(
     out["session"] = anchor
     tp = (out.high + out.low + out.close) / 3
     pv = tp * out.volume
-    out["vwap"] = pv.groupby(anchor).cumsum() / out.volume.groupby(
-        anchor
-    ).cumsum().replace(0, np.nan)
+    out["vwap"] = pv.groupby(anchor).cumsum() / out.volume.groupby(anchor).cumsum().replace(
+        0, np.nan
+    )
     out["price_above_vwap"] = out.close > out.vwap
     return out
 
 
-def add_volume_profile(
-    df: pd.DataFrame, bins: int = 24, lookback: int = 200
-) -> pd.DataFrame:
+def add_volume_profile(df: pd.DataFrame, bins: int = 24, lookback: int = 200) -> pd.DataFrame:
     """Approximate volume profile: distribute each bar's volume uniformly
     between its high and low across a fixed price grid, then find the POC and
     high-volume nodes. Operates on the trailing `lookback` bars.
@@ -280,9 +264,7 @@ def add_volume_profile(
         profile[bot : top + 1] += row.volume / span
     poc_idx = int(np.argmax(profile))
     poc = edges[poc_idx] + width / 2
-    hvn_mask = profile > np.percentile(
-        profile[profile > 0] if (profile > 0).any() else [0], 70
-    )
+    hvn_mask = profile > np.percentile(profile[profile > 0] if (profile > 0).any() else [0], 70)
     hvn = [float(edges[i] + width / 2) for i in np.where(hvn_mask)[0]]
     out["poc"] = np.nan
     out["high_volume_nodes"] = np.nan
@@ -308,9 +290,7 @@ def _fractals(df: pd.DataFrame, window: int = 2) -> tuple[np.ndarray, np.ndarray
     return np.array(highs, dtype=int), np.array(lows, dtype=int)
 
 
-def find_rsi_divergence(
-    df: pd.DataFrame, lookback: int = 80, min_swing: float = 0.15
-) -> dict:
+def find_rsi_divergence(df: pd.DataFrame, lookback: int = 80, min_swing: float = 0.15) -> dict:
     """Detect RSI swing divergence on the last `lookback` bars.
 
     Returns a dict with keys:
@@ -344,10 +324,7 @@ def find_rsi_divergence(
         if pct(prices[i1], prices[i2]) < min_swing or pct(rsis[i1], rsis[i2]) < 1.5:
             continue
         if prices[i2] < prices[i1] and rsis[i2] > rsis[i1]:
-            confirmed = (
-                i2 <= len(data) - 3
-                and prices[i2] == data.low.tail(len(data) - i2).min()
-            )
+            confirmed = i2 <= len(data) - 3 and prices[i2] == data.low.tail(len(data) - i2).min()
             result["bull_div"] = 2 if confirmed else 1
             result["bull_price_low"] = float(prices[i2])
             result["bull_rsi_low"] = float(rsis[i2])
@@ -360,8 +337,7 @@ def find_rsi_divergence(
                 continue
             if prices[i2] > prices[i1] and rsis[i2] < rsis[i1]:
                 confirmed = (
-                    i2 <= len(data) - 3
-                    and prices[i2] == data.high.tail(len(data) - i2).max()
+                    i2 <= len(data) - 3 and prices[i2] == data.high.tail(len(data) - i2).max()
                 )
                 result["bear_div"] = 2 if confirmed else 1
                 result["bear_price_high"] = float(prices[i2])
@@ -370,9 +346,7 @@ def find_rsi_divergence(
     return result
 
 
-def find_equal_levels(
-    df: pd.DataFrame, lookback: int = 120, tolerance_pct: float = 0.12
-) -> dict:
+def find_equal_levels(df: pd.DataFrame, lookback: int = 120, tolerance_pct: float = 0.12) -> dict:
     """Cluster swing highs/lows that are within `tolerance_pct` of each other —
     the classic 'equal highs' / 'equal lows' liquidity pools."""
     result = {"equal_highs": [], "equal_lows": []}
@@ -402,9 +376,7 @@ def find_equal_levels(
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def add_all_indicators(
-    df: pd.DataFrame, session_hours: int | None = None
-) -> pd.DataFrame:
+def add_all_indicators(df: pd.DataFrame, session_hours: int | None = None) -> pd.DataFrame:
     """Convenience: run the whole suite. `session_hours` optionally fixes the
     VWAP anchor length (e.g. 24 for daily-anchored on any timeframe)."""
     out = df.copy()

@@ -54,6 +54,13 @@ def _extract_api_key(request: Request, x_api_key: str | None) -> str | None:
     return None
 
 
+def _is_production_env() -> bool:
+    return any(
+        os.getenv(k, "").strip().lower() in ("production", "prod")
+        for k in ("APP_ENV", "ENVIRONMENT", "ENV", "NODE_ENV")
+    )
+
+
 async def require_api_key(
     request: Request,
     x_api_key: str | None = Depends(_api_key_header),
@@ -63,10 +70,9 @@ async def require_api_key(
     When API_KEY is not configured, all requests pass through in dev/test.
     In production, missing API_KEY raises a 500 error to prevent accidental open access.
     """
-    env = os.getenv("APP_ENV", os.getenv("ENVIRONMENT", "development")).lower()
     current_key = globals().get("API_KEY", "")
     if not current_key:
-        if env == "production":
+        if _is_production_env():
             raise HTTPException(
                 status_code=500,
                 detail={
@@ -96,13 +102,12 @@ async def require_api_key(
 def validate_production_security_config() -> None:
     """
     Fail-closed security check executed at server boot.
-    In production (APP_ENV or ENVIRONMENT == 'production'):
+    In production (APP_ENV, ENVIRONMENT, ENV, or NODE_ENV == 'production'):
       - API_KEY must be set and >= 16 characters.
       - CORS_ORIGIN must be set to an explicit allowlist (not unset, empty, or wildcard '*').
     Raises RuntimeError on any misconfiguration.
     """
-    env = os.getenv("APP_ENV", os.getenv("ENVIRONMENT", "development")).lower()
-    if env == "production":
+    if _is_production_env():
         key = globals().get("API_KEY", "") or os.getenv("API_KEY", "")
         if not key or len(key.strip()) < 16:
             raise RuntimeError(

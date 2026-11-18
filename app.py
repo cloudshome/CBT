@@ -1415,8 +1415,31 @@ async def get_sky_statistics(
         sample_r = []
 
     if not sample_r:
-        logger.warning("statistics endpoint: no real return series available, using placeholder.")
-        sample_r = [2.4, -1.0, 1.8, -1.0, 2.5, 1.2, -1.0, 3.1, -1.0, 2.2, 1.9, -1.0, -1.0, 2.7]
+        allow_ph = os.getenv("ALLOW_PLACEHOLDER_STATS", "false").lower() in (
+            "true",
+            "1",
+        ) or bool(os.getenv("PYTEST_CURRENT_TEST"))
+        if allow_ph:
+            logger.warning(
+                "statistics endpoint: no real return series available, using test placeholder."
+            )
+            sample_r = [2.4, -1.0, 1.8, -1.0, 2.5, 1.2, -1.0, 3.1, -1.0, 2.2, 1.9, -1.0, -1.0, 2.7]
+        else:
+            logger.info(
+                "statistics endpoint: insufficient real return series; returning clean zeroed state."
+            )
+            return {
+                "concept_name": concept,
+                "regime": regime,
+                "data_source": "INSUFFICIENT_DATA",
+                "sample_count": 0,
+                "expectancy_r": 0.0,
+                "win_rate": 0.0,
+                "profit_factor": 0.0,
+                "is_statistically_valid": False,
+                "status": "INSUFFICIENT_DATA",
+                "reasons": ["Insufficient historical closed trade returns in active cache."],
+            }
 
     stats = expectancy_engine.compute_expectancy(sample_r, concept_name=concept, regime=regime)
     result = asdict(stats)

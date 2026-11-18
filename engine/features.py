@@ -69,12 +69,8 @@ def build_snapshot(
     rsi_prev = _f(prev.get("rsi", 50), 1)
     macd_hist = _f(last.get("macd_hist", 0), 4)
     macd_hist_prev = _f(prev.get("macd_hist", 0), 4)
-    macd_bull_cross = bool(
-        (last.get("macd_hist", 0) > 0) and (prev.get("macd_hist", 0) <= 0)
-    )
-    macd_bear_cross = bool(
-        (last.get("macd_hist", 0) < 0) and (prev.get("macd_hist", 0) >= 0)
-    )
+    macd_bull_cross = bool((last.get("macd_hist", 0) > 0) and (prev.get("macd_hist", 0) <= 0))
+    macd_bear_cross = bool((last.get("macd_hist", 0) < 0) and (prev.get("macd_hist", 0) >= 0))
     wt1, wt2 = _f(last.get("wt1", 0), 2), _f(last.get("wt2", 0), 2)
     stoch_k = _f(last.get("stoch_k", 50), 1)
     roc = _f(last.get("roc", 0), 2)
@@ -128,11 +124,7 @@ def build_snapshot(
         "price": price,
         "bar_ts": int(last.ts),
         # trend
-        "trend": "bullish"
-        if bullish_alignment
-        else "bearish"
-        if bearish_alignment
-        else "mixed",
+        "trend": "bullish" if bullish_alignment else "bearish" if bearish_alignment else "mixed",
         "ema_alignment_bull": bullish_alignment,
         "ema_alignment_bear": bearish_alignment,
         "supertrend_bull": supertrend_bull,
@@ -148,9 +140,7 @@ def build_snapshot(
         "rsi_bullish": bool(rsi and rsi >= 50),
         "macd_hist": macd_hist,
         "macd_hist_rising": bool(
-            macd_hist is not None
-            and macd_hist_prev is not None
-            and macd_hist > macd_hist_prev
+            macd_hist is not None and macd_hist_prev is not None and macd_hist > macd_hist_prev
         ),
         "macd_bull_cross": macd_bull_cross,
         "macd_bear_cross": macd_bear_cross,

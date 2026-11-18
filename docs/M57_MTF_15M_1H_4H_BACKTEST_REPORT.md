@@ -1,9 +1,9 @@
 # MILESTONE 57 CERTIFICATION REPORT
 ## Multi-Timeframe (`15m` Tactical Day vs. `4h` Structural Swing) Walk-Forward Backtest & Cross-Horizon Regime Synthesis Across the 1.2M Candle Store
 
-**Date:** 2026-11-17T09:26:47.846186+00:00  
+**Date:** 2026-11-18T06:36:15.518745+00:00  
 **Certification Status:** **CERTIFIED_PASS**  
-**Total Runtime:** 822.25 seconds  
+**Total Runtime:** 1118.36 seconds  
 **Total Active Trading Bars Evaluated:** 1,194,521 bars across `15m`, `1h`, and `4h`  
 **Execution Model:** `impact` (`IMPACT_K = 0.4`)  
 **Real Capital Enabled:** `False` (PERMANENTLY LOCKED)  

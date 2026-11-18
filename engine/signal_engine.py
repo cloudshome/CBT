@@ -80,9 +80,7 @@ def _signal_id(symbol: str, ts_ms: int) -> str:
     return f"{symbol.replace('/', '')}_{time.strftime('%Y%m%d_%H%M', time.localtime(ts_ms / 1000))}"
 
 
-def _reason(
-    features: dict, side: str, bull: ScoreBreakdown, bear: ScoreBreakdown
-) -> str:
+def _reason(features: dict, side: str, bull: ScoreBreakdown, bear: ScoreBreakdown) -> str:
     parts = []
     if side == "BUY":
         if (features.get("rsi_divergence") or {}).get("bull"):
@@ -280,9 +278,7 @@ def _analyze_at(
     # frame shorter than REGIME_MIN_ROWS, so hand it a window that is exactly
     # the prefix when the prefix is short and exactly 20 rows otherwise — the
     # same rows the prefix call would have seen.
-    regime = classify_market_regime(
-        raw.iloc[max(0, i - REGIME_MIN_ROWS + 1) : i + 1], features
-    )
+    regime = classify_market_regime(raw.iloc[max(0, i - REGIME_MIN_ROWS + 1) : i + 1], features)
     features["regime"] = regime
     features["regime_name"] = regime.get("regime", "RANGING")
     features["regime_label"] = regime.get("label", "Ranging / Neutral")
@@ -306,9 +302,7 @@ def _analyze_at(
         tp_rr_by_type=tp_rr_by_type,
         regime=features.get("regime_name", ""),
     )
-    best = build_best_signal(
-        features, bull, bear, plans, symbol, timeframe, min_confidence
-    )
+    best = build_best_signal(features, bull, bear, plans, symbol, timeframe, min_confidence)
 
     return BrainOutput(
         features=features,

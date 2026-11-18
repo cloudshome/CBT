@@ -18,9 +18,10 @@ import os
 import time
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
+from core.auth import require_api_key
 from core.prediction_ladder import compute_bidirectional_style_signals
 
 logger = logging.getLogger(__name__)
@@ -1780,7 +1781,7 @@ class SignalApprovalRequest(BaseModel):
     notes: str | None = None
 
 
-@terminal_router.post("/api/terminal/approval-action")
+@terminal_router.post("/api/terminal/approval-action", dependencies=[Depends(require_api_key)])
 async def update_signal_approval(req: SignalApprovalRequest):
     """Signal Lifecycle State Transitions (PENDING -> APPROVED -> EXECUTED -> CLOSED) with Order Freeze & Real DB Sync."""
     now = int(time.time() * 1000)
@@ -1948,7 +1949,9 @@ async def get_sovereign_agent_decision(symbol: str = Query("BTCUSDT")):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@terminal_router.post("/api/terminal/sovereign-agent/execute")
+@terminal_router.post(
+    "/api/terminal/sovereign-agent/execute", dependencies=[Depends(require_api_key)]
+)
 async def execute_sovereign_agent_decision(req: SovereignExecuteRequest):
     """Instantly executes the Sovereign Master Agent's decision into live paper & testnet."""
     if not sovereign_master_agent:
@@ -1976,7 +1979,9 @@ async def get_sovereign_auto_pilot():
     return sovereign_master_agent.get_auto_pilot_status()
 
 
-@terminal_router.post("/api/terminal/sovereign-agent/auto-pilot")
+@terminal_router.post(
+    "/api/terminal/sovereign-agent/auto-pilot", dependencies=[Depends(require_api_key)]
+)
 async def set_sovereign_auto_pilot(req: SovereignAutoPilotRequest):
     """Enables or disables Autonomous Auto-Pilot for the Sovereign Master Agent."""
     if not sovereign_master_agent:
@@ -2355,7 +2360,7 @@ async def get_radar_alpha_candidates():
     return await radar_alpha_executor.evaluate_radar_candidates()
 
 
-@terminal_router.post("/api/terminal/radar-alpha/execute")
+@terminal_router.post("/api/terminal/radar-alpha/execute", dependencies=[Depends(require_api_key)])
 async def execute_radar_alpha_candidate(candidate: dict[str, Any]):
     from core.screener.radar_executor import radar_alpha_executor
 

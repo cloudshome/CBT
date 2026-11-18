@@ -213,6 +213,141 @@ class ExecutionGateway:
             message=msg,
         )
 
+    async def execute_order_async(
+        self,
+        symbol: str,
+        direction: str,
+        units: float,
+        target_price: float,
+        order_type: str = "SMART_ROUTED_LIMIT",
+    ) -> ExecutionResult:
+        """
+        Native asynchronous order execution directly awaiting live_execution_router
+        on the active event loop without spawning nested thread pools.
+        """
+        t_start = time.perf_counter()
+        now_ms = int(time.time() * 1000)
+        order_id = f"ORD_{symbol.replace('/', '_')}_{now_ms}"
+        audit_id = f"AUD_{now_ms}"
+
+        if os.getenv("EXECUTION_MODE", "PAPER").strip().upper() == "PRODUCTION":
+            from core.execution.live_router import (
+                LiveOrderRequest,
+                live_execution_router,
+            )
+            from core.portfolio_shadow import portfolio_shadow
+
+            side = "BUY" if direction.upper() == "LONG" else "SELL"
+            acct = portfolio_shadow.get_portfolio_accounting()
+            open_pos = portfolio_shadow.get_open_positions()
+            curr_eq = float(acct.get("virtual_equity", 100_000.0))
+            d_realized = float(acct.get("daily_realized_pnl", 0.0))
+            d_unrealized = float(acct.get("total_unrealized_pnl", 0.0))
+
+            req = LiveOrderRequest(
+                exchange="BINANCE_FUTURES",
+                environment="PRODUCTION",
+                symbol=symbol,
+                side=side,
+                order_type="MARKET" if "MARKET" in order_type.upper() else "LIMIT",
+                quantity=units,
+                price=target_price if "LIMIT" in order_type.upper() else None,
+                reference_price=target_price,
+                account_equity_usd=curr_eq,
+                daily_realized_pnl_usd=d_realized,
+                daily_unrealized_pnl_usd=d_unrealized,
+                current_open_positions_count=len(open_pos),
+                max_open_positions_cap=3,
+                client_order_id=order_id,
+            )
+            routes = [OrderRoute("BINANCE_FUTURES_LIVE", units, 100.0, 0.0)]
+            try:
+                receipt = await live_execution_router.execute_live_order(req)
+                status = receipt.status
+                executed_price = receipt.executed_price or target_price
+                final_units = receipt.executed_qty or units
+                msg = f"LIVE PRODUCTION order executed via live_router: {receipt.client_order_id} ({receipt.status})"
+            except Exception as exc:
+                logger.error("Live router execution failed: %s", exc)
+                status = "REJECTED_LIVE"
+                executed_price = target_price
+                final_units = 0.0
+                msg = f"LIVE PRODUCTION execution rejected: {exc}"
+
+            t_end = time.perf_counter()
+            simulated_latency_ms = round((t_end - t_start) * 1000.0, 1)
+            realized_slippage_bps = 0.0
+            venue_label = "BINANCE_FUTURES_LIVE"
+        else:
+            routes = [
+                OrderRoute("BINANCE_FUTURES", units * 0.50, 50.0, 2.0),
+                OrderRoute("BYBIT_V5", units * 0.30, 30.0, 2.5),
+                OrderRoute("HYPERLIQUID_L2", units * 0.20, 20.0, 1.8),
+            ]
+            t_end = time.perf_counter()
+            simulated_latency_ms = round((t_end - t_start) * 1000.0 + 24.5, 1)
+            is_long = direction.upper() == "LONG"
+            realized_slippage_bps = 2.4
+            slippage_factor = (realized_slippage_bps / 10000.0) * (1 if is_long else -1)
+            executed_price = round(target_price * (1.0 + slippage_factor), 2)
+
+            if simulated_latency_ms > self.max_latency_ms:
+                status = "REJECTED_LATENCY"
+                msg = f"Order aborted by Latency Watchdog: RTT {simulated_latency_ms:.1f}ms > {self.max_latency_ms}ms"
+                logger.error(msg)
+            elif realized_slippage_bps > self.max_slippage_bps:
+                status = "REJECTED_SLIPPAGE"
+                msg = f"Order aborted: Slippage {realized_slippage_bps:.1f}bps > max tolerance {self.max_slippage_bps}bps"
+                logger.error(msg)
+            else:
+                status = "FILLED"
+                msg = f"Successfully filled {units} {symbol} @ ${executed_price:,.2f} via SOR ({simulated_latency_ms:.1f}ms)."
+            final_units = units if status == "FILLED" else 0.0
+            venue_label = "PAPER_SIMULATOR"
+
+        with db_manager.get_trading_conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO execution_audits (
+                    audit_id, timestamp, order_id, symbol, venue, order_type,
+                    requested_price, executed_price, slippage_bps, latency_ms, status
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                """,
+                (
+                    audit_id,
+                    now_ms,
+                    order_id,
+                    symbol,
+                    venue_label,
+                    order_type,
+                    target_price,
+                    executed_price if status in ("FILLED", "LIVE_ORDER_FILLED") else target_price,
+                    realized_slippage_bps,
+                    simulated_latency_ms,
+                    status,
+                ),
+            )
+            conn.commit()
+
+        return ExecutionResult(
+            order_id=order_id,
+            symbol=symbol,
+            direction=direction.upper(),
+            requested_units=units,
+            requested_price=target_price,
+            executed_price=executed_price
+            if status in ("FILLED", "LIVE_ORDER_FILLED")
+            else target_price,
+            executed_units=final_units,
+            slippage_bps=realized_slippage_bps,
+            latency_ms=simulated_latency_ms,
+            status=status,
+            routes=routes,
+            audit_id=audit_id,
+            message=msg,
+        )
+
 
 # Singleton
 execution_gateway = ExecutionGateway()

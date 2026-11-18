@@ -8,9 +8,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from core.auth import require_api_key
 from core.web3.portfolio_aggregator import portfolio_aggregator
 from core.web3.rpc_client import DEFAULT_RPC_POOLS, multi_rpc_client
 from core.web3.wallet_store import (
@@ -39,7 +40,7 @@ async def list_wallets() -> dict[str, Any]:
     }
 
 
-@router.post("/api/web3/wallets")
+@router.post("/api/web3/wallets", dependencies=[Depends(require_api_key)])
 async def add_wallet(req: AddWalletRequest) -> dict[str, Any]:
     """
     Registers a watch-only public wallet address.
@@ -62,7 +63,7 @@ async def add_wallet(req: AddWalletRequest) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=str(val_err)) from val_err
 
 
-@router.delete("/api/web3/wallets/{address}")
+@router.delete("/api/web3/wallets/{address}", dependencies=[Depends(require_api_key)])
 async def delete_wallet(address: str) -> dict[str, Any]:
     """Removes a registered watch-only wallet."""
     success = web3_wallet_store.remove_wallet(address)

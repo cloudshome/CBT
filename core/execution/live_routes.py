@@ -49,7 +49,7 @@ class CanaryExecuteRequest(BaseModel):
     session_id: str | None = Field(default=None, description="Optional client session ID")
 
 
-@router.get("/account-readiness")
+@router.get("/account-readiness", dependencies=[Depends(require_api_key)])
 async def get_account_readiness(
     environment: str = Query("PRODUCTION", description="PRODUCTION or TESTNET"),
 ):
@@ -86,7 +86,7 @@ async def get_account_readiness(
     }
 
 
-@router.post("/live-gatekeeper/check")
+@router.post("/live-gatekeeper/check", dependencies=[Depends(require_api_key)])
 async def evaluate_gatekeeper_clearance(req: LivePreflightCheckRequest):
     """
     Executes all 6 non-bypassable constitutional preflight checks:
@@ -473,7 +473,7 @@ async def get_capital_escalation_status(
     }
 
 
-@router.post("/escalation/evaluate")
+@router.post("/escalation/evaluate", dependencies=[Depends(require_api_key)])
 async def evaluate_capital_escalation(req: EscalationEvaluateRequest):
     """
     Evaluates 6-pillar walk-forward evidence stack for promotion eligibility.

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import abc
 import logging
+import os
 from dataclasses import dataclass
 from typing import Any
 
@@ -99,6 +100,16 @@ class BaseExchangeConnector(abc.ABC):
             raise ValueError(
                 f"Invalid environment: '{self.environment}'. Must be 'TESTNET' or 'PRODUCTION'."
             )
+
+    def assert_outbound_socket_allowed(self, ignore_pytest: bool = False) -> None:
+        """Enforces permanent socket airgap for production real-capital execution."""
+        if self.environment == "PRODUCTION":
+            from core.risk.execution_isolation import REAL_CAPITAL_ENABLED
+
+            if not REAL_CAPITAL_ENABLED and (ignore_pytest or not os.getenv("PYTEST_CURRENT_TEST")):
+                raise ExchangeAuthenticationError(
+                    "REAL_CAPITAL_LOCK: Outbound PRODUCTION network dispatch is permanently prohibited while REAL_CAPITAL_ENABLED is False."
+                )
 
     @abc.abstractmethod
     async def get_balances(self) -> list[NormalizedBalance]:

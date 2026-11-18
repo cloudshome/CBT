@@ -52,9 +52,7 @@ INSUFFICIENT_DATA = "INSUFFICIENT_DATA"
 
 DEFAULT_MIN_DECIDED = 30  # overall decisive sample floor
 DEFAULT_REGIME_MIN_DECIDED = 10  # a regime must reach this to count as sampled
-DEFAULT_POSITIVE_REGIME_FRAC = (
-    0.5  # majority of well-sampled regimes must be net-positive
-)
+DEFAULT_POSITIVE_REGIME_FRAC = 0.5  # majority of well-sampled regimes must be net-positive
 
 
 def net_r(g: GradedPlan) -> float:
@@ -205,9 +203,7 @@ def regime_edge_report(
     (>= ``regime_min_decided`` decided trades).
     """
     overall = edge_stats(plans)
-    per_regime = {
-        regime: edge_stats(group) for regime, group in segment_by_regime(plans).items()
-    }
+    per_regime = {regime: edge_stats(group) for regime, group in segment_by_regime(plans).items()}
     sampled = []
     for regime, stats in per_regime.items():
         sampled.append(
@@ -218,8 +214,7 @@ def regime_edge_report(
                 "win_rate_net": stats.get("win_rate_net"),
                 "pf_net": stats.get("pf_net"),
                 "positive_net": bool(
-                    stats.get("expectancy_net") is not None
-                    and stats.get("expectancy_net", 0.0) > 0
+                    stats.get("expectancy_net") is not None and stats.get("expectancy_net", 0.0) > 0
                 ),
                 "well_sampled": stats["decided"] >= regime_min_decided,
             }
@@ -648,9 +643,7 @@ def edge_validate_report(
 def format_edge_verdict(report: dict) -> str:
     """Human-readable edge block in the honest NO-EDGE style."""
     if not report.get("ok"):
-        return "EDGE VALIDATION — could not run\n  " + str(
-            report.get("error", "unknown")
-        )
+        return "EDGE VALIDATION — could not run\n  " + str(report.get("error", "unknown"))
     edge = report["edge"]
     meta = report["meta"]
     o = edge["overall"]
@@ -666,10 +659,8 @@ def format_edge_verdict(report: dict) -> str:
         f"EDGE VALIDATION  {meta['symbol']} {meta['timeframe']}  "
         f"primary {meta['primary_horizon_hours']}h",
         "-" * 70,
-        f"  decisive windows : {', '.join(meta['decisive_windows'])} "
-        f"(unseen by the walk)",
-        f"  decided samples  : {o['decided']}   (wins {o['wins']} / "
-        f"losses {o['losses']})",
+        f"  decisive windows : {', '.join(meta['decisive_windows'])} (unseen by the walk)",
+        f"  decided samples  : {o['decided']}   (wins {o['wins']} / losses {o['losses']})",
         f"  expectancy (net) : {exp_str}",
         f"  win rate (net)   : {wr_str}",
         f"  profit factor    : {pf_str}",
@@ -683,9 +674,7 @@ def format_edge_verdict(report: dict) -> str:
         rexp_str = f"{rexp:+.3f}R" if rexp is not None else "n/a"
         mark = "✓" if r.get("positive_net") else "✗"
         flag = "  well-sampled" if r.get("well_sampled") else "  thin"
-        lines.append(
-            f"    {mark} {r['regime']:<22} n={r['decided']:>4}  exp {rexp_str}{flag}"
-        )
+        lines.append(f"    {mark} {r['regime']:<22} n={r['decided']:>4}  exp {rexp_str}{flag}")
 
     # P13.5 — Monte-Carlo stability block.
     mc = report.get("monte") or edge.get("monte")
@@ -693,18 +682,14 @@ def format_edge_verdict(report: dict) -> str:
         lines.append("-" * 70)
         lines.append("  MONTE CARLO (decisive-window resampling):")
         lines.append(
-            f"    trades {mc['n_trades']}  samples {mc['samples']}  "
-            f"risk {mc['risk_pct']}%/trade"
+            f"    trades {mc['n_trades']}  samples {mc['samples']}  risk {mc['risk_pct']}%/trade"
         )
         e = mc["expectancy"]
         lines.append(
-            f"    expectancy  p5 {e['p5']:+.4f}R   "
-            f"p50 {e['p50']:+.4f}R   p95 {e['p95']:+.4f}R"
+            f"    expectancy  p5 {e['p5']:+.4f}R   p50 {e['p50']:+.4f}R   p95 {e['p95']:+.4f}R"
         )
         dd = mc["drawdown"]
-        lines.append(
-            f"    drawdown    median {dd['median_pct']:.1f}%   p95 {dd['p95_pct']:.1f}%"
-        )
+        lines.append(f"    drawdown    median {dd['median_pct']:.1f}%   p95 {dd['p95_pct']:.1f}%")
         lines.append(
             f"    ruin prob   {mc['ruin_prob'] * 100:.1f}%   "
             f"(>= {mc['ruin_threshold_pct']}% drawdown)"
@@ -715,8 +700,7 @@ def format_edge_verdict(report: dict) -> str:
         )
         eq = mc["equity"]
         lines.append(
-            f"    equity      p5 {eq['p5']:,.0f}   "
-            f"p50 {eq['p50']:,.0f}   p95 {eq['p95']:,.0f}"
+            f"    equity      p5 {eq['p5']:,.0f}   p50 {eq['p50']:,.0f}   p95 {eq['p95']:,.0f}"
         )
         # MC floor check
         p5_exp = e["p5"]

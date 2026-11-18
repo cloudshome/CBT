@@ -307,7 +307,7 @@ Under **Milestone 37**, a trustworthy, continuous, multi-year derivatives datase
 
 1. **Funding Settlements:**
    - Settled at `00:00`, `08:00`, `16:00` UTC.
-   - Signal evaluation rule: At bar $t$, only funding events with $ts \le t$ are visible.
+   - Signal evaluation rule: At bar $t$, only funding events with $ts \\le t$ are visible.
 2. **Open Interest Sampling:**
    - Extracted from Binance Vision 5-minute daily metrics by sampling the final 5-minute snapshot of each hour ($XX:55:00$ UTC).
    - Signal evaluation rule: Hour $H$ Open Interest represents state at bar close $H$. Causal decisions executed at open of $H+1$ reference $\text{{OI}}(H)$ without lookahead.

@@ -39,6 +39,6 @@
 ## 3. Constitutional Governance Decision
 
 ### Policy Decision: `CERTIFIED`
-1. **Mathematical Honesty Invariant:** Under M47 Refined Progressive Ratchet (+1.15R Stage 1 trigger), the Deflated Sharpe Ratio achieved **`0.9999`** (clearing the 0.9500 hurdle at 99.99% statistical significance) across $N = 747$ trades.
+1. **Mathematical Honesty Invariant:** Under M47 Refined Progressive Ratchet (+1.20R Stage 1 trigger -> +0.25R locked profit), the Deflated Sharpe Ratio achieved **`0.9999`** (clearing the 0.9500 hurdle at 99.99% statistical significance) across $N = 747$ trades.
 2. **Strict Joint Hurdle 2e Clearance:** Net Expectancy achieved **`+0.2709R`** (clearing $\ge +0.2500R$) AND Profit Factor achieved **`1.54`** (clearing $\ge 1.4500$ threshold across all multi-asset partitions).
 3. **Perimeter Status:** Checkpoint 2 (`CP-2`) status is officially certified as **`CERTIFIED`**. Capital Governor enforces strict isolation and remains at **`TIER_0_PAPER`** until Checkpoint 3 (`CP-3`: 20 decided forward paper trades with zero accounting drift) completes.

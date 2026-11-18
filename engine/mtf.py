@@ -57,13 +57,7 @@ def analyze_timeframe(df: pd.DataFrame, tf: str) -> dict:
     last = ind.iloc[-1]
     price = float(last.close)
     ema20, ema50, ema200 = (float(last.get(f"ema_{p}", price)) for p in (20, 50, 200))
-    alignment = (
-        "bull"
-        if ema20 > ema50 > ema200
-        else "bear"
-        if ema20 < ema50 < ema200
-        else "mixed"
-    )
+    alignment = "bull" if ema20 > ema50 > ema200 else "bear" if ema20 < ema50 < ema200 else "mixed"
     pd_zone = ms.premium_discount["zone"] if ms.premium_discount else "unknown"
     return {
         "tf": tf,
@@ -140,9 +134,7 @@ def analyze_mtf(
 
     htf_tfs = [t for t in ("1M", "1w", "1d", "4h") if views.get(t, {}).get("available")]
     mtd_tf = views.get("1h", {})
-    ltf_tfs = [
-        t for t in ("30m", "15m", "5m", "1m") if views.get(t, {}).get("available")
-    ]
+    ltf_tfs = [t for t in ("30m", "15m", "5m", "1m") if views.get(t, {}).get("available")]
 
     def _bias(tfs: list) -> str:
         s = sum(_score(views[t]) * WEIGHTS[t] for t in tfs)

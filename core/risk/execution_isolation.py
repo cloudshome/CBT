@@ -20,6 +20,10 @@ from typing import Any, Final
 logger = logging.getLogger(__name__)
 
 
+# Permanent Constitutional Constant (Type-checked as Final; default is False)
+REAL_CAPITAL_ENABLED: Final[bool] = False
+
+
 class ExecutionMode(StrEnum):
     """Constitutional Execution Modes: PAPER (default) vs PRODUCTION."""
 
@@ -41,12 +45,19 @@ def is_production_execution_cleared(
 ) -> tuple[bool, list[str]]:
     """Evaluates fail-closed dual-mode gate for ExecutionMode.PRODUCTION:
 
+    0. Permanent Constitutional Lock: REAL_CAPITAL_ENABLED must be True.
     1. LIVE_EXECUTION_ENABLED environment flag set explicitly to 'true'.
     2. Master live kill switch disengaged.
     3. Valid, non-mock API credentials registered in credential_vault.
     4. Hardware key / FIDO2 physical clearance or daemon lease active.
     """
     reasons: list[str] = []
+
+    # 0. Permanent Constitutional Invariant (REAL_CAPITAL_ENABLED = False)
+    if not REAL_CAPITAL_ENABLED:
+        reasons.append(
+            "Permanent Constitutional Lock: REAL_CAPITAL_ENABLED is False (Real-capital execution is permanently disabled)."
+        )
 
     # 1. LIVE_EXECUTION_ENABLED flag
     live_flag = os.getenv("LIVE_EXECUTION_ENABLED", "false").strip().lower()
@@ -103,9 +114,6 @@ def is_real_capital_enabled() -> bool:
     cleared, _ = is_production_execution_cleared()
     return cleared
 
-
-# Permanent Constitutional Constant (Type-checked as Final; default is False)
-REAL_CAPITAL_ENABLED: Final[bool] = False
 
 # Forbidden venue, desk, and mode indicators
 FORBIDDEN_KEYWORDS: Final[frozenset[str]] = frozenset(

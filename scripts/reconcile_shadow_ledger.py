@@ -113,10 +113,32 @@ def run_reconciliation() -> dict:
 
     reconciliation_passed = is_cash_drift_zero and is_equity_drift_zero and is_qual_drift_zero
 
+    import hashlib
+
+    from core.database import db_manager
+
+    db_path = Path(str(db_manager.trading_db_path))
+    db_exists = db_path.exists()
+    db_size = db_path.stat().st_size if db_exists else 0
+    if db_exists and db_size > 0:
+        h = hashlib.sha256()
+        with open(db_path, "rb") as f:
+            while chunk := f.read(65536):
+                h.update(chunk)
+        db_sha256 = h.hexdigest()
+    else:
+        db_sha256 = "N/A"
+
     return {
         "timestamp_utc": datetime.datetime.now(datetime.UTC).isoformat(),
         "reconciliation_passed": reconciliation_passed,
         "total_positions": len(all_positions),
+        "database_metadata": {
+            "path": str(db_path),
+            "exists": db_exists,
+            "size_bytes": db_size,
+            "sha256": db_sha256,
+        },
         "closed_positions": len(closed_positions),
         "open_positions": len(open_positions),
         "starting_cash": starting_cash,
@@ -149,6 +171,10 @@ def generate_markdown(res: dict) -> str:
     )
     md.append(f"**Audit Timestamp:** `{res['timestamp_utc']}`  ")
     md.append(f"**Tolerance Level:** `< ${float(TOLERANCE_USD):.3f}`  ")
+    db_meta = res.get("database_metadata", {})
+    md.append(f"**Database Path:** `{db_meta.get('path', 'N/A')}`  ")
+    md.append(f"**Database Size:** `{db_meta.get('size_bytes', 0):,} bytes`  ")
+    md.append(f"**Database SHA-256:** `{db_meta.get('sha256', 'N/A')}`  ")
     md.append(
         "**Governance Guard:** `REAL_CAPITAL_ENABLED = False` (Isolated Paper/Simulation Sandbox)  "
     )
@@ -286,8 +312,17 @@ def generate_markdown(res: dict) -> str:
 
 if __name__ == "__main__":
     report_data = run_reconciliation()
-    md_content = generate_markdown(report_data)
     out_path = ROOT / "docs" / "SHADOW_LEDGER_RECONCILIATION.md"
+    allow_empty = "--allow-empty-ledger" in sys.argv
+
+    if report_data["total_positions"] == 0 and out_path.exists() and not allow_empty:
+        print(
+            "[SKIP WRITE] Local trading_logs.db has 0 rows (gitignored on fresh checkout); "
+            "preserving existing docs/SHADOW_LEDGER_RECONCILIATION.md. Pass --allow-empty-ledger to overwrite."
+        )
+        sys.exit(0)
+
+    md_content = generate_markdown(report_data)
     out_path.write_text(md_content, encoding="utf-8")
     print("Reconciliation completed successfully.")
     print(f"Reconciliation passed: {report_data['reconciliation_passed']}")

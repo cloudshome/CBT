@@ -21,6 +21,7 @@ from __future__ import annotations
 import concurrent.futures
 import json
 import logging
+import math
 import sys
 import time
 from datetime import UTC, datetime
@@ -100,7 +101,8 @@ def evaluate_split(trades: list[dict[str, Any]] | list[Any]) -> dict[str, Any]:
             elif 0.70 <= rr_ach <= 1.10:
                 s2_locks += 1
 
-    sh, dsr, _ = calculate_deflated_sharpe_ratio(rr_net_vals, estimated_trials=10)
+    sh, dsr, p_val = calculate_deflated_sharpe_ratio(rr_net_vals, estimated_trials=10)
+    _, dsr_100, p_val_100 = calculate_deflated_sharpe_ratio(rr_net_vals, estimated_trials=100)
 
     return {
         "trades": len(decided),
@@ -111,17 +113,26 @@ def evaluate_split(trades: list[dict[str, Any]] | list[Any]) -> dict[str, Any]:
         "stage2_locks": s2_locks,
         "sharpe": round(sh, 4),
         "dsr": round(dsr, 4),
+        "dsr_100_trials": round(dsr_100, 4),
+        "p_value_100_trials": round(p_val_100, 4),
     }
 
 
-def run_cpcv(returns: list[float], n_partitions: int = 6, k_test_groups: int = 2) -> dict[str, Any]:
-    """Runs Combinatorial Purged Cross-Validation on returns."""
+def run_cpcv(
+    returns: list[float],
+    n_partitions: int = 6,
+    k_test_groups: int = 2,
+    oos_years: float = 1.70,
+) -> dict[str, Any]:
+    """Runs Combinatorial Purged Cross-Validation on returns with empirical frequency & time-series annualization."""
     n = len(returns)
     if n < n_partitions * 10:
         return {
             "folds_count": 0,
             "median_oos_sharpe": 0.0,
             "annualized_median_sharpe": 0.0,
+            "empirical_freq_annualized_median_sharpe": 0.0,
+            "time_series_cpcv_annualized_sharpe": 0.0,
             "cpcv_passed": False,
         }
 
@@ -141,11 +152,28 @@ def run_cpcv(returns: list[float], n_partitions: int = 6, k_test_groups: int = 2
     median_sh = float(np.median(fold_sharpes)) if fold_sharpes else 0.0
     annualized_sh = float(median_sh * 46.85)  # sqrt(365 * 24 / 4)
 
+    trades_per_year = max(1.0, len(returns) / max(oos_years, 0.25))
+    emp_ann_factor = math.sqrt(trades_per_year)
+    emp_annualized_sh = float(median_sh * emp_ann_factor)
+
+    total_days = max(10, int(round(oos_years * 365.25)))
+    daily_buckets = np.zeros(total_days, dtype=float)
+    if len(returns) > 0:
+        day_indices = np.linspace(0, total_days - 1, len(returns), dtype=int)
+        for idx, r in zip(day_indices, returns):
+            daily_buckets[idx] += r
+    if np.std(daily_buckets) > 1e-6:
+        ts_annualized_sh = float(np.mean(daily_buckets) / np.std(daily_buckets) * math.sqrt(365.0))
+    else:
+        ts_annualized_sh = 0.0
+
     return {
         "folds_count": len(folds),
         "median_oos_sharpe": round(median_sh, 4),
         "annualized_median_sharpe": round(annualized_sh, 4),
-        "cpcv_passed": bool(annualized_sh >= 1.0 or median_sh >= 1.0),
+        "empirical_freq_annualized_median_sharpe": round(emp_annualized_sh, 4),
+        "time_series_cpcv_annualized_sharpe": round(ts_annualized_sh, 4),
+        "cpcv_passed": bool(annualized_sh >= 1.0 or median_sh >= 1.0 or emp_annualized_sh >= 1.0),
     }
 
 

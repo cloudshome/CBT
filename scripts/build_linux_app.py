@@ -159,7 +159,8 @@ def main() -> None:
 
     # Try electron-builder native targets
     builder_res = subprocess.run(
-        ["npx", "electron-builder", "--linux", "tar.gz", "--x64"], shell=True
+        ["npx", "electron-builder", "--linux", "tar.gz", "--x64"],
+        shell=(os.name == "nt"),
     )
 
     # Build Debian package via Python DEB builder

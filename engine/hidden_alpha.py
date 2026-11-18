@@ -104,9 +104,7 @@ def _zscore(x: np.ndarray) -> np.ndarray:
 
 
 # ── 1. latent regime probabilities ────────────────────────────────────────
-def _emission_matrix(
-    df: pd.DataFrame, window: int = WINDOW, history: int = HISTORY
-) -> np.ndarray:
+def _emission_matrix(df: pd.DataFrame, window: int = WINDOW, history: int = HISTORY) -> np.ndarray:
     """(n, 5) emission features for every bar — vectorised rolling.
 
     All five features are tanh-saturated to [-1, 1] so a single anomalous bar
@@ -231,9 +229,7 @@ def _neutral_regime(reason: str) -> dict:
 
 
 # ── 2. order flow / microstructure ────────────────────────────────────────
-def cvd_analysis(
-    df: pd.DataFrame, i: int | None = None, history: int = HISTORY
-) -> dict:
+def cvd_analysis(df: pd.DataFrame, i: int | None = None, history: int = HISTORY) -> dict:
     """Cumulative volume delta + absorption/exhaustion at bar ``i``."""
     if df is None or len(df) < 30:
         return {"available": False, "note": "insufficient data"}
@@ -292,9 +288,7 @@ def cvd_analysis(
 
 
 # ── 3. Bayesian fractional Kelly sizing ───────────────────────────────────
-def bayesian_win_rate(
-    wins: int, losses: int, prior_a: float = 2.0, prior_b: float = 2.0
-):
+def bayesian_win_rate(wins: int, losses: int, prior_a: float = 2.0, prior_b: float = 2.0):
     """Beta-posterior win rate: (wins + a) / (n + a + b).
 
     The weak prior (a=b=2, mean 0.5) keeps low-sample estimates neutral
@@ -382,9 +376,7 @@ def kelly_from_progress(
     Aggregates wins/losses/win R/loss R over ``plan_types`` (default: all
     rows given) — the same deduped samples the graduation gate uses.
     """
-    rows = [
-        p for p in progress if plan_types is None or p["plan_type"] in set(plan_types)
-    ]
+    rows = [p for p in progress if plan_types is None or p["plan_type"] in set(plan_types)]
     if not rows:
         return kelly_size(None, None, fraction, max_risk)
     wins = sum(p["wins"] for p in rows)
@@ -402,9 +394,7 @@ def kelly_from_progress(
     return out
 
 
-def kelly_from_rows(
-    rows: list[dict], fraction: float = 0.25, max_risk: float = 1.0
-) -> dict:
+def kelly_from_rows(rows: list[dict], fraction: float = 0.25, max_risk: float = 1.0) -> dict:
     """Kelly advisory from decided paper-trade *rows* (the live book).
 
     **P12.15.** The risk gate and the chart-read advisory used to feed raw
@@ -485,9 +475,7 @@ STATE_DIM_NAMES = (
 )
 
 
-def state_vectors(
-    df: pd.DataFrame, window: int = WINDOW, history: int = HISTORY
-) -> pd.DataFrame:
+def state_vectors(df: pd.DataFrame, window: int = WINDOW, history: int = HISTORY) -> pd.DataFrame:
     """8D normalized state vectors for every bar (vectorised, [-1, 1])."""
     n = len(df)
     if n < window + 4:
@@ -634,9 +622,7 @@ def hidden_alpha_report(
 
             with SignalDB() as db:
                 progress = paper_progress(db)
-            report["kelly"] = kelly_from_progress(
-                progress, plan_types=primary_plan_types()
-            )
+            report["kelly"] = kelly_from_progress(progress, plan_types=primary_plan_types())
         except Exception as exc:
             report["kelly"] = {
                 "available": False,
@@ -691,9 +677,7 @@ def format_hidden(report: dict) -> str:
             f"b={kelly.get('payoff')}, n={kelly.get('n')}) — {note}"
         )
     elif kelly:
-        lines.append(
-            f"  kelly size    : {kelly.get('note', 'not enough evidence yet')}"
-        )
+        lines.append(f"  kelly size    : {kelly.get('note', 'not enough evidence yet')}")
     sv = report["state_vector"]
     if sv.get("available"):
         vec = " ".join(f"{x:+.2f}" for x in sv["vector"])
