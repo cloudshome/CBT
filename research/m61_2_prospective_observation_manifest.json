@@ -1,0 +1,86 @@
+{
+  "milestone": "M61.2",
+  "title": "Milestone 61.2 Prospective 30-Day Paper Observation Protocol Manifest",
+  "protocol_version": "1.0.0",
+  "created_at_utc": "2026-11-18T17:15:00.000000+00:00",
+  "status": "SEALED_ACTIVE",
+  "governance": {
+    "constitution": "REAL_CAPITAL_ENABLED = False",
+    "capital_mode": "PAPER_VIRTUAL_SHADOW",
+    "production_order_dispatch": "PROHIBITED_FAIL_CLOSED",
+    "production_credentials": "PROHIBITED_ISOLATED",
+    "m18_certified_surface_hash": "2acbff25f391249cb1881bd40a4440384cecdd7682c6f83b91487d8744d0b57b",
+    "m18_status": "LOCKED_PRESERVED_149_PASSING",
+    "ledger_target": "data/trading_logs.db",
+    "ledger_table": "shadow_positions"
+  },
+  "observation_window": {
+    "start_utc": "2026-11-18T18:00:00Z",
+    "end_utc": "2026-12-18T18:00:00Z",
+    "duration_calendar_days": 30,
+    "evaluation_schedule": "DAILY_AND_WEEKLY_ROLLING"
+  },
+  "qualified_universe": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT",
+    "PAXGUSDT",
+    "XAUUSD"
+  ],
+  "registered_strategies": [
+    {
+      "strategy_id": "M57_SETUP_A_PULLBACK",
+      "timeframes": ["15m", "1h", "4h"],
+      "prior": {"alpha": 5.6, "beta": 4.4, "mean_wr": 0.56, "payoff_r": 1.70},
+      "min_confluence_hurdle": 70.0,
+      "min_ev_hurdle_r": 0.25
+    },
+    {
+      "strategy_id": "M57_SETUP_B_FVG_RETEST",
+      "timeframes": ["15m", "1h", "4h"],
+      "prior": {"alpha": 5.5, "beta": 4.5, "mean_wr": 0.55, "payoff_r": 1.65},
+      "min_confluence_hurdle": 75.0,
+      "min_ev_hurdle_r": 0.25
+    },
+    {
+      "strategy_id": "M57_SETUP_B_SWEEP_REVERSAL",
+      "timeframes": ["15m", "1h", "4h"],
+      "prior": {"alpha": 5.5, "beta": 4.5, "mean_wr": 0.55, "payoff_r": 1.65},
+      "min_confluence_hurdle": 75.0,
+      "min_ev_hurdle_r": 0.25
+    }
+  ],
+  "risk_limits": {
+    "max_trade_risk_pct": 1.5,
+    "max_aggregate_risk_pct": 2.0,
+    "max_portfolio_heat_pct": 6.0,
+    "max_crypto_cluster_risk_pct": 1.6,
+    "max_leverage_ceiling": 3.0,
+    "daily_drawdown_circuit_breaker_pct": 3.0,
+    "breakeven_trigger_r": 1.5,
+    "partial_profit_take_pct": 50.0
+  },
+  "prospective_gate_criteria": {
+    "min_completed_trades": 40,
+    "min_win_rate_pct": 54.0,
+    "empirical_target_win_rate_pct": 60.14,
+    "min_net_expectancy_r": 0.20,
+    "empirical_target_expectancy_r": 0.3594,
+    "max_drawdown_pct": 8.0,
+    "min_profit_factor": 1.40,
+    "min_per_trade_sharpe": 0.15
+  },
+  "invalidation_triggers": [
+    "REAL_CAPITAL_ENABLED set to True or live exchange order dispatched",
+    "Any modification or hash drift in M18 certified execution files",
+    "Manual database injection or modification of shadow_positions records",
+    "Strategy parameter alteration during the active 30-day window",
+    "Model retrain or prior parameter revision without audit approval",
+    "Breach of 3.0% daily risk circuit breaker without immediate freeze"
+  ],
+  "monitoring_telemetry": {
+    "health_endpoint": "/api/autonomous-trader/status",
+    "positions_endpoint": "/api/shadow-portfolio/positions",
+    "ledger_verification_query": "SELECT count(*), sum(realized_pnl) FROM shadow_positions WHERE opened_at >= '2026-11-18 18:00:00';"
+  }
+}

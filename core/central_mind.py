@@ -402,6 +402,36 @@ class CentralTradingMind:
             return v
 
         # -------------------------------------------------------------
+        # INVARIANT 0: Master Emergency Kill Switch Gate
+        # -------------------------------------------------------------
+        try:
+            from core.execution.kill_switch import live_kill_switch
+
+            is_ks_active, ks_state = live_kill_switch.is_active()
+            if is_ks_active:
+                return _reject(
+                    f"Kill Switch Active: {ks_state.reason or 'Master emergency kill switch engaged'}. "
+                    f"All order routing and position entries hard-halted."
+                )
+        except Exception as ks_err:
+            logger.debug(f"Kill switch check fallback: {ks_err}")
+
+        # -------------------------------------------------------------
+        # INVARIANT 0b: Signal Freshness & Anti-Staleness Gate (< 300s TTL)
+        # -------------------------------------------------------------
+        signal_age_ms = now_ms - proposal.timestamp_ms
+        if signal_age_ms > 300_000:
+            return _reject(
+                f"Signal Staleness Rejection: Proposal age ({signal_age_ms / 1000.0:.1f}s) "
+                f"exceeds max signal TTL (300s). Execution rejected."
+            )
+        if signal_age_ms < -60_000:
+            return _reject(
+                f"Causal Clock Breach: Proposal timestamp is {-signal_age_ms / 1000.0:.1f}s in the future. "
+                f"Execution rejected."
+            )
+
+        # -------------------------------------------------------------
         # INVARIANT 1: Master Risk Circuit Breaker Check
         # -------------------------------------------------------------
         accounting = portfolio_shadow.get_portfolio_accounting()

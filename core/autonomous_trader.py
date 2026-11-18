@@ -1101,6 +1101,10 @@ class AutonomousTrader:
             lock_path = "/tmp/cbt_autonomous_trader_supervisor.lock"
             lock_fd = open(lock_path, "w")
             fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except (ImportError, ModuleNotFoundError):
+            logger.debug(
+                "fcntl not available on this platform (Windows/non-posix); continuing without file lock."
+            )
         except OSError:
             logger.info(
                 f"AutonomousTrader loop passive in worker PID {os.getpid()} (another worker holds supervisor lock)."

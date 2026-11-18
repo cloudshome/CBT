@@ -1,0 +1,1061 @@
+{
+  "priors": {
+    "SETUP_A": {
+      "name": "Setup A (Liquidity Sweep)",
+      "alpha_0": 5.6,
+      "beta_0": 4.4,
+      "r_0": 1.7,
+      "effective_sample_size": 10.0,
+      "prior_mean_win_rate": 0.56,
+      "prior_std": 0.1497,
+      "credible_interval_95": [
+        0.2629,
+        0.8345
+      ],
+      "empirical_source": "M60 Sealed OOS Sweep Reversal Buy (561 trades, 60.96% WR, 1.88R gross)",
+      "grid_samples": [
+        {
+          "confluence": 60.0,
+          "stop_dist_pct": 0.3,
+          "p_effective": 0.5,
+          "friction_r": 0.2667,
+          "gross_ev_r": 0.35,
+          "net_ev_r": 0.0833,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 60.0,
+          "stop_dist_pct": 0.5,
+          "p_effective": 0.5,
+          "friction_r": 0.16,
+          "gross_ev_r": 0.35,
+          "net_ev_r": 0.19,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 60.0,
+          "stop_dist_pct": 0.8,
+          "p_effective": 0.5,
+          "friction_r": 0.1,
+          "gross_ev_r": 0.35,
+          "net_ev_r": 0.25,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 60.0,
+          "stop_dist_pct": 1.0,
+          "p_effective": 0.5,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.35,
+          "net_ev_r": 0.27,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 60.0,
+          "stop_dist_pct": 1.5,
+          "p_effective": 0.5,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.35,
+          "net_ev_r": 0.27,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 65.0,
+          "stop_dist_pct": 0.3,
+          "p_effective": 0.52,
+          "friction_r": 0.2667,
+          "gross_ev_r": 0.404,
+          "net_ev_r": 0.1373,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 65.0,
+          "stop_dist_pct": 0.5,
+          "p_effective": 0.52,
+          "friction_r": 0.16,
+          "gross_ev_r": 0.404,
+          "net_ev_r": 0.244,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 65.0,
+          "stop_dist_pct": 0.8,
+          "p_effective": 0.52,
+          "friction_r": 0.1,
+          "gross_ev_r": 0.404,
+          "net_ev_r": 0.304,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 65.0,
+          "stop_dist_pct": 1.0,
+          "p_effective": 0.52,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.404,
+          "net_ev_r": 0.324,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 65.0,
+          "stop_dist_pct": 1.5,
+          "p_effective": 0.52,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.404,
+          "net_ev_r": 0.324,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 70.0,
+          "stop_dist_pct": 0.3,
+          "p_effective": 0.54,
+          "friction_r": 0.2667,
+          "gross_ev_r": 0.458,
+          "net_ev_r": 0.1913,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 70.0,
+          "stop_dist_pct": 0.5,
+          "p_effective": 0.54,
+          "friction_r": 0.16,
+          "gross_ev_r": 0.458,
+          "net_ev_r": 0.298,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 70.0,
+          "stop_dist_pct": 0.8,
+          "p_effective": 0.54,
+          "friction_r": 0.1,
+          "gross_ev_r": 0.458,
+          "net_ev_r": 0.358,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 70.0,
+          "stop_dist_pct": 1.0,
+          "p_effective": 0.54,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.458,
+          "net_ev_r": 0.378,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 70.0,
+          "stop_dist_pct": 1.5,
+          "p_effective": 0.54,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.458,
+          "net_ev_r": 0.378,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 75.0,
+          "stop_dist_pct": 0.3,
+          "p_effective": 0.56,
+          "friction_r": 0.2667,
+          "gross_ev_r": 0.512,
+          "net_ev_r": 0.2453,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 75.0,
+          "stop_dist_pct": 0.5,
+          "p_effective": 0.56,
+          "friction_r": 0.16,
+          "gross_ev_r": 0.512,
+          "net_ev_r": 0.352,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 75.0,
+          "stop_dist_pct": 0.8,
+          "p_effective": 0.56,
+          "friction_r": 0.1,
+          "gross_ev_r": 0.512,
+          "net_ev_r": 0.412,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 75.0,
+          "stop_dist_pct": 1.0,
+          "p_effective": 0.56,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.512,
+          "net_ev_r": 0.432,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 75.0,
+          "stop_dist_pct": 1.5,
+          "p_effective": 0.56,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.512,
+          "net_ev_r": 0.432,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 80.0,
+          "stop_dist_pct": 0.3,
+          "p_effective": 0.58,
+          "friction_r": 0.2667,
+          "gross_ev_r": 0.566,
+          "net_ev_r": 0.2993,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 80.0,
+          "stop_dist_pct": 0.5,
+          "p_effective": 0.58,
+          "friction_r": 0.16,
+          "gross_ev_r": 0.566,
+          "net_ev_r": 0.406,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 80.0,
+          "stop_dist_pct": 0.8,
+          "p_effective": 0.58,
+          "friction_r": 0.1,
+          "gross_ev_r": 0.566,
+          "net_ev_r": 0.466,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 80.0,
+          "stop_dist_pct": 1.0,
+          "p_effective": 0.58,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.566,
+          "net_ev_r": 0.486,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 80.0,
+          "stop_dist_pct": 1.5,
+          "p_effective": 0.58,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.566,
+          "net_ev_r": 0.486,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 85.0,
+          "stop_dist_pct": 0.3,
+          "p_effective": 0.6,
+          "friction_r": 0.2667,
+          "gross_ev_r": 0.62,
+          "net_ev_r": 0.3533,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 85.0,
+          "stop_dist_pct": 0.5,
+          "p_effective": 0.6,
+          "friction_r": 0.16,
+          "gross_ev_r": 0.62,
+          "net_ev_r": 0.46,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 85.0,
+          "stop_dist_pct": 0.8,
+          "p_effective": 0.6,
+          "friction_r": 0.1,
+          "gross_ev_r": 0.62,
+          "net_ev_r": 0.52,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 85.0,
+          "stop_dist_pct": 1.0,
+          "p_effective": 0.6,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.62,
+          "net_ev_r": 0.54,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 85.0,
+          "stop_dist_pct": 1.5,
+          "p_effective": 0.6,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.62,
+          "net_ev_r": 0.54,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 90.0,
+          "stop_dist_pct": 0.3,
+          "p_effective": 0.62,
+          "friction_r": 0.2667,
+          "gross_ev_r": 0.674,
+          "net_ev_r": 0.4073,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 90.0,
+          "stop_dist_pct": 0.5,
+          "p_effective": 0.62,
+          "friction_r": 0.16,
+          "gross_ev_r": 0.674,
+          "net_ev_r": 0.514,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 90.0,
+          "stop_dist_pct": 0.8,
+          "p_effective": 0.62,
+          "friction_r": 0.1,
+          "gross_ev_r": 0.674,
+          "net_ev_r": 0.574,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 90.0,
+          "stop_dist_pct": 1.0,
+          "p_effective": 0.62,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.674,
+          "net_ev_r": 0.594,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 90.0,
+          "stop_dist_pct": 1.5,
+          "p_effective": 0.62,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.674,
+          "net_ev_r": 0.594,
+          "hurdle_passed": true
+        }
+      ]
+    },
+    "SETUP_B": {
+      "name": "Setup B (FVG Institutional Retest)",
+      "alpha_0": 5.5,
+      "beta_0": 4.5,
+      "r_0": 1.65,
+      "effective_sample_size": 10.0,
+      "prior_mean_win_rate": 0.55,
+      "prior_std": 0.15,
+      "credible_interval_95": [
+        0.2541,
+        0.827
+      ],
+      "empirical_source": "M60 Sealed OOS FVG Retest (35 trades, 62.8% WR, 1.65R gross)",
+      "grid_samples": [
+        {
+          "confluence": 60.0,
+          "stop_dist_pct": 0.3,
+          "p_effective": 0.49,
+          "friction_r": 0.2667,
+          "gross_ev_r": 0.2985,
+          "net_ev_r": 0.0318,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 60.0,
+          "stop_dist_pct": 0.5,
+          "p_effective": 0.49,
+          "friction_r": 0.16,
+          "gross_ev_r": 0.2985,
+          "net_ev_r": 0.1385,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 60.0,
+          "stop_dist_pct": 0.8,
+          "p_effective": 0.49,
+          "friction_r": 0.1,
+          "gross_ev_r": 0.2985,
+          "net_ev_r": 0.1985,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 60.0,
+          "stop_dist_pct": 1.0,
+          "p_effective": 0.49,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.2985,
+          "net_ev_r": 0.2185,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 60.0,
+          "stop_dist_pct": 1.5,
+          "p_effective": 0.49,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.2985,
+          "net_ev_r": 0.2185,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 65.0,
+          "stop_dist_pct": 0.3,
+          "p_effective": 0.51,
+          "friction_r": 0.2667,
+          "gross_ev_r": 0.3515,
+          "net_ev_r": 0.0848,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 65.0,
+          "stop_dist_pct": 0.5,
+          "p_effective": 0.51,
+          "friction_r": 0.16,
+          "gross_ev_r": 0.3515,
+          "net_ev_r": 0.1915,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 65.0,
+          "stop_dist_pct": 0.8,
+          "p_effective": 0.51,
+          "friction_r": 0.1,
+          "gross_ev_r": 0.3515,
+          "net_ev_r": 0.2515,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 65.0,
+          "stop_dist_pct": 1.0,
+          "p_effective": 0.51,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.3515,
+          "net_ev_r": 0.2715,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 65.0,
+          "stop_dist_pct": 1.5,
+          "p_effective": 0.51,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.3515,
+          "net_ev_r": 0.2715,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 70.0,
+          "stop_dist_pct": 0.3,
+          "p_effective": 0.53,
+          "friction_r": 0.2667,
+          "gross_ev_r": 0.4045,
+          "net_ev_r": 0.1378,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 70.0,
+          "stop_dist_pct": 0.5,
+          "p_effective": 0.53,
+          "friction_r": 0.16,
+          "gross_ev_r": 0.4045,
+          "net_ev_r": 0.2445,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 70.0,
+          "stop_dist_pct": 0.8,
+          "p_effective": 0.53,
+          "friction_r": 0.1,
+          "gross_ev_r": 0.4045,
+          "net_ev_r": 0.3045,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 70.0,
+          "stop_dist_pct": 1.0,
+          "p_effective": 0.53,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.4045,
+          "net_ev_r": 0.3245,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 70.0,
+          "stop_dist_pct": 1.5,
+          "p_effective": 0.53,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.4045,
+          "net_ev_r": 0.3245,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 75.0,
+          "stop_dist_pct": 0.3,
+          "p_effective": 0.55,
+          "friction_r": 0.2667,
+          "gross_ev_r": 0.4575,
+          "net_ev_r": 0.1908,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 75.0,
+          "stop_dist_pct": 0.5,
+          "p_effective": 0.55,
+          "friction_r": 0.16,
+          "gross_ev_r": 0.4575,
+          "net_ev_r": 0.2975,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 75.0,
+          "stop_dist_pct": 0.8,
+          "p_effective": 0.55,
+          "friction_r": 0.1,
+          "gross_ev_r": 0.4575,
+          "net_ev_r": 0.3575,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 75.0,
+          "stop_dist_pct": 1.0,
+          "p_effective": 0.55,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.4575,
+          "net_ev_r": 0.3775,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 75.0,
+          "stop_dist_pct": 1.5,
+          "p_effective": 0.55,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.4575,
+          "net_ev_r": 0.3775,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 80.0,
+          "stop_dist_pct": 0.3,
+          "p_effective": 0.57,
+          "friction_r": 0.2667,
+          "gross_ev_r": 0.5105,
+          "net_ev_r": 0.2438,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 80.0,
+          "stop_dist_pct": 0.5,
+          "p_effective": 0.57,
+          "friction_r": 0.16,
+          "gross_ev_r": 0.5105,
+          "net_ev_r": 0.3505,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 80.0,
+          "stop_dist_pct": 0.8,
+          "p_effective": 0.57,
+          "friction_r": 0.1,
+          "gross_ev_r": 0.5105,
+          "net_ev_r": 0.4105,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 80.0,
+          "stop_dist_pct": 1.0,
+          "p_effective": 0.57,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.5105,
+          "net_ev_r": 0.4305,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 80.0,
+          "stop_dist_pct": 1.5,
+          "p_effective": 0.57,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.5105,
+          "net_ev_r": 0.4305,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 85.0,
+          "stop_dist_pct": 0.3,
+          "p_effective": 0.59,
+          "friction_r": 0.2667,
+          "gross_ev_r": 0.5635,
+          "net_ev_r": 0.2968,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 85.0,
+          "stop_dist_pct": 0.5,
+          "p_effective": 0.59,
+          "friction_r": 0.16,
+          "gross_ev_r": 0.5635,
+          "net_ev_r": 0.4035,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 85.0,
+          "stop_dist_pct": 0.8,
+          "p_effective": 0.59,
+          "friction_r": 0.1,
+          "gross_ev_r": 0.5635,
+          "net_ev_r": 0.4635,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 85.0,
+          "stop_dist_pct": 1.0,
+          "p_effective": 0.59,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.5635,
+          "net_ev_r": 0.4835,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 85.0,
+          "stop_dist_pct": 1.5,
+          "p_effective": 0.59,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.5635,
+          "net_ev_r": 0.4835,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 90.0,
+          "stop_dist_pct": 0.3,
+          "p_effective": 0.61,
+          "friction_r": 0.2667,
+          "gross_ev_r": 0.6165,
+          "net_ev_r": 0.3498,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 90.0,
+          "stop_dist_pct": 0.5,
+          "p_effective": 0.61,
+          "friction_r": 0.16,
+          "gross_ev_r": 0.6165,
+          "net_ev_r": 0.4565,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 90.0,
+          "stop_dist_pct": 0.8,
+          "p_effective": 0.61,
+          "friction_r": 0.1,
+          "gross_ev_r": 0.6165,
+          "net_ev_r": 0.5165,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 90.0,
+          "stop_dist_pct": 1.0,
+          "p_effective": 0.61,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.6165,
+          "net_ev_r": 0.5365,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 90.0,
+          "stop_dist_pct": 1.5,
+          "p_effective": 0.61,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.6165,
+          "net_ev_r": 0.5365,
+          "hurdle_passed": true
+        }
+      ]
+    },
+    "FALLBACK": {
+      "name": "Conservative Fallback",
+      "alpha_0": 5.2,
+      "beta_0": 4.8,
+      "r_0": 1.5,
+      "effective_sample_size": 10.0,
+      "prior_mean_win_rate": 0.52,
+      "prior_std": 0.1506,
+      "credible_interval_95": [
+        0.2285,
+        0.804
+      ],
+      "empirical_source": "Institutional minimum viable edge floor (52% WR, 1.50R gross)",
+      "grid_samples": [
+        {
+          "confluence": 60.0,
+          "stop_dist_pct": 0.3,
+          "p_effective": 0.46,
+          "friction_r": 0.2667,
+          "gross_ev_r": 0.15,
+          "net_ev_r": -0.1167,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 60.0,
+          "stop_dist_pct": 0.5,
+          "p_effective": 0.46,
+          "friction_r": 0.16,
+          "gross_ev_r": 0.15,
+          "net_ev_r": -0.01,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 60.0,
+          "stop_dist_pct": 0.8,
+          "p_effective": 0.46,
+          "friction_r": 0.1,
+          "gross_ev_r": 0.15,
+          "net_ev_r": 0.05,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 60.0,
+          "stop_dist_pct": 1.0,
+          "p_effective": 0.46,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.15,
+          "net_ev_r": 0.07,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 60.0,
+          "stop_dist_pct": 1.5,
+          "p_effective": 0.46,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.15,
+          "net_ev_r": 0.07,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 65.0,
+          "stop_dist_pct": 0.3,
+          "p_effective": 0.48,
+          "friction_r": 0.2667,
+          "gross_ev_r": 0.2,
+          "net_ev_r": -0.0667,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 65.0,
+          "stop_dist_pct": 0.5,
+          "p_effective": 0.48,
+          "friction_r": 0.16,
+          "gross_ev_r": 0.2,
+          "net_ev_r": 0.04,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 65.0,
+          "stop_dist_pct": 0.8,
+          "p_effective": 0.48,
+          "friction_r": 0.1,
+          "gross_ev_r": 0.2,
+          "net_ev_r": 0.1,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 65.0,
+          "stop_dist_pct": 1.0,
+          "p_effective": 0.48,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.2,
+          "net_ev_r": 0.12,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 65.0,
+          "stop_dist_pct": 1.5,
+          "p_effective": 0.48,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.2,
+          "net_ev_r": 0.12,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 70.0,
+          "stop_dist_pct": 0.3,
+          "p_effective": 0.5,
+          "friction_r": 0.2667,
+          "gross_ev_r": 0.25,
+          "net_ev_r": -0.0167,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 70.0,
+          "stop_dist_pct": 0.5,
+          "p_effective": 0.5,
+          "friction_r": 0.16,
+          "gross_ev_r": 0.25,
+          "net_ev_r": 0.09,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 70.0,
+          "stop_dist_pct": 0.8,
+          "p_effective": 0.5,
+          "friction_r": 0.1,
+          "gross_ev_r": 0.25,
+          "net_ev_r": 0.15,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 70.0,
+          "stop_dist_pct": 1.0,
+          "p_effective": 0.5,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.25,
+          "net_ev_r": 0.17,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 70.0,
+          "stop_dist_pct": 1.5,
+          "p_effective": 0.5,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.25,
+          "net_ev_r": 0.17,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 75.0,
+          "stop_dist_pct": 0.3,
+          "p_effective": 0.52,
+          "friction_r": 0.2667,
+          "gross_ev_r": 0.3,
+          "net_ev_r": 0.0333,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 75.0,
+          "stop_dist_pct": 0.5,
+          "p_effective": 0.52,
+          "friction_r": 0.16,
+          "gross_ev_r": 0.3,
+          "net_ev_r": 0.14,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 75.0,
+          "stop_dist_pct": 0.8,
+          "p_effective": 0.52,
+          "friction_r": 0.1,
+          "gross_ev_r": 0.3,
+          "net_ev_r": 0.2,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 75.0,
+          "stop_dist_pct": 1.0,
+          "p_effective": 0.52,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.3,
+          "net_ev_r": 0.22,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 75.0,
+          "stop_dist_pct": 1.5,
+          "p_effective": 0.52,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.3,
+          "net_ev_r": 0.22,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 80.0,
+          "stop_dist_pct": 0.3,
+          "p_effective": 0.54,
+          "friction_r": 0.2667,
+          "gross_ev_r": 0.35,
+          "net_ev_r": 0.0833,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 80.0,
+          "stop_dist_pct": 0.5,
+          "p_effective": 0.54,
+          "friction_r": 0.16,
+          "gross_ev_r": 0.35,
+          "net_ev_r": 0.19,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 80.0,
+          "stop_dist_pct": 0.8,
+          "p_effective": 0.54,
+          "friction_r": 0.1,
+          "gross_ev_r": 0.35,
+          "net_ev_r": 0.25,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 80.0,
+          "stop_dist_pct": 1.0,
+          "p_effective": 0.54,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.35,
+          "net_ev_r": 0.27,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 80.0,
+          "stop_dist_pct": 1.5,
+          "p_effective": 0.54,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.35,
+          "net_ev_r": 0.27,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 85.0,
+          "stop_dist_pct": 0.3,
+          "p_effective": 0.56,
+          "friction_r": 0.2667,
+          "gross_ev_r": 0.4,
+          "net_ev_r": 0.1333,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 85.0,
+          "stop_dist_pct": 0.5,
+          "p_effective": 0.56,
+          "friction_r": 0.16,
+          "gross_ev_r": 0.4,
+          "net_ev_r": 0.24,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 85.0,
+          "stop_dist_pct": 0.8,
+          "p_effective": 0.56,
+          "friction_r": 0.1,
+          "gross_ev_r": 0.4,
+          "net_ev_r": 0.3,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 85.0,
+          "stop_dist_pct": 1.0,
+          "p_effective": 0.56,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.4,
+          "net_ev_r": 0.32,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 85.0,
+          "stop_dist_pct": 1.5,
+          "p_effective": 0.56,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.4,
+          "net_ev_r": 0.32,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 90.0,
+          "stop_dist_pct": 0.3,
+          "p_effective": 0.58,
+          "friction_r": 0.2667,
+          "gross_ev_r": 0.45,
+          "net_ev_r": 0.1833,
+          "hurdle_passed": false
+        },
+        {
+          "confluence": 90.0,
+          "stop_dist_pct": 0.5,
+          "p_effective": 0.58,
+          "friction_r": 0.16,
+          "gross_ev_r": 0.45,
+          "net_ev_r": 0.29,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 90.0,
+          "stop_dist_pct": 0.8,
+          "p_effective": 0.58,
+          "friction_r": 0.1,
+          "gross_ev_r": 0.45,
+          "net_ev_r": 0.35,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 90.0,
+          "stop_dist_pct": 1.0,
+          "p_effective": 0.58,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.45,
+          "net_ev_r": 0.37,
+          "hurdle_passed": true
+        },
+        {
+          "confluence": 90.0,
+          "stop_dist_pct": 1.5,
+          "p_effective": 0.58,
+          "friction_r": 0.08,
+          "gross_ev_r": 0.45,
+          "net_ev_r": 0.37,
+          "hurdle_passed": true
+        }
+      ]
+    }
+  },
+  "instruments": {
+    "total_oos_trades": 848,
+    "overall_win_rate_pct": 61.32,
+    "overall_net_ev_r": 0.3594,
+    "overall_sum_net_r": 304.78,
+    "instruments": {
+      "BTCUSDT": {
+        "total_trades": 260,
+        "trade_share_pct": 30.66,
+        "win_rate_pct": 64.62,
+        "net_ev_r": 0.4258,
+        "sum_net_r": 110.71,
+        "max_drawdown_r": 16.42,
+        "avg_cost_r": 0.0932,
+        "avg_fee_r": 0.0582,
+        "avg_slip_r": 0.0311,
+        "avg_funding_r": 0.004,
+        "min_trade_r": -1.254,
+        "max_trade_r": 2.965
+      },
+      "ETHUSDT": {
+        "total_trades": 65,
+        "trade_share_pct": 7.67,
+        "win_rate_pct": 64.62,
+        "net_ev_r": 0.3561,
+        "sum_net_r": 23.15,
+        "max_drawdown_r": 5.47,
+        "avg_cost_r": 0.0968,
+        "avg_fee_r": 0.0492,
+        "avg_slip_r": 0.0462,
+        "avg_funding_r": 0.0014,
+        "min_trade_r": -1.256,
+        "max_trade_r": 2.96
+      },
+      "PAXGUSDT": {
+        "total_trades": 225,
+        "trade_share_pct": 26.53,
+        "win_rate_pct": 60.89,
+        "net_ev_r": 0.4008,
+        "sum_net_r": 90.18,
+        "max_drawdown_r": 22.07,
+        "avg_cost_r": 0.1529,
+        "avg_fee_r": 0.0167,
+        "avg_slip_r": 0.1362,
+        "avg_funding_r": 0.0,
+        "min_trade_r": -1.372,
+        "max_trade_r": 4.014
+      },
+      "SOLUSDT": {
+        "total_trades": 298,
+        "trade_share_pct": 35.14,
+        "win_rate_pct": 58.05,
+        "net_ev_r": 0.2709,
+        "sum_net_r": 80.74,
+        "max_drawdown_r": 18.62,
+        "avg_cost_r": 0.1457,
+        "avg_fee_r": 0.0456,
+        "avg_slip_r": 0.0954,
+        "avg_funding_r": 0.0047,
+        "min_trade_r": -1.425,
+        "max_trade_r": 3.136
+      }
+    }
+  }
+}
