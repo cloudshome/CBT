@@ -12,6 +12,7 @@ import logging
 import time
 from typing import Any
 
+from core.correlation_context import get_correlation_id
 from core.data_quality_gate import data_quality_gate
 from core.sky_intelligence.derivatives_intelligence import derivatives_engine
 from core.sky_intelligence.displacement_engine import displacement_engine
@@ -136,12 +137,14 @@ class SKYIntelligenceOrchestrator:
         funding_rate: float = 0.0001,
         account_equity_usd: float = 100_000.0,
         simulated_now_ms: float | None = None,
+        correlation_id: str | None = None,
     ) -> DecisionOutput:
         """
         Runs the full 12-stage sequential quantitative evaluation.
         """
         now_ms = simulated_now_ms if simulated_now_ms is not None else (time.time() * 1000)
         tick_time = latest_tick_time_ms or now_ms
+        cid = correlation_id or get_correlation_id()
 
         if not candles:
             return DecisionOutput(
@@ -153,8 +156,9 @@ class SKYIntelligenceOrchestrator:
                 kelly_fraction=0.0,
                 suggested_position_size_usd=0.0,
                 risk_gate_passed=False,
-                explanation_dossier={"error": "Empty candlestick series"},
+                explanation_dossier={"error": "Empty candlestick series", "correlation_id": cid},
                 no_trade_reason="EMPTY_DATA_FEED",
+                correlation_id=cid,
             )
 
         curr_close = float(candles[-1]["close"])
@@ -184,8 +188,10 @@ class SKYIntelligenceOrchestrator:
                 explanation_dossier={
                     "gate_score": gate_res.quality_score,
                     "reason": gate_res.reason,
+                    "correlation_id": cid,
                 },
                 no_trade_reason=f"DATA_QUALITY_FAILURE: {gate_res.reason}",
+                correlation_id=cid,
             )
 
         # ----------------------------------------------------
@@ -318,8 +324,10 @@ class SKYIntelligenceOrchestrator:
                         "deviation_sigmas": vwap_feat.deviation_sigmas,
                         "mean_reversion_prob": vwap_feat.mean_reversion_prob,
                     },
+                    "correlation_id": cid,
                 },
                 no_trade_reason=reason,
+                correlation_id=cid,
             )
 
         # P3.1: Sort deterministically by Confluence Score descending, then Risk-Reward ratio descending
@@ -411,6 +419,7 @@ class SKYIntelligenceOrchestrator:
             },
             "mtf_alignment": getattr(mtf_context, "stack_alignment", "NEUTRAL"),
             "explanation": best_setup.explanation_text,
+            "correlation_id": cid,
         }
 
         return DecisionOutput(
@@ -424,6 +433,7 @@ class SKYIntelligenceOrchestrator:
             risk_gate_passed=risk_passed,
             explanation_dossier=dossier,
             no_trade_reason=no_trade_reason,
+            correlation_id=cid,
         )
 
 

@@ -515,3 +515,34 @@ async def test_telegram_message_chunking_and_limits():
         # Final chunk should contain Part 2
         call_args_list = mock_send.call_args_list
         assert any("[Part 2/" in str(call) for call in call_args_list)
+
+
+def test_telegram_auto_execute_paper_trade_guardian_sizing_compliance():
+    """
+    Verifies that DeskStateMind.auto_execute_paper_trade sizes positions within
+    PortfolioRiskGuardian's strict per-position initial risk limit ($25.00 on $10k base),
+    preventing PER_POSITION_RISK_LIMIT_EXCEEDED exceptions.
+    """
+    signal = {
+        "symbol": "BTC/USDT",
+        "direction": "LONG",
+        "entry_price": 63465.76,
+        "stop_loss": 62279.36,
+        "tp1": 65268.0,
+        "tp2": 66573.36,
+        "tp3": 67904.83,
+        "risk_reward": "1:2.0R",
+        "setup": "Confirmed LONG reclaim with CVD absorption",
+        "regime": "Volatility Expansion",
+        "confluence_score": 62,
+        "kelly_allocation_pct": 1.5,
+    }
+
+    res = telegram_bot.state_mind.auto_execute_paper_trade(signal)
+    # Must execute cleanly or skip if already open; must never raise unhandled exception
+    assert res["status"] in ("EXECUTED", "SKIPPED")
+    if res["status"] == "EXECUTED":
+        # Dollar risk must strictly not exceed guardian limit
+        sl_dist = abs(signal["entry_price"] - signal["stop_loss"])
+        actual_risk = res["size"] * sl_dist
+        assert actual_risk <= 25.00 + 1e-4

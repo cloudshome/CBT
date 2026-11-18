@@ -96,20 +96,59 @@ class DeskStateMind:
                 "reason": f"Event Lockout active: '{ev_title}' within {event_st.minutes_until_event:.1f}m",
             }
 
-        # 3. Apply Hard Half-Kelly Sizing Cap
+        # 3. Dynamic Virtual Equity & Portfolio Risk Guardian Sizing Cap
+        accounting = portfolio_shadow.get_portfolio_accounting()
+        equity_usd = float(accounting.get("virtual_equity", self.virtual_equity_usd))
         effective_kelly = min(kelly, self.max_portfolio_risk_pct)
-        target_val_usd = self.virtual_equity_usd * (effective_kelly / 100.0)
-        size = round(target_val_usd / entry, 4) if entry > 0 else 0.01
 
-        # 4. Atomically commit virtual paper position to shadow ledger
-        pos_id = portfolio_shadow.open_position(
-            symbol=sym,
-            direction=direction,
-            size=size,
-            entry_price=entry,
-            stop_loss=sl,
-            take_profit=tp,
-        )
+        from core.risk.portfolio_risk_guardian import PortfolioRiskGuardian
+
+        guardian = PortfolioRiskGuardian()
+        max_allowed_risk = guardian.limits.max_position_risk_usd
+
+        sl_dist = abs(entry - sl) if sl > 0 else 0.0
+        if sl_dist > 0:
+            # Kelly risk budget bounded strictly by per-position initial risk limit ($25.00 on $10k base)
+            budget_risk = min(equity_usd * (effective_kelly / 100.0), max_allowed_risk)
+            safe_risk_usd = budget_risk * 0.98
+            raw_size = safe_risk_usd / sl_dist
+            if "BTC" in sym.upper():
+                size = round(raw_size, 4)
+                if size * sl_dist > max_allowed_risk:
+                    size = max(0.0001, round(size - 0.0001, 4))
+            elif "ETH" in sym.upper():
+                size = round(raw_size, 3)
+                if size * sl_dist > max_allowed_risk:
+                    size = max(0.001, round(size - 0.001, 3))
+            else:
+                size = round(raw_size, 2)
+                if size * sl_dist > max_allowed_risk:
+                    size = max(0.01, round(size - 0.01, 2))
+        else:
+            target_val_usd = equity_usd * (effective_kelly / 100.0)
+            size = round(target_val_usd / entry, 4) if entry > 0 else 0.01
+
+        target_val_usd = size * entry
+
+        # 4. Atomically commit virtual paper position to shadow ledger with error safety
+        try:
+            pos_id = portfolio_shadow.open_position(
+                symbol=sym,
+                direction=direction,
+                size=size,
+                entry_price=entry,
+                stop_loss=sl,
+                take_profit=tp,
+            )
+        except Exception as exec_err:
+            logger.warning(
+                f"DeskStateMind: Execution blocked by Portfolio Risk Guardian: {exec_err}"
+            )
+            return {
+                "status": "BLOCKED",
+                "reason": str(exec_err),
+                "symbol": sym,
+            }
 
         logger.info(
             f"DeskStateMind: Auto-executed paper trade {pos_id} on {sym} ({direction} {size})"
@@ -2920,10 +2959,10 @@ class TelegramBotDispatcher:
 
             # Create tokens for Phase 2 Confirmation and Cancellation
             confirm_tok = callback_router.create_action_token(
-                "CONFIRM_EXECUTE", user_id, chat_id, sig, ttl_seconds=60
+                "CONFIRM_EXECUTE", user_id, chat_id, sig, ttl_seconds=120
             )
             cancel_tok = callback_router.create_action_token(
-                "CANCEL_ACTION", user_id, chat_id, {}, ttl_seconds=60
+                "CANCEL_ACTION", user_id, chat_id, {}, ttl_seconds=120
             )
             kb = callback_router.build_confirmation_keyboard(
                 confirm_tok.token_id, cancel_tok.token_id
@@ -2938,7 +2977,7 @@ class TelegramBotDispatcher:
                 f"• **Half-Kelly Risk Cap:** `{kelly:.2f}%` equity\n"
                 f"• **Risk Gate State:** `VERIFIED PRE-QUALIFIED`\n\n"
                 f"⚠️ *Confirm atomic virtual execution in Shadow Portfolio?*\n"
-                f"_This confirmation token expires in 60 seconds._"
+                f"_This confirmation token expires in 120 seconds._"
             )
             await self.send_message(conf_msg, chat_id=chat_id, reply_markup=kb)
             await self.answer_callback_query(cb_id, "Confirmation card dispatched.")

@@ -17,6 +17,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from core.audit_bus import audit_bus
+from core.correlation_context import get_correlation_id
 from core.database import db_manager
 from core.loss_autopsy import loss_autopsy_engine
 
@@ -79,6 +80,7 @@ class ShadowPosition:
     exit_reason: str | None = None
     book_id: str = "MAIN_SOVEREIGN"
     fee_usd: float = 0.0
+    correlation_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -119,6 +121,8 @@ class PortfolioShadowManager:
                     conn.execute(
                         "ALTER TABLE shadow_positions ADD COLUMN fee_usd REAL DEFAULT 0.0;"
                     )
+                if "correlation_id" not in cols:
+                    conn.execute("ALTER TABLE shadow_positions ADD COLUMN correlation_id TEXT;")
                 conn.commit()
         except Exception as e:
             logger.debug(f"Shadow positions column verification check: {e}")
@@ -164,7 +168,11 @@ class PortfolioShadowManager:
         confluence_score: float | None = None,
         enforce_m57_stop_floor: bool = False,
         timeframe: str | None = None,
+        correlation_id: str | None = None,
     ) -> str:
+        # Resolve active or explicit request correlation identifier
+        cid = correlation_id or get_correlation_id()
+
         # Multi-Book Institutional Asset Firewall
         is_test_env = "test" in os.environ.get("TRADING_LOGS_DB_PATH", "").lower() or bool(
             os.getenv("PYTEST_CURRENT_TEST")
@@ -478,36 +486,90 @@ class PortfolioShadowManager:
                             f"exceeds aggregate ceiling (${max_agg_usd:.2f})."
                         )
 
-            conn.execute(
-                """
-                INSERT INTO shadow_positions (
-                    position_id, opened_at, closed_at, symbol, direction, size,
-                    entry_price, current_price, stop_loss, take_profit,
-                    unrealized_pnl, realized_pnl, status, trailing_stop, breakeven_triggered,
-                    entry_reason, exit_reason, book_id, initial_stop_loss
+            # Check if correlation_id column is present in current connection
+            sp_cols = [
+                r[1] for r in conn.execute("PRAGMA table_info(shadow_positions);").fetchall()
+            ]
+            if "correlation_id" in sp_cols:
+                conn.execute(
+                    """
+                    INSERT INTO shadow_positions (
+                        position_id, opened_at, closed_at, symbol, direction, size,
+                        entry_price, current_price, stop_loss, take_profit,
+                        unrealized_pnl, realized_pnl, status, trailing_stop, breakeven_triggered,
+                        entry_reason, exit_reason, book_id, initial_stop_loss, correlation_id
+                    )
+                    VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, 0.0, 0.0, 'OPEN', NULL, 0, ?, NULL, ?, ?, ?);
+                    """,
+                    (
+                        pos_id,
+                        now,
+                        symbol,
+                        direction.upper(),
+                        float(size),
+                        float(entry_price),
+                        float(entry_price),
+                        float(stop_loss),
+                        float(take_profit),
+                        reason_text,
+                        book_id,
+                        float(stop_loss),
+                        cid,
+                    ),
                 )
-                VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, 0.0, 0.0, 'OPEN', NULL, 0, ?, NULL, ?, ?);
-                """,
-                (
-                    pos_id,
-                    now,
-                    symbol,
-                    direction.upper(),
-                    float(size),
-                    float(entry_price),
-                    float(entry_price),
-                    float(stop_loss),
-                    float(take_profit),
-                    reason_text,
-                    book_id,
-                    float(stop_loss),
-                ),
-            )
+            else:
+                conn.execute(
+                    """
+                    INSERT INTO shadow_positions (
+                        position_id, opened_at, closed_at, symbol, direction, size,
+                        entry_price, current_price, stop_loss, take_profit,
+                        unrealized_pnl, realized_pnl, status, trailing_stop, breakeven_triggered,
+                        entry_reason, exit_reason, book_id, initial_stop_loss
+                    )
+                    VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, 0.0, 0.0, 'OPEN', NULL, 0, ?, NULL, ?, ?);
+                    """,
+                    (
+                        pos_id,
+                        now,
+                        symbol,
+                        direction.upper(),
+                        float(size),
+                        float(entry_price),
+                        float(entry_price),
+                        float(stop_loss),
+                        float(take_profit),
+                        reason_text,
+                        book_id,
+                        float(stop_loss),
+                    ),
+                )
             conn.commit()
 
         logger.info(
-            f"Opened shadow position {pos_id}: {direction} {size} {symbol} @ {entry_price} | Reason: {reason_text}"
+            f"Opened shadow position {pos_id}: {direction} {size} {symbol} @ {entry_price} | Reason: {reason_text} | CID: {cid}"
         )
+
+        # Emit audit trail event for open position with correlation_id
+        try:
+            audit_bus.emit_event(
+                event_type="TRADE_OPENED",
+                symbol=symbol,
+                reason=f"Opened shadow position {pos_id} ({direction} {size}) | {reason_text}",
+                details={
+                    "position_id": pos_id,
+                    "symbol": symbol,
+                    "direction": direction,
+                    "size": float(size),
+                    "entry_price": float(entry_price),
+                    "stop_loss": float(stop_loss),
+                    "take_profit": float(take_profit),
+                    "book_id": book_id,
+                    "correlation_id": cid,
+                },
+                correlation_id=cid,
+            )
+        except Exception as audit_err:
+            logger.debug(f"Audit event emission deferred: {audit_err}")
 
         # Dispatch real-time Telegram Trade Entry Alert with date, time, and entry reason
         try:

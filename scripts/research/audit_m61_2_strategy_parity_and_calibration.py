@@ -19,6 +19,7 @@ from scipy import stats
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 
+
 def audit_bayesian_priors() -> dict[str, Any]:
     """Audits the mathematical properties of the informative priors across parameter grids."""
     priors = {
@@ -71,15 +72,17 @@ def audit_bayesian_priors() -> dict[str, Any]:
                 c_friction = max(0.08, 0.0008 / sd)
                 gross_ev = (p_eff * r) - ((1.0 - p_eff) * 1.0)
                 net_ev = gross_ev - c_friction
-                grid.append({
-                    "confluence": conf,
-                    "stop_dist_pct": sd * 100.0,
-                    "p_effective": round(p_eff, 4),
-                    "friction_r": round(c_friction, 4),
-                    "gross_ev_r": round(gross_ev, 4),
-                    "net_ev_r": round(net_ev, 4),
-                    "hurdle_passed": bool(net_ev >= 0.25),
-                })
+                grid.append(
+                    {
+                        "confluence": conf,
+                        "stop_dist_pct": sd * 100.0,
+                        "p_effective": round(p_eff, 4),
+                        "friction_r": round(c_friction, 4),
+                        "gross_ev_r": round(gross_ev, 4),
+                        "net_ev_r": round(net_ev, 4),
+                        "hurdle_passed": bool(net_ev >= 0.25),
+                    }
+                )
 
         results[key] = {
             "name": p["name"],
@@ -95,6 +98,7 @@ def audit_bayesian_priors() -> dict[str, Any]:
         }
 
     return results
+
 
 def audit_instrument_breakdown() -> dict[str, Any]:
     """Analyzes the sealed 848-trade OOS ledger across all 4 eligible instruments."""
@@ -136,35 +140,47 @@ def audit_instrument_breakdown() -> dict[str, Any]:
 
     return {
         "total_oos_trades": len(df),
-        "overall_win_rate_pct": round(df["outcome"].isin(["FULL_WIN", "PARTIAL_WIN"]).mean() * 100.0, 2),
+        "overall_win_rate_pct": round(
+            df["outcome"].isin(["FULL_WIN", "PARTIAL_WIN"]).mean() * 100.0, 2
+        ),
         "overall_net_ev_r": round(df["rr_net"].mean(), 4),
         "overall_sum_net_r": round(df["rr_net"].sum(), 2),
         "instruments": stats_by_sym,
     }
 
+
 def main():
     print("=== M61.2 STRATEGY PARITY & BAYESIAN CALIBRATION AUDIT ===")
     priors_res = audit_bayesian_priors()
     for k, v in priors_res.items():
-        print(f"\n[{v['name']}] Prior Mean: {v['prior_mean_win_rate']*100:.1f}% | 95% Credible Interval: {v['credible_interval_95']} | N0: {v['effective_sample_size']}")
+        print(
+            f"\n[{v['name']}] Prior Mean: {v['prior_mean_win_rate'] * 100:.1f}% | 95% Credible Interval: {v['credible_interval_95']} | N0: {v['effective_sample_size']}"
+        )
         # Print representative grid slice (stop distance = 0.5%)
         print("  Confluence | p_effective | Friction | Gross EV | Net EV  | Passed?")
         print("  -----------|-------------|----------|----------|---------|--------")
         for g in v["grid_samples"]:
             if g["stop_dist_pct"] == 0.5:
-                print(f"     {g['confluence']:4.1f}    |    {g['p_effective']:.3f}    |  {g['friction_r']:.2f}R   |  {g['gross_ev_r']:+.3f}R | {g['net_ev_r']:+.3f}R | {g['hurdle_passed']}")
+                print(
+                    f"     {g['confluence']:4.1f}    |    {g['p_effective']:.3f}    |  {g['friction_r']:.2f}R   |  {g['gross_ev_r']:+.3f}R | {g['net_ev_r']:+.3f}R | {g['hurdle_passed']}"
+                )
 
     print("\n=== M61.2 INSTRUMENT OOS AUDIT ===")
     inst_res = audit_instrument_breakdown()
-    print(f"Total OOS Trades: {inst_res['total_oos_trades']} | Win Rate: {inst_res['overall_win_rate_pct']}% | Net EV: {inst_res['overall_net_ev_r']:+.4f}R | Total Net R: {inst_res['overall_sum_net_r']:+.2f}R")
+    print(
+        f"Total OOS Trades: {inst_res['total_oos_trades']} | Win Rate: {inst_res['overall_win_rate_pct']}% | Net EV: {inst_res['overall_net_ev_r']:+.4f}R | Total Net R: {inst_res['overall_sum_net_r']:+.2f}R"
+    )
     for sym, s in inst_res["instruments"].items():
-        print(f"\n[{sym}] Trades: {s['total_trades']} ({s['trade_share_pct']}%) | WR: {s['win_rate_pct']}% | Net EV: {s['net_ev_r']:+.4f}R | Sum Net R: {s['sum_net_r']:+.2f}R | Max DD: -{s['max_drawdown_r']:.2f}R | Avg Cost: {s['avg_cost_r']:.3f}R")
+        print(
+            f"\n[{sym}] Trades: {s['total_trades']} ({s['trade_share_pct']}%) | WR: {s['win_rate_pct']}% | Net EV: {s['net_ev_r']:+.4f}R | Sum Net R: {s['sum_net_r']:+.2f}R | Max DD: -{s['max_drawdown_r']:.2f}R | Avg Cost: {s['avg_cost_r']:.3f}R"
+        )
 
     # Save to json for report grounding
     out_path = ROOT_DIR / "research" / "m61_2_calibration_audit.json"
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump({"priors": priors_res, "instruments": inst_res}, f, indent=2)
     print(f"\nAudit results successfully persisted to {out_path}")
+
 
 if __name__ == "__main__":
     main()
