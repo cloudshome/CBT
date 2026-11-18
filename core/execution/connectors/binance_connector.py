@@ -91,7 +91,7 @@ class BinanceSpotConnector(BaseExchangeConnector):
 
         own_session = self._external_session is None
         if own_session and self.environment == "PRODUCTION":
-            self.assert_outbound_socket_allowed()
+            self.assert_outbound_socket_allowed(method=method, url=url)
         session = self._external_session or aiohttp.ClientSession(
             timeout=aiohttp.ClientTimeout(total=self.timeout_sec)
         )

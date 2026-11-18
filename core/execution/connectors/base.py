@@ -101,8 +101,10 @@ class BaseExchangeConnector(abc.ABC):
                 f"Invalid environment: '{self.environment}'. Must be 'TESTNET' or 'PRODUCTION'."
             )
 
-    def assert_outbound_socket_allowed(self, ignore_pytest: bool = False) -> None:
-        """Enforces permanent socket airgap for production real-capital execution."""
+    def assert_outbound_socket_allowed(
+        self, method: str = "GET", url: str = "", ignore_pytest: bool = False
+    ) -> None:
+        """Enforces permanent socket airgap and egress firewall policy for production real-capital execution."""
         if self.environment == "PRODUCTION":
             from core.risk.execution_isolation import REAL_CAPITAL_ENABLED
 
@@ -110,6 +112,11 @@ class BaseExchangeConnector(abc.ABC):
                 raise ExchangeAuthenticationError(
                     "REAL_CAPITAL_LOCK: Outbound PRODUCTION network dispatch is permanently prohibited while REAL_CAPITAL_ENABLED is False."
                 )
+
+        if url:
+            from core.security.egress_firewall_verifier import OutboundEgressPolicy
+
+            OutboundEgressPolicy.verify_request(method, url)
 
     @abc.abstractmethod
     async def get_balances(self) -> list[NormalizedBalance]:

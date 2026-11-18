@@ -1,0 +1,150 @@
+{
+  "milestone": "M60",
+  "title": "Milestone 60 Sealed OOS 848-Trade Cryptographic Manifest",
+  "generated_at_utc": "2026-11-18T08:02:07.503736+00:00",
+  "csv_path": "research/m60_sealed_oos_848_trades_ledger.csv",
+  "csv_sha256": "40df3ae820d610bf719c4a0fbccd2e21ddb3ad73faff82bdf701133b8307497c",
+  "m57_walk_forward_results_sha256": "8f3e7b68268f3599027685defbbc9aa44504a4f20522c9cff32ac6ce412da1d7",
+  "sealed_oos_recalculated_metrics": {
+    "total_trades": 848,
+    "win_rate_net_pct": 60.14,
+    "expectancy_net_r": 0.3594,
+    "std_net_r": 1.4816,
+    "skewness": 0.4573,
+    "kurtosis_pearson": 1.8188,
+    "profit_factor_net": 1.8067,
+    "stage1_locks": 198,
+    "stage2_locks": 55,
+    "oos_start_iso": "2025-02-19T10:30:00+00:00",
+    "oos_end_iso": "2026-10-28T08:00:00+00:00",
+    "oos_calendar_days": 615.9,
+    "oos_years": 1.6862,
+    "per_trade_sharpe": 0.2426,
+    "dsr_10_trials": 1.0,
+    "dsr_100_trials": 1.0,
+    "p_value_100_trials": 0.0,
+    "cpcv_median_oos_sharpe": 0.2342,
+    "empirical_freq_annualized_cpcv_sharpe": 5.2517,
+    "daily_time_series_annualized_cpcv_sharpe": 4.8685
+  },
+  "timeframe_breakdown": {
+    "15m": {
+      "trades": 200,
+      "win_rate_pct": 57.0,
+      "expectancy_net_r": 0.2397,
+      "profit_factor_net": 1.5048,
+      "stage1_locks": 45,
+      "stage2_locks": 19
+    },
+    "1h": {
+      "trades": 268,
+      "win_rate_pct": 64.55,
+      "expectancy_net_r": 0.3842,
+      "profit_factor_net": 1.9381,
+      "stage1_locks": 72,
+      "stage2_locks": 15
+    },
+    "4h": {
+      "trades": 380,
+      "win_rate_pct": 58.68,
+      "expectancy_net_r": 0.4049,
+      "profit_factor_net": 1.889,
+      "stage1_locks": 81,
+      "stage2_locks": 21
+    }
+  },
+  "symbol_breakdown": {
+    "BTCUSDT": {
+      "trades": 260,
+      "win_rate_pct": 64.62,
+      "expectancy_net_r": 0.4258,
+      "profit_factor_net": 2.0781
+    },
+    "ETHUSDT": {
+      "trades": 65,
+      "win_rate_pct": 64.62,
+      "expectancy_net_r": 0.3561,
+      "profit_factor_net": 1.8787
+    },
+    "SOLUSDT": {
+      "trades": 298,
+      "win_rate_pct": 54.7,
+      "expectancy_net_r": 0.2709,
+      "profit_factor_net": 1.556
+    },
+    "PAXGUSDT": {
+      "trades": 225,
+      "win_rate_pct": 60.89,
+      "expectancy_net_r": 0.4008,
+      "profit_factor_net": 1.8708
+    }
+  },
+  "candle_store_partitions": {
+    "BTCUSDT_15m": {
+      "bars": 239616,
+      "sha256": "96628fea0d6f316ce3ec5b26a28edf5e28b40bbba38db5517b08258876f046a6"
+    },
+    "BTCUSDT_1h": {
+      "bars": 59904,
+      "sha256": "8e05d1c0e1583268b53892ccdaeb80c8621e96b0472124591eceb6202f656cff"
+    },
+    "BTCUSDT_4h": {
+      "bars": 14976,
+      "sha256": "f6a56c9945b7fb1a84c1a45443d68896b2002e915da78eb1661f51a665dc065c"
+    },
+    "BTCUSDT_1d": {
+      "bars": 2496,
+      "sha256": "ec17f8fb84b74c32fdf4fc117b4f7ced14bffbf0f5976d3f577dcbf37d5613ef"
+    },
+    "ETHUSDT_15m": {
+      "bars": 239616,
+      "sha256": "52f3ea7e71abcf8d5f887b0b2a7a57f200a8babf0e0c1320c1fc617dfa1343ef"
+    },
+    "ETHUSDT_1h": {
+      "bars": 59904,
+      "sha256": "bc9d49abddbc62c8c8e86449ccabd77055eeecf418820b91e90384afb9aca971"
+    },
+    "ETHUSDT_4h": {
+      "bars": 14976,
+      "sha256": "04887a4d9155354c0f373537a8b7a62c1039006991cbe662fa241df733664408"
+    },
+    "ETHUSDT_1d": {
+      "bars": 2496,
+      "sha256": "53faf8b9bccb1eb2ba488fde9bb1d097cca31f2ac2dd9a78dbedac5478bd9b55"
+    },
+    "SOLUSDT_15m": {
+      "bars": 214436,
+      "sha256": "d6e6d64948382ca0224a31ab65f8dc6ce59f9198be5e5d8d9507f741ae891610"
+    },
+    "SOLUSDT_1h": {
+      "bars": 53609,
+      "sha256": "3b362eb15f8be8da040496e9fac06d1bd8c30930a46f7e4505f799f40f74cba1"
+    },
+    "SOLUSDT_4h": {
+      "bars": 13403,
+      "sha256": "fee1ad73938db5c2c3dd40a4a8d0061c5392b9d1549ee89ec787ed6975310fc9"
+    },
+    "SOLUSDT_1d": {
+      "bars": 2234,
+      "sha256": "5e2d3bde2ef13652eafccb9fe1b9be6a6c4b5f4c230683f09cc36e40f2748fe8"
+    },
+    "PAXGUSDT_15m": {
+      "bars": 216435,
+      "sha256": "41bf9416716687cdcf6038fb50891949444e6caedf011c23f12023160eb2cacc"
+    },
+    "PAXGUSDT_1h": {
+      "bars": 54113,
+      "sha256": "51ef177d44c9ea306bc2f3845a00c1918cabce230b599530bc43038fea143ff3"
+    },
+    "PAXGUSDT_4h": {
+      "bars": 13533,
+      "sha256": "663d28ecaa6ac49f7fa8af4834b63d1d4197cf9d298dc1d24f5b6071ecbffa55"
+    },
+    "PAXGUSDT_1d": {
+      "bars": 2256,
+      "sha256": "c92f28aaa927dbddddbb60342723de4f5fba1191d9ade7d443b045822b7a203e"
+    }
+  },
+  "total_store_bars": 1204003,
+  "active_backtest_bars_15m_1h_4h": 1194521
+}
