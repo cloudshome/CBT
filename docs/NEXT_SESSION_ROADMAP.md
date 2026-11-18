@@ -125,14 +125,15 @@ graph TD
 - **Milestone 32 (32-A, 32-B, 32-C, 32-R):** Autonomous 336h Testnet Burn-In Campaign & Multi-Strategy Ensemble Allocator (32 passing tests, `M32_R_BURN_IN_DOSSIER.md` 🟢 QUALIFIED).
 - **Milestone 33:** Multi-Venue Synthetic Cross-Arbitrage, Basis Dispersion & Leg-Risk Fail-Safe Router (`core/intelligence/synthetic_basis_engine.py`, `core/execution/strategy_gateway/synthetic_router.py`, `core/risk_engine/basis_governor.py`, 12 passing tests).
 - **Milestone 34:** Cross-Venue Collateral Telemetry, Liquidation Distance Buffer & Rebalancing Advisor (`core/risk_engine/collateral_monitor.py`, `core/risk_engine/rebalancing_advisor.py`, 9 passing tests).
+- **Milestone 55–60:** Multi-Year 2020–2026 OOS Walk-Forward & Cryptographic Evidence Closure (`research/m60_sealed_oos_manifest.json`, 848 decided OOS trades, +0.3594R Net EV, 60.14% WR, strict outbound network egress isolation).
+- **Milestone 61.1:** Five-Blocker Autonomous Trading Pipeline Forensics & Paper-Trade Recovery (Commit `0717eaf`, 14/14 tests in `tests/test_m61_1_autonomous_pipeline_integration.py`).
+- **Milestone 61.2:** Autonomous Paper Trading Recovery, Strategy Parity & 30-Day Prospective Evidence (Commit `7a33860`, 8/8 tests in `tests/test_m61_2_paper_execution_lifecycle.py`, 20/20 total M61 tests, all 9 preflight quality gates green).
+- **Active Continuous Protocol:** 30-Day Prospective Paper Observation Protocol (`research/m61_2_prospective_observation_manifest.json`) running unattended in virtual shadow mode (`REAL_CAPITAL_ENABLED = False`) across BTC, ETH, SOL, and Gold (PAXG/XAU) through 2026-12-18.
 - **CI / Quality Gates:** 100% Green across all gates. Milestone 18 Production Pass remains certified and untouched (149/149 tests).
 
-### Next Implementation Focus — Milestone 35:
-- **Objective:** Generation 6 Institutional Platform Release & Packaging (`v4.0.0`).
-- **Core Modules & Actions:**
-  1. `scripts/build_windows_app.py` — Run 17-point production release blocker matrix.
-  2. `scripts/sign_windows_binaries.py` — Authenticode dual-profile code signing & RFC-3161 timestamping.
-  3. `release/CTB_Setup_v4.0.0.exe` — Compile production desktop application binary and GNU `release/SHA256SUMS.txt`.
+### Next Implementation Focus:
+- Continuous prospective paper monitoring and weekly drift verification against the empirical M60 baseline ($\ge 54.0\%$ WR, $\ge +0.20R$ Net EV, max drawdown $\le 8.0\%$).
+- Daily ledger reconciliation on `data/trading_logs.db` (`shadow_positions`).
 
 
 

@@ -34,6 +34,9 @@ To resolve the documentation divergence and cognitive overload identified in **P
 | **M35-R** | **Independent Release & Code Signing Audit** | 15 audit obligations (RFC-3161 timestamps) | **RELEASE CANDIDATE** | [`tests/execution/test_milestone35_r_independent_audit.py`](../tests/execution/test_milestone35_r_independent_audit.py) |
 | **Route Contract** | **Backend Route Matrix & Proxy Parity** | 4 contract parity gates (Vite, Nginx, Caddy, FastAPI) | **PASS (100% PARITY)** | [`docs/BACKEND_ROUTE_MATRIX.md`](BACKEND_ROUTE_MATRIX.md) |
 | **UI Stream** | **Zero-Shake WebSocket Heartbeat & Lifecycle** | Adaptive staleness watchdog & Vitest suite | **PASS** | [`frontend/src/test/WSStateMachine.test.ts`](../frontend/src/test/WSStateMachine.test.ts) |
+| **M60** | **Evidence Closure & Capital Isolation Guard** | Outbound egress isolation & 848-trade OOS audit | **PASS (ISOLATED)** | [`docs/M60_EVIDENCE_CLOSURE_AND_EGRESS_REPORT.md`](M60_EVIDENCE_CLOSURE_AND_EGRESS_REPORT.md) |
+| **M61.1** | **Five-Blocker Autonomous Pipeline Integration** | 14 integration gates / 14 tests | **PRODUCTION PASS** | [`docs/M61_1_FIVE_BLOCKER_ROOT_CAUSE_REPORT.md`](M61_1_FIVE_BLOCKER_ROOT_CAUSE_REPORT.md) |
+| **M61.2** | **Autonomous Paper Recovery & 30-Day Prospective Manifest** | 8 lifecycle gates / 20 total M61 tests / 9 preflight gates | **PRODUCTION PASS** | [`docs/M61_2_PAPER_EXECUTION_LIFECYCLE_REPORT.md`](M61_2_PAPER_EXECUTION_LIFECYCLE_REPORT.md) |
 
 ---
 

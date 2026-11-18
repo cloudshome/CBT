@@ -27,6 +27,13 @@ As of November 2026, the Crypto Brain Terminal (CBT / SKY) has reached an instit
    - Dual-profile Authenticode code signing with Digicert RFC-3161 HTTPS timestamps recorded in `release/CODE_SIGNING_REPORT.json`.
    - Release state machine locked to `RELEASE_CANDIDATE` awaiting physical Gate G-21 operator signature before any live trading promotion.
 
+4. **Milestone 61.1 & 61.2 Autonomous Paper Trading Recovery & Strategy Parity:**
+   - Five pipeline blockers diagnosed, repaired, and certified across 20/20 integration and deterministic lifecycle tests (`tests/test_m61_1_*.py` and `tests/test_m61_2_*.py`).
+   - Strategy parity confirmed between historical M57/M60 walk-forward rule engine and autonomous adapter (`docs/M61_2_STRATEGY_PARITY_REPORT.md`).
+   - Informative Bayesian priors calibrated to empirical 848-trade OOS dataset (Setup A: $\alpha_0=5.6, \beta_0=4.4$; Setup B: $\alpha_0=5.5, \beta_0=4.5$; Fallback: $\alpha_0=5.2, \beta_0=4.8$).
+   - Non-POSIX / Windows supervisor lock compatibility resolved in `core/autonomous_trader.py`.
+   - 30-day paper observation protocol sealed in `research/m61_2_prospective_observation_manifest.json` under permanent capital airgap (`REAL_CAPITAL_ENABLED = False`).
+
 ---
 
 ## 2. Service Authority Matrix & Backend Convergence (Priority 1)
