@@ -19,6 +19,34 @@ from core.provenance_engine import provenance_engine
 
 logger = logging.getLogger("ai_quant_sentinel.autonomous_research.failure_memory")
 
+# Canonical immutable ledger of rigorously falsified research families & hypotheses
+FALSIFIED_M63_RECORD = FailureMemoryRecord(
+    failure_id="FALSIFIED_M63",
+    hypothesis_id="M63_FAMILY2_DERIVATIVES_CROWDING",
+    hypothesis_text="Derivatives Crowding 1h funding rate and open interest fade mean reversion",
+    target_symbol="BTCUSDT,ETHUSDT,SOLUSDT",
+    timeframe="1h",
+    parameters={
+        "funding_zscore_entry": 1.5,
+        "oi_percentile_min": 75,
+        "holding_bars": 12,
+        "family": "Family 2 (Derivatives Crowding / Funding-OI Fade 1h)",
+    },
+    failure_reason="Negative expectancy across all splits (Train -0.2031R / Val -0.1175R / OOS -0.1410R, Sharpe -1.7672). Naive funding/OI crowding fades bleed fees and trend-continuation slippage in crypto perpetuals.",
+    metrics={
+        "train_r": -0.2031,
+        "val_r": -0.1175,
+        "oos_r": -0.1410,
+        "oos_sharpe": -1.7672,
+        "status": "FALSIFIED_M63",
+    },
+    autopsy_text="M63 causal alpha discovery benchmark conclusively falsified Family 2 (Derivatives Crowding 1h fade) across 2022-2026 dataset (Train -0.2031R / Val -0.1175R / OOS -0.1410R, Sharpe -1.7672). Future autonomous research agents are forbidden from re-testing naive funding rate/OI counter-trend fades without explicit structural regime grounding.",
+)
+
+STATIC_FALSIFIED_RECORDS: list[FailureMemoryRecord] = [
+    FALSIFIED_M63_RECORD,
+]
+
 
 class FailureMemoryEngine:
     """Manages failure archives, similarity detection, and autopsy indexing."""
@@ -73,6 +101,8 @@ class FailureMemoryEngine:
             if len(symbol_failures) >= 5
             else self.storage.search_failures(limit=100)
         )
+        # Include canonical static falsified records
+        all_failures = list(STATIC_FALSIFIED_RECORDS) + list(all_failures)
 
         for fail in all_failures:
             prior_keywords = self.extract_keywords(fail.hypothesis_text)
