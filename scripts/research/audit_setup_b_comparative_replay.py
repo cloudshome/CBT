@@ -17,10 +17,10 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 import numpy as np
-import pandas as pd
 
-from data.store import CandleStore
+from core.sky_intelligence.setup_engine import SetupEngine
 from core.sky_intelligence.types import (
+    DisplacementFeature,
     FVGFeature,
     FVGStatus,
     FVGType,
@@ -28,9 +28,8 @@ from core.sky_intelligence.types import (
     MarketRegimeType,
     MultiTimeframeContext,
     VolatilityRegime,
-    DisplacementFeature,
 )
-from core.sky_intelligence.setup_engine import SetupEngine
+from data.store import CandleStore
 
 
 def run_setup_b_comparison():
