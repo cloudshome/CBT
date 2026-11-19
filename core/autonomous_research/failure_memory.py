@@ -43,8 +43,36 @@ FALSIFIED_M63_RECORD = FailureMemoryRecord(
     autopsy_text="M63 causal alpha discovery benchmark conclusively falsified Family 2 (Derivatives Crowding 1h fade) across 2022-2026 dataset (Train -0.2031R / Val -0.1175R / OOS -0.1410R, Sharpe -1.7672). Future autonomous research agents are forbidden from re-testing naive funding rate/OI counter-trend fades without explicit structural regime grounding.",
 )
 
+FALSIFIED_M67_RECORD = FailureMemoryRecord(
+    failure_id="FALSIFIED_M67",
+    hypothesis_id="M67_SLEEVE3_DELTA_NEUTRAL_FUNDING_CARRY",
+    hypothesis_text="Delta-neutral spot-perp 8h perpetual funding rate carry sleeve with 10% entry / 2% exit threshold",
+    target_symbol="BTCUSDT,ETHUSDT,SOLUSDT",
+    timeframe="8h",
+    parameters={
+        "entry_threshold_ann": 0.10,
+        "exit_threshold_ann": 0.02,
+        "consecutive_neg_exit": 3,
+        "lookback_settlements": 21,
+        "roundtrip_fee_bps": 40.0,
+        "basis_drag_bps": 5.0,
+        "sleeve": "S3-Carry",
+    },
+    failure_reason="Negative net return in Sealed OOS (-0.60% CAGR, Sharpe -1.3071). Funding rate compression in 2025-2026 caused turnover fee drag (40 bps two-leg fees + 5 bps basis drag) to outstrip captured funding yield during low-duration regimes.",
+    metrics={
+        "full_period_sharpe": 3.2774,
+        "train_sharpe": 3.7007,
+        "val_sharpe": 6.2217,
+        "oos_sharpe": -1.3071,
+        "oos_cagr_pct": -0.60,
+        "status": "FALSIFIED_M67",
+    },
+    autopsy_text="M67 causal research benchmark falsified standalone S3-Carry sleeve across Sealed OOS (2025-2026). While highly profitable in 2020-2024 bull/high-vol regimes (Sharpe > 3.7), compressed funding rates in 2025-2026 failed to cover institutional two-leg execution frictions (40 bps roundtrip). Future carry strategies require dynamic funding persistence or volatility filtering before allocating capital.",
+)
+
 STATIC_FALSIFIED_RECORDS: list[FailureMemoryRecord] = [
     FALSIFIED_M63_RECORD,
+    FALSIFIED_M67_RECORD,
 ]
 
 
