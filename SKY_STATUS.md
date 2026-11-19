@@ -1,13 +1,15 @@
 # SKY — Project Status & Agent Handoff Document
 
-> **Last Updated:** 2026-11-13  
-> **Release Tag:** `v4.11.0-m48-forward-throughput-multi-horizon-live-sync` (Milestone 48 Forward Throughput & Multi-Horizon Live Sync Operational 🚀)  
+> **Last Updated:** 2026-11-19  
+> **Release Tag:** `v4.12.0-m62-institutional-audit-remediation` (Milestone 62: Institutional Audit Remediation & Hardening 🛡️)  
 > **Branch:** `main`  
 > **Remote:** `https://github.com/cloudshome/CBT.git`  
 > **Lead Agent:** Antigravity  
 > **Milestone 18 Status:** PRODUCTION PASS (Certified & Re-Validated Active — 149/149 Tests Green 🏛️)  
-> **Checkpoint 2 (Edge Verification) Status:** CERTIFIED (Strict Joint Hurdle 2e: E[R_net] = +0.2709R >= +0.2500R AND PF = 1.54 >= 1.4500, DSR = 0.9999 >= 0.9500 across 747 OOS Trades, CPCV Median Sharpe = 8.8609 🟢)  
-> **Checkpoint 3 (Forward Qualification) Status:** PENDING FORWARD FILL (1 Surviving M41-M48 Decided Trade / 20 Required, Quarantined: 5 Pre-Breakout Setups, Surviving Expectancy: +3.29R, Zero Drift $0.000000 🟡)  
+> **Checkpoint 1 Status:** BLOCKED_BY_POLICY (REAL_CAPITAL_ENABLED = False permanently locked)  
+> **Checkpoint 2 (Edge Verification) Status:** FAILED_REAUDIT (M62 Causal Re-Audit: Lookahead survivorship bias, synthetic linspace Sharpe, and 46.85x annualization eliminated. True pooled OOS metrics reflect negative/degraded expectancy; historical +8.86 Sharpe and CP-2 certification revoked pending alpha redesign 🔴)  
+> **Checkpoint 3 (Forward Qualification) Status:** PENDING FORWARD FILL (Surviving Expectancy requires re-qualification 🟡)  
+> **Milestone 62 (Institutional Audit Remediation & Hardening) Status:** COMPLETED & CERTIFIED (Strict Fail-Closed Egress Allowlist, 11 Authenticated Mutating Routes, Fail-Closed Telegram Webhook Secret, Hermes CLI Flag Injection Prevention, Airgap Bypass Removal, Causal Backtester Zero-Survivorship Fill Model, Continuous Calendar-Day Daily Sharpe, LF Normalization — 8/8 Tests Green 🟢)  
 > **Milestone 48 (Forward Qualification Throughput & Multi-Horizon Sync) Status:** COMPLETED & OPERATIONAL (Live Mark-to-Market Intrabar 4-Point Candle Replay, Multi-Horizon Slot Isolation DAY/SWING, M47 Progressive Ratchet Sync, sync_forward_paper_book CLI — 6/6 Tests Green 🟢)  
 > **Milestone 47 (Strict Joint Hurdle 2e & Autonomous Paper Wiring) Status:** COMPLETED & CERTIFIED (Refined Two-Stage Ratchet Geometry +1.20R/+0.25R, 35% Bank/+0.65R Runner, Autonomous Paper Trader Wired — 5/5 Tests Green 🟢)  
 > **Milestone 46 (Progressive Ratchet & CP-2 Certification) Status:** COMPLETED & SUPERSEDED BY M47 (Two-Stage Progressive Ratchet + Asset Universe Gating — 7/7 Tests Green 🟢)  
@@ -83,9 +85,9 @@ Audited under Milestones 39, 40 & 44 with Zero-Trust Empirical Verification:
 | Checkpoint | Scope | Operational State | Governance Action |
 |:---|:---|:---:|:---|
 | **CP-1** | Current Operating Mode | `BLOCKED_BY_POLICY` | Fail-closed in `.env` (`TRADING_MODE=PAPER_TRADING`, `real_capital_enabled=False`). |
-| **CP-2** | Proving a Trading Edge | `CERTIFIED` | M47 Refined Progressive Ratchet Engine (+1.20R Defensive Ratchet -> +0.25R locked profit, +1.50R Stage 2 35% bank + +0.65R trailing runner stop) benchmarked against 125,820 bars (`derivatives_expanded_2022_2026.parquet`) and 9 K9 frozen datasets. **All 5 CP-2 Hurdles CLEARED**: Hurdle 2a ($N = 747 \ge 100$), Hurdle 2b (Causal Ordering PASS), Hurdle 2c (CPCV Annualized Median Sharpe = $8.8609 \ge 1.0$), Hurdle 2d ($\text{DSR} = 0.9999 \ge 0.9500, p = 0.0001$), and Hurdle 2e Strict Joint Hurdle ($\mathbb{E}[R_{\text{net}}] = \mathbf{+0.2709R} \ge +0.2500\text{R}$ AND $\text{PF} = \mathbf{1.54} \ge 1.4500$ simultaneously). Certified artifact generated: `research/m47_cp2_joint_certification_results.json`. |
-| **CP-3** | Decided Forward Paper Trades | `BLOCKED_BY_POLICY` | 6/20 decided forward trades completed (deficit: 14 trades). Autonomous paper trader (`core/autonomous_trader.py`) wired with M47 bidirectional reclaim engine, progressive ratchet, and SOL MTF alignment gate. Shadow ledger zero-drift verified ($0.000000 across 507 lifetime shadow trades). |
-| **CP-4** | Capital Governor Tier Progression | `BLOCKED_BY_POLICY` | Locked at `Tier 0 (Paper Shadow)`. CP-2 officially CERTIFIED. Promotion to `Tier 1-E (Canary Eligible)` strictly gated by completing the remaining 14 CP-3 forward qualification trades. |
+| **CP-2** | Proving a Trading Edge | `FAILED_REAUDIT` | Milestone 62 Institutional Audit Remediation permanently eliminated backtest survivorship lookahead bias (Mode A/B separation, same-bar touch instant loss, post-ratchet conservative SL priority, blended 50/50 TP2) and replaced synthetic `np.linspace` Sharpe and `* 46.85` annualization with true continuous calendar-day daily Sharpe (`sqrt(365)`). The honest causal re-audit uncovered negative/degraded expectancy on 1h/4h primary pairs, officially revoking the historical artificial CP-2 certification (+8.86 Sharpe). Strategy logic and multi-timeframe filters must undergo fundamental alpha redesign. |
+| **CP-3** | Decided Forward Paper Trades | `BLOCKED_BY_POLICY` | 6/20 decided forward trades completed (deficit: 14 trades). Autonomous paper trader (`core/autonomous_trader.py`) wired with M47 bidirectional reclaim engine, progressive ratchet, and SOL MTF alignment gate. Shadow ledger zero-drift verified ($0.000000 across 507 lifetime shadow trades). Forward paper qualification frozen until CP-2 edge re-established. |
+| **CP-4** | Capital Governor Tier Progression | `BLOCKED_BY_POLICY` | Locked at `Tier 0 (Paper Shadow)`. CP-2 marked `FAILED_REAUDIT`. Promotion to `Tier 1-E (Canary Eligible)` strictly blocked by policy until causal statistical edge is proven without lookahead. |
 
 | **CP-5** | Production Exchange API Keys | `BLOCKED_BY_POLICY` | No live production keys configured; only testnet simulated keys installed. |
 | **CP-6** | AES-256-GCM Credential Vault | `CERTIFIED` | PBKDF2-HMAC-SHA256 (600k iterations) + AES-256-GCM authenticated encryption active. |

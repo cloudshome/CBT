@@ -1,4 +1,29 @@
-**Last updated:** 2026-11-13 (**v4.11.0 — Milestone 48 Forward Qualification Throughput, Multi-Horizon Isolation & Live Tick Sync**).
+**Last updated:** 2026-11-19 (**v4.12.0 — Milestone 62 Institutional Audit Remediation & Hardening**).
+- **WP-1A (Outbound Egress Policy Allowlist Enforcement):**
+  - Converted `core/security/egress_firewall_verifier.py` from an easily bypassed blocklist into a strict fail-closed allowlist.
+  - Allowed outbound traffic strictly bounded to Testnet REST/WS (`testnet.binancefuture.com`, `testnet.binance.vision`, `api-testnet.bybit.com`), public market data GET-only (`api.binance.com`, `fapi.binance.com`, `api.bybit.com`), and authorized Telegram / LLM API endpoints.
+  - All unauthorized hosts, raw IPs, internal networks, or non-GET requests to public endpoints raise `PermissionError` immediately.
+- **WP-1B (API Route Authentication & Hermes Input Hardening):**
+  - Enforced `Depends(require_api_key)` on 11 previously unauthenticated mutating routes in `app.py`: `/api/risk/half-kelly-calc`, `/api/research/share-telegram`, `/api/execution/simulate_impact`, `/api/execution/sor/route-quote`, `/api/execution/slicer/almgren-chriss`, `/api/mastermind/specialists/deploy`, `/api/v1/hermes/query`, `/api/hermes/query`, `/api/v1/hermes/market-critique`, `/api/hermes/market-critique`.
+  - Hardened `verify_telegram_secret` to fail closed (HTTP 401) when `TELEGRAM_WEBHOOK_SECRET` is unset.
+  - Hardened `core/cognitive_brain/hermes_agent_bridge.py`: sanitized model/provider flags via regex `^[A-Za-z0-9._:/-]+$`, rejected leading dashes (flag injection prevention), clamped query length <= 8000 chars, and bounded timeout in `[1.0, 120.0]`.
+- **WP-2 (Elimination of Backtester Causal Biases & Sharpe Distortion):**
+  - Remediated fill survivorship lookahead in `data/backtester.py`: separated Mode A (Resting Limit) and Mode B (Close-confirmed). In Mode A, if bar touches limit and stop-loss on the same bar, it is immediately marked as a LOSS (`rr_achieved = -1.0`, `ambiguous_bar = True`) instead of surviving as `NOT_TRIGGERED`. Mode B fills at `b_c` and starts exit checks on `bar_k + 1`.
+  - Enforced post-ratchet conservative SL priority: on ambiguous bars, stop-loss check takes strict precedence over TP2.
+  - Fixed blended TP2 accounting: 50% partial at +1.5R, 50% runner at target (+3.1R) properly blended in realized R calculation.
+  - Remediated statistical reporting in `scripts/research/run_m57_mtf_15m_4h_walk_forward_audit.py`: deleted synthetic `np.linspace` Sharpe and arbitrary `* 46.85` annualizer; implemented true continuous calendar-day daily Sharpe (`sqrt(365)`), portfolio same-bar deduplication, and max concurrent position tracking.
+  - Marked Checkpoint 2 as `FAILED_REAUDIT` reflecting honest causal metrics.
+- **WP-3 (M18 Connector Security & Test Isolation):**
+  - Removed `PYTEST_CURRENT_TEST` bypass in `core/execution/connectors/base.py`; airgap unconditionally raises `ExchangeAuthenticationError` in `PRODUCTION`.
+  - Hardened `BinanceSpotConnector` and `BybitV5Connector` to unconditionally invoke `assert_outbound_socket_allowed()` on all requests.
+  - Re-validated 149/149 M18 certification tests across all 14 gates via `scripts/verify_m18_certification.py`.
+- **WP-4 (Configuration Hygiene & Verification):**
+  - Cleaned `config.py` duplicate futures host and replaced invalid `gemini-3.6-flash` model identifier with `gemini-2.5-flash`.
+  - Created test suite `tests/test_m62_institutional_audit_remediation.py` (8/8 tests green).
+  - Verified Ruff linting and formatting (0 errors, 100% clean).
+  - Ensured LF newline normalization across all modified files.
+
+**Previous:** 2026-11-13 (**v4.11.0 — Milestone 48 Forward Qualification Throughput, Multi-Horizon Isolation & Live Tick Sync**).
 - **WP-1 (Live Mark-to-Market & Intrabar High/Low Tick Sync):**
   - Audited live price pipeline in `core/autonomous_trader.py`, `core/data_streamer.py`, and `cbt_backend.py`.
   - Implemented `replay_candle()` and `replay_candles()` in `core/portfolio_shadow.py` using chronological 4-point intrabar reconstruction (`O -> L -> H -> C` for bullish bars, `O -> H -> L -> C` for bearish bars) to evaluate Stage 1 (`+1.20R`), Stage 2 (`+1.50R`), and stop/target executions with zero lookahead bias.

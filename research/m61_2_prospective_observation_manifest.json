@@ -3,7 +3,8 @@
   "title": "Milestone 61.2 Prospective 30-Day Paper Observation Protocol Manifest",
   "protocol_version": "1.0.0",
   "created_at_utc": "2026-11-18T17:15:00.000000+00:00",
-  "status": "SEALED_ACTIVE",
+  "status": "SUSPENDED_M62_FAILED_REAUDIT",
+  "suspension_reason": "Milestone 62 institutional re-audit eliminated backtest survivorship lookahead bias, revealing true causal OOS expectancy E[R_net] = -0.1204R and daily Sharpe = -1.7197. Prospective paper observation is suspended pending M63 causal alpha discovery.",
   "governance": {
     "constitution": "REAL_CAPITAL_ENABLED = False",
     "capital_mode": "PAPER_VIRTUAL_SHADOW",

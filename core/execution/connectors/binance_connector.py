@@ -89,9 +89,8 @@ class BinanceSpotConnector(BaseExchangeConnector):
         url = f"{self.base_url}{endpoint}?{query_string}"
         t_start = time.perf_counter()
 
+        self.assert_outbound_socket_allowed(method=method, url=url)
         own_session = self._external_session is None
-        if own_session and self.environment == "PRODUCTION":
-            self.assert_outbound_socket_allowed(method=method, url=url)
         session = self._external_session or aiohttp.ClientSession(
             timeout=aiohttp.ClientTimeout(total=self.timeout_sec)
         )

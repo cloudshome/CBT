@@ -299,6 +299,7 @@ def _evaluate(
     use_ladder = bool(
         strict_a_plus_only
         or ladder_parity
+        or progressive_ratchet
         or plan.get("ladder_parity")
         or plan.get("use_ladder_parity")
         or "entryZone" in plan
@@ -380,24 +381,21 @@ def _evaluate(
             "tp3": target_tp3,
         }
 
+        close_confirmed_entry = bool(
+            plan.get("confirmation") == "close"
+            or plan.get("close_confirmed")
+            or plan.get("entry_mode") == "CLOSE_CONFIRMED"
+        )
+
         is_filled = not conditional
         fill_bar_idx = 0 if not conditional else None
 
-        if not conditional and strict_a_plus_only and len(window) > 0:
-            b_o = float(opens[0])
-            b_h = float(highs[0])
-            b_l = float(lows[0])
-            b_c = float(closes[0])
-            cvd_v = float(cvd_vals[0])
-            tick_eval = evaluate_ladder_tick(ladder_plan, b_o, b_h, b_l, b_c, cvd_score=cvd_v)
-            if not (
-                tick_eval.fill_allowed
-                and (tick_eval.state == "IN_ZONE_CONFIRMED" or tick_eval.rejection_confirmed)
-            ):
-                is_filled = False
-                fill_bar_idx = None
+        if not conditional:
+            is_filled = True
+            fill_bar_idx = 0
 
-        if conditional:
+        elif close_confirmed_entry:
+            # Mode B: Close-confirmed entry
             for bar_k in range(len(window)):
                 b_o = float(opens[bar_k])
                 b_h = float(highs[bar_k])
@@ -415,6 +413,27 @@ def _evaluate(
                     or tick_eval.rejection_confirmed
                 )
                 if fill_confirmed:
+                    is_filled = True
+                    entry = b_c
+                    risk = max(abs(entry - sl), 1e-6)
+                    fill_bar_idx = bar_k + 1
+                    break
+
+        else:
+            # Mode A: Resting Maker Limit Order at entry price
+            for bar_k in range(len(window)):
+                b_h = float(highs[bar_k])
+                b_l = float(lows[bar_k])
+                penetrated = (b_l <= entry) if is_buy else (b_h >= entry)
+                if penetrated:
+                    sl_touched_bar = (b_l <= sl) if is_buy else (b_h >= sl)
+                    if sl_touched_bar:
+                        # Price filled limit at entry and plunged to stop loss on the same bar
+                        gp.outcome = "LOSS"
+                        gp.rr_achieved = -1.0
+                        gp.ambiguous_bar = True
+                        set_holding(bar_k)
+                        return gp
                     is_filled = True
                     fill_bar_idx = bar_k
                     break
@@ -456,23 +475,7 @@ def _evaluate(
             )
 
             if progressive_ratchet:
-                # 1. Ambiguity check: if both initial SL and TP1 touched on same bar before any ratchet
-                if sl_touched and tp1_touched and not stage1_hit and not stage2_hit:
-                    gp.outcome = "LOSS"
-                    gp.rr_achieved = -1.0
-                    gp.ambiguous_bar = True
-                    set_holding(bar_k)
-                    return gp
-
-                # 2. TP2 full runner exit
-                if tp2_touched and (stage2_hit or tp1_touched):
-                    gp.outcome = "FULL_WIN"
-                    gp.rr_achieved = realized_r(target_tp2)
-                    set_holding(bar_k)
-                    decided_bar = bar_k
-                    break
-
-                # 3. Stop loss touched
+                # 1. Stop loss / Ambiguity check FIRST (conservative intrabar ambiguity rule)
                 if sl_touched:
                     if stage2_hit:
                         # Price hit +1.5R (TP1) then pulled back to Stage 2 stop
@@ -485,11 +488,26 @@ def _evaluate(
                     else:
                         gp.outcome = "LOSS"
                         gp.rr_achieved = -1.0
+                    if tp1_touched or tp2_touched:
+                        gp.ambiguous_bar = True
                     set_holding(bar_k)
                     decided_bar = bar_k
                     break
 
-                # 4. Stage 2 Ratchet (+1.5R / TP1): Bank partial profit, move stop to Stage 2 stop
+                # 2. TP2 runner exit (with proper blended R accounting after Stage 2 bank)
+                if tp2_touched and (stage2_hit or tp1_touched):
+                    gp.outcome = "FULL_WIN"
+                    if stage2_hit:
+                        gp.rr_achieved = round(
+                            s2_bank * 1.50 + (1.0 - s2_bank) * realized_r(target_tp2), 4
+                        )
+                    else:
+                        gp.rr_achieved = realized_r(target_tp2)
+                    set_holding(bar_k)
+                    decided_bar = bar_k
+                    break
+
+                # 3. Stage 2 Ratchet (+1.5R / TP1): Bank partial profit, move stop to Stage 2 stop
                 if tp1_touched and not stage2_hit:
                     stage2_hit = True
                     stage1_hit = True
@@ -500,7 +518,7 @@ def _evaluate(
                     )
                     decided_bar = bar_k
 
-                # 5. Stage 1 Ratchet: Move stop to Stage 1 defensive locked profit
+                # 4. Stage 1 Ratchet: Move stop to Stage 1 defensive locked profit
                 elif enable_stage1 and r1_touched and not stage1_hit and not stage2_hit:
                     stage1_hit = True
                     breakeven_active = True
@@ -509,12 +527,17 @@ def _evaluate(
                     )
                     decided_bar = bar_k
 
-                # 6. TP3 extension (if applicable)
+                # 5. TP3 extension (if applicable)
                 if target_tp3 is not None:
                     tp3_touched = (b_h >= target_tp3) if is_buy else (b_l <= target_tp3)
                     if tp3_touched:
                         gp.outcome = "FULL_WIN"
-                        gp.rr_achieved = realized_r(target_tp3)
+                        if stage2_hit:
+                            gp.rr_achieved = round(
+                                s2_bank * 1.50 + (1.0 - s2_bank) * realized_r(target_tp3), 4
+                            )
+                        else:
+                            gp.rr_achieved = realized_r(target_tp3)
                         set_holding(bar_k)
                         decided_bar = bar_k
                         break

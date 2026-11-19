@@ -25,7 +25,7 @@ BARS = int(os.getenv("BARS", "500"))
 # first, then the standard host. Futures endpoints geo-block some regions;
 # the client degrades gracefully when they are unreachable.
 BINANCE_HOSTS = ["https://data-api.binance.vision", "https://api.binance.com"]
-BINANCE_FUTURES_HOSTS = ["https://fapi.binance.com", "https://fapi.binance.com"]
+BINANCE_FUTURES_HOSTS = ["https://fapi.binance.com"]
 
 # ── Signal engine ────────────────────────────────────────────────────────
 MIN_CONFIDENCE = int(os.getenv("MIN_CONFIDENCE", "55"))
@@ -150,7 +150,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 # ── Notifiers ────────────────────────────────────────────────────────────
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")

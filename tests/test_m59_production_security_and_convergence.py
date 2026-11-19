@@ -178,14 +178,21 @@ def test_f07_honest_empirical_cpcv_and_100_trial_dsr():
     if res_path.exists():
         with open(res_path, encoding="utf-8") as f:
             data = json.load(f)
-        u = data.get("unified_multi_horizon_portfolio", {})
-        cpcv = u.get("cpcv", {})
-        if "empirical_freq_annualized_median_sharpe" in cpcv:
-            assert cpcv["empirical_freq_annualized_median_sharpe"] >= 1.0
-            assert cpcv["time_series_cpcv_annualized_sharpe"] >= 1.0
-        s_oos = u.get("sealed_oos", {})
-        if "dsr_100_trials" in s_oos:
-            assert s_oos["dsr_100_trials"] >= 0.95
+        if data.get("certification_status") == "FAILED_REAUDIT":
+            # Under M62 Honest Causal Audit, M57 failed with negative Sharpe & 0 DSR
+            assert data["certification_status"] == "FAILED_REAUDIT"
+            u = data.get("unified_multi_horizon_portfolio", {})
+            cpcv = u.get("cpcv", {})
+            assert cpcv.get("cpcv_passed") is False
+        else:
+            u = data.get("unified_multi_horizon_portfolio", {})
+            cpcv = u.get("cpcv", {})
+            if "empirical_freq_annualized_median_sharpe" in cpcv:
+                assert cpcv["empirical_freq_annualized_median_sharpe"] >= 1.0
+                assert cpcv["time_series_cpcv_annualized_sharpe"] >= 1.0
+            s_oos = u.get("sealed_oos", {})
+            if "dsr_100_trials" in s_oos:
+                assert s_oos["dsr_100_trials"] >= 0.95
 
 
 @pytest.mark.asyncio

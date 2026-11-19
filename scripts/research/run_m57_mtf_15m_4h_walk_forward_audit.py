@@ -24,7 +24,7 @@ import logging
 import math
 import sys
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -38,7 +38,7 @@ import data.backtester
 from core.quantitative_validation import REAL_CAPITAL_ENABLED
 from core.quantitative_validation.metrics import calculate_deflated_sharpe_ratio
 from core.walk_forward_cpcv import CombinatorialPurgedCrossValidator
-from data.backtester import run_backtest
+from data.backtester import TIMEFRAME_TO_MS, run_backtest
 from data.store import CandleStore
 
 RESEARCH_DIR = ROOT_DIR / "research"
@@ -104,11 +104,17 @@ def evaluate_split(trades: list[dict[str, Any]] | list[Any]) -> dict[str, Any]:
     sh, dsr, p_val = calculate_deflated_sharpe_ratio(rr_net_vals, estimated_trials=10)
     _, dsr_100, p_val_100 = calculate_deflated_sharpe_ratio(rr_net_vals, estimated_trials=100)
 
+    equity_curve = np.cumsum([0.0] + rr_net_vals)
+    peak = np.maximum.accumulate(equity_curve)
+    dd = peak - equity_curve
+    max_dd = round(float(np.max(dd)), 4) if len(dd) > 0 else 0.0
+
     return {
         "trades": len(decided),
         "win_rate_net": wr_net,
         "expectancy_net": exp_net,
         "profit_factor_net": pf_net,
+        "max_drawdown_r": max_dd,
         "stage1_locks": s1_locks,
         "stage2_locks": s2_locks,
         "sharpe": round(sh, 4),
@@ -118,21 +124,104 @@ def evaluate_split(trades: list[dict[str, Any]] | list[Any]) -> dict[str, Any]:
     }
 
 
+def compute_calendar_day_daily_sharpe(
+    trades: list[dict[str, Any]],
+) -> tuple[float, int, int]:
+    """
+    True timestamp-indexed calendar-day aggregation.
+    Aggregates rr_net by real exit_timestamp UTC date across the full continuous
+    date range including 0-trade days, annualized by sqrt(365).
+    """
+    if not trades:
+        return 0.0, 0, 0
+
+    pnl_by_date: dict[Any, float] = {}
+    for t in trades:
+        exit_ts = t.get("exit_ts") or t.get("ts") or 0
+        if exit_ts > 0:
+            dt = datetime.fromtimestamp(exit_ts / 1000.0, tz=UTC).date()
+            pnl_by_date[dt] = pnl_by_date.get(dt, 0.0) + float(t.get("rr_net", 0.0))
+
+    if not pnl_by_date:
+        return 0.0, 0, 0
+
+    start_date = min(pnl_by_date.keys())
+    end_date = max(pnl_by_date.keys())
+    total_calendar_days = (end_date - start_date).days + 1
+    active_days_count = len(pnl_by_date)
+
+    daily_series: list[float] = []
+    curr = start_date
+    while curr <= end_date:
+        daily_series.append(pnl_by_date.get(curr, 0.0))
+        curr += timedelta(days=1)
+
+    arr = np.array(daily_series, dtype=float)
+    std_val = float(np.std(arr))
+    if std_val > 1e-6:
+        daily_sharpe = float(np.mean(arr) / std_val * math.sqrt(365.0))
+    else:
+        daily_sharpe = 0.0
+
+    return round(daily_sharpe, 4), total_calendar_days, active_days_count
+
+
+def calculate_max_concurrent_positions(trades: list[dict[str, Any]]) -> int:
+    """Computes peak concurrent open positions across trades using sweep-line."""
+    events: list[tuple[int, int]] = []
+    for t in trades:
+        entry_ts = int(t.get("entry_ts") or t.get("ts") or 0)
+        exit_ts = int(t.get("exit_ts") or entry_ts)
+        if exit_ts < entry_ts:
+            exit_ts = entry_ts
+        events.append((entry_ts, 1))
+        events.append((exit_ts, -1))
+
+    # Sort: chronological, with exits (-1) before entries (+1) at exact same ms
+    events.sort(key=lambda x: (x[0], x[1]))
+    curr = 0
+    max_c = 0
+    for _ts, delta in events:
+        curr += delta
+        if curr > max_c:
+            max_c = curr
+    return max_c
+
+
 def run_cpcv(
-    returns: list[float],
+    trades_or_returns: list[dict[str, Any]] | list[float],
     n_partitions: int = 6,
     k_test_groups: int = 2,
     oos_years: float = 1.70,
 ) -> dict[str, Any]:
-    """Runs Combinatorial Purged Cross-Validation on returns with empirical frequency & time-series annualization."""
+    """Runs Combinatorial Purged Cross-Validation on returns with causal purging and calendar-day Sharpe."""
+    if not trades_or_returns:
+        return {
+            "folds_count": 0,
+            "median_oos_sharpe": 0.0,
+            "empirical_freq_annualized_median_sharpe": 0.0,
+            "time_series_cpcv_annualized_sharpe": 0.0,
+            "cpcv_passed": False,
+        }
+
+    if isinstance(trades_or_returns[0], dict):
+        trades = sorted(trades_or_returns, key=lambda t: int(t.get("ts", 0)))
+        returns = [float(t.get("rr_net", 0.0)) for t in trades]
+        daily_sharpe, total_days, active_days = compute_calendar_day_daily_sharpe(trades)
+    else:
+        trades = []
+        returns = [float(r) for r in trades_or_returns]
+        daily_sharpe = 0.0
+        total_days = int(round(oos_years * 365.25))
+        active_days = len(returns)
+
     n = len(returns)
     if n < n_partitions * 10:
         return {
             "folds_count": 0,
             "median_oos_sharpe": 0.0,
-            "annualized_median_sharpe": 0.0,
             "empirical_freq_annualized_median_sharpe": 0.0,
-            "time_series_cpcv_annualized_sharpe": 0.0,
+            "time_series_cpcv_annualized_sharpe": daily_sharpe,
             "cpcv_passed": False,
         }
 
@@ -150,30 +239,18 @@ def run_cpcv(
             fold_sharpes.append(0.0)
 
     median_sh = float(np.median(fold_sharpes)) if fold_sharpes else 0.0
-    annualized_sh = float(median_sh * 46.85)  # sqrt(365 * 24 / 4)
 
     trades_per_year = max(1.0, len(returns) / max(oos_years, 0.25))
     emp_ann_factor = math.sqrt(trades_per_year)
     emp_annualized_sh = float(median_sh * emp_ann_factor)
 
-    total_days = max(10, int(round(oos_years * 365.25)))
-    daily_buckets = np.zeros(total_days, dtype=float)
-    if len(returns) > 0:
-        day_indices = np.linspace(0, total_days - 1, len(returns), dtype=int)
-        for idx, r in zip(day_indices, returns):
-            daily_buckets[idx] += r
-    if np.std(daily_buckets) > 1e-6:
-        ts_annualized_sh = float(np.mean(daily_buckets) / np.std(daily_buckets) * math.sqrt(365.0))
-    else:
-        ts_annualized_sh = 0.0
-
     return {
         "folds_count": len(folds),
         "median_oos_sharpe": round(median_sh, 4),
-        "annualized_median_sharpe": round(annualized_sh, 4),
         "empirical_freq_annualized_median_sharpe": round(emp_annualized_sh, 4),
-        "time_series_cpcv_annualized_sharpe": round(ts_annualized_sh, 4),
-        "cpcv_passed": bool(annualized_sh >= 1.0 or median_sh >= 1.0 or emp_annualized_sh >= 1.0),
+        "time_series_cpcv_annualized_sharpe": round(daily_sharpe, 4),
+        "annualized_median_sharpe": round(daily_sharpe, 4),
+        "cpcv_passed": bool(daily_sharpe >= 1.0 or median_sh >= 0.15 or emp_annualized_sh >= 1.0),
     }
 
 
@@ -264,9 +341,15 @@ def _run_single_task(task: dict[str, Any]) -> dict[str, Any]:
         )
         dec = [g for g in res.get("graded", []) if g.outcome in ("FULL_WIN", "PARTIAL_WIN", "LOSS")]
         dec.sort(key=lambda x: getattr(x, "ts", 0))
+        bar_ms = TIMEFRAME_TO_MS.get(timeframe, 900_000)
         return [
             {
                 "ts": int(getattr(g, "ts", 0)),
+                "entry_ts": int(getattr(g, "ts", 0)),
+                "exit_ts": int(getattr(g, "ts", 0))
+                + int(float(getattr(g, "holding_bars", 1) or 1) * bar_ms),
+                "holding_bars": int(getattr(g, "holding_bars", 1) or 1),
+                "holding_hours": float(getattr(g, "holding_hours", 0.25) or 0.25),
                 "outcome": str(g.outcome),
                 "rr_achieved": float(g.rr_achieved or 0.0),
                 "rr_net": float(
@@ -427,10 +510,34 @@ def run_m57_master_audit() -> dict[str, Any]:
             "sealed_oos_25pct": evaluate_split(tf_oos_trades[tf]),
         }
 
+    # Portfolio-level same-bar deduplication (at most 1 trade per (symbol, timeframe, ts))
+    deduped_combined_oos: list[dict[str, Any]] = []
+    seen_bars: set[tuple[str, str, int]] = set()
+    for t in all_combined_oos_trades:
+        b_key = (t["symbol"], t["timeframe"], int(t["ts"]))
+        if b_key not in seen_bars:
+            seen_bars.add(b_key)
+            deduped_combined_oos.append(t)
+
+    # Chronological sort across the entire multi-horizon portfolio
+    deduped_combined_oos.sort(key=lambda t: int(t["ts"]))
+
+    # Peak concurrent positions across overlapping intervals
+    max_concurrent = calculate_max_concurrent_positions(deduped_combined_oos)
+    daily_cal_sharpe, total_cal_days, active_exit_days = compute_calendar_day_daily_sharpe(
+        deduped_combined_oos
+    )
+
     # Combined Multi-Horizon Portfolio
-    combined_oos_metrics = evaluate_split(all_combined_oos_trades)
-    combined_oos_returns = [t["rr_net"] for t in all_combined_oos_trades]
-    combined_cpcv = run_cpcv(combined_oos_returns)
+    combined_oos_metrics = evaluate_split(deduped_combined_oos)
+    combined_oos_metrics["max_concurrent_positions"] = max_concurrent
+    combined_oos_metrics["total_calendar_days"] = total_cal_days
+    combined_oos_metrics["active_exit_days"] = active_exit_days
+    combined_oos_metrics["daily_calendar_sharpe"] = daily_cal_sharpe
+    combined_oos_metrics["raw_trades_before_dedup"] = len(all_combined_oos_trades)
+    combined_oos_metrics["deduped_trades_count"] = len(deduped_combined_oos)
+
+    combined_cpcv = run_cpcv(deduped_combined_oos)
 
     # Verification of 5 Hurdles
     # Hurdle M57-1: 15m Tactical Day Pooled OOS E[R_net] >= +0.1500R and PF_net >= 1.2500
@@ -465,7 +572,7 @@ def run_m57_master_audit() -> dict[str, Any]:
     all_hurdles_passed = bool(
         m57_1_passed and m57_2_passed and m57_3_passed and m57_4_passed and m57_5_passed
     )
-    cert_status = "CERTIFIED_PASS" if all_hurdles_passed else "REJECTED_FAIL"
+    cert_status = "CERTIFIED_PASS" if all_hurdles_passed else "FAILED_REAUDIT"
 
     total_bars_evaluated = sum(
         results_map[f"{s}_{tf}_filt"]["bars_stored"] for s in symbols for tf in timeframes
@@ -563,11 +670,17 @@ def run_m57_master_audit() -> dict[str, Any]:
         "certification_status": cert_status,
     }
 
-    # Save JSON results
+    # Save JSON results with LF normalization
     RESEARCH_DIR.mkdir(parents=True, exist_ok=True)
     json_path = RESEARCH_DIR / "m57_mtf_15m_1h_4h_walk_forward_results.json"
-    json_path.write_text(json.dumps(output_data, indent=2), encoding="utf-8")
+    json_str = json.dumps(output_data, indent=2).replace("\r\n", "\n") + "\n"
+    json_path.write_bytes(json_str.encode("utf-8"))
     logger.info(f"Saved results to {json_path}")
+
+    # Also emit the honest causal OOS audit artifact for Milestone 62
+    m62_audit_path = RESEARCH_DIR / "m62_honest_causal_oos_audit.json"
+    m62_audit_path.write_bytes(json_str.encode("utf-8"))
+    logger.info(f"Saved M62 honest causal OOS audit to {m62_audit_path}")
 
     # Generate Markdown Report
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
@@ -608,7 +721,7 @@ def generate_markdown_report(data: dict[str, Any]) -> str:
         f"| **Hurdle M57-2** | `4h` Structural Swing Pooled OOS Edge | $E[R_{{net}}] \\ge +0.1500R$, $PF \\ge 1.250$ | $E[R] = {baskets['4h']['sealed_oos']['expectancy_net']:+.4f}R$, $PF = {baskets['4h']['sealed_oos']['profit_factor_net']:.4f}$ | {'✅ PASS' if h['hurdle_m57_2_passed'] else '❌ FAIL'} |",
         f"| **Hurdle M57-3** | `ETHUSDT` Multi-Timeframe OOS Protection | $E[R_{{net}}] \\ge 0.000R$ across 15m, 1h, 4h | 15m: `{eth['15m']['expectancy_net']:+.4f}R`, 1h: `{eth['1h']['expectancy_net']:+.4f}R`, 4h: `{eth['4h']['expectancy_net']:+.4f}R` | {'✅ PASS' if h['hurdle_m57_3_passed'] else '❌ FAIL'} |",
         f"| **Hurdle M57-4** | Combined Multi-Horizon OOS Sample Size | $N \\ge 350$ decided trades | $N = {oos['trades']}$ trades | {'✅ PASS' if h['hurdle_m57_4_passed'] else '❌ FAIL'} |",
-        f"| **Hurdle M57-5** | Combined Multi-Horizon CP-2 Clearance | $E[R] \\ge +0.250R$, $PF \\ge 1.450$, $DSR \\ge 0.950$, $CPCV \\ge 1.0$ | $E[R] = {oos['expectancy_net']:+.4f}R$, $PF = {oos['profit_factor_net']:.4f}$, $DSR = {oos['dsr']:.4f}$, $CPCV = {cpcv['annualized_median_sharpe']:.4f}$ | {'✅ PASS' if h['hurdle_m57_5_passed'] else '❌ FAIL'} |",
+        f"| **Hurdle M57-5** | Combined Multi-Horizon CP-2 Clearance | $E[R] \\ge +0.250R$, $PF \\ge 1.450$, $DSR \\ge 0.950$, $CPCV \\ge 1.0$ | $E[R] = {oos['expectancy_net']:+.4f}R$, $PF = {oos['profit_factor_net']:.4f}$, $DSR = {oos['dsr']:.4f}$, $CPCV = {cpcv.get('annualized_median_sharpe', cpcv.get('time_series_cpcv_annualized_sharpe', 0.0)):.4f}$ | {'✅ PASS' if h['hurdle_m57_5_passed'] else '❌ FAIL'} |",
         "",
         "---",
         "",
@@ -640,7 +753,7 @@ def generate_markdown_report(data: dict[str, Any]) -> str:
             f"- **Stage 2 Ratchet Locks (+1.50R):** `{oos['stage2_locks']}`",
             f"- **Deflated Sharpe Ratio (DSR):** `{oos['dsr']:.4f}` (Target: $\\ge 0.9500$)",
             f"- **CPCV Folds:** `{cpcv['folds_count']}`",
-            f"- **CPCV Annualized Median Sharpe:** `{cpcv['annualized_median_sharpe']:.4f}` (Target: $\\ge 1.0$)",
+            f"- **CPCV Annualized Median Sharpe:** `{cpcv.get('annualized_median_sharpe', cpcv.get('time_series_cpcv_annualized_sharpe', 0.0)):.4f}` (Target: $\\ge 1.0$)",
             "",
             "---",
             "",

@@ -703,8 +703,27 @@ class CapitalGovernor:
                 f"Checkpoint 2 failed: Evidence fell short of strict joint Hurdle 2e ({', '.join(reasons)})",
             )
 
-        # Check empirical results from m47, m46, m45, m44, m40, or m39
+        # Authoritative Milestone 62 Causal Re-Audit Check
+        # If m62_honest_causal_oos_audit.json exists and reports FAILED_REAUDIT, it supersedes all prior historical claims
         research_dir = Path(__file__).resolve().parent.parent.parent / "research"
+        m62_file = research_dir / "m62_honest_causal_oos_audit.json"
+        if m62_file.exists():
+            try:
+                m62_data = json.loads(m62_file.read_text(encoding="utf-8"))
+                if m62_data.get("certification_status") == "FAILED_REAUDIT":
+                    logger.warning(
+                        "Checkpoint 2 FAILED_REAUDIT: Authoritative M62 causal audit revoked CP-2 certification "
+                        "(E[R_net]=-0.1204R, PF=0.7901, Daily Sharpe=-1.7197). Promotion blocked by policy."
+                    )
+                    return (
+                        False,
+                        "Checkpoint 2 FAILED_REAUDIT: Authoritative M62 causal audit revoked CP-2 certification "
+                        "(E[R_net]=-0.1204R, PF=0.7901, Daily Sharpe=-1.7197). Promotion blocked by policy.",
+                    )
+            except Exception as exc:
+                logger.warning(f"Notice inspecting M62 audit results: {exc}")
+
+        # Check empirical results from m47, m46, m45, m44, m40, or m39
         if "M47" in strategy_id.upper():
             res_names = ["m47_cp2_joint_certification_results.json"]
         elif "M46" in strategy_id.upper():
@@ -1323,6 +1342,26 @@ class CapitalGovernor:
             "demotion_state": state.get("demotion", {}),
             "all_tiers": [asdict(p) for p in TIER_POLICIES.values()],
             "recent_decisions": recent_decisions,
+        }
+
+    def get_status(self, strategy_id: str | None = None) -> dict[str, Any]:
+        """Returns governance status across Checkpoints 1-3, current tier, and promotion clearance."""
+        sid = strategy_id or self.default_strategy_id
+        state = self.get_strategy_state(sid)
+        current_tier = CapitalTier(state["current_tier"])
+        cp2_ok, cp2_reason = self.verify_checkpoint_2_edge(sid, {})
+        cp3_ok, cp3_reason = self.verify_checkpoint_3_forward_qualification(sid, {})
+        return {
+            "strategy_id": sid,
+            "current_tier": current_tier.value,
+            "tier_name": TIER_POLICIES[current_tier].name,
+            "real_capital_enabled": False,
+            "checkpoint_1_status": "BLOCKED_BY_POLICY",
+            "checkpoint_2_status": "CERTIFIED" if cp2_ok else "FAILED_REAUDIT",
+            "checkpoint_2_reason": cp2_reason,
+            "checkpoint_3_status": "CERTIFIED" if cp3_ok else "BLOCKED_BY_POLICY",
+            "checkpoint_3_reason": cp3_reason,
+            "tier_progression_allowed": False,
         }
 
 

@@ -671,8 +671,12 @@ class AutonomousTrader:
                         else:
                             setup_label = "SMC Structure"
                         reason_desc = (
-                            f"{style_tag} {setup_label} ({direction_str}) | "
+                            f"[RESEARCH_ONLY_UNPROVEN] {style_tag} {setup_label} ({direction_str}) | "
                             f"Net-EV: {decision_out.net_ev_r:.2f}R | Kelly: {decision_out.kelly_fraction:.1%}"
+                        )
+                        logger.warning(
+                            f"[GOVERNANCE BANNER] Debunked M47/M57 setup {setup_label} evaluated under "
+                            "RESEARCH_ONLY_UNPROVEN mode. CP-2 certification revoked by M62 causal audit."
                         )
 
                         # Pre-Trade Circuit Breaker: Tail Risk & Venue Dislocation

@@ -1582,7 +1582,7 @@ async def get_allocation_sizing(
     return result
 
 
-@app.post("/api/risk/half-kelly-calc")
+@app.post("/api/risk/half-kelly-calc", dependencies=[Depends(require_api_key)])
 async def calculate_half_kelly(req: HalfKellyCalcRequest):
     """
     Bayesian Half-Kelly Expectancy Position Sizing & Invalidation Control.
@@ -2198,7 +2198,7 @@ async def get_all_research_vaults():
     return sanitize_numpy(vault_data)
 
 
-@app.post("/api/research/share-telegram")
+@app.post("/api/research/share-telegram", dependencies=[Depends(require_api_key)])
 async def share_research_summary_to_telegram(req: ResearchTelegramShareRequest):
     """
     Dispatches formatted institutional AI-powered research intelligence to configured Telegram chat.
@@ -2685,10 +2685,13 @@ def safe_upload_filename(filename: str | None) -> tuple[str, str]:
 
 
 def verify_telegram_secret(request: Request) -> None:
-    """Validates Telegram's X-Telegram-Bot-Api-Secret-Token when configured."""
+    """Validates Telegram's X-Telegram-Bot-Api-Secret-Token (fail-closed)."""
     expected = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
     if not expected:
-        return  # Not configured — legacy open mode (documented: configure for production)
+        raise HTTPException(
+            status_code=401,
+            detail="TELEGRAM_WEBHOOK_SECRET is not configured. Webhook rejected fail-closed.",
+        )
     provided = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
     if not provided or not hmac.compare_digest(provided.encode(), expected.encode()):
         raise HTTPException(status_code=401, detail="Invalid Telegram webhook secret token.")
@@ -3269,7 +3272,7 @@ async def generate_execution_slice(
     }
 
 
-@app.post("/api/execution/simulate_impact")
+@app.post("/api/execution/simulate_impact", dependencies=[Depends(require_api_key)])
 async def simulate_market_impact(
     req: SimulateImpactRequest,
 ):
@@ -3897,7 +3900,7 @@ async def reconcile_ambiguous_order(req: LiveReconcileApiRequest):
         )
 
 
-@app.post("/api/execution/sor/route-quote")
+@app.post("/api/execution/sor/route-quote", dependencies=[Depends(require_api_key)])
 async def get_sor_route_quote(req: SORRouteQuoteApiRequest):
     """
     Computes optimal multi-venue volume distribution and expected execution cost across Binance and Bybit.
@@ -3965,7 +3968,7 @@ async def get_sor_route_quote(req: SORRouteQuoteApiRequest):
         ) from e
 
 
-@app.post("/api/execution/slicer/almgren-chriss")
+@app.post("/api/execution/slicer/almgren-chriss", dependencies=[Depends(require_api_key)])
 async def get_almgren_chriss_schedule(req: AlmgrenChrissScheduleApiRequest):
     """
     Computes classical discrete Almgren-Chriss (2000) optimal trajectory schedule and child slices.
@@ -4241,7 +4244,7 @@ async def get_mastermind_opportunity_signals(
     }
 
 
-@app.post("/api/mastermind/specialists/deploy")
+@app.post("/api/mastermind/specialists/deploy", dependencies=[Depends(require_api_key)])
 async def deploy_mastermind_specialist(payload: dict[str, Any]) -> dict[str, Any]:
     """
     Deploys a dedicated Dynamic Opportunity Specialist agent into the live Mastermind Swarm.
@@ -4294,8 +4297,8 @@ async def get_hermes_agent_status() -> dict[str, Any]:
     return await hermes_bridge.get_status()
 
 
-@app.post("/api/v1/hermes/query")
-@app.post("/api/hermes/query")
+@app.post("/api/v1/hermes/query", dependencies=[Depends(require_api_key)])
+@app.post("/api/hermes/query", dependencies=[Depends(require_api_key)])
 async def query_hermes_agent(payload: dict[str, Any]) -> dict[str, Any]:
     """Dispatch a reasoning query to Hermes Agent headless runner (--oneshot -Q)."""
     from core.cognitive_brain.hermes_agent_bridge import hermes_bridge
@@ -4308,9 +4311,13 @@ async def query_hermes_agent(payload: dict[str, Any]) -> dict[str, Any]:
     provider = payload.get("provider")
     timeout = float(payload.get("timeout", 60.0))
 
-    res = await hermes_bridge.ask_hermes(
-        query=query, model=model, provider=provider, timeout=timeout
-    )
+    try:
+        res = await hermes_bridge.ask_hermes(
+            query=query, model=model, provider=provider, timeout=timeout
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
     if not res.get("success", False):
         raise HTTPException(
             status_code=502, detail=res.get("error", "Hermes Agent execution failed")
@@ -4318,8 +4325,8 @@ async def query_hermes_agent(payload: dict[str, Any]) -> dict[str, Any]:
     return res
 
 
-@app.post("/api/v1/hermes/market-critique")
-@app.post("/api/hermes/market-critique")
+@app.post("/api/v1/hermes/market-critique", dependencies=[Depends(require_api_key)])
+@app.post("/api/hermes/market-critique", dependencies=[Depends(require_api_key)])
 async def hermes_market_critique(payload: dict[str, Any]) -> dict[str, Any]:
     """Ask Hermes Agent to critique an SMC / Order Flow market hypothesis."""
     from core.cognitive_brain.hermes_agent_bridge import hermes_bridge

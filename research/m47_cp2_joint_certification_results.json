@@ -206,8 +206,9 @@
     "all_hurdles_passed": true
   },
   "governance_decision": {
-    "checkpoint_2_status": "CERTIFIED",
+    "checkpoint_2_status": "REVOKED_BY_M62",
+    "superseded_by": "m62_honest_causal_oos_audit.json",
     "tier_progression_allowed": false,
-    "reason": "Checkpoint 2 certified: CPCV DSR 0.9999 >= 0.95 and Profit Factor 1.54 >= 1.45 verified across 747 OOS trades (+0.2709R net)"
+    "reason": "REVOKED by Milestone 62 Causal Re-Audit: Elimination of lookahead fill bias and linspace annualization revealed true negative expectancy (-0.1204R) and daily Sharpe (-1.7197)."
   }
 }

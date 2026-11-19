@@ -85,6 +85,19 @@ class HermesAgentBridge:
         timeout: float = 60.0,
     ) -> dict[str, Any]:
         """Execute a headless query against Hermes Agent and return response text."""
+        if len(query) > 8000:
+            raise ValueError(f"Query length ({len(query)}) exceeds maximum allowed 8000 characters.")
+
+        identifier_re = re.compile(r"^[A-Za-z0-9._:/-]+$")
+        if model is not None:
+            if not identifier_re.match(model) or model.startswith("-"):
+                raise ValueError(f"Invalid model format or flag injection attempt: '{model}'")
+        if provider is not None:
+            if not identifier_re.match(provider) or provider.startswith("-"):
+                raise ValueError(f"Invalid provider format or flag injection attempt: '{provider}'")
+
+        bounded_timeout = max(1.0, min(120.0, float(timeout)))
+
         if not self.is_installed:
             return {
                 "success": False,
@@ -104,7 +117,7 @@ class HermesAgentBridge:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=bounded_timeout)
             out_str = stdout.decode("utf-8", errors="replace").strip()
             err_str = stderr.decode("utf-8", errors="replace").strip()
 

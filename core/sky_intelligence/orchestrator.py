@@ -418,6 +418,8 @@ class SKYIntelligenceOrchestrator:
                 "mean_reversion_prob": vwap_feat.mean_reversion_prob,
             },
             "mtf_alignment": getattr(mtf_context, "stack_alignment", "NEUTRAL"),
+            "governance_status": "RESEARCH_ONLY_UNPROVEN",
+            "audit_warning": "M62 Causal Re-Audit revoked CP-2 certification. Setup is unproven.",
             "explanation": best_setup.explanation_text,
             "correlation_id": cid,
         }

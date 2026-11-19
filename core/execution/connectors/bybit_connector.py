@@ -91,9 +91,8 @@ class BybitV5Connector(BaseExchangeConnector):
             url = f"{url}?{serialized_payload}"
 
         t_start = time.perf_counter()
+        self.assert_outbound_socket_allowed(method=http_method, url=url)
         own_session = self._external_session is None
-        if own_session and self.environment == "PRODUCTION":
-            self.assert_outbound_socket_allowed(method=http_method, url=url)
         session = self._external_session or aiohttp.ClientSession(
             timeout=aiohttp.ClientTimeout(total=self.timeout_sec)
         )
