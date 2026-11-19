@@ -319,9 +319,10 @@ def next_scheduled_agent(db: SignalDB | None = None) -> dict:
             candidates.sort(key=lambda c: (-c["overdue_hours"], c["name"]))
             pick = candidates[0]
         if pick["never_run"]:
+            cmd_slug = "morning" if pick["name"] == "morning_brief" else pick["name"].replace("_", "-")
             reason = (
                 f"{pick['name']} has never run — start the desk with "
-                f"`python main.py agent {pick['name'].replace('_', '-')}`"
+                f"`python main.py agent {cmd_slug}`"
             )
         elif pick["overdue_hours"] > 0:
             reason = (

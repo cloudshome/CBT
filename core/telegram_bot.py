@@ -3316,6 +3316,20 @@ class TelegramBotDispatcher:
                 await self.send_message(default_reply)
             return {"status": "HELP_RETURNED", "text": default_reply}
 
+        # Check Bengali and English Today's Desk triggers (Milestone 66)
+        clean_nl = text.strip().lower()
+        if (
+            clean_nl in ("আজকের মার্কেট", "ajker market", "আজকেরমার্কেট", "ajkermarket", "/আজকের_মার্কেট", "আজকের বাজার")
+            or "আজকের মার্কেট" in text
+        ):
+            from core.telegram.handlers import handle_today
+
+            response_text = await handle_today(args="bn", chat_id=chat_id, identity=identity, lang="bn")
+            telegram_audit.log_command_execution(
+                identity, "/today", "bn", execution_result="EXECUTED"
+            )
+            return {"status": "EXECUTED", "command": "/today", "response": response_text}
+
         # 6. Natural Language Conversational AI Query
         try:
             ai_reply = await self.state_mind.handle_conversational_query(

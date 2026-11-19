@@ -1720,6 +1720,36 @@ async def parse_trade_command(req: CommandParseRequest):
     return asdict(result)
 
 
+@app.get("/api/desk/today")
+async def get_desk_today(
+    equity: float = Query(10_000.0, description="Account equity in USD"),
+    source: str = Query("auto", description="Data source: auto, parquet, live"),
+):
+    """Milestone 66: Unified 10-second Today's Desk P2_RP risk-parity shadow desk endpoint."""
+    from core.strategies.p2_risk_parity import (
+        TodayDeskSnapshot,
+        evaluate_p2_rp_snapshot,
+        load_candles_for_p2_rp,
+    )
+
+    try:
+        candles, resolved_source = load_candles_for_p2_rp(source=source)
+        snapshot = evaluate_p2_rp_snapshot(
+            candles_by_symbol=candles,
+            account_equity=equity,
+            data_source=resolved_source,
+        )
+        return snapshot.to_dict()
+    except Exception as e:
+        logger.error(f"Error evaluating Today's Desk snapshot: {e}")
+        snapshot = TodayDeskSnapshot.create_fail_closed(
+            account_equity=equity,
+            data_source=source.upper(),
+            reason=str(e),
+        )
+        return snapshot.to_dict()
+
+
 @app.post("/api/desk/ask", dependencies=[Depends(require_api_key)])
 async def ask_desk_copilot(req: AskDeskRequest):
     ctx = req.context or {}

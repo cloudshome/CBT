@@ -796,6 +796,52 @@ async def handle_dictionary(
     return msg
 
 
+async def handle_today(
+    args: str = "",
+    chat_id: Any = None,
+    identity: TelegramUserIdentity | None = None,
+    lang: str | None = None,
+) -> str:
+    """Milestone 66: Unified 10-second Today's Desk P2_RP risk-parity daily briefing in English or Bengali."""
+    from core.strategies.p2_risk_parity import (
+        TodayDeskSnapshot,
+        evaluate_p2_rp_snapshot,
+        format_today_desk_briefing,
+        load_candles_for_p2_rp,
+    )
+    from core.telegram_bot import telegram_bot
+
+    clean_args = (args or "").strip().lower()
+    is_bn = (
+        lang == "bn"
+        or clean_args in ("bn", "bangla", "bengali", "আজকের মার্কেট", "ajker market")
+        or any(ord(c) >= 0x0980 and ord(c) <= 0x09FF for c in clean_args)
+    )
+    target_lang = "bn" if is_bn else "en"
+
+    try:
+        candles, data_source = load_candles_for_p2_rp(source="auto")
+        snapshot = evaluate_p2_rp_snapshot(
+            candles_by_symbol=candles,
+            account_equity=10_000.0,
+            data_source=data_source,
+        )
+    except Exception as e:
+        logger.error(f"Telegram /today error loading candles: {e}")
+        snapshot = TodayDeskSnapshot.create_fail_closed(
+            account_equity=10_000.0,
+            data_source="AUTO",
+            reason=str(e),
+        )
+
+    briefing = format_today_desk_briefing(snapshot, lang=target_lang)
+    msg = f"```\n{briefing}\n```"
+    if chat_id:
+        await telegram_bot.send_message(msg, chat_id=chat_id)
+    return msg
+    return msg
+
+
 async def handle_candidate(
     args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
 ) -> str:
@@ -1628,6 +1674,14 @@ def register_all_v5_commands() -> None:
             required_role=TelegramRole.ANALYST,
             aliases=["/define", "/glossary", "/term"],
             argument_schema="<term>",
+        ),
+        TelegramCommand(
+            name="/today",
+            description="Today's Desk P2_RP risk-parity shadow desk daily briefing (English/Bengali)",
+            handler=handle_today,
+            required_role=TelegramRole.ANALYST,
+            aliases=["/ajker_market", "/desk_today"],
+            argument_schema="[bn|en]",
         ),
     ]
 

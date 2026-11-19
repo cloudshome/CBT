@@ -81,6 +81,7 @@ from cli.daily import (
     cmd_sourcetrust,
     cmd_state,
     cmd_stats,
+    cmd_today,
     cmd_tradestate,
     cmd_watch,
     cmd_web,
@@ -825,7 +826,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_agent.set_defaults(func=cmd_agent)
     a_sub = p_agent.add_subparsers(dest="action", required=True)
-    p_morning = a_sub.add_parser("morning", help="morning briefing across the watchlist")
+    p_morning = a_sub.add_parser(
+        "morning",
+        aliases=["morning-brief", "morning_brief"],
+        help="morning briefing across the watchlist",
+    )
     p_morning.add_argument(
         "--symbols",
         default=None,
@@ -890,6 +895,31 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_desk.add_argument("--json", action="store_true")
     p_desk.set_defaults(func=cmd_desk)
+
+    p_today = sub.add_parser(
+        "today",
+        help="10-second unified Today's Desk P2_RP risk-parity shadow desk briefing",
+    )
+    p_today.add_argument(
+        "--equity",
+        type=float,
+        default=10000.0,
+        help="Account equity in USD (default: 10,000.0)",
+    )
+    p_today.add_argument(
+        "--source",
+        choices=["auto", "parquet", "live"],
+        default="auto",
+        help="Data source: auto (live with parquet fallback), parquet, or live",
+    )
+    p_today.add_argument(
+        "--lang",
+        choices=["en", "bn"],
+        default="en",
+        help="Display language: en (English) or bn (Bengali)",
+    )
+    p_today.add_argument("--json", action="store_true", help="Output JSON snapshot")
+    p_today.set_defaults(func=cmd_today)
 
     p_daily = sub.add_parser(
         "daily",

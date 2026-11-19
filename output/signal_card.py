@@ -46,6 +46,32 @@ def format_signal_card(intel: dict) -> str:
         "label", intel.get("market_structure", "Normal")
     )
 
+    is_no_trade = (
+        signal in ("WAIT", "NO TRADE")
+        or (intel.get("decision") or {}).get("action") in ("WAIT", "NO TRADE")
+        or "WAIT" in action_badge
+        or "NO TRADE" in action_badge
+    )
+
+    if is_no_trade:
+        why_header = "Why AI Is Waiting (Stand Aside):"
+        filtered_reasons = [str(r) for r in reasons]
+        if not filtered_reasons:
+            filtered_reasons = ["Risk gate, regime filter, or setup criteria closed — capital preservation prioritized."]
+    else:
+        why_header = "Why AI Took This Trade:"
+        filtered_reasons = []
+        for r in reasons:
+            r_str = str(r)
+            r_lower = r_str.lower()
+            if signal == "SELL" and ("bull" in r_lower or "choch up" in r_lower or "bos up" in r_lower):
+                continue
+            if signal == "BUY" and ("bear" in r_lower or "choch down" in r_lower or "bos down" in r_lower):
+                continue
+            filtered_reasons.append(r_str)
+        if not filtered_reasons:
+            filtered_reasons = [str(r) for r in reasons[:4]]
+
     lines = []
     lines.append(
         "╔══════════════════════════════════════════════════════════════════════════════════╗"
@@ -92,10 +118,8 @@ def format_signal_card(intel: dict) -> str:
     lines.append(
         "├──────────────────────────────────────────────────────────────────────────────────┤"
     )
-    lines.append(
-        "│   Why AI Took This Trade:                                                        │"
-    )
-    for r in reasons[:4]:
+    lines.append(f"│   {why_header:<78}│")
+    for r in filtered_reasons[:4]:
         lines.append(f"│   • {r[:74]:<76}│")
     lines.append(
         "├──────────────────────────────────────────────────────────────────────────────────┤"

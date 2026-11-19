@@ -226,10 +226,21 @@ def mentor(payload: dict, db=None) -> str:
     p = plans[0]
     out.append(f"2. The setup I like most: {p['type']} ({p['confidence']}%).")
     out.append(f"   Condition: {p['condition']}")
-    out.append(
-        f"3. Entry {p['entry']:,.2f} — "
-        f"{'we can enter immediately' if p['status'] == 'active' else 'we WAIT for the trigger — do not chase'}."
-    )
+
+    decision = payload.get("decision") or {}
+    action = decision.get("action", sig.get("action"))
+    blocked_by = decision.get("blocked_by") or []
+    is_vetoed = action in ("NO TRADE", "WAIT") or sig.get("action") == "NO TRADE" or len(blocked_by) > 0
+
+    if is_vetoed:
+        veto_reason = f" ({'; '.join(blocked_by)})" if blocked_by else ""
+        entry_guidance = f"DESK VETOED — DO NOT ENTER{veto_reason}. Protect capital and stand aside"
+    elif p.get("status") == "active":
+        entry_guidance = "we can enter immediately"
+    else:
+        entry_guidance = "we WAIT for the trigger — do not chase"
+
+    out.append(f"3. Entry {p['entry']:,.2f} — {entry_guidance}.")
     out.append(
         f"4. Stop at {p['stop_loss']:,.2f}. That's the line where the idea is wrong. "
         f"Risk per trade ≈ {abs(p['entry'] - p['stop_loss']):,.2f}."
@@ -238,8 +249,9 @@ def mentor(payload: dict, db=None) -> str:
         f"5. Take profits at {', '.join(f'{tp:,.2f}' for tp in p['take_profits'])}. "
         f"TP1 banks the first target, TP2 lets the winner run."
     )
+    rr_val = p.get("risk_reward", 2.0)
     out.append(
-        f"6. Risk:reward ≈ {p['risk_reward']}. "
+        f"6. Risk:reward ≈ {rr_val}. "
         f"With a positive R:R you can be right less than half the time and still profit."
     )
     for i, r in enumerate(p.get("reasons", [])[:3], start=7):

@@ -153,18 +153,33 @@ def analyze_mtf(
         alignment = "mixed"
 
     # Key levels carried down from the higher frames
+    current_price = None
+    for tf in ("1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w", "1M"):
+        v = views.get(tf, {})
+        if v.get("available") and v.get("price") is not None:
+            current_price = float(v["price"])
+            break
+
     resistances, supports = [], []
     for tf in ("1M", "1w", "1d", "4h", "1h"):
         v = views.get(tf, {})
         if not v.get("available"):
             continue
-        price = v["price"]
-        if v.get("swing_high") and v["swing_high"] > price:
-            resistances.append(v["swing_high"])
-        if v.get("swing_low") and v["swing_low"] < price:
-            supports.append(v["swing_low"])
-    resistances = sorted({round(r, 2) for r in resistances}, reverse=True)[:3]
-    supports = sorted({round(s, 2) for s in supports})[-3:]
+        p = current_price if current_price is not None else float(v.get("price", 0.0))
+        sh = v.get("swing_high")
+        sl = v.get("swing_low")
+        if sh is not None and float(sh) > p:
+            resistances.append(float(sh))
+        if sl is not None and float(sl) < p:
+            supports.append(float(sl))
+
+    # Strict polarity against current price: r > current_price, s < current_price
+    if current_price is not None:
+        resistances = [r for r in resistances if r > current_price]
+        supports = [s for s in supports if s < current_price]
+
+    resistances = sorted({round(r, 2) for r in resistances})[:3]  # sorted ascending, nearest 3
+    supports = sorted({round(s, 2) for s in supports}, reverse=True)[:3]  # sorted descending, nearest 3
 
     pivot = views.get("1d", {}).get("price")
     return {
@@ -174,6 +189,8 @@ def analyze_mtf(
         "ltf_bias": ltf_bias,
         "alignment": {"score": alignment_score, "label": alignment},
         "key_levels": {"support": supports, "resistance": resistances},
+        "resistances": resistances,
+        "supports": supports,
         "pivot": pivot,
         "suggested_bias": "bullish"
         if htf_bias == "bullish" and ltf_bias != "bearish"

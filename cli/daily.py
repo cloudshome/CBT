@@ -59,9 +59,14 @@ def _print_human(payload: dict) -> None:
             f"conf={sig['confidence']:<7} {sig['signal_id']}"
         )
     if sig.get("entry"):
+        rr = sig.get("risk_reward", 0.0)
+        if sig.get("stop_loss") and sig.get("take_profit") and sig.get("entry"):
+            risk_dist = abs(sig["entry"] - sig["stop_loss"])
+            if risk_dist > 1e-6:
+                rr = abs(sig["take_profit"] - sig["entry"]) / risk_dist
         print(
             f"   entry {sig['entry']:>12,.2f}   SL {sig['stop_loss']:>10,.2f}   "
-            f"TP {sig['take_profit']:>12,.2f}   RR {sig['risk_reward']:.2f}"
+            f"TP {sig['take_profit']:>12,.2f}   RR {rr:.2f}"
         )
     print(f"   reason: {sig['reason']}")
     if decision:
@@ -304,6 +309,18 @@ def cmd_coach(args) -> int:
     )
     from data.database import SignalDB
 
+    # If --term is passed, print the requested glossary definition cleanly (standalone)
+    # without forcing an unrelated market scan
+    if getattr(args, "term", None):
+        term = next((k for k in GLOSSARY if k.lower() == args.term.lower()), None)
+        if term:
+            meaning, why = GLOSSARY[term]
+            print(f"📖 {term}: {meaning}\n   Why it matters: {why}")
+            return 0
+        else:
+            print(f"[!] unknown term '{args.term}' — try: {', '.join(GLOSSARY)}")
+            return 1
+
     # 1) teach from the current market (fresh scan, no DB save)
     payload = run_scan(args.symbol, args.tf, args.bars, save_db=False)
     print("=" * 70)
@@ -329,14 +346,6 @@ def cmd_coach(args) -> int:
     for f in fb:
         print(" ", f)
 
-    # 3) optional glossary deep-dive
-    if args.term:
-        term = next((k for k in GLOSSARY if k.lower() == args.term.lower()), None)
-        if term:
-            meaning, why = GLOSSARY[term]
-            print(f"\n📖 {term}: {meaning}\n   Why it matters: {why}")
-        else:
-            print(f"\n[!] unknown term '{args.term}' — try: {', '.join(GLOSSARY)}")
     return 0
 
 
@@ -838,7 +847,7 @@ def cmd_agent(args) -> int:
             if result.get("data"):
                 print(json.dumps(result["data"], indent=2, default=str))
         return 0
-    if args.action == "morning":
+    if args.action in ("morning", "morning-brief", "morning_brief"):
         briefing = morning_briefing(
             symbols=args.symbols, timeframe=args.tf, bars=args.bars, save=args.save
         )
@@ -1014,6 +1023,41 @@ def cmd_practice(args) -> int:
         print(json.dumps(card, indent=2, default=str))
         return 0
     print(format_practice_scorecard(card))
+    return 0
+
+
+def cmd_today(args) -> int:
+    """Unified 10-second Today's Desk P2_RP risk-parity shadow desk briefing."""
+    from core.strategies.p2_risk_parity import (
+        TodayDeskSnapshot,
+        evaluate_p2_rp_snapshot,
+        format_today_desk_briefing,
+        load_candles_for_p2_rp,
+    )
+
+    equity = float(getattr(args, "equity", 10000.0) or 10000.0)
+    source = str(getattr(args, "source", "auto") or "auto").lower()
+    lang = str(getattr(args, "lang", "en") or "en").lower()
+    as_json = bool(getattr(args, "json", False))
+
+    try:
+        candles, data_source = load_candles_for_p2_rp(source=source)
+        snapshot = evaluate_p2_rp_snapshot(
+            candles_by_symbol=candles,
+            account_equity=equity,
+            data_source=data_source,
+        )
+    except Exception as e:
+        snapshot = TodayDeskSnapshot.create_fail_closed(
+            account_equity=equity,
+            data_source=source.upper(),
+            reason=str(e),
+        )
+
+    if as_json:
+        print(snapshot.to_json(indent=2))
+    else:
+        print(format_today_desk_briefing(snapshot, lang=lang))
     return 0
 
 

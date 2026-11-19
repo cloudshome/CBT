@@ -190,7 +190,28 @@ def cmd_edge_validate(args) -> int:
             client = StoreClient(exchange=args.exchange, market=args.market)
         else:
             client = _client()
-        df = client.klines(symbol, args.tf, args.bars)
+        try:
+            df = client.klines(symbol, args.tf, args.bars)
+        except ConnectionError as net_err:
+            # Fallback to local Parquet candle store if available
+            try:
+                from data.store import StoreClient
+
+                store_client = StoreClient(exchange=args.exchange, market=args.market)
+                df = store_client.klines(symbol, args.tf, args.bars)
+                if df.empty or len(df) < args.min_bars:
+                    raise FileNotFoundError("Insufficient local store candles")
+                print(
+                    f"[i] Network unavailable ({net_err}); fell back to local Parquet candle store ({len(df)} bars).",
+                    file=sys.stderr,
+                )
+            except Exception:
+                print(
+                    f"[!] Offline / Connection Error: Unable to fetch candles for {symbol} ({net_err}).\n"
+                    f"    Check network connectivity or run with `--source store` with populated local candles.",
+                    file=sys.stderr,
+                )
+                return 1
         result = edge_validate_report(
             df,
             symbol=symbol,
