@@ -9,7 +9,7 @@ Verifies:
 2. Zero-Leverage Cap Enforcement: Gross exposure of S1, S2-Div, and P2_RP never exceeds
    1.0001 on any bar even in ultra-low volatility regimes.
 3. Balanced Risk Contribution: S1 and S2-Div variance contributions in P2_RP are within
-   [30%, 70%] (fixing M64's 95%/5% dominance bug).
+   strict [35%, 65%] (fixing M64's 95%/5% dominance bug and satisfying Hurdle 6).
 4. Dynamic Hurdle Count & Capital Lock: passed_count + failed_count == total_hurdles and
    REAL_CAPITAL_ENABLED is False.
 """
@@ -179,8 +179,9 @@ def test_zero_leverage_cap_enforcement():
 def test_balanced_risk_contribution():
     """
     Verifies that the realized variance contributions of S1 and S2-Div in P2_RP
-    are balanced within [30%, 70%] across both the Full Period and Sealed OOS,
-    formally resolving M64's 95%/5% dominance bug.
+    are balanced within strict [35%, 65%] bounds across the Full Period,
+    formally resolving M64's 95%/5% dominance bug and satisfying Hurdle 6.
+    Also verifies S2-Div volatility targeting (15% target) and switch count.
     """
     results_path = ROOT_DIR / "research" / "m65_risk_parity_stress_results.json"
     assert results_path.exists(), "M65 results JSON not found. Run simulation first."
@@ -193,8 +194,9 @@ def test_balanced_risk_contribution():
     s1_rc = fp_rc["s1_rc_pct"]
     s2_rc = fp_rc["s2_rc_pct"]
 
-    assert 30.0 <= s1_rc <= 70.0, f"S1 risk contribution outside [30%, 70%]: {s1_rc}%"
-    assert 30.0 <= s2_rc <= 70.0, f"S2-Div risk contribution outside [30%, 70%]: {s2_rc}%"
+    # Strict [35%, 65%] bounds from directive
+    assert 35.0 <= s1_rc <= 65.0, f"S1 risk contribution outside strict [35%, 65%]: {s1_rc}%"
+    assert 35.0 <= s2_rc <= 65.0, f"S2-Div risk contribution outside strict [35%, 65%]: {s2_rc}%"
     assert np.isclose(s1_rc + s2_rc, 100.0, atol=0.1), f"Risk contributions do not sum to 100%: {s1_rc + s2_rc}%"
 
     # Sealed OOS Realized Risk Contributions
@@ -204,6 +206,22 @@ def test_balanced_risk_contribution():
 
     assert 25.0 <= s1_oos_rc <= 75.0, f"S1 OOS risk contribution skewed: {s1_oos_rc}%"
     assert 25.0 <= s2_oos_rc <= 75.0, f"S2-Div OOS risk contribution skewed: {s2_oos_rc}%"
+
+    # S2-Div Realized Volatility Target Verification (Target: 15.0%)
+    s2_fp = res["splits_scorecard"]["full_period"]["s2_div"]
+    assert 13.0 <= s2_fp["annualized_vol_pct"] <= 17.0, (
+        f"S2-Div realized volatility {s2_fp['annualized_vol_pct']}% deviated from 15% target"
+    )
+
+    # S2-Div Membership Switches Verification (distinguished from weekly rebalance legs)
+    regime_1 = res["stress_matrix"]["regime_1_baseline"]
+    s2_switches = regime_1["membership_switches"]
+    assert 100 <= s2_switches <= 160, (
+        f"S2-Div membership switches {s2_switches} outside expected [100, 160] range"
+    )
+    assert regime_1["rebalance_trades"] < 500, (
+        f"S2-Div rebalance trades {regime_1['rebalance_trades']} failed deadband threshold"
+    )
 
 
 # ==============================================================================
@@ -233,6 +251,8 @@ def test_dynamic_hurdle_count_and_capital_lock():
         f"Arithmetic drift: passed ({passed_count}) + failed ({failed_count}) != total ({total_hurdles})"
     )
     assert hs["summary_text"] == f"{passed_count} Passed / {failed_count} Failed"
+    assert passed_count == 4, f"Expected 4 passed hurdles, got {passed_count}"
+    assert failed_count == 2, f"Expected 2 failed hurdles, got {failed_count}"
 
     # 2. Check each hurdle in dictionary is boolean
     hurdles = res["cp2_hurdles"]
