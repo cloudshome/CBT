@@ -13,6 +13,7 @@ import uuid
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from core.correlation_context import get_correlation_id
 from core.database import db_manager
 
 logger = logging.getLogger("ai_quant_sentinel.audit_bus")
@@ -28,6 +29,7 @@ class AuditEvent:
     reason: str
     details: dict[str, Any] = field(default_factory=dict)
     software_version: str = "2.0.0"
+    correlation_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -55,6 +57,7 @@ class AuditBus:
                         reason TEXT NOT NULL,
                         details_json TEXT,
                         software_version TEXT NOT NULL,
+                        correlation_id TEXT,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                     """
@@ -65,6 +68,18 @@ class AuditBus:
                 conn.execute(
                     "CREATE INDEX IF NOT EXISTS idx_audit_sym ON system_audit_events(symbol)"
                 )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_audit_cid ON system_audit_events(correlation_id)"
+                )
+
+                # Ensure backwards-compatible schema migration for existing tables
+                cursor = conn.execute("PRAGMA table_info(system_audit_events);")
+                cols = [r[1] for r in cursor.fetchall()]
+                if "correlation_id" not in cols:
+                    conn.execute("ALTER TABLE system_audit_events ADD COLUMN correlation_id TEXT;")
+                    conn.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_audit_cid ON system_audit_events(correlation_id)"
+                    )
                 conn.commit()
         except Exception as e:
             logger.warning(f"Could not initialize system_audit_events table: {e}")
@@ -76,6 +91,7 @@ class AuditBus:
         reason: str,
         severity: str = "INFO",
         details: dict[str, Any] | None = None,
+        correlation_id: str | None = None,
     ) -> AuditEvent:
         """Emits and records an immutable audit event."""
         now = time.time()
@@ -83,6 +99,7 @@ class AuditBus:
         # are recorded within 1 ms → UNIQUE violation and a silently DROPPED
         # audit record. UUID suffix keeps the audit ledger lossless.
         event_id = f"AUD-{int(now * 1000)}-{event_type[:4]}-{uuid.uuid4().hex[:8]}"
+        cid = correlation_id or get_correlation_id()
         ev = AuditEvent(
             event_id=event_id,
             timestamp=now,
@@ -91,6 +108,7 @@ class AuditBus:
             severity=severity.upper(),
             reason=reason,
             details=details or {},
+            correlation_id=cid,
         )
 
         # In-memory buffer
@@ -104,8 +122,8 @@ class AuditBus:
                 conn.execute(
                     """
                     INSERT INTO system_audit_events (
-                        event_id, timestamp, event_type, symbol, severity, reason, details_json, software_version
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        event_id, timestamp, event_type, symbol, severity, reason, details_json, software_version, correlation_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         ev.event_id,
@@ -116,6 +134,7 @@ class AuditBus:
                         ev.reason,
                         json.dumps(ev.details),
                         ev.software_version,
+                        ev.correlation_id,
                     ),
                 )
                 conn.commit()
@@ -221,6 +240,8 @@ class AuditBus:
                     )
                 rows = cursor.fetchall()
                 for r in rows:
+                    keys = r.keys()
+                    cid = r["correlation_id"] if "correlation_id" in keys else None
                     events.append(
                         AuditEvent(
                             event_id=r["event_id"],
@@ -231,6 +252,7 @@ class AuditBus:
                             reason=r["reason"],
                             details=json.loads(r["details_json"] or "{}"),
                             software_version=r["software_version"],
+                            correlation_id=cid,
                         )
                     )
         except Exception as e:
@@ -241,6 +263,43 @@ class AuditBus:
                     :limit
                 ]
             return list(reversed(self._memory_ring))[:limit]
+
+        return events
+
+    def get_events_by_correlation_id(self, correlation_id: str) -> list[AuditEvent]:
+        """Retrieves all audit events tagged with a specific correlation ID."""
+        events: list[AuditEvent] = []
+        try:
+            with db_manager.get_trading_conn() as conn:
+                cursor = conn.execute(
+                    "SELECT * FROM system_audit_events WHERE correlation_id = ? ORDER BY timestamp ASC",
+                    (correlation_id,),
+                )
+                rows = cursor.fetchall()
+                for r in rows:
+                    keys = r.keys()
+                    cid = r["correlation_id"] if "correlation_id" in keys else None
+                    events.append(
+                        AuditEvent(
+                            event_id=r["event_id"],
+                            timestamp=float(r["timestamp"]),
+                            event_type=r["event_type"],
+                            symbol=r["symbol"],
+                            severity=r["severity"],
+                            reason=r["reason"],
+                            details=json.loads(r["details_json"] or "{}"),
+                            software_version=r["software_version"],
+                            correlation_id=cid,
+                        )
+                    )
+        except Exception as e:
+            logger.error(f"Error fetching audit events by correlation_id {correlation_id}: {e}")
+
+        # Also search memory buffer in case DB was mocked or bypassed
+        seen_ids = {e.event_id for e in events}
+        for mem_ev in self._memory_ring:
+            if mem_ev.correlation_id == correlation_id and mem_ev.event_id not in seen_ids:
+                events.append(mem_ev)
 
         return events
 

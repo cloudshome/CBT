@@ -366,3 +366,4 @@ class DecisionOutput:
     risk_gate_passed: bool
     explanation_dossier: dict[str, Any]
     no_trade_reason: str | None = None
+    correlation_id: str | None = None

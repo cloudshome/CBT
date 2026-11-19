@@ -11,6 +11,7 @@ from core.audit_bus import audit_bus
 from core.database import db_manager
 from core.portfolio_shadow import portfolio_shadow
 from core.provenance_engine import provenance_engine
+from core.slo_monitor import slo_monitor
 
 
 def generate_prometheus_metrics() -> str:
@@ -42,6 +43,10 @@ def generate_prometheus_metrics() -> str:
         f"sky_uptime_seconds {round(time.time() - getattr(generate_prometheus_metrics, '_start_time', time.time()), 2)}",
         "",
     ]
+
+    # Append operational SLO rolling percentiles & anomaly counters
+    lines.extend(slo_monitor.generate_prometheus_lines())
+
     return "\n".join(lines)
 
 

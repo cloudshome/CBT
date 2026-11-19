@@ -11,6 +11,8 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
+from core.correlation_context import get_correlation_id
+
 logger = logging.getLogger("ai_quant_sentinel.half_kelly_sizer")
 
 
@@ -31,6 +33,7 @@ class HalfKellySizingResult:
     invalidation_distance_pct: float
     hurdle_passed: bool = True
     narrative: str = ""
+    correlation_id: str | None = None
 
 
 class HalfKellyPositionSizer:
@@ -56,10 +59,12 @@ class HalfKellyPositionSizer:
         historical_sample_size: int = 50,
         current_drawdown_pct: float = 0.0,
         symbol: str = "BTC/USDT",
+        correlation_id: str | None = None,
     ) -> HalfKellySizingResult:
         """
         Calculates position size in base units and USD, strictly capped by account risk rules.
         """
+        cid = correlation_id or get_correlation_id()
         if entry_price <= 0 or stop_loss <= 0 or account_equity <= 0:
             return HalfKellySizingResult(
                 symbol=symbol,
@@ -77,6 +82,7 @@ class HalfKellyPositionSizer:
                 invalidation_distance_pct=0.0,
                 hurdle_passed=False,
                 narrative="Invalid price or equity inputs.",
+                correlation_id=cid,
             )
 
         # Risk distance and reward distance
@@ -100,6 +106,7 @@ class HalfKellyPositionSizer:
                 invalidation_distance_pct=0.0,
                 hurdle_passed=False,
                 narrative="Stop loss equals entry price.",
+                correlation_id=cid,
             )
 
         b = reward_dist / risk_dist  # Payoff ratio (R:R)
@@ -127,6 +134,7 @@ class HalfKellyPositionSizer:
                 invalidation_distance_pct=round((risk_dist / entry_price) * 100.0, 2),
                 hurdle_passed=False,
                 narrative=f"Negative mathematical expectancy (p={p:.2f}, R:R={b:.2f}R). Sizing zeroed out.",
+                correlation_id=cid,
             )
 
         # Half-Kelly for conservative institutional variance mitigation
@@ -178,6 +186,7 @@ class HalfKellyPositionSizer:
             invalidation_distance_pct=round(inv_pct, 2),
             hurdle_passed=True,
             narrative=narrative,
+            correlation_id=cid,
         )
 
 
