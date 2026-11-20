@@ -76,15 +76,16 @@ from cli.daily import (
     cmd_practice,
     cmd_risk,
     cmd_scan,
+    cmd_shadow,
     cmd_signal,
     cmd_sources,
     cmd_sourcetrust,
     cmd_state,
     cmd_stats,
-    cmd_shadow,
     cmd_today,
     cmd_tradestate,
     cmd_watch,
+    cmd_watchdog,
     cmd_web,
     cmd_weekly,
 )
@@ -950,6 +951,29 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_shadow.add_argument("--json", action="store_true", help="Output JSON format")
     p_shadow.set_defaults(func=cmd_shadow)
+
+    p_watchdog = sub.add_parser(
+        "watchdog",
+        help="24/7 CBT Ops Watchdog health inspection and automated ledger backup",
+    )
+    p_watchdog.add_argument(
+        "--check",
+        action="store_true",
+        help="Evaluate operational health checks (default)",
+    )
+    p_watchdog.add_argument(
+        "--backup",
+        action="store_true",
+        help="Execute safe online SQLite ledger backup (.db.gz)",
+    )
+    p_watchdog.add_argument(
+        "--lang",
+        choices=["en", "bn"],
+        default="en",
+        help="Display language: en (English) or bn (Bengali)",
+    )
+    p_watchdog.add_argument("--json", action="store_true", help="Output JSON format")
+    p_watchdog.set_defaults(func=cmd_watchdog)
 
     p_daily = sub.add_parser(
         "daily",

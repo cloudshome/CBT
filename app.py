@@ -15,6 +15,7 @@ import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import asdict
+from datetime import UTC, datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any
@@ -1811,6 +1812,39 @@ async def run_desk_shadow_cycle(
         return {
             "cycle": {"status": "ERROR", "reason": str(e), "fills": 0, "notified": False},
             "scorecard": get_shadow_scorecard(),
+            "capital_mode": "TIER_0_PAPER",
+            "real_capital_enabled": False,
+        }
+
+
+@app.get("/api/desk/watchdog")
+async def get_desk_watchdog():
+    """Milestone 71: 24/7 P2_RP Ops Watchdog Health Report."""
+    from core.ops.p2_shadow_watchdog import run_watchdog_check
+
+    try:
+        report = run_watchdog_check(auto_backup=False)
+        return report.to_dict()
+    except Exception as e:
+        logger.error(f"Error evaluating ops watchdog report: {e}")
+        return {
+            "status": "CRITICAL",
+            "checked_at_utc": datetime.now(UTC).isoformat(),
+            "last_bar_ts_utc": None,
+            "last_bar_age_hours": None,
+            "db_integrity": False,
+            "disk_free_mb": 0.0,
+            "last_backup_file": None,
+            "last_backup_at_utc": None,
+            "backup_count": 0,
+            "active_alerts": [
+                {
+                    "code": "WATCHDOG_INTERNAL_ERROR",
+                    "severity": "CRITICAL",
+                    "message_en": f"Internal error evaluating watchdog checks: {e}",
+                    "message_bn": f"ওয়াচডগ চেক মূল্যায়নে অভ্যন্তরীণ ত্রুটি: {e}",
+                }
+            ],
             "capital_mode": "TIER_0_PAPER",
             "real_capital_enabled": False,
         }

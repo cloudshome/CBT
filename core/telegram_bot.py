@@ -3345,6 +3345,21 @@ class TelegramBotDispatcher:
             )
             return {"status": "EXECUTED", "command": "/shadow", "response": response_text}
 
+        # Check Bengali and English Ops Watchdog triggers (Milestone 71)
+        if (
+            clean_nl in ("সিস্টেম চেক", "ops check", "সিস্টেমচেক", "opscheck", "/ops_check", "/সিস্টেম_চেক", "watchdog", "ওয়াচডগ", "ops")
+            or "সিস্টেম চেক" in text
+            or "ops check" in text
+        ):
+            from core.telegram.handlers import handle_ops
+
+            target_l = "bn" if any(c in text for c in ["সিস্টেম", "চেক", "ওয়াচডগ"]) else "en"
+            response_text = await handle_ops(args=target_l, chat_id=chat_id, identity=identity, lang=target_l)
+            telegram_audit.log_command_execution(
+                identity, "/ops", target_l, execution_result="EXECUTED"
+            )
+            return {"status": "EXECUTED", "command": "/ops", "response": response_text}
+
         # 6. Natural Language Conversational AI Query
         try:
             ai_reply = await self.state_mind.handle_conversational_query(

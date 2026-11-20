@@ -10,6 +10,7 @@ vi.mock('../services/api', () => ({
     getShadowScorecard: vi.fn(),
     getShadowHistory: vi.fn(),
     runShadowCycle: vi.fn(),
+    getWatchdogReport: vi.fn(),
   },
   ApiError: class ApiError extends Error {
     statusCode: number;
@@ -197,6 +198,21 @@ const mockShadowHistory = {
   ],
 };
 
+const mockWatchdogReport = {
+  status: 'HEALTHY',
+  checked_at_utc: '2026-11-20T12:00:00Z',
+  last_bar_ts_utc: 1795161600000,
+  last_bar_age_hours: 2.1,
+  db_integrity: true,
+  disk_free_mb: 25000.0,
+  last_backup_file: 'p2_shadow_ledger_20261120.db.gz',
+  last_backup_at_utc: '2026-11-20T11:00:00Z',
+  backup_count: 5,
+  active_alerts: [],
+  capital_mode: 'TIER_0_PAPER',
+  real_capital_enabled: false,
+};
+
 describe('P2ShadowDesk Component', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -204,6 +220,7 @@ describe('P2ShadowDesk Component', () => {
     vi.mocked(api.getTodayDeskSnapshot).mockResolvedValue(mockTodayData as any);
     vi.mocked(api.getShadowScorecard).mockResolvedValue(mockShadowScorecard as any);
     vi.mocked(api.getShadowHistory).mockResolvedValue(mockShadowHistory as any);
+    vi.mocked(api.getWatchdogReport).mockResolvedValue(mockWatchdogReport as any);
     vi.mocked(api.runShadowCycle).mockResolvedValue({
       cycle: { status: 'COMPLETED', fills: 1 },
       scorecard: mockShadowScorecard as any,
@@ -367,6 +384,35 @@ describe('P2ShadowDesk Component', () => {
         'Shadow Cycle Executed',
         expect.stringMatching(/Shadow Cycle: COMPLETED \(1 fills executed under TIER_0_PAPER\)/i)
       );
+    });
+  });
+
+  it('renders Ops Health Pill in HEALTHY state with backup metadata', async () => {
+    render(<P2ShadowDesk />);
+
+    await waitFor(() => {
+      expect(screen.getByText('OPS: HEALTHY')).toBeInTheDocument();
+    });
+  });
+
+  it('renders Ops Health Pill in ALERT state when operational alerts are active', async () => {
+    vi.mocked(api.getWatchdogReport).mockResolvedValue({
+      ...mockWatchdogReport,
+      status: 'DEGRADED',
+      active_alerts: [
+        {
+          code: 'MISSED_BAR_ALERT',
+          severity: 'DEGRADED',
+          message_en: 'Missed 4h bar: last bar age is 6.2h (> 5.0h limit)',
+          message_bn: '৪ ঘণ্টার বার মিস হয়েছে: সর্বশেষ বারের বয়স ৬.২ ঘণ্টা',
+        },
+      ],
+    } as any);
+
+    render(<P2ShadowDesk />);
+
+    await waitFor(() => {
+      expect(screen.getByText('OPS: ALERT (1)')).toBeInTheDocument();
     });
   });
 });

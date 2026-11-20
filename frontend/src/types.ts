@@ -3284,6 +3284,28 @@ export interface ShadowRunResponse {
   real_capital_enabled: boolean;
 }
 
+export interface WatchdogAlert {
+  code: string;
+  severity: 'HEALTHY' | 'DEGRADED' | 'CRITICAL' | 'INFO' | string;
+  message_en: string;
+  message_bn: string;
+}
+
+export interface WatchdogReport {
+  status: 'HEALTHY' | 'DEGRADED' | 'CRITICAL' | 'NOT_INITIALIZED' | string;
+  checked_at_utc: string;
+  last_bar_ts_utc: number | null;
+  last_bar_age_hours: number | null;
+  db_integrity: boolean;
+  disk_free_mb: number;
+  last_backup_file: string | null;
+  last_backup_at_utc: string | null;
+  backup_count: number;
+  active_alerts: WatchdogAlert[];
+  capital_mode: string;
+  real_capital_enabled: boolean;
+}
+
 
 
 

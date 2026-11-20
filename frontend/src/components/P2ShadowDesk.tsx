@@ -16,6 +16,7 @@ import {
   ShadowScorecard,
   ShadowBar,
   ShadowFill,
+  WatchdogReport,
 } from '../types';
 
 interface P2ShadowDeskProps {
@@ -166,6 +167,7 @@ export const P2ShadowDesk: React.FC<P2ShadowDeskProps> = ({ onNotify }) => {
   const [scorecard, setScorecard] = useState<ShadowScorecard | null>(null);
   const [bars, setBars] = useState<ShadowBar[]>([]);
   const [fills, setFills] = useState<ShadowFill[]>([]);
+  const [watchdog, setWatchdog] = useState<WatchdogReport | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const t = I18N[lang];
@@ -203,6 +205,14 @@ export const P2ShadowDesk: React.FC<P2ShadowDeskProps> = ({ onNotify }) => {
         setFills(histData.fills || []);
       } catch (err: unknown) {
         console.warn('Could not load shadow history:', err);
+      }
+
+      // 4. Fetch 24/7 Ops Watchdog Report (Milestone 71)
+      try {
+        const watchData = await api.getWatchdogReport();
+        setWatchdog(watchData);
+      } catch (err: unknown) {
+        console.warn('Could not load watchdog report:', err);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Network error loading shadow desk';
@@ -308,6 +318,37 @@ export const P2ShadowDesk: React.FC<P2ShadowDeskProps> = ({ onNotify }) => {
           {/* Permanent Safety Pill */}
           <div className="px-2.5 py-1 rounded text-xs font-bold bg-[#0d1520] border border-emerald-500/30 text-emerald-400">
             {t.safetyPill}
+          </div>
+
+          {/* Ops Health Pill (Milestone 71) */}
+          <div
+            className={`px-2.5 py-1 rounded text-xs font-semibold border flex items-center gap-1.5 transition-all ${
+              !watchdog || watchdog.status === 'HEALTHY'
+                ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+                : watchdog.status === 'DEGRADED'
+                ? 'bg-amber-950/40 border-amber-500/40 text-amber-300'
+                : watchdog.status === 'CRITICAL'
+                ? 'bg-rose-950/40 border-rose-500/40 text-rose-300'
+                : 'bg-slate-900 border-slate-700 text-slate-300'
+            }`}
+            title={
+              watchdog
+                ? `Checked: ${watchdog.checked_at_utc} | Free Disk: ${watchdog.disk_free_mb.toFixed(0)}MB | Backup: ${watchdog.last_backup_file || 'None'}${
+                    watchdog.active_alerts && watchdog.active_alerts.length > 0
+                      ? ' | Alerts: ' + watchdog.active_alerts.map((a) => (lang === 'bn' ? a.message_bn : a.message_en)).join('; ')
+                      : ''
+                  }`
+                : 'Ops Watchdog Standby'
+            }
+          >
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>
+              {!watchdog || watchdog.status === 'HEALTHY'
+                ? 'OPS: HEALTHY'
+                : watchdog.active_alerts && watchdog.active_alerts.length > 0
+                ? `OPS: ALERT (${watchdog.active_alerts.length})`
+                : `OPS: ${watchdog.status}`}
+            </span>
           </div>
 
           {/* Data Freshness Badge */}

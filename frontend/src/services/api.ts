@@ -93,6 +93,7 @@ import {
   ShadowScorecard,
   ShadowHistoryResponse,
   ShadowRunResponse,
+  WatchdogReport,
 } from '../types';
 
 const getApiBaseUrl = (): string => {
@@ -475,6 +476,14 @@ export const api = {
       method: 'POST',
     });
     return handleResponse<ShadowRunResponse>(res);
+  },
+
+  /**
+   * GET /api/desk/watchdog
+   */
+  async getWatchdogReport(): Promise<WatchdogReport> {
+    const res = await authFetch(`${BASE_URL}/api/desk/watchdog`);
+    return handleResponse<WatchdogReport>(res);
   },
 
   /**

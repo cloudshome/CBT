@@ -1110,6 +1110,73 @@ def cmd_shadow(args) -> int:
     return 0
 
 
+def cmd_watchdog(args) -> int:
+    """Milestone 71: 24/7 CBT Ops Watchdog and Automated Ledger Backup CLI."""
+    from core.ops.p2_shadow_watchdog import (
+        backup_shadow_ledger,
+        format_watchdog_report,
+        run_watchdog_check,
+    )
+
+    as_json = bool(getattr(args, "json", False))
+    lang = str(getattr(args, "lang", "en") or "en").lower()
+    do_backup = bool(getattr(args, "backup", False))
+
+    if do_backup:
+        try:
+            backup_file = backup_shadow_ledger()
+            if as_json:
+                print(
+                    json.dumps(
+                        {
+                            "backup_status": "SUCCESS",
+                            "backup_file": str(backup_file),
+                            "integrity_check": "OK",
+                        },
+                        indent=2,
+                    )
+                )
+            else:
+                print("=" * 64)
+                print("CBT SHADOW LEDGER BACKUP: SUCCESS")
+                print(f"Archive  : {backup_file}")
+                print("Integrity: PRAGMA integrity_check OK")
+                print("=" * 64)
+            return 0
+        except Exception as e:
+            if as_json:
+                print(
+                    json.dumps(
+                        {
+                            "backup_status": "ERROR",
+                            "error": str(e),
+                            "integrity_check": "FAILED",
+                        },
+                        indent=2,
+                    )
+                )
+            else:
+                print("=" * 64)
+                print(f"CBT SHADOW LEDGER BACKUP: FAILED ({e})")
+                print("=" * 64)
+            return 1
+
+    # Default or --check: run watchdog check
+    try:
+        report = run_watchdog_check(auto_backup=True)
+        if as_json:
+            print(json.dumps(report.to_dict(), indent=2, default=str))
+        else:
+            print(format_watchdog_report(report, lang=lang))
+        return 0
+    except Exception as e:
+        if as_json:
+            print(json.dumps({"status": "CRITICAL", "error": str(e)}, indent=2))
+        else:
+            print(f"Watchdog Error: {e}")
+        return 1
+
+
 # ── Agent-Reach-inspired CLI surface (P7/P8, additive) ─────────────────
 # These three commands are the install/doctor/SKILL trio borrowed from
 # Panniantong/Agent-Reach, scoped to CryptoBrain's read-only safety

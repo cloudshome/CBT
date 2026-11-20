@@ -870,6 +870,40 @@ async def handle_shadow(
     return msg
 
 
+async def handle_ops(
+    args: str = "",
+    chat_id: Any = None,
+    identity: TelegramUserIdentity | None = None,
+    lang: str | None = None,
+) -> str:
+    """Milestone 71: Unified 24/7 CBT Ops Watchdog health report in English or Bengali."""
+    from core.ops.p2_shadow_watchdog import (
+        format_watchdog_report,
+        run_watchdog_check,
+    )
+    from core.telegram_bot import telegram_bot
+
+    clean_args = (args or "").strip().lower()
+    is_bn = (
+        lang == "bn"
+        or clean_args in ("bn", "bangla", "bengali", "সিস্টেম চেক", "ops check")
+        or any(0x0980 <= ord(c) <= 0x09FF for c in clean_args)
+    )
+    target_lang = "bn" if is_bn else "en"
+
+    try:
+        report = run_watchdog_check(auto_backup=False)
+        report_str = format_watchdog_report(report, lang=target_lang)
+    except Exception as e:
+        logger.error(f"Telegram /ops error: {e}")
+        report_str = f"Error evaluating ops watchdog: {e}"
+
+    msg = f"```\n{report_str}\n```"
+    if chat_id:
+        await telegram_bot.send_message(msg, chat_id=chat_id)
+    return msg
+
+
 async def handle_candidate(
     args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
 ) -> str:
@@ -1717,6 +1751,14 @@ def register_all_v5_commands() -> None:
             handler=handle_shadow,
             required_role=TelegramRole.ANALYST,
             aliases=["/shadow_report", "/desk_shadow", "/shado"],
+            argument_schema="[bn|en]",
+        ),
+        TelegramCommand(
+            name="/ops",
+            description="24/7 P2_RP Ops Watchdog health & backup status (English/Bengali)",
+            handler=handle_ops,
+            required_role=TelegramRole.ANALYST,
+            aliases=["/system_check", "/watchdog", "/health_check"],
             argument_schema="[bn|en]",
         ),
     ]

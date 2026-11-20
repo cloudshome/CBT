@@ -1,0 +1,10 @@
+[Unit]
+Description=CBT 24/7 P2_RP Ops Watchdog Timer (Hourly at :15 UTC)
+Documentation=https://github.com/cloudshome/CBT
+
+[Timer]
+OnCalendar=*-*-* *:15:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target
