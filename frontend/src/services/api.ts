@@ -89,6 +89,10 @@ import {
   ForwardScorecardResponse,
   ForwardDriftResponse,
   ForwardSuspensionLogsResponse,
+  TodayDeskSnapshot,
+  ShadowScorecard,
+  ShadowHistoryResponse,
+  ShadowRunResponse,
 } from '../types';
 
 const getApiBaseUrl = (): string => {
@@ -159,7 +163,7 @@ export class ApiError extends Error {
 }
 
 async function handleResponse<T>(res: Response): Promise<T> {
-  const isJson = res.headers.get('content-type')?.includes('application/json');
+  const isJson = res.headers?.get ? res.headers.get('content-type')?.includes('application/json') : true;
   const data = isJson ? await res.json() : null;
 
   if (!res.ok) {
@@ -437,6 +441,40 @@ export const api = {
       }),
     });
     return handleResponse<DeskAskResponse>(res);
+  },
+
+  /**
+   * GET /api/desk/today
+   */
+  async getTodayDeskSnapshot(equity: number = 10000, source: string = 'auto'): Promise<TodayDeskSnapshot> {
+    const res = await authFetch(`${BASE_URL}/api/desk/today?equity=${equity}&source=${source}`);
+    return handleResponse<TodayDeskSnapshot>(res);
+  },
+
+  /**
+   * GET /api/desk/shadow
+   */
+  async getShadowScorecard(): Promise<ShadowScorecard> {
+    const res = await authFetch(`${BASE_URL}/api/desk/shadow`);
+    return handleResponse<ShadowScorecard>(res);
+  },
+
+  /**
+   * GET /api/desk/shadow/history
+   */
+  async getShadowHistory(limitBars: number = 360, limitFills: number = 50): Promise<ShadowHistoryResponse> {
+    const res = await authFetch(`${BASE_URL}/api/desk/shadow/history?limit_bars=${limitBars}&limit_fills=${limitFills}`);
+    return handleResponse<ShadowHistoryResponse>(res);
+  },
+
+  /**
+   * POST /api/desk/shadow/run
+   */
+  async runShadowCycle(source: string = 'live'): Promise<ShadowRunResponse> {
+    const res = await authFetch(`${BASE_URL}/api/desk/shadow/run?source=${source}`, {
+      method: 'POST',
+    });
+    return handleResponse<ShadowRunResponse>(res);
   },
 
   /**

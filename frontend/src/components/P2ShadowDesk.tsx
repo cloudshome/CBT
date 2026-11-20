@@ -10,89 +10,13 @@ import {
   Layers,
   CheckCircle2,
 } from 'lucide-react';
-
-interface AssetMetrics {
-  symbol: string;
-  price: number;
-  ema_200: number;
-  ema_status: string;
-  donchian_h48: number;
-  donchian_l24: number;
-  atr_14: number;
-  stop_loss: number;
-  momentum_30d_pct: number;
-  vol_20d_ann_pct: number;
-}
-
-interface TodayDeskSnapshot {
-  timestamp_utc: string;
-  data_source: string;
-  data_age_hours: number;
-  stale_data_warning: boolean;
-  regime_label: string;
-  action_verdict: string;
-  assets: Record<string, AssetMetrics>;
-  s1_weights: Record<string, number>;
-  s2_weights: Record<string, number>;
-  p2_rp_weights: Record<string, number>;
-  gross_exposure: number;
-  account_equity: number;
-  dollar_allocations: Record<string, number>;
-  days_to_rebalance: number;
-  capital_mode: string;
-  real_capital_enabled: boolean;
-  details?: string;
-  error_reason?: string;
-}
-
-interface ShadowPosition {
-  units: number;
-  avg_entry_price: number;
-  last_price: number;
-  market_value_usd: number;
-  target_weight: number;
-}
-
-interface ShadowScorecard {
-  days_tracked: number;
-  target_forward_days: number;
-  equity_usd: number;
-  total_return_pct: number;
-  bnh_return_pct: number;
-  alpha_vs_bnh_pct: number;
-  max_drawdown_pct: number;
-  live_sharpe: number | null;
-  total_fills: number;
-  avg_slippage_bps: number;
-  avg_spread_bps: number;
-  total_fees_usd: number;
-  current_regime: string;
-  positions: Record<string, ShadowPosition>;
-  capital_mode: string;
-  real_capital_enabled: boolean;
-}
-
-interface ShadowBar {
-  bar_ts_utc: number;
-  equity_usd: number;
-  bnh_equity_usd: number;
-  gross_exposure: number;
-  regime_label: string;
-}
-
-interface ShadowFill {
-  bar_ts_utc: number;
-  symbol: string;
-  side: string;
-  units: number;
-  signal_close_price: number;
-  live_exec_price: number;
-  spread_bps: number;
-  slippage_bps: number;
-  fee_usd: number;
-  notional_usd: number;
-  reason: string;
-}
+import { api, ApiError } from '../services/api';
+import {
+  TodayDeskSnapshot,
+  ShadowScorecard,
+  ShadowBar,
+  ShadowFill,
+} from '../types';
 
 interface P2ShadowDeskProps {
   onNotify?: (type: 'success' | 'error' | 'info' | 'warning', title: string, message: string) => void;
@@ -152,6 +76,18 @@ const I18N = {
     colSlippage: "Slippage",
     colFee: "Fee ($)",
     colReason: "Reason",
+    explainerSectionTitle: "Why Trade / Why Waiting & Exact Next Trigger Conditions",
+    explainerSubtitle: "Deterministic Causal Verification · Zero Discretionary Overrides",
+    activeTradesHeading: "ACTIVE SHADOW POSITIONS",
+    activeTradesSub: "Real-time mark-to-market and risk parameters under TIER_0_PAPER",
+    waitingHeadlineDefault: "PROTECTING CAPITAL IN 100% CASH — No asset meets S1 breakout or S2 positive-momentum rules.",
+    waitingChecklistHeading: "What CBT Is Watching & Waiting For (Top 3 Triggers)",
+    assetTriggerHeading: "4-Asset Causal Rules & Trigger Distance",
+    colEntry: "Avg Entry",
+    colCurrent: "Current Price",
+    colUnrealizedPnl: "Unrealized P&L",
+    colTriggerSleeve: "Trigger Sleeve",
+    away: "away",
   },
   bn: {
     deskTitle: "P2_RP রিস্ক-প্যারিটি শ্যাডো ডেস্ক",
@@ -206,6 +142,18 @@ const I18N = {
     colSlippage: "স্লিপেজ",
     colFee: "ফি ($)",
     colReason: "কারণ",
+    explainerSectionTitle: "ট্রেড সিদ্ধান্ত ও পরবর্তী সুনির্দিষ্ট ট্রিগার শর্তাবলি",
+    explainerSubtitle: "ডিটারমিনিস্টিক কজাল ভেরিফিকেশন · কোন ডিসক্রেশন নেই",
+    activeTradesHeading: "সক্রিয় শ্যাডো পজিশনসমূহ",
+    activeTradesSub: "TIER_0_PAPER এর অধীনে রিয়েল-টাইম মার্ক-টু-মার্কেট ও রিস্ক প্যারামিটার",
+    waitingHeadlineDefault: "১০০% ক্যাশে মূলধন সুরক্ষা — কোন অ্যাসেটেই S1 ব্রেকআউট বা S2 পজিটিভ মোমেন্টাম শর্ত পূরণ হয়নি।",
+    waitingChecklistHeading: "CBT যেসব সুনির্দিষ্ট ট্রিগারের অপেক্ষায় রয়েছে (শীর্ষ ৩টি)",
+    assetTriggerHeading: "৪-অ্যাসেট কজাল নিয়ম ও ট্রিগার ব্যবধান",
+    colEntry: "গড় এন্ট্রি",
+    colCurrent: "বর্তমান মূল্য",
+    colUnrealizedPnl: "অবাস্তবায়িত লাভ/ক্ষতি",
+    colTriggerSleeve: "ট্রিগার স্লিভ",
+    away: "দূরে",
   },
 };
 
@@ -226,28 +174,35 @@ export const P2ShadowDesk: React.FC<P2ShadowDeskProps> = ({ onNotify }) => {
     setLoading(true);
     setErrorMessage(null);
     try {
-      // 1. Fetch Today's Desk Snapshot
-      const snapRes = await fetch(`/api/desk/today?equity=${equityInput}&source=auto`);
-      if (snapRes.ok) {
-        const snapData = await snapRes.json();
+      // 1. Fetch Today's Desk Snapshot via shared api service
+      try {
+        const snapData = await api.getTodayDeskSnapshot(equityInput, 'auto');
         setSnapshot(snapData);
-      } else {
-        setErrorMessage('Failed to load Today desk snapshot');
+      } catch (err: unknown) {
+        const detail =
+          err instanceof ApiError
+            ? `HTTP ${err.statusCode}: ${err.message}`
+            : err instanceof Error
+            ? err.message
+            : String(err);
+        setErrorMessage(`Failed to load Today desk snapshot (${detail})`);
       }
 
       // 2. Fetch Shadow Scorecard
-      const scoreRes = await fetch('/api/desk/shadow');
-      if (scoreRes.ok) {
-        const scoreData = await scoreRes.json();
+      try {
+        const scoreData = await api.getShadowScorecard();
         setScorecard(scoreData);
+      } catch (err: unknown) {
+        console.warn('Could not load shadow scorecard:', err);
       }
 
       // 3. Fetch Shadow History (bars & fills)
-      const histRes = await fetch('/api/desk/shadow/history?limit_bars=360&limit_fills=50');
-      if (histRes.ok) {
-        const histData = await histRes.json();
+      try {
+        const histData = await api.getShadowHistory(360, 50);
         setBars(histData.bars || []);
         setFills(histData.fills || []);
+      } catch (err: unknown) {
+        console.warn('Could not load shadow history:', err);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Network error loading shadow desk';
@@ -267,21 +222,22 @@ export const P2ShadowDesk: React.FC<P2ShadowDeskProps> = ({ onNotify }) => {
   const handleRunCycle = async () => {
     setRunningCycle(true);
     try {
-      const res = await fetch('/api/desk/shadow/run?source=live', { method: 'POST' });
-      const data = await res.json();
-      if (res.ok) {
-        const status = data.cycle?.status || 'COMPLETED';
-        const fillCount = data.cycle?.fills || 0;
-        const msg = `Shadow Cycle: ${status} (${fillCount} fills executed under TIER_0_PAPER)`;
-        if (onNotify) {
-          onNotify(status === 'ALREADY_PROCESSED' ? 'info' : 'success', 'Shadow Cycle Executed', msg);
-        }
-        await fetchDeskData();
-      } else {
-        throw new Error(data.detail || 'Failed to trigger shadow cycle');
+      const data = await api.runShadowCycle('live');
+      const status = data.cycle?.status || 'COMPLETED';
+      const fillCount = data.cycle?.fills || 0;
+      const msg = `Shadow Cycle: ${status} (${fillCount} fills executed under TIER_0_PAPER)`;
+      if (onNotify) {
+        onNotify(status === 'ALREADY_PROCESSED' ? 'info' : 'success', 'Shadow Cycle Executed', msg);
       }
+      await fetchDeskData();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Shadow cycle execution failed';
+      const detail =
+        err instanceof ApiError
+          ? `HTTP ${err.statusCode}: ${err.message}`
+          : err instanceof Error
+          ? err.message
+          : String(err);
+      const msg = `Shadow cycle execution failed (${detail})`;
       if (onNotify) {
         onNotify('error', 'Cycle Trigger Error', msg);
       }
@@ -320,6 +276,11 @@ export const P2ShadowDesk: React.FC<P2ShadowDeskProps> = ({ onNotify }) => {
   const assetsList = snapshot?.assets ? Object.values(snapshot.assets) : [];
   const p2Weights = snapshot?.p2_rp_weights || {};
   const cashWeight = p2Weights['CASH'] ?? Math.max(0, 1 - (snapshot?.gross_exposure || 0));
+
+  const activePositions = Object.entries(scorecard?.positions || {}).filter(
+    ([_, pos]) => (pos.units || 0) > 0.00001 && (pos.market_value_usd || 0) > 1.0
+  );
+  const isInTrade = activePositions.length > 0;
 
   return (
     <div className="max-w-[1920px] w-full mx-auto px-4 py-4 space-y-4 font-mono text-slate-200">
@@ -545,6 +506,206 @@ export const P2ShadowDesk: React.FC<P2ShadowDeskProps> = ({ onNotify }) => {
             ✓ {t.kpiExposureCap}
           </div>
         </div>
+      </div>
+
+      {/* 2.5. WHY TRADE / WHY WAITING & EXACT NEXT TRIGGER CONDITIONS */}
+      <div className="bg-[#090d16] border border-[#1e293b] rounded-lg p-4 space-y-4 shadow-md">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#1e293b]/70 pb-3">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <h3 className="text-sm font-bold text-white tracking-wide">{t.explainerSectionTitle}</h3>
+          </div>
+          <div className="text-[11px] text-slate-400">
+            {t.explainerSubtitle}
+          </div>
+        </div>
+
+        {isInTrade ? (
+          /* ACTIVE SHADOW TRADES VIEW */
+          <div className="space-y-3">
+            <div className="bg-emerald-950/30 border border-emerald-500/40 rounded-lg p-3 flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-emerald-300 uppercase tracking-wider block">
+                  {t.activeTradesHeading}
+                </span>
+                <p className="text-xs text-white font-medium mt-0.5">
+                  {lang === 'bn'
+                    ? (snapshot?.decision_headline_bn || t.activeTradesHeading)
+                    : (snapshot?.decision_headline_en || t.activeTradesHeading)}
+                </p>
+              </div>
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                ACTIVE
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-[#0b101c] text-slate-400 uppercase text-[10px] tracking-wider border-b border-[#1e293b]">
+                  <tr>
+                    <th className="py-2 px-3">{t.colAsset}</th>
+                    <th className="py-2 px-3">{t.colEntry}</th>
+                    <th className="py-2 px-3">{t.colCurrent}</th>
+                    <th className="py-2 px-3">{t.colStop}</th>
+                    <th className="py-2 px-3">{t.colUnrealizedPnl}</th>
+                    <th className="py-2 px-3">{t.colTriggerSleeve}</th>
+                    <th className="py-2 px-3">{t.colShadowUnits}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#1e293b]/60">
+                  {activePositions.map(([sym, pos]) => {
+                    const entryPrice = pos.avg_entry_price || pos.last_price;
+                    const currentPrice = pos.last_price;
+                    const pnlUsd = (currentPrice - entryPrice) * (pos.units || 0);
+                    const pnlPct = entryPrice > 0 ? ((currentPrice - entryPrice) / entryPrice) * 100 : 0;
+                    const isProfit = pnlUsd >= 0;
+                    const sl = snapshot?.assets?.[sym]?.stop_loss ?? 0;
+                    const isS1 = (snapshot?.s1_weights?.[sym] || 0) > 0;
+                    const isS2 = (snapshot?.s2_weights?.[sym] || 0) > 0;
+                    const sleeveLabel =
+                      isS1 && isS2
+                        ? 'S1 + S2-Div (Ensemble)'
+                        : isS1
+                        ? 'S1 (Donchian Breakout)'
+                        : isS2
+                        ? 'S2-Div (Momentum)'
+                        : 'P2_RP Shadow';
+
+                    return (
+                      <tr key={sym} className="hover:bg-slate-900/50">
+                        <td className="py-2.5 px-3 font-bold text-white">{sym}</td>
+                        <td className="py-2.5 px-3 text-slate-300">
+                          ${entryPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-2.5 px-3 text-white font-medium">
+                          ${currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-2.5 px-3 text-amber-300">
+                          ${sl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span className={`font-bold ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {isProfit ? '+' : ''}${pnlUsd.toFixed(2)} ({isProfit ? '+' : ''}{pnlPct.toFixed(2)}%)
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/20 text-sky-400 border border-sky-500/40">
+                            {sleeveLabel}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-300 font-mono">{(pos.units || 0).toFixed(4)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          /* CASH PROTECTION & NEXT TRIGGER CHECKLIST VIEW */
+          <div className="space-y-4">
+            {/* Decision Headline Banner */}
+            <div className="bg-[#0e1526] border border-sky-500/30 rounded-lg p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-start sm:items-center gap-2.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-sky-400 animate-pulse shrink-0 mt-1 sm:mt-0" />
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider text-sky-400 font-bold block">
+                    {lang === 'bn' ? 'বর্তমান পোর্টফোলিও স্ট্যাটাস' : 'CURRENT PORTFOLIO STATUS'}
+                  </span>
+                  <div className="text-xs sm:text-sm font-bold text-white mt-0.5">
+                    {lang === 'bn'
+                      ? (snapshot?.decision_headline_bn || t.waitingHeadlineDefault)
+                      : (snapshot?.decision_headline_en || t.waitingHeadlineDefault)}
+                  </div>
+                </div>
+              </div>
+              <span className="px-2.5 py-1 rounded text-xs font-bold bg-sky-500/20 text-sky-300 border border-sky-500/40 self-start sm:self-auto shrink-0">
+                100% CASH SHIELD
+              </span>
+            </div>
+
+            {/* Top 3 Concrete Watchlist Checklist */}
+            <div className="space-y-2 bg-[#0b101c] border border-[#1e293b] rounded-lg p-3.5">
+              <div className="text-xs font-bold text-slate-300 flex items-center justify-between">
+                <span>{t.waitingChecklistHeading}</span>
+                <span className="text-[10px] text-slate-400">Strict Causal Invariance</span>
+              </div>
+              <div className="space-y-2 pt-1">
+                {(lang === 'bn'
+                  ? snapshot?.next_trade_checklist_bn?.length
+                    ? snapshot.next_trade_checklist_bn
+                    : ['লাইভ ক্যান্ডেল ফিডের জন্য অপেক্ষমাণ', 'S1 ডনচিয়ান-৪৮ ব্রেকআউট পর্যবেক্ষণাধীন', 'S2 পজিটিভ মোমেন্টাম পর্যবেক্ষণাধীন']
+                  : snapshot?.next_trade_checklist_en?.length
+                  ? snapshot.next_trade_checklist_en
+                  : ['Waiting for live 4h candle close', 'Monitoring S1 Donchian-48 breakout levels', 'Monitoring S2 positive momentum filters']
+                ).map((item, idx) => (
+                  <div key={idx} className="flex items-start gap-2.5 text-xs bg-[#111726] border border-[#1d273b] rounded p-2 text-slate-200">
+                    <span className="w-5 h-5 rounded bg-sky-900/60 border border-sky-500/40 text-sky-300 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">
+                      {idx + 1}
+                    </span>
+                    <span className="font-mono text-slate-300">{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 4-Asset Trigger Quick-Scan Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+              {['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'PAXGUSDT'].map((sym) => {
+                const asset = snapshot?.assets?.[sym];
+                if (!asset) return null;
+                const isAboveEma = asset.ema_status === 'ABOVE';
+                const distBrk = asset.distance_to_breakout_pct ?? 0;
+                const distEma = asset.distance_to_ema200_pct ?? 0;
+                const waitingReason = lang === 'bn' ? (asset.waiting_reason_bn || '') : (asset.waiting_reason_en || '');
+
+                return (
+                  <div key={sym} className="bg-[#0b101c] border border-[#1e293b] rounded-lg p-3 space-y-2 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-white">{sym}</span>
+                        <span className="text-xs font-mono text-slate-300">
+                          ${asset.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+
+                      {/* Levels */}
+                      <div className="mt-2 space-y-1.5 text-[11px]">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400">Donchian-48:</span>
+                          <span className="font-mono font-bold text-amber-300">
+                            ${(asset.donchian48_high ?? asset.donchian_h48).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            <span className="text-[10px] text-slate-400 ml-1">(+{distBrk.toFixed(1)}% {t.away})</span>
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400">EMA-200:</span>
+                          <span className={`font-mono font-bold ${isAboveEma ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            ${(asset.ema200_price ?? asset.ema_200).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            <span className="text-[10px] ml-1">({distEma >= 0 ? '+' : ''}{distEma.toFixed(1)}%)</span>
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400">30d Mom (S2):</span>
+                          <span className={`font-mono font-bold ${asset.momentum_30d_pct >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {asset.momentum_30d_pct >= 0 ? '+' : ''}{asset.momentum_30d_pct.toFixed(2)}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 1-Line Explanation */}
+                    {waitingReason && (
+                      <div className="pt-2 border-t border-[#1e293b]/70 text-[10px] text-slate-400 leading-relaxed italic">
+                        {waitingReason}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 3. ROW 2: 4-ASSET LIVE ALLOCATION & SIGNAL TABLE */}

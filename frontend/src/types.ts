@@ -3166,6 +3166,125 @@ export interface WikiCalendarResponse {
   target_day_data?: WikiTimelineResponse;
 }
 
+// ==============================================================================
+// MILESTONE 69/70: P2_RP SHADOW DESK & TELEMETRY TYPES
+// ==============================================================================
+export interface TodayAssetMetrics {
+  symbol: string;
+  price: number;
+  ema_200: number;
+  ema_status: string;
+  donchian_h48: number;
+  donchian_l24: number;
+  atr_14: number;
+  stop_loss: number;
+  momentum_30d_pct: number;
+  vol_20d_ann_pct: number;
+  ema200_price?: number;
+  donchian48_high?: number;
+  distance_to_ema200_pct?: number;
+  distance_to_breakout_pct?: number;
+  s1_status?: string;
+  s2_status?: string;
+  waiting_reason_en?: string;
+  waiting_reason_bn?: string;
+}
+
+export interface TodayDeskSnapshot {
+  timestamp_utc: string;
+  data_source: string;
+  data_age_hours: number;
+  stale_data_warning: boolean;
+  regime_label: string;
+  action_verdict: string;
+  assets: Record<string, TodayAssetMetrics>;
+  s1_weights: Record<string, number>;
+  s2_weights: Record<string, number>;
+  p2_rp_weights: Record<string, number>;
+  gross_exposure: number;
+  account_equity: number;
+  dollar_allocations: Record<string, number>;
+  days_to_rebalance: number;
+  capital_mode: string;
+  real_capital_enabled: boolean;
+  details?: string;
+  error_reason?: string;
+  decision_headline_en?: string;
+  decision_headline_bn?: string;
+  next_trade_checklist_en?: string[];
+  next_trade_checklist_bn?: string[];
+}
+
+export interface ShadowPosition {
+  units: number;
+  avg_entry_price: number;
+  last_price: number;
+  market_value_usd: number;
+  target_weight: number;
+}
+
+export interface ShadowScorecard {
+  days_tracked: number;
+  target_forward_days: number;
+  equity_usd: number;
+  total_return_pct: number;
+  bnh_return_pct: number;
+  alpha_vs_bnh_pct: number;
+  max_drawdown_pct: number;
+  live_sharpe: number | null;
+  total_fills: number;
+  avg_slippage_bps: number;
+  avg_spread_bps: number;
+  total_fees_usd: number;
+  current_regime: string;
+  positions: Record<string, ShadowPosition>;
+  capital_mode: string;
+  real_capital_enabled: boolean;
+}
+
+export interface ShadowBar {
+  bar_ts_utc: number;
+  equity_usd: number;
+  bnh_equity_usd: number;
+  gross_exposure: number;
+  regime_label: string;
+}
+
+export interface ShadowFill {
+  bar_ts_utc: number;
+  symbol: string;
+  side: string;
+  units: number;
+  signal_close_price: number;
+  live_exec_price: number;
+  spread_bps: number;
+  slippage_bps: number;
+  fee_usd: number;
+  notional_usd: number;
+  reason: string;
+}
+
+export interface ShadowHistoryResponse {
+  bars: ShadowBar[];
+  fills: ShadowFill[];
+  capital_mode: string;
+  real_capital_enabled: boolean;
+}
+
+export interface ShadowRunResponse {
+  cycle: {
+    status?: string;
+    fills?: number;
+    reason?: string;
+    notified?: boolean;
+    bar_ts_utc?: number;
+  };
+  scorecard: ShadowScorecard;
+  capital_mode: string;
+  real_capital_enabled: boolean;
+}
+
+
 
 
 

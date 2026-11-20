@@ -21,7 +21,7 @@ import json
 import logging
 import math
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -71,6 +71,14 @@ class AssetMetrics:
     stop_loss: float
     momentum_30d_pct: float
     vol_20d_ann_pct: float
+    ema200_price: float = 0.0
+    donchian48_high: float = 0.0
+    distance_to_ema200_pct: float = 0.0
+    distance_to_breakout_pct: float = 0.0
+    s1_status: str = "WAITING_BREAKOUT"  # "ACTIVE_LONG" | "WAITING_EMA200" | "WAITING_BREAKOUT"
+    s2_status: str = "OUTRANKED"  # "SELECTED_TOP2" | "NEGATIVE_MOMENTUM" | "OUTRANKED"
+    waiting_reason_en: str = ""
+    waiting_reason_bn: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -96,6 +104,10 @@ class TodayDeskSnapshot:
     real_capital_enabled: bool = REAL_CAPITAL_ENABLED
     details: str = ""
     error_reason: str | None = None
+    decision_headline_en: str = ""
+    decision_headline_bn: str = ""
+    next_trade_checklist_en: list[str] = field(default_factory=list)
+    next_trade_checklist_bn: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -140,6 +152,18 @@ class TodayDeskSnapshot:
             real_capital_enabled=REAL_CAPITAL_ENABLED,
             details=f"Fail-closed safe state engaged: {reason}",
             error_reason=reason,
+            decision_headline_en="FAIL-CLOSED SAFETY ACTIVE — Market data stale or offline; all allocations locked at 0%.",
+            decision_headline_bn="ফেল-ক্লোজড সুরক্ষা সক্রিয় — মার্কেট ডেটা পুরনো বা অফলাইন; সকল অ্যালটমেন্ট ০% এ লক করা।",
+            next_trade_checklist_en=[
+                "Waiting for live candle feed recovery.",
+                "Zero synthetic fills permitted.",
+                "Standing by for fresh 4h bar.",
+            ],
+            next_trade_checklist_bn=[
+                "লাইভ ক্যান্ডেল ফিড পুনরুদ্ধারের অপেক্ষায়।",
+                "কোন সিন্থেটিক ফিল অনুমোদিত নয়।",
+                "নতুন ৪ ঘণ্টার বারের জন্য অপেক্ষমাণ।",
+            ],
         )
 
 
@@ -387,6 +411,56 @@ def evaluate_p2_rp_snapshot(
         risk_d = max(3.0 * atr, c * 0.005)
         sl = max(l24, c - risk_d)
 
+        # Distances and trigger conditions
+        dist_ema_pct = round(((c - ema) / ema) * 100.0, 2)
+        dist_brk_pct = round(max(0.0, ((h48 - c) / c) * 100.0), 2)
+
+        # S1 Status
+        if c > h48 and c > ema:
+            s1_status = "ACTIVE_LONG"
+        elif c <= ema:
+            s1_status = "WAITING_EMA200"
+        else:
+            s1_status = "WAITING_BREAKOUT"
+
+        # S2 Status
+        ret_30d_s = ret_30ds.get(s, 0.0)
+        if base_weights.get(s, 0.0) > 0.0:
+            s2_status = "SELECTED_TOP2"
+        elif ret_30d_s <= 0.0:
+            s2_status = "NEGATIVE_MOMENTUM"
+        else:
+            s2_status = "OUTRANKED"
+
+        # Waiting / Explainer Reasons
+        if s1_status == "ACTIVE_LONG":
+            waiting_en = f"Active trade: Long breakout active with SL at ${sl:,.2f}."
+            waiting_bn = f"সক্রিয় ট্রেড: লং ব্রেকআউট চালু রয়েছে, স্টপ-লস ${sl:,.2f} এ নির্ধারিত।"
+        elif s1_status == "WAITING_EMA200":
+            s2_sub_en = "must turn > 0% for S2" if ret_30d_s <= 0 else "qualifies for S2 ranking"
+            s2_sub_bn = "S2 এর জন্য > ০% হতে হবে" if ret_30d_s <= 0 else "S2 র্যাঙ্কিংয়ে উত্তীর্ণ"
+            waiting_en = (
+                f"Waiting: price is {abs(dist_ema_pct):.1f}% below EMA-200 (${ema:,.2f}) "
+                f"and needs 4h close > ${h48:,.2f} (+{dist_brk_pct:.1f}%) to trigger S1; "
+                f"30d momentum ({ret_30d_s*100:+.1f}%) {s2_sub_en}."
+            )
+            waiting_bn = (
+                f"অপেক্ষমাণ: মূল্য EMA-200 (${ema:,.2f}) এর থেকে {abs(dist_ema_pct):.1f}% নিচে "
+                f"এবং S1 সক্রিয় হতে ${h48:,.2f} (+{dist_brk_pct:.1f}%) এর উপরে ৪ ঘণ্টার ক্লোজ প্রয়োজন; "
+                f"৩০ দিনের মোমেন্টাম ({ret_30d_s*100:+.1f}%) {s2_sub_bn}।"
+            )
+        else:
+            waiting_en = (
+                f"Waiting: price is above EMA-200 (+{dist_ema_pct:.1f}%), needs 4h close > "
+                f"${h48:,.2f} (+{dist_brk_pct:.1f}% away) for S1 breakout; "
+                f"30d momentum is {ret_30d_s*100:+.1f}%."
+            )
+            waiting_bn = (
+                f"অপেক্ষমাণ: মূল্য EMA-200 এর উপরে (+{dist_ema_pct:.1f}%), S1 ব্রেকআউটের জন্য "
+                f"${h48:,.2f} (+{dist_brk_pct:.1f}% দূরে) এর উপরে ৪ ঘণ্টার ক্লোজ প্রয়োজন; "
+                f"৩০ দিনের মোমেন্টাম {ret_30d_s*100:+.1f}%।"
+            )
+
         asset_metrics_map[s] = AssetMetrics(
             symbol=s,
             price=round(c, 4),
@@ -396,8 +470,16 @@ def evaluate_p2_rp_snapshot(
             donchian_l24=round(l24, 4),
             atr_14=round(atr, 4),
             stop_loss=round(sl, 4),
-            momentum_30d_pct=round(ret_30ds.get(s, 0.0) * 100.0, 2),
+            momentum_30d_pct=round(ret_30d_s * 100.0, 2),
             vol_20d_ann_pct=round(vols_20d.get(s, 0.50) * 100.0, 2),
+            ema200_price=round(ema, 4),
+            donchian48_high=round(h48, 4),
+            distance_to_ema200_pct=dist_ema_pct,
+            distance_to_breakout_pct=dist_brk_pct,
+            s1_status=s1_status,
+            s2_status=s2_status,
+            waiting_reason_en=waiting_en,
+            waiting_reason_bn=waiting_bn,
         )
 
     # 5. S1 Sleeve Allocation
@@ -515,6 +597,44 @@ def evaluate_p2_rp_snapshot(
     else:
         action_verdict = "HOLD"
 
+    active_symbols = [s for s in UNIVERSE if p2_weights.get(s, 0.0) > 0.0001]
+    if len(active_symbols) == 0:
+        decision_headline_en = "PROTECTING CAPITAL IN 100% CASH — No asset meets S1 breakout or S2 positive-momentum rules."
+        decision_headline_bn = "১০০% ক্যাশে মূলধন সুরক্ষা — কোন অ্যাসেটেই S1 ব্রেকআউট বা S2 পজিটিভ মোমেন্টাম শর্ত পূরণ হয়নি।"
+    else:
+        active_list_str = ", ".join(active_symbols)
+        decision_headline_en = f"ACTIVE POSITIONS — Holding {active_list_str} under 15% vol-target risk parity."
+        decision_headline_bn = f"সক্রিয় পজিশন — ১৫% ভল-টার্গেট রিস্ক প্যারিটিতে {active_list_str} হোল্ডিং।"
+
+    # Generate Top 3 Concrete Watchlist Checklist Conditions sorted by proximity to breakout
+    sorted_candidates = sorted(UNIVERSE, key=lambda sym: asset_metrics_map[sym].distance_to_breakout_pct)
+    top_3 = sorted_candidates[:3]
+
+    checklist_en = []
+    checklist_bn = []
+    for sym in top_3:
+        m = asset_metrics_map[sym]
+        if m.price <= m.ema_200:
+            en_item = (
+                f"{sym}: Needs {abs(m.distance_to_ema200_pct):.1f}% rally to reclaim EMA-200 (${m.ema_200:,.2f}) "
+                f"and 4h close > ${m.donchian_h48:,.2f} (+{m.distance_to_breakout_pct:.1f}% away) for S1 breakout."
+            )
+            bn_item = (
+                f"{sym}: EMA-200 (${m.ema_200:,.2f}) রিক্লেইম করতে {abs(m.distance_to_ema200_pct):.1f}% র‍্যালি "
+                f"এবং S1 ডনচিয়ান-৪৮ ব্রেকআউটের জন্য ${m.donchian_h48:,.2f} (+{m.distance_to_breakout_pct:.1f}% দূরে) এর উপরে ৪ ঘণ্টার ক্লোজ প্রয়োজন।"
+            )
+        else:
+            en_item = (
+                f"{sym}: Needs 4h close > ${m.donchian_h48:,.2f} (+{m.distance_to_breakout_pct:.1f}% away) "
+                f"for S1 breakout (reclaimed EMA-200 at ${m.ema_200:,.2f})."
+            )
+            bn_item = (
+                f"{sym}: S1 ডনচিয়ান-৪৮ ব্রেকআউটের জন্য ${m.donchian_h48:,.2f} (+{m.distance_to_breakout_pct:.1f}% দূরে) "
+                f"এর উপরে ৪ ঘণ্টার ক্লোজ প্রয়োজন (EMA-200 রিক্লেইম ${m.ema_200:,.2f})।"
+            )
+        checklist_en.append(en_item)
+        checklist_bn.append(bn_item)
+
     return TodayDeskSnapshot(
         timestamp_utc=ts_iso,
         data_source=data_source,
@@ -533,6 +653,10 @@ def evaluate_p2_rp_snapshot(
         capital_mode=CAPITAL_MODE,
         real_capital_enabled=REAL_CAPITAL_ENABLED,
         details="M65.1 Audited Point-in-Time Risk-Parity Snapshot",
+        decision_headline_en=decision_headline_en,
+        decision_headline_bn=decision_headline_bn,
+        next_trade_checklist_en=checklist_en,
+        next_trade_checklist_bn=checklist_bn,
     )
 
 
