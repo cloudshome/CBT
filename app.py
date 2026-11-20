@@ -1766,6 +1766,56 @@ async def get_desk_shadow():
         return get_default_shadow_scorecard()
 
 
+@app.get("/api/desk/shadow/history")
+async def get_desk_shadow_history(
+    limit_bars: int = Query(360, ge=1, le=2000, description="Max number of historical 4h bars"),
+    limit_fills: int = Query(50, ge=1, le=500, description="Max number of recent fills"),
+):
+    """Milestone 69: Historical shadow equity curve & recent fills for the GUI."""
+    from core.strategies.p2_shadow_runner import get_shadow_history
+
+    try:
+        history = get_shadow_history(limit_bars=limit_bars, limit_fills=limit_fills)
+        return history
+    except Exception as e:
+        logger.error(f"Error fetching shadow history: {e}")
+        return {
+            "bars": [],
+            "fills": [],
+            "capital_mode": "TIER_0_PAPER",
+            "real_capital_enabled": False,
+        }
+
+
+@app.post("/api/desk/shadow/run")
+async def run_desk_shadow_cycle(
+    source: str = Query("live", description="Data source: live or parquet"),
+):
+    """Milestone 69: Executes one idempotent 4h shadow cycle (strictly TIER_0_PAPER)."""
+    from core.strategies.p2_shadow_runner import (
+        get_shadow_scorecard,
+        run_shadow_cycle,
+    )
+
+    try:
+        cycle_res = run_shadow_cycle(source=source)
+        scorecard = get_shadow_scorecard()
+        return {
+            "cycle": cycle_res,
+            "scorecard": scorecard,
+            "capital_mode": "TIER_0_PAPER",
+            "real_capital_enabled": False,
+        }
+    except Exception as e:
+        logger.error(f"Error executing shadow cycle: {e}")
+        return {
+            "cycle": {"status": "ERROR", "reason": str(e), "fills": 0, "notified": False},
+            "scorecard": get_shadow_scorecard(),
+            "capital_mode": "TIER_0_PAPER",
+            "real_capital_enabled": False,
+        }
+
+
 @app.post("/api/desk/ask", dependencies=[Depends(require_api_key)])
 async def ask_desk_copilot(req: AskDeskRequest):
     ctx = req.context or {}

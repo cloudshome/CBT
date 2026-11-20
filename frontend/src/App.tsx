@@ -39,6 +39,7 @@ import { InstitutionalMasterTerminal } from './components/terminal/Institutional
 import { MastermindSwarmDesk } from './components/MastermindSwarmDesk';
 import { DarwinianArenaDesk } from './components/DarwinianArenaDesk';
 import { SovereignMasterAgentDesk } from './components/SovereignMasterAgentDesk';
+import { P2ShadowDesk } from './components/P2ShadowDesk';
 import { ToastContainer } from './components/ToastContainer';
 import { marketProvider, TickerData } from './data/providers/marketProvider';
 import {
@@ -113,8 +114,9 @@ export const App: React.FC = () => {
   const [brief, setBrief] = useState<DeskBriefResponse | null>(null);
   const [loadingBrief, setLoadingBrief] = useState<boolean>(false);
 
-  // Main Screen View Switcher: Sovereign Master Agent vs Terminal vs Arena vs Swarm vs Paper Ledger vs Research Lab
-  const [activeMainView, setActiveMainView] = useState<'MASTER_AGENT' | 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM' | 'DARWINIAN_ARENA' | 'LEGACY_DESK' | 'LIVE_LAUNCHPAD'>('MASTER_AGENT');
+  // Main Screen View Switcher: Today's Desk (Default) vs Chart Terminal vs AI Copilot vs Research & Labs
+  const [activeMainView, setActiveMainView] = useState<'TODAY_DESK' | 'TERMINAL' | 'MASTER_AGENT' | 'LABS' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM' | 'DARWINIAN_ARENA' | 'LEGACY_DESK' | 'LIVE_LAUNCHPAD'>('TODAY_DESK');
+  const [activeLabsTab, setActiveLabsTab] = useState<'PAPER_DESK' | 'RESEARCH_LAB' | 'DARWINIAN_ARENA' | 'MASTERMIND_SWARM' | 'LIVE_LAUNCHPAD'>('PAPER_DESK');
 
   // Tab State for Single-Screen Compact Cockpit
   const [activeRightTab, setActiveRightTab] = useState<'ORDER_DESK' | 'ORDER_BOOK' | 'PAPER' | 'AI_DESK'>('ORDER_DESK');
@@ -401,7 +403,19 @@ export const App: React.FC = () => {
         return;
       }
 
-      const entry = order.type === 'LIMIT' && order.price ? order.price : (stats.lastPrice > 0 ? stats.lastPrice : 65000.0);
+      let entry: number;
+      if (order.type === 'LIMIT' && order.price && order.price > 0) {
+        entry = order.price;
+      } else if (stats.lastPrice > 0) {
+        entry = stats.lastPrice;
+      } else {
+        addToast(
+          'error',
+          'Order Submission Blocked (Missing Market Price)',
+          'Fail-closed: No valid ticker price received from exchange feed. Order submission blocked.'
+        );
+        return;
+      }
       const isLong = order.side === 'BUY';
       const safeSl = order.stopLoss && order.stopLoss > 0
         ? (isLong && order.stopLoss < entry ? order.stopLoss : (!isLong && order.stopLoss > entry ? order.stopLoss : (isLong ? Number((entry * 0.985).toFixed(2)) : Number((entry * 1.015).toFixed(2)))))
@@ -580,8 +594,10 @@ export const App: React.FC = () => {
         latencyMs={latencyMs}
       />
 
-      {/* Primary View Routing: Sovereign Master Agent vs Terminal vs Arena vs Swarm vs Paper Desk vs Research Lab */}
-      {activeMainView === 'MASTER_AGENT' ? (
+      {/* Primary View Routing: Today's Desk (Default) vs AI Copilot vs Research & Labs vs Chart Terminal */}
+      {activeMainView === 'TODAY_DESK' ? (
+        <P2ShadowDesk onNotify={addToast} />
+      ) : activeMainView === 'MASTER_AGENT' ? (
         <SovereignMasterAgentDesk
           onSelectSymbol={(sym) => {
             const clean = sym.replace('/', '').toUpperCase();
@@ -591,49 +607,105 @@ export const App: React.FC = () => {
           }}
           addToast={addToast}
         />
-      ) : activeMainView === 'PAPER_DESK' ? (
-        <DedicatedPaperTradingDesk
-          onClosePosition={handleClosePosition}
-        />
-      ) : activeMainView === 'RESEARCH_LAB' ? (
-        <div className="max-w-[1920px] w-full mx-auto p-4 flex-1">
-          <ResearchIngestLab
-            onNotify={addToast}
-            selectedSymbol={symbol}
-            selectedTimeframe={timeframe}
-          />
-        </div>
-      ) : activeMainView === 'MASTERMIND_SWARM' ? (
-        <MastermindSwarmDesk
-          onSelectSymbol={(sym) => {
-            const clean = sym.replace('/', '').toUpperCase();
-            setSymbol(clean);
-            setActiveMainView('TERMINAL');
-            addToast('info', 'Cockpit Synced', `Switched Cockpit to ${clean}`);
-          }}
-          onPrepareTrade={(opp) => {
-            const clean = opp.symbol.replace('/', '').toUpperCase();
-            setSymbol(clean);
-            setActiveMainView('TERMINAL');
-            addToast('info', 'Trade Ticket Ready', `Loaded ${clean} (${opp.recommended_direction}) in Terminal`);
-          }}
-          addToast={addToast}
-        />
-      ) : activeMainView === 'DARWINIAN_ARENA' ? (
-        <DarwinianArenaDesk
-          onSelectSymbol={(sym) => {
-            const clean = sym.replace('/', '').toUpperCase();
-            setSymbol(clean);
-            setActiveMainView('TERMINAL');
-            addToast('info', 'Cockpit Synced', `Switched Cockpit to ${clean}`);
-          }}
-          addToast={addToast}
-        />
-      ) : activeMainView === 'LIVE_LAUNCHPAD' ? (
-        <div className="max-w-[1920px] w-full mx-auto p-4 flex-1">
-          <LiveLaunchpadDesk
-            onNotify={addToast}
-          />
+      ) : activeMainView === 'LABS' || activeMainView === 'PAPER_DESK' || activeMainView === 'RESEARCH_LAB' || activeMainView === 'MASTERMIND_SWARM' || activeMainView === 'DARWINIAN_ARENA' || activeMainView === 'LIVE_LAUNCHPAD' ? (
+        <div className="max-w-[1920px] w-full mx-auto px-4 pt-3 flex-1 flex flex-col font-mono">
+          <div className="flex flex-wrap items-center gap-1 bg-[#090d16] border border-[#1e293b] rounded-lg p-1 text-xs mb-3 w-fit shadow-sm">
+            <button
+              onClick={() => setActiveLabsTab('PAPER_DESK')}
+              className={`px-3 py-1.5 rounded transition-all ${
+                activeLabsTab === 'PAPER_DESK'
+                  ? 'bg-cyan-600 text-white font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Positions Ledger
+            </button>
+            <button
+              onClick={() => setActiveLabsTab('RESEARCH_LAB')}
+              className={`px-3 py-1.5 rounded transition-all ${
+                activeLabsTab === 'RESEARCH_LAB'
+                  ? 'bg-indigo-600 text-white font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Research Vault
+            </button>
+            <button
+              onClick={() => setActiveLabsTab('DARWINIAN_ARENA')}
+              className={`px-3 py-1.5 rounded transition-all ${
+                activeLabsTab === 'DARWINIAN_ARENA'
+                  ? 'bg-emerald-600 text-white font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Darwinian Arena
+            </button>
+            <button
+              onClick={() => setActiveLabsTab('MASTERMIND_SWARM')}
+              className={`px-3 py-1.5 rounded transition-all ${
+                activeLabsTab === 'MASTERMIND_SWARM'
+                  ? 'bg-purple-600 text-white font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Mastermind Swarm
+            </button>
+            <button
+              onClick={() => setActiveLabsTab('LIVE_LAUNCHPAD')}
+              className={`px-3 py-1.5 rounded transition-all ${
+                activeLabsTab === 'LIVE_LAUNCHPAD'
+                  ? 'bg-teal-600 text-white font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Live Launchpad
+            </button>
+          </div>
+          {activeLabsTab === 'PAPER_DESK' && (
+            <DedicatedPaperTradingDesk onClosePosition={handleClosePosition} />
+          )}
+          {activeLabsTab === 'RESEARCH_LAB' && (
+            <div className="w-full flex-1">
+              <ResearchIngestLab
+                onNotify={addToast}
+                selectedSymbol={symbol}
+                selectedTimeframe={timeframe}
+              />
+            </div>
+          )}
+          {activeLabsTab === 'DARWINIAN_ARENA' && (
+            <DarwinianArenaDesk
+              onSelectSymbol={(sym) => {
+                const clean = sym.replace('/', '').toUpperCase();
+                setSymbol(clean);
+                setActiveMainView('TERMINAL');
+                addToast('info', 'Cockpit Synced', `Switched Cockpit to ${clean}`);
+              }}
+              addToast={addToast}
+            />
+          )}
+          {activeLabsTab === 'MASTERMIND_SWARM' && (
+            <MastermindSwarmDesk
+              onSelectSymbol={(sym) => {
+                const clean = sym.replace('/', '').toUpperCase();
+                setSymbol(clean);
+                setActiveMainView('TERMINAL');
+                addToast('info', 'Cockpit Synced', `Switched Cockpit to ${clean}`);
+              }}
+              onPrepareTrade={(opp) => {
+                const clean = opp.symbol.replace('/', '').toUpperCase();
+                setSymbol(clean);
+                setActiveMainView('TERMINAL');
+                addToast('info', 'Trade Ticket Ready', `Loaded ${clean} (${opp.recommended_direction}) in Terminal`);
+              }}
+              addToast={addToast}
+            />
+          )}
+          {activeLabsTab === 'LIVE_LAUNCHPAD' && (
+            <div className="w-full flex-1">
+              <LiveLaunchpadDesk onNotify={addToast} />
+            </div>
+          )}
         </div>
       ) : activeMainView === 'LEGACY_DESK' ? (
         <>

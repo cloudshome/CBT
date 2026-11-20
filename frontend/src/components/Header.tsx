@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCw, Activity, Zap, TrendingUp, TrendingDown, BellOff, BellRing, Send, Layers, Crown, Dna, Cpu, Sparkles, ShieldCheck } from 'lucide-react';
+import { RefreshCw, Activity, Zap, TrendingUp, TrendingDown, BellOff, BellRing, Send, Layers, Crown, ShieldCheck } from 'lucide-react';
 import { SupportedTimeframe } from '../types';
 import { api } from '../services/api';
 import { PairVenueLinks } from './PairVenueLinks';
@@ -17,8 +17,8 @@ interface HeaderProps {
   onRefresh: () => void;
   notificationsEnabled: boolean;
   onToggleNotifications: () => void;
-  activeView?: 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM' | 'DARWINIAN_ARENA' | 'LEGACY_DESK' | 'MASTER_AGENT' | 'LIVE_LAUNCHPAD';
-  onViewChange?: (view: 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM' | 'DARWINIAN_ARENA' | 'LEGACY_DESK' | 'MASTER_AGENT' | 'LIVE_LAUNCHPAD') => void;
+  activeView?: 'TODAY_DESK' | 'TERMINAL' | 'MASTER_AGENT' | 'LABS' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM' | 'DARWINIAN_ARENA' | 'LEGACY_DESK' | 'LIVE_LAUNCHPAD' | string;
+  onViewChange?: (view: any) => void;
   openPositionsCount?: number;
   wsState?: 'CONNECTING' | 'CONNECTED' | 'RECONNECTING' | 'DISCONNECTED' | 'ERROR' | 'IDLE';
   latencyMs?: number;
@@ -27,8 +27,8 @@ interface HeaderProps {
 const POPULAR_SYMBOLS = [
   { symbol: 'BTCUSDT', label: 'BTC' },
   { symbol: 'ETHUSDT', label: 'ETH' },
-  { symbol: 'PAXGUSDT', label: 'GOLD (PAXG)' },
-  { symbol: 'XAUUSDT', label: 'GOLD (XAU)' },
+  { symbol: 'SOLUSDT', label: 'SOL' },
+  { symbol: 'PAXGUSDT', label: 'PAXG' },
 ];
 const TIMEFRAMES: SupportedTimeframe[] = ['1m', '3m', '5m', '15m', '1h', '4h', '1d'];
 
@@ -99,8 +99,34 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Primary Screen View Switcher: Clean Unified Institutional Cockpit (6 Core Desks) */}
+        {/* Primary Screen View Switcher: 4 Calm Institutional Workspaces */}
         <div className="flex items-center bg-[#090d16] border border-[#1e293b] rounded-lg p-0.5 text-xs font-mono">
+          <button
+            onClick={() => onViewChange?.('TODAY_DESK')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all font-bold ${
+              activeView === 'TODAY_DESK'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+            title="Institutional P2_RP Today's Desk & Live Shadow Runner Telemetry"
+          >
+            <ShieldCheck size={13} className={activeView === 'TODAY_DESK' ? 'text-white' : 'text-emerald-400'} />
+            <span>Today's Desk</span>
+          </button>
+
+          <button
+            onClick={() => onViewChange?.('TERMINAL')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all font-bold ${
+              activeView === 'TERMINAL' || activeView === 'MASTER_COCKPIT' || activeView === 'LEGACY_DESK'
+                ? 'bg-sky-500 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+            title="Institutional Trading Terminal with TradingView chart, depth ladder, and order desk"
+          >
+            <Activity size={13} className={activeView === 'TERMINAL' || activeView === 'MASTER_COCKPIT' || activeView === 'LEGACY_DESK' ? 'text-white' : 'text-sky-400'} />
+            <span>Chart Terminal</span>
+          </button>
+
           <button
             onClick={() => onViewChange?.('MASTER_AGENT')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all font-bold ${
@@ -108,93 +134,33 @@ export const Header: React.FC<HeaderProps> = ({
                 ? 'bg-gradient-to-r from-amber-500/20 via-cyan-500/20 to-purple-500/20 text-white border border-cyan-400/50 shadow-md shadow-cyan-500/20'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
-            title="Sovereign Master Agent for BTC, ETH, and Gold with auto-pilot and loss autopsies"
+            title="Sovereign AI Copilot for market intelligence and risk evaluation"
           >
             <Crown size={13} className={activeView === 'MASTER_AGENT' ? 'text-amber-400' : 'text-slate-400'} />
-            <span>Master Agent</span>
+            <span>AI Copilot</span>
           </button>
 
           <button
-            onClick={() => onViewChange?.('TERMINAL')}
+            onClick={() => onViewChange?.('LABS')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all font-bold ${
-              activeView === 'TERMINAL' || activeView === 'MASTER_COCKPIT'
-                ? 'bg-sky-500 text-white shadow-sm'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-            title="Institutional Trading Terminal with TradingView chart, depth ladder, and order desk"
-          >
-            <Activity size={13} className={activeView === 'TERMINAL' || activeView === 'MASTER_COCKPIT' ? 'text-white' : 'text-sky-400'} />
-            <span>Terminal</span>
-          </button>
-
-          <button
-            onClick={() => onViewChange?.('DARWINIAN_ARENA')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all font-bold ${
-              activeView === 'DARWINIAN_ARENA'
-                ? 'bg-emerald-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-            title="Darwinian Specialist Arena: 10 isolated coin specialists competing with $1,000 capital"
-          >
-            <Dna size={13} className={activeView === 'DARWINIAN_ARENA' ? 'text-white' : 'text-emerald-400'} />
-            <span>Arena</span>
-          </button>
-
-          <button
-            onClick={() => onViewChange?.('MASTERMIND_SWARM')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all font-bold ${
-              activeView === 'MASTERMIND_SWARM'
+              activeView === 'LABS' ||
+              activeView === 'PAPER_DESK' ||
+              activeView === 'RESEARCH_LAB' ||
+              activeView === 'MASTERMIND_SWARM' ||
+              activeView === 'DARWINIAN_ARENA' ||
+              activeView === 'LIVE_LAUNCHPAD'
                 ? 'bg-purple-600 text-white shadow-sm'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
-            title="Mastermind Swarm Council: Multi-agent debate, adversarial challenge, and consensus"
+            title="Research & Labs: Position Ledger, Research Vault, Darwinian Arena, Mastermind Swarm, Live Launchpad"
           >
-            <Cpu size={13} className={activeView === 'MASTERMIND_SWARM' ? 'text-white' : 'text-purple-400'} />
-            <span>Swarm</span>
-          </button>
-
-          <button
-            onClick={() => onViewChange?.('PAPER_DESK')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all font-bold ${
-              activeView === 'PAPER_DESK'
-                ? 'bg-cyan-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-            title="Positions Ledger: Dedicated shadow/paper portfolio tracking and markouts"
-          >
-            <Layers size={13} className={activeView === 'PAPER_DESK' ? 'text-white' : 'text-cyan-400'} />
-            <span>Ledger</span>
+            <Layers size={13} className={activeView === 'LABS' || activeView === 'PAPER_DESK' || activeView === 'RESEARCH_LAB' || activeView === 'MASTERMIND_SWARM' || activeView === 'DARWINIAN_ARENA' || activeView === 'LIVE_LAUNCHPAD' ? 'text-white' : 'text-purple-400'} />
+            <span>Research &amp; Labs</span>
             {openPositionsCount > 0 && (
               <span className="px-1.5 py-0.5 bg-emerald-500 text-[#0B0E14] text-[10px] rounded-full font-bold leading-none">
                 {openPositionsCount}
               </span>
             )}
-          </button>
-
-          <button
-            onClick={() => onViewChange?.('RESEARCH_LAB')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all font-bold ${
-              activeView === 'RESEARCH_LAB'
-                ? 'bg-gradient-to-r from-indigo-500 via-purple-600 to-pink-600 text-white shadow-sm shadow-indigo-500/30'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-            title="Research Vault: Macroeconomic intelligence, dossiers, and knowledge synthesis"
-          >
-            <Sparkles size={13} className={activeView === 'RESEARCH_LAB' ? 'text-white' : 'text-indigo-400'} />
-            <span>Vault</span>
-          </button>
-
-          <button
-            onClick={() => onViewChange?.('LIVE_LAUNCHPAD')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all font-bold ${
-              activeView === 'LIVE_LAUNCHPAD'
-                ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white shadow-sm shadow-emerald-500/30'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-            title="Live Launchpad: Binance/exchange connectivity, live balances, active working orders, and panic flatten"
-          >
-            <ShieldCheck size={13} className={activeView === 'LIVE_LAUNCHPAD' ? 'text-white' : 'text-emerald-400'} />
-            <span>Launchpad</span>
           </button>
         </div>
 

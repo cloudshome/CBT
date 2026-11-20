@@ -817,6 +817,93 @@ def get_shadow_scorecard(db_path: Path | str | None = None) -> dict[str, Any]:
         conn.close()
 
 
+def get_shadow_history(
+    db_path: Path | str | None = None,
+    limit_bars: int = 360,
+    limit_fills: int = 50,
+) -> dict[str, Any]:
+    """Retrieves chronological forward equity curve bars and recent fills for the GUI."""
+    resolved_db_path = get_db_path(db_path)
+    if not resolved_db_path.exists():
+        return {
+            "bars": [],
+            "fills": [],
+            "capital_mode": CAPITAL_MODE,
+            "real_capital_enabled": REAL_CAPITAL_ENABLED,
+        }
+
+    conn = sqlite3.connect(str(resolved_db_path))
+    conn.row_factory = sqlite3.Row
+
+    try:
+        init_shadow_db(conn)
+        cur = conn.cursor()
+
+        # Chronological forward bars up to limit_bars
+        bar_rows = cur.execute(
+            """
+            SELECT bar_ts_utc, equity_usd, bnh_equity_usd, gross_exposure, regime_label
+            FROM (
+                SELECT bar_ts_utc, equity_usd, bnh_equity_usd, gross_exposure, regime_label
+                FROM shadow_bars
+                ORDER BY bar_ts_utc DESC
+                LIMIT ?
+            )
+            ORDER BY bar_ts_utc ASC
+            """,
+            (limit_bars,),
+        ).fetchall()
+
+        bars = [
+            {
+                "bar_ts_utc": int(r["bar_ts_utc"]),
+                "equity_usd": round(float(r["equity_usd"]), 2),
+                "bnh_equity_usd": round(float(r["bnh_equity_usd"]), 2),
+                "gross_exposure": round(float(r["gross_exposure"]), 4),
+                "regime_label": str(r["regime_label"]),
+            }
+            for r in bar_rows
+        ]
+
+        # Most recent fills up to limit_fills (newest first)
+        fill_rows = cur.execute(
+            """
+            SELECT bar_ts_utc, symbol, side, units, signal_close_price, live_exec_price,
+                   spread_bps, slippage_bps, fee_usd, notional_usd, reason
+            FROM shadow_fills
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (limit_fills,),
+        ).fetchall()
+
+        fills = [
+            {
+                "bar_ts_utc": int(r["bar_ts_utc"]),
+                "symbol": str(r["symbol"]),
+                "side": str(r["side"]),
+                "units": round(float(r["units"]), 8),
+                "signal_close_price": round(float(r["signal_close_price"]), 4),
+                "live_exec_price": round(float(r["live_exec_price"]), 4),
+                "spread_bps": round(float(r["spread_bps"]), 2),
+                "slippage_bps": round(float(r["slippage_bps"]), 2),
+                "fee_usd": round(float(r["fee_usd"]), 4),
+                "notional_usd": round(float(r["notional_usd"]), 2),
+                "reason": str(r["reason"]),
+            }
+            for r in fill_rows
+        ]
+
+        return {
+            "bars": bars,
+            "fills": fills,
+            "capital_mode": CAPITAL_MODE,
+            "real_capital_enabled": REAL_CAPITAL_ENABLED,
+        }
+    finally:
+        conn.close()
+
+
 # ==============================================================================
 # SCORECARD & ALERT FORMATTERS (EN & BN)
 # ==============================================================================
