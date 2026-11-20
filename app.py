@@ -1750,6 +1750,22 @@ async def get_desk_today(
         return snapshot.to_dict()
 
 
+@app.get("/api/desk/shadow")
+async def get_desk_shadow():
+    """Milestone 68: 24/7 P2_RP live shadow runner forward scorecard endpoint."""
+    from core.strategies.p2_shadow_runner import (
+        get_default_shadow_scorecard,
+        get_shadow_scorecard,
+    )
+
+    try:
+        scorecard = get_shadow_scorecard()
+        return scorecard
+    except Exception as e:
+        logger.error(f"Error fetching shadow scorecard: {e}")
+        return get_default_shadow_scorecard()
+
+
 @app.post("/api/desk/ask", dependencies=[Depends(require_api_key)])
 async def ask_desk_copilot(req: AskDeskRequest):
     ctx = req.context or {}

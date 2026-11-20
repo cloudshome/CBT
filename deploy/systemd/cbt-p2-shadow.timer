@@ -1,0 +1,10 @@
+[Unit]
+Description=CBT 24/7 P2_RP Shadow Runner Timer (Every 4h Candle Close + 2m)
+Documentation=https://github.com/cloudshome/CBT
+
+[Timer]
+OnCalendar=*-*-* 00,04,08,12,16,20:02:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

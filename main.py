@@ -81,6 +81,7 @@ from cli.daily import (
     cmd_sourcetrust,
     cmd_state,
     cmd_stats,
+    cmd_shadow,
     cmd_today,
     cmd_tradestate,
     cmd_watch,
@@ -920,6 +921,35 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_today.add_argument("--json", action="store_true", help="Output JSON snapshot")
     p_today.set_defaults(func=cmd_today)
+
+    p_shadow = sub.add_parser(
+        "shadow",
+        help="24/7 P2_RP live shadow runner and forward scorecard",
+    )
+    p_shadow.add_argument(
+        "--once",
+        action="store_true",
+        help="Execute one idempotent 4h shadow cycle and exit",
+    )
+    p_shadow.add_argument(
+        "--source",
+        choices=["live", "parquet", "auto"],
+        default="live",
+        help="Data source: live, parquet, or auto",
+    )
+    p_shadow.add_argument(
+        "--status",
+        action="store_true",
+        help="Display live forward scorecard (default if --once omitted)",
+    )
+    p_shadow.add_argument(
+        "--lang",
+        choices=["en", "bn"],
+        default="en",
+        help="Display language: en (English) or bn (Bengali)",
+    )
+    p_shadow.add_argument("--json", action="store_true", help="Output JSON format")
+    p_shadow.set_defaults(func=cmd_shadow)
 
     p_daily = sub.add_parser(
         "daily",

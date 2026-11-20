@@ -839,6 +839,34 @@ async def handle_today(
     if chat_id:
         await telegram_bot.send_message(msg, chat_id=chat_id)
     return msg
+
+
+async def handle_shadow(
+    args: str = "",
+    chat_id: Any = None,
+    identity: TelegramUserIdentity | None = None,
+    lang: str | None = None,
+) -> str:
+    """Milestone 68: Unified 24/7 P2_RP shadow desk live forward scorecard in English or Bengali."""
+    from core.strategies.p2_shadow_runner import (
+        format_shadow_scorecard,
+        get_shadow_scorecard,
+    )
+    from core.telegram_bot import telegram_bot
+
+    clean_args = (args or "").strip().lower()
+    is_bn = (
+        lang == "bn"
+        or clean_args in ("bn", "bangla", "bengali", "শ্যাডো রিপোর্ট", "shadow report")
+        or any(0x0980 <= ord(c) <= 0x09FF for c in clean_args)
+    )
+    target_lang = "bn" if is_bn else "en"
+
+    scorecard = get_shadow_scorecard()
+    scorecard_str = format_shadow_scorecard(scorecard, lang=target_lang)
+    msg = f"```\n{scorecard_str}\n```"
+    if chat_id:
+        await telegram_bot.send_message(msg, chat_id=chat_id)
     return msg
 
 
@@ -1681,6 +1709,14 @@ def register_all_v5_commands() -> None:
             handler=handle_today,
             required_role=TelegramRole.ANALYST,
             aliases=["/ajker_market", "/desk_today"],
+            argument_schema="[bn|en]",
+        ),
+        TelegramCommand(
+            name="/shadow",
+            description="24/7 P2_RP live shadow runner forward scorecard (English/Bengali)",
+            handler=handle_shadow,
+            required_role=TelegramRole.ANALYST,
+            aliases=["/shadow_report", "/desk_shadow", "/shado"],
             argument_schema="[bn|en]",
         ),
     ]

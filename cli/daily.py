@@ -1061,6 +1061,55 @@ def cmd_today(args) -> int:
     return 0
 
 
+def cmd_shadow(args) -> int:
+    """Milestone 68: 24/7 P2_RP Live Shadow Runner and Forward Scorecard CLI."""
+    from core.strategies.p2_shadow_runner import (
+        format_shadow_scorecard,
+        get_shadow_scorecard,
+        run_shadow_cycle,
+    )
+
+    once = bool(getattr(args, "once", False))
+    source = str(getattr(args, "source", "live") or "live").lower()
+    lang = str(getattr(args, "lang", "en") or "en").lower()
+    as_json = bool(getattr(args, "json", False))
+
+    if once:
+        # Run one idempotent 4h cycle
+        result = run_shadow_cycle(source=source)
+        if as_json:
+            print(json.dumps(result, indent=2, default=str))
+        else:
+            status_code = result.get("status", "UNKNOWN")
+            fills = result.get("fills", 0)
+            eq = result.get("equity_usd", 0.0)
+            gross = result.get("gross_exposure", 0.0)
+            regime = result.get("regime_label", "UNKNOWN")
+            print("=" * 64)
+            print(f"CBT P2_RP SHADOW CYCLE: {status_code}")
+            print(f"Regime: {regime} | Fills Executed: {fills}")
+            print(f"Portfolio Equity: ${eq:,.2f} | Gross Exposure: {gross * 100.0:.2f}%")
+            if fills > 0:
+                print("-" * 64)
+                print("FILLS:")
+                for f in result.get("fill_details", []):
+                    print(
+                        f"  • {f['side']} {f['symbol']}: {f['units']} @ ${f['live_exec_price']:,.2f} "
+                        f"(slippage: {f['slippage_bps']:.2f} bps, fee: ${f['fee_usd']:,.2f})"
+                    )
+            print("=" * 64)
+            print("[TIER_0_PAPER — NO REAL CAPITAL]")
+        return 0
+
+    # Default or --status: display scorecard
+    scorecard = get_shadow_scorecard()
+    if as_json:
+        print(json.dumps(scorecard, indent=2, default=str))
+    else:
+        print(format_shadow_scorecard(scorecard, lang=lang))
+    return 0
+
+
 # ── Agent-Reach-inspired CLI surface (P7/P8, additive) ─────────────────
 # These three commands are the install/doctor/SKILL trio borrowed from
 # Panniantong/Agent-Reach, scoped to CryptoBrain's read-only safety

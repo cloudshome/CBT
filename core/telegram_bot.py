@@ -3330,6 +3330,21 @@ class TelegramBotDispatcher:
             )
             return {"status": "EXECUTED", "command": "/today", "response": response_text}
 
+        # Check Bengali and English Shadow Report triggers (Milestone 68)
+        if (
+            clean_nl in ("শ্যাডো রিপোর্ট", "shadow report", "শ্যাডোরিপোর্ট", "shadowreport", "/shadow_report", "/শ্যাডো_রিপোর্ট")
+            or "শ্যাডো রিপোর্ট" in text
+            or clean_nl == "shadow"
+            or clean_nl == "শ্যাডো"
+        ):
+            from core.telegram.handlers import handle_shadow
+
+            response_text = await handle_shadow(args="bn", chat_id=chat_id, identity=identity, lang="bn")
+            telegram_audit.log_command_execution(
+                identity, "/shadow", "bn", execution_result="EXECUTED"
+            )
+            return {"status": "EXECUTED", "command": "/shadow", "response": response_text}
+
         # 6. Natural Language Conversational AI Query
         try:
             ai_reply = await self.state_mind.handle_conversational_query(
