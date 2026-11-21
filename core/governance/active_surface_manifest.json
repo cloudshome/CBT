@@ -149,6 +149,11 @@
           "path": "scripts/research/run_m75_1_clean_discovery_batch.py",
           "verdict": "CLEAN_BATCH_M75_1",
           "tested_hypothesis": "Clean Discovery Batch #2 (H1_CLEAN Vol Squeeze, H4 Trend Pullback, H5 Dual-Momentum Gold)"
+        },
+        {
+          "path": "scripts/research/run_m76_ensemble_upgrade_audit.py",
+          "verdict": "ENSEMBLE_AUDIT_M76",
+          "tested_hypothesis": "Milestone 76 Causal Ensemble Upgrade Audit (P2_RP vs P2_RP_V2 with H5 and H1_CLEAN)"
         }
       ]
     },

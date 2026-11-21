@@ -1,8 +1,8 @@
 {
   "ledger_version": "1.0.0",
   "baseline_trials": 18,
-  "cumulative_trials_count": 24,
-  "last_updated_utc": "2026-11-21T10:32:01.485625+00:00",
+  "cumulative_trials_count": 27,
+  "last_updated_utc": "2026-11-21T10:50:00.859022+00:00",
   "trials": [
     {
       "hypothesis_id": "H1_VOL_SQUEEZE_EXPANSION_LONG",
@@ -171,6 +171,87 @@
       "m_cum": 24,
       "trial_number": 24,
       "recorded_at_utc": "2026-11-21T10:32:01.485601+00:00"
+    },
+    {
+      "hypothesis_id": "P2_RP_V2A_S1_H5",
+      "name": "P2_RP_V2A (50% S1 + 50% H5)",
+      "family": "Multi-Strategy Causal Risk-Parity Ensemble Upgrade",
+      "direction_mode": "LONG_ONLY_ENSEMBLE",
+      "train_sharpe": 1.0118,
+      "val_sharpe": 2.0751,
+      "oos_sharpe": 0.6487,
+      "oos_return_pct": 13.57,
+      "oos_max_dd_pct": 13.88,
+      "cpcv_median_sharpe": 0.0,
+      "dsr_oos": 0.119,
+      "dsr_pval": 0.881,
+      "hurdles_passed": 3,
+      "hurdles_total": 5,
+      "stress_regimes": {
+        "baseline_oos_sharpe": 0.6487,
+        "friction_2x_oos_sharpe": 0.445,
+        "delay_1bar_oos_sharpe": 0.5006,
+        "stress_resistance_verdict": "SURVIVES STRESS"
+      },
+      "verdict": "KEEP_P2_RP_BASELINE",
+      "verdict_rationale": "Failed Gate 1 (Full Sharpe: 1.19 vs 1.28, Calmar: 1.02 vs 1.23); Failed Gate 3 (Full DD: 16.26% vs 15.16%)",
+      "m_cum": 25,
+      "trial_number": 25,
+      "recorded_at_utc": "2026-11-21T10:50:00.705930+00:00"
+    },
+    {
+      "hypothesis_id": "P2_RP_V2B_S1_H5_H1",
+      "name": "P2_RP_V2B (33% S1 + 33% H5 + 33% H1_CLEAN)",
+      "family": "Multi-Strategy Causal Risk-Parity Ensemble Upgrade",
+      "direction_mode": "LONG_ONLY_ENSEMBLE",
+      "train_sharpe": 1.0569,
+      "val_sharpe": 2.0447,
+      "oos_sharpe": 0.708,
+      "oos_return_pct": 12.38,
+      "oos_max_dd_pct": 11.25,
+      "cpcv_median_sharpe": 0.0,
+      "dsr_oos": 0.1388,
+      "dsr_pval": 0.8612,
+      "hurdles_passed": 4,
+      "hurdles_total": 5,
+      "stress_regimes": {
+        "baseline_oos_sharpe": 0.708,
+        "friction_2x_oos_sharpe": 0.5102,
+        "delay_1bar_oos_sharpe": 0.6582,
+        "stress_resistance_verdict": "SURVIVES STRESS"
+      },
+      "verdict": "KEEP_P2_RP_BASELINE",
+      "verdict_rationale": "Failed Gate 1 (Full Sharpe: 1.20 vs 1.28, Calmar: 1.06 vs 1.23)",
+      "m_cum": 26,
+      "trial_number": 26,
+      "recorded_at_utc": "2026-11-21T10:50:00.772947+00:00"
+    },
+    {
+      "hypothesis_id": "P2_RP_V2C_4SLEEVE",
+      "name": "P2_RP_V2C (25% S1 + 25% S2-Div + 25% H5 + 25% H1_CLEAN)",
+      "family": "Multi-Strategy Causal Risk-Parity Ensemble Upgrade",
+      "direction_mode": "LONG_ONLY_ENSEMBLE",
+      "train_sharpe": 1.2856,
+      "val_sharpe": 2.2555,
+      "oos_sharpe": 0.6344,
+      "oos_return_pct": 10.66,
+      "oos_max_dd_pct": 10.72,
+      "cpcv_median_sharpe": 0.0,
+      "dsr_oos": 0.1109,
+      "dsr_pval": 0.8891,
+      "hurdles_passed": 4,
+      "hurdles_total": 5,
+      "stress_regimes": {
+        "baseline_oos_sharpe": 0.6344,
+        "friction_2x_oos_sharpe": 0.4485,
+        "delay_1bar_oos_sharpe": 0.6301,
+        "stress_resistance_verdict": "SURVIVES STRESS"
+      },
+      "verdict": "KEEP_P2_RP_BASELINE",
+      "verdict_rationale": "Failed Gate 1 (Full Sharpe: 1.35 vs 1.28, Calmar: 1.11 vs 1.23)",
+      "m_cum": 27,
+      "trial_number": 27,
+      "recorded_at_utc": "2026-11-21T10:50:00.858994+00:00"
     }
   ]
 }
