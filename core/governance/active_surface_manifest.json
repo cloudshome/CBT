@@ -1,0 +1,171 @@
+{
+  "MANIFEST_VERSION": "1.0.0",
+  "schema_version": "1.0.0",
+  "MILESTONE": "M74",
+  "milestone": "M74",
+  "GENERATED_AT_UTC": "2026-11-21T08:50:00Z",
+  "GOVERNANCE_INVARIANTS": {
+    "REAL_CAPITAL_ENABLED": false,
+    "CAPITAL_MODE": "TIER_0_PAPER",
+    "FORECAST_EQUALS_SIGNAL": false,
+    "OVERFILL_HALT_GUARANTEE": true,
+    "EQUITY_CAP_PCT": 1.5
+  },
+  "TIERS": {
+    "ACTIVE_PRODUCTION": {
+      "description": "Production surface for 24/7 P2_RP risk-parity execution, forward accounting, ops health, and market surveillance.",
+      "files": [
+        {
+          "path": "core/strategies/p2_risk_parity.py",
+          "role": "Frozen P2_RP Desk Engine (Donchian-48 + 7d Dual Momentum + Volatility Parity)"
+        },
+        {
+          "path": "core/strategies/p2_shadow_runner.py",
+          "role": "24/7 Shadow Runner & SQLite Forward Ledger (p2_shadow_ledger.db)"
+        },
+        {
+          "path": "core/ops/p2_shadow_watchdog.py",
+          "role": "24/7 CBT Ops Watchdog & Automated .db.gz Backups"
+        },
+        {
+          "path": "core/ops/market_radar.py",
+          "role": "24/7 Proactive Market Radar & Bilingual Trader Copilot"
+        },
+        {
+          "path": "core/autonomous_research/failure_memory.py",
+          "role": "Immutable Falsification Archive (FALSIFIED_M63, FALSIFIED_M67, FALSIFIED_M72)"
+        },
+        {
+          "path": "app.py",
+          "role": "FastAPI Master Gateway (/api/desk/today, /api/desk/shadow, /api/desk/watchdog, /api/desk/radar)"
+        },
+        {
+          "path": "main.py",
+          "role": "CLI Master Router (today, shadow, watchdog, radar)"
+        },
+        {
+          "path": "cli/daily.py",
+          "role": "CLI Desk Command Implementations (cmd_today, cmd_shadow, cmd_watchdog, cmd_radar)"
+        },
+        {
+          "path": "core/telegram/handlers.py",
+          "role": "Telegram AI Typed Handlers (/today, /shadow, /ops, /radar)"
+        },
+        {
+          "path": "core/telegram_bot.py",
+          "role": "Telegram Bot Dispatcher & Natural Language Triggers"
+        },
+        {
+          "path": "frontend/src/components/P2ShadowDesk.tsx",
+          "role": "Today's Desk GUI Cockpit (Executive KPIs, Allocations, Watchdog Pill, Market Radar Card)"
+        },
+        {
+          "path": "deploy/systemd/cbt-p2-shadow.service",
+          "role": "Systemd Service for 24/7 P2 Shadow Runner"
+        },
+        {
+          "path": "deploy/systemd/cbt-p2-shadow.timer",
+          "role": "Systemd Timer for 4h Shadow Execution (00:05, 04:05, 08:05, 12:05, 16:05, 20:05 UTC)"
+        },
+        {
+          "path": "deploy/systemd/cbt-p2-watchdog.service",
+          "role": "Systemd Service for Hourly CBT Ops Watchdog"
+        },
+        {
+          "path": "deploy/systemd/cbt-p2-watchdog.timer",
+          "role": "Systemd Timer for Hourly Watchdog Checks (:15 UTC)"
+        },
+        {
+          "path": "deploy/systemd/cbt-market-radar.service",
+          "role": "Systemd Service for 24/7 Proactive Market Radar Surveillance"
+        },
+        {
+          "path": "deploy/systemd/cbt-market-radar.timer",
+          "role": "Systemd Timer for 4h Market Radar Checks (00:07, 04:07, 08:07, 12:07, 16:07, 20:07 UTC)"
+        }
+      ]
+    },
+    "CERTIFIED_PROTECTED": {
+      "description": "Milestone 18 certified smart order routing, execution connectors, and reconciliation ledger surface area.",
+      "manifest_reference": "core/execution/m18_certification_manifest.json",
+      "certified_commit": "c9cc1cad780453b81032f6b1b1b81117d41c060f",
+      "certified_test_count": 149,
+      "files": [
+        "core/execution/live_router.py",
+        "core/execution/smart_order_router.py",
+        "core/execution/reconciliation_ledger.py",
+        "core/execution/almgren_chriss.py",
+        "core/execution/idempotency.py",
+        "core/execution/kill_switch.py",
+        "core/execution/connectors/base.py",
+        "core/execution/connectors/binance_connector.py",
+        "core/execution/connectors/bybit_connector.py",
+        "core/database.py",
+        "app.py",
+        "tests/test_milestone18_sor_and_slicing.py",
+        "tests/test_milestone18_boss_adversarial.py",
+        "tests/test_milestone18_final_certification.py"
+      ]
+    },
+    "RESEARCH_LAB": {
+      "description": "Causal hypothesis benchmarks, walk-forward falsification scripts, and multiple-testing quarantine.",
+      "files": [
+        {
+          "path": "scripts/research/run_m63_causal_alpha_discovery.py",
+          "verdict": "FALSIFIED_M63",
+          "tested_hypothesis": "Derivatives Crowding Fade (funding rate / OI liquidation sweeps on 1h)"
+        },
+        {
+          "path": "scripts/research/run_m64_structural_alpha_synthesis.py",
+          "verdict": "CANDIDATE_DISCOVERY",
+          "tested_hypothesis": "Multi-Strategy Alpha Synthesis (Donchian-48 Macro Trend + 7d Dual Momentum)"
+        },
+        {
+          "path": "scripts/research/run_m65_risk_parity_and_stress_test.py",
+          "verdict": "VALIDATED_P2_RP",
+          "tested_hypothesis": "P2_RP Conservative Inverse-Volatility Risk Parity + 4h Cash Defense"
+        },
+        {
+          "path": "scripts/research/run_m67_funding_carry_and_p3_ensemble.py",
+          "verdict": "FALSIFIED_M67",
+          "tested_hypothesis": "Static Funding Carry S3 Overlay on P2_RP"
+        },
+        {
+          "path": "scripts/research/run_m72_s4_asymmetric_shorting.py",
+          "verdict": "FALSIFIED_M72",
+          "tested_hypothesis": "Strategy S4 Asymmetric Shorting Engine (Donchian-48 Breakdown + Derivatives Flush)"
+        }
+      ]
+    },
+    "LEGACY_QUARANTINED": {
+      "description": "Falsified or experimental models strictly barred from capital allocation.",
+      "quarantine_policy": "DO_NOT_ALLOCATE_CAPITAL",
+      "engines": [
+        {
+          "name": "15m Tactical SMC",
+          "reason": "Execution friction, high fee decay, negative expectation under walk-forward cost modeling.",
+          "status": "QUARANTINED"
+        },
+        {
+          "name": "M63 Derivatives Crowding Fade",
+          "reason": "Failed CP-2 hurdles; negative OOS Sharpe (-0.29); DSR 0.0000; archived in FALSIFIED_M63.",
+          "status": "QUARANTINED"
+        },
+        {
+          "name": "M67 Static S3-Carry",
+          "reason": "Severe delta-bleed during bear market regime; negative alpha vs P2_RP; archived in FALSIFIED_M67.",
+          "status": "QUARANTINED"
+        },
+        {
+          "name": "M72 S4 Asymmetric Shorting",
+          "reason": "Failed 4/6 institutional hurdles; catastrophic -34.8% bear market DD; 0% OOS win rate; archived in FALSIFIED_M72.",
+          "status": "QUARANTINED"
+        }
+      ],
+      "directories": [
+        "archive/",
+        "docs/archive/legacy_root_docs/"
+      ]
+    }
+  }
+}

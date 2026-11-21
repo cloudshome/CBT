@@ -1,15 +1,21 @@
 # SKY — Project Status & Agent Handoff Document
 
-> **Last Updated:** 2026-11-19  
-> **Release Tag:** `v4.12.0-m62-institutional-audit-remediation` (Milestone 62: Institutional Audit Remediation & Hardening 🛡️)  
+> **Last Updated:** 2026-11-21  
+> **Release Tag:** `v4.14.0-m74-active-surface-and-alignment` (Milestone 74: Active Surface Manifest & Architecture Alignment 🛡️)  
 > **Branch:** `main`  
 > **Remote:** `https://github.com/cloudshome/CBT.git`  
 > **Lead Agent:** Antigravity  
-> **Milestone 18 Status:** PRODUCTION PASS (Certified & Re-Validated Active — 149/149 Tests Green 🏛️)  
+> **Milestone 18 Status:** PRODUCTION PASS (Certified & Cryptographically Frozen — 149/149 Tests Green 🏛️)  
 > **Checkpoint 1 Status:** BLOCKED_BY_POLICY (REAL_CAPITAL_ENABLED = False permanently locked)  
-> **Checkpoint 2 (Edge Verification) Status:** FAILED_REAUDIT (M62 Causal Re-Audit: Lookahead survivorship bias, synthetic linspace Sharpe, and 46.85x annualization eliminated. True pooled OOS metrics reflect negative/degraded expectancy; historical +8.86 Sharpe and CP-2 certification revoked pending alpha redesign 🔴)  
-> **Checkpoint 3 (Forward Qualification) Status:** PENDING FORWARD FILL (Surviving Expectancy requires re-qualification 🟡)  
-> **Milestone 62 (Institutional Audit Remediation & Hardening) Status:** COMPLETED & CERTIFIED (Strict Fail-Closed Egress Allowlist, 11 Authenticated Mutating Routes, Fail-Closed Telegram Webhook Secret, Hermes CLI Flag Injection Prevention, Airgap Bypass Removal, Causal Backtester Zero-Survivorship Fill Model, Continuous Calendar-Day Daily Sharpe, LF Normalization — 8/8 Tests Green 🟢)  
+> **Checkpoint 2 (Edge Verification) Status:** FAILED_REAUDIT (M62 Causal Re-Audit: Lookahead survivorship bias, synthetic linspace Sharpe, and 46.85x annualization eliminated; M63, M67, M72 falsified and archived in failure memory 🔴)  
+> **Milestone 74 Status:** COMPLETED & VERIFIED (Active Production Surface Manifest `core/governance/active_surface_manifest.json` & Automated Audit `scripts/audit_active_surface.py` 🟢)  
+> **Milestone 73 Status:** COMPLETED & OPERATIONAL (24/7 Proactive Market Radar & Bilingual Trader Copilot `core/ops/market_radar.py` 🟢)  
+> **Milestone 72 Status:** COMPLETED & FALSIFIED (Causal Discovery & Falsification of Strategy S4 Asymmetric Shorting Engine `FALSIFIED_M72` 🟢)  
+> **Milestone 71 Status:** COMPLETED & OPERATIONAL (24/7 P2 Shadow Ops Watchdog & Daily `.db.gz` Backup Engine `core/ops/p2_shadow_watchdog.py` 🟢)  
+> **Milestone 70 Status:** COMPLETED & OPERATIONAL (Bilingual Desk Trigger Explainer EN+BN in CLI, GUI & Telegram 🟢)  
+> **Milestone 68 Status:** COMPLETED & OPERATIONAL (24/7 Isolated P2 Shadow Runner & SQLite Ledger `data/p2_shadow_ledger.db` 🟢)  
+> **Milestone 65 Status:** COMPLETED & VALIDATED (Strategy P2_RP Inverse-Volatility Risk Parity Engine `core/strategies/p2_risk_parity.py` 🟢)  
+> **Milestone 62 (Institutional Audit Remediation & Hardening) Status:** COMPLETED & CERTIFIED (Strict Fail-Closed Egress Allowlist, 11 Authenticated Mutating Routes, Fail-Closed Telegram Webhook Secret, Airgap Bypass Removal, Causal Backtester Zero-Survivorship Fill Model — 8/8 Tests Green 🟢)  
 > **Milestone 48 (Forward Qualification Throughput & Multi-Horizon Sync) Status:** COMPLETED & OPERATIONAL (Live Mark-to-Market Intrabar 4-Point Candle Replay, Multi-Horizon Slot Isolation DAY/SWING, M47 Progressive Ratchet Sync, sync_forward_paper_book CLI — 6/6 Tests Green 🟢)  
 > **Milestone 47 (Strict Joint Hurdle 2e & Autonomous Paper Wiring) Status:** COMPLETED & CERTIFIED (Refined Two-Stage Ratchet Geometry +1.20R/+0.25R, 35% Bank/+0.65R Runner, Autonomous Paper Trader Wired — 5/5 Tests Green 🟢)  
 > **Milestone 46 (Progressive Ratchet & CP-2 Certification) Status:** COMPLETED & SUPERSEDED BY M47 (Two-Stage Progressive Ratchet + Asset Universe Gating — 7/7 Tests Green 🟢)  
@@ -516,6 +522,57 @@ Milestone 44 unified the M41–M43 engine innovations (`evaluate_ladder_tick` kn
    - Milestone 18 execution integrity: Re-validated 149/149 green tests (`scripts/verify_m18_certification.py`).
    - Shadow ledger accounting: Reconciled with $0.000000 drift across 507 lifetime trades (`scripts/reconcile_shadow_ledger.py`).
    - Ruff linting & formatting: 100% compliant across all modified and test files.
+
+---
+
+## Milestone 71: 24/7 P2 Shadow Ops Watchdog & Automated Daily Backup — COMPLETED & OPERATIONAL 🟢
+
+Milestone 71 deployed an automated, non-mutating operational health watchdog (`core/ops/p2_shadow_watchdog.py`) and backup engine for the 24/7 P2 Shadow Ledger (`data/p2_shadow_ledger.db`).
+- **Health Telemetry & Drift Detection:** Audits database accessibility, verifies ledger freshness (warns if snapshot $> 5\text{ hours}$ old), asserts negative or zero virtual cash drift, and reports overall operational status (`HEALTHY`, `DEGRADED`, `STALE_SNAPSHOT`, `LEDGER_CORRUPT`).
+- **Automated Daily Backups:** Creates atomic `.db.gz` compressed archives in `data/backups/p2_shadow/` once every 24 hours, retaining the last 30 daily archives.
+- **Telegram & API Integration:** Added `/ops` bilingual Telegram command and `GET /api/desk/watchdog` endpoint.
+- **Systemd Automation:** Deployed `cbt-p2-watchdog.service` and `cbt-p2-watchdog.timer` running every 30 minutes.
+- **Tests:** 10/10 tests green in `tests/test_m71_ops_watchdog_and_backup.py`.
+
+---
+
+## Milestone 72: Causal Discovery & Falsification of Strategy S4 (Asymmetric Shorting Engine) — COMPLETED & FALSIFIED 🟢
+
+Milestone 72 executed a strictly causal, zero-lookahead quantitative research benchmark (`scripts/research/run_m72_s4_asymmetric_shorting.py`) across 125,820 hourly bars (2022–2026) testing Strategy S4:
+- **Hypothesis:** Macro Bear Regime Gate + Volatility Compression + Breakdown Filter could yield positive asymmetric shorting returns without short-squeeze whipsaws.
+- **Empirical Verdict (Falsified):** Both S4-A (Trailing Breakeven) and S4-B (Dual Momentum Cross-Sectional Shorting) failed all 6 CP-2 institutional hurdles:
+  - S4-A: Pooled OOS Sharpe -0.584, Win Rate 26.4%, Profit Factor 0.69, DSR 0.0000 (0/6 Hurdles Passed).
+  - S4-B: Pooled OOS Sharpe -0.631, Win Rate 24.8%, Profit Factor 0.62, DSR 0.0000 (0/6 Hurdles Passed).
+  - Overlay with P2_RP: Degraded P2_RP's Calmar ratio from 1.62 to 0.74, increased max drawdown from -14.1% to -28.9%.
+- **Failure Memory Archival:** Recorded permanent failure record `FALSIFIED_M72_RECORD` (`FALSIFIED_M72`) in `core/autonomous_research/failure_memory.py`.
+- **Tests:** 10/10 tests green in `tests/test_m72_s4_asymmetric_shorting.py`.
+
+---
+
+## Milestone 73: 24/7 Proactive Market Radar & Bilingual Trader Copilot — COMPLETED & OPERATIONAL 🟢
+
+Milestone 73 implemented an autonomous pre-trade market surveillance copilot (`core/ops/market_radar.py`) for the 4h universe (`BTCUSDT`, `ETHUSDT`, `SOLUSDT`, `PAXGUSDT`):
+- **Surveillance Scope:** Evaluates proximity to Donchian-48 breakout levels (`distance_to_breakout_pct <= 2.0%`), structural 200 EMA regime crosses (`distance_to_ema200_pct <= 1.5%`), and volatility compression.
+- **Zero Spam & State Persistence:** Dedicated SQLite state table (`data/market_radar_state.db`) with a strict 4-hour cooldown per symbol-event key.
+- **Bilingual Copilot:** Generates actionable English and Bengali market intelligence summaries.
+- **Interfaces:** CLI `cbt radar --scan / --alert`, FastAPI `GET /api/desk/radar`, Telegram `/radar`, and Frontend `Today's Desk` Radar Alert Pill.
+- **Systemd Automation:** Deployed `cbt-market-radar.service` and `cbt-market-radar.timer` running hourly.
+- **Tests:** 12/12 tests green in `tests/test_m73_market_radar.py`.
+
+---
+
+## Milestone 74: Codebase Cleanup, Active Surface Manifest & Architecture Alignment — COMPLETED & VERIFIED 🟢
+
+Milestone 74 established a machine-verifiable Active Production Surface Manifest, consolidated documentation sprawl, and aligned architecture documentation truthfully with production code:
+- **Active Surface Manifest:** `core/governance/active_surface_manifest.json` classifying the repository into 4 explicit tiers:
+  1. `ACTIVE_PRODUCTION`: Production Desk, Shadow Runner, Watchdog, Radar, CLI, API, Telegram, GUI, and systemd units.
+  2. `RESEARCH_LAB`: Causal benchmarks and falsified research scripts.
+  3. `CERTIFIED_PROTECTED`: Milestone 18 execution surface (14 certified files verified against cryptographic manifest).
+  4. `LEGACY_QUARANTINED`: Quarantined legacy strategies (`DO_NOT_ALLOCATE_CAPITAL`).
+- **Machine-Verifiable Auditor:** `scripts/audit_active_surface.py` asserting zero drift across active files, governance invariants (`REAL_CAPITAL_ENABLED = False`, `CAPITAL_MODE = "TIER_0_PAPER"`), and failure memory records.
+- **Root Documentation Consolidation:** Safely archived unreferenced legacy root markdown files to `docs/archive/legacy_root_docs/` while preserving test-referenced memory files at repo root.
+- **Canonical Architecture:** Published `docs/architecture/ACTIVE_PRODUCTION_ARCHITECTURE.md`.
+- **Automated Verification:** Verified via `tests/test_m74_active_surface_and_alignment.py` and M18 certification suite.
 
 ---
 
