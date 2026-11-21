@@ -267,8 +267,10 @@ def compute_standard_indicators(df: pd.DataFrame) -> dict[str, np.ndarray]:
     tr = np.insert(tr, 0, highs[0] - lows[0])
     atr = pd.Series(tr).rolling(14).mean().values
 
-    # EMA-200
+    # EMAs: 200, 50, 20
     ema200 = pd.Series(closes).ewm(span=200, adjust=False).mean().values
+    ema50 = pd.Series(closes).ewm(span=50, adjust=False).mean().values
+    ema20 = pd.Series(closes).ewm(span=20, adjust=False).mean().values
 
     # Bollinger Bands (20-bar, 2-std) and Bandwidth
     sma20 = pd.Series(closes).rolling(20).mean().values
@@ -308,6 +310,8 @@ def compute_standard_indicators(df: pd.DataFrame) -> dict[str, np.ndarray]:
         "ts": ts_vals,
         "atr": atr,
         "ema200": ema200,
+        "ema50": ema50,
+        "ema20": ema20,
         "bb_width": bb_width,
         "bb_width_q20_120": bb_width_q20_120,
         "donch_h20": donch_h20,
@@ -315,6 +319,55 @@ def compute_standard_indicators(df: pd.DataFrame) -> dict[str, np.ndarray]:
         "rsi14": rsi14,
         "vol_20d": vol_20d,
     }
+
+
+def compute_stress_resistance_verdict(
+    stress_matrix: dict[str, Any] | None = None,
+    *,
+    friction_sharpe: float | None = None,
+    friction_return: float | None = None,
+    delay_sharpe: float | None = None,
+    delay_return: float | None = None,
+    max_gross_exposure: float = 1.0,
+) -> str:
+    """Computes strict institutional stress resistance verdict.
+
+    SURVIVES STRESS requires:
+    1. oos_return_pct > 0.0 AND oos_sharpe > 0.0 for Regime 2 (2x Friction Stress).
+    2. oos_return_pct > 0.0 AND oos_sharpe > 0.0 for Regime 3 (1-Bar Delay Stress).
+    3. max_gross_exposure <= 1.0001.
+    Any non-positive return (e.g. -54.49%), non-positive Sharpe, or leverage breach returns 'FAILS STRESS'.
+    """
+    f_sh = friction_sharpe
+    f_ret = friction_return
+    d_sh = delay_sharpe
+    d_ret = delay_return
+
+    if stress_matrix is not None:
+        r2_oos = stress_matrix.get("regime_2_friction_stress", {}).get("sealed_oos", {})
+        r3_oos = stress_matrix.get("regime_3_delay_stress", {}).get("sealed_oos", {})
+        if f_sh is None:
+            f_sh = float(r2_oos.get("daily_mtm_sharpe", 0.0))
+        if f_ret is None:
+            f_ret = float(r2_oos.get("total_return_pct", 0.0))
+        if d_sh is None:
+            d_sh = float(r3_oos.get("daily_mtm_sharpe", 0.0))
+        if d_ret is None:
+            d_ret = float(r3_oos.get("total_return_pct", 0.0))
+
+    f_sh = 0.0 if f_sh is None else f_sh
+    f_ret = 0.0 if f_ret is None else f_ret
+    d_sh = 0.0 if d_sh is None else d_sh
+    d_ret = 0.0 if d_ret is None else d_ret
+
+    survives = (
+        (f_sh > 0.0)
+        and (f_ret > 0.0)
+        and (d_sh > 0.0)
+        and (d_ret > 0.0)
+        and (max_gross_exposure <= 1.0001)
+    )
+    return "SURVIVES STRESS" if survives else "FAILS STRESS"
 
 
 class CausalDiscoveryEngine:
@@ -390,55 +443,100 @@ class CausalDiscoveryEngine:
             # 1. Process Pending Fills at open[i]
             if i in pending_orders:
                 orders = pending_orders.pop(i)
-                for order in orders:
-                    action = order["action"]
+                rebal_orders = [o for o in orders if o.get("action") == "REBALANCE"]
+                exit_orders = [o for o in orders if o.get("action") == "EXIT"]
+                entry_orders = [o for o in orders if o.get("action") == "ENTRY"]
 
-                    if action == "REBALANCE":
-                        target_weights = order.get("target_weights", {})
-                        # Mark-to-market equity prior to rebalance
-                        cur_nav = cash + sum(
-                            (p["units"] * float(self.indicators[s]["opens"][i]) if not p["is_short"]
-                             else (p["entry_price"] - float(self.indicators[s]["opens"][i])) * p["units"])
+                # A. Handle REBALANCE orders (Phase 1: Exits/reductions, Phase 2: Entries/increases)
+                for order in rebal_orders:
+                    target_weights = order.get("target_weights", {})
+                    # Normalize target weights if sum of abs weights > 1.0
+                    sum_abs_w = sum(abs(w) for w in target_weights.values())
+                    if sum_abs_w > 1.0:
+                        target_weights = {k: v / sum_abs_w for k, v in target_weights.items()}
+
+                    cur_open_px = {s: float(self.indicators[s]["opens"][i]) for s in self.data_bundle["all_symbols"]}
+                    cur_nav = max(
+                        cash + sum(
+                            (p["units"] * cur_open_px[s] if not p["is_short"]
+                             else (p["entry_price"] - cur_open_px[s]) * p["units"])
                             for s, p in positions.items()
+                        ),
+                        10.0,
+                    )
+
+                    target_plans = {}
+                    for s in self.data_bundle["all_symbols"]:
+                        t_w = target_weights.get(s, 0.0)
+                        target_plans[s] = {
+                            "notional": abs(t_w) * cur_nav,
+                            "is_short": t_w < 0.0,
+                        }
+
+                    # Phase 1: EXITS and REDUCTIONS executed FIRST to free gross exposure
+                    for s in list(positions.keys()):
+                        pos = positions[s]
+                        op_s = cur_open_px[s]
+                        plan = target_plans.get(s, {"notional": 0.0, "is_short": False})
+                        curr_notional = pos["units"] * op_s
+
+                        if plan["notional"] < 10.0 or pos["is_short"] != plan["is_short"]:
+                            del positions[s]
+                            fee = curr_notional * half_fee_rate
+                            if not pos["is_short"]:
+                                cash += (curr_notional - fee)
+                                pnl = (op_s - pos["entry_price"]) * pos["units"] - (fee + pos["units"] * pos["entry_price"] * half_fee_rate)
+                            else:
+                                pnl = (pos["entry_price"] - op_s) * pos["units"] - (fee + pos["units"] * pos["entry_price"] * half_fee_rate)
+                                cash += pnl
+                            trades_closed.append({
+                                "symbol": s,
+                                "entry_bar": pos["entry_bar"],
+                                "exit_bar": i,
+                                "entry_price": pos["entry_price"],
+                                "exit_price": op_s,
+                                "pnl": pnl,
+                                "r_mult": 0.0,
+                                "reason": "REBALANCE_EXIT",
+                                "is_short": pos["is_short"],
+                            })
+                        elif curr_notional > plan["notional"] + 10.0:
+                            reduce_notional = curr_notional - plan["notional"]
+                            reduce_units = reduce_notional / op_s
+                            fee = reduce_notional * half_fee_rate
+                            if not pos["is_short"]:
+                                cash += (reduce_notional - fee)
+                                pnl = (op_s - pos["entry_price"]) * reduce_units - (fee + reduce_units * pos["entry_price"] * half_fee_rate)
+                            else:
+                                pnl = (pos["entry_price"] - op_s) * reduce_units - (fee + reduce_units * pos["entry_price"] * half_fee_rate)
+                                cash += pnl
+                            pos["units"] -= reduce_units
+
+                    # Phase 2: ENTRIES and INCREASES executed AFTER exits
+                    for s, plan in target_plans.items():
+                        if plan["notional"] < 10.0:
+                            continue
+                        op_s = cur_open_px[s]
+                        cur_gross = sum(p["units"] * cur_open_px[k] for k, p in positions.items())
+                        cur_eq = max(
+                            cash + sum(
+                                (p["units"] * cur_open_px[k] if not p["is_short"]
+                                 else (p["entry_price"] - cur_open_px[k]) * p["units"])
+                                for k, p in positions.items()
+                            ),
+                            10.0,
                         )
-                        # Rebalance each asset
-                        for s in self.data_bundle["all_symbols"]:
-                            t_w = target_weights.get(s, 0.0)
-                            cur_p = positions.get(s)
-                            target_notional = abs(t_w) * cur_nav
-                            target_short = t_w < 0.0
-                            op_s = float(self.indicators[s]["opens"][i])
+                        avail_gross = max(0.0, 1.0 - (cur_gross / cur_eq)) * cur_eq
 
-                            if cur_p is not None:
-                                # Close if direction flipped or target is zero
-                                if (cur_p["is_short"] != target_short) or (target_notional < 10.0):
-                                    pos = positions.pop(s)
-                                    notional = pos["units"] * op_s
-                                    fee = notional * half_fee_rate
-                                    if not pos["is_short"]:
-                                        cash += (notional - fee)
-                                        pnl = (op_s - pos["entry_price"]) * pos["units"] - fee
-                                    else:
-                                        pnl = (pos["entry_price"] - op_s) * pos["units"] - fee
-                                        cash += pnl
-                                    trades_closed.append({
-                                        "symbol": s,
-                                        "entry_bar": pos["entry_bar"],
-                                        "exit_bar": i,
-                                        "entry_price": pos["entry_price"],
-                                        "exit_price": op_s,
-                                        "pnl": pnl,
-                                        "r_mult": 0.0,
-                                        "reason": "REBALANCE_EXIT",
-                                        "is_short": pos["is_short"],
-                                    })
-
-                            # Open new position if target notional > 10
-                            if target_notional >= 10.0 and s not in positions:
-                                fee = target_notional * half_fee_rate
-                                units = (target_notional - fee) / op_s
-                                if not target_short:
-                                    cash -= target_notional
+                        if s not in positions:
+                            eff_notional = min(plan["notional"], avail_gross)
+                            if not plan["is_short"]:
+                                eff_notional = min(eff_notional, cash)
+                            if eff_notional >= 10.0:
+                                fee = eff_notional * half_fee_rate
+                                units = (eff_notional - fee) / op_s
+                                if not plan["is_short"]:
+                                    cash -= eff_notional
                                 else:
                                     cash -= fee
                                 positions[s] = {
@@ -450,59 +548,107 @@ class CausalDiscoveryEngine:
                                     "current_sl": 0.0,
                                     "tp": 0.0,
                                     "max_hold_bars": 0,
-                                    "is_short": target_short,
+                                    "is_short": plan["is_short"],
                                     "risk_dist": op_s * 0.02,
                                 }
+                        else:
+                            curr_notional = positions[s]["units"] * op_s
+                            if plan["notional"] > curr_notional + 10.0:
+                                add_notional = min(plan["notional"] - curr_notional, avail_gross)
+                                if not plan["is_short"]:
+                                    add_notional = min(add_notional, cash)
+                                if add_notional >= 10.0:
+                                    fee = add_notional * half_fee_rate
+                                    add_units = (add_notional - fee) / op_s
+                                    if not plan["is_short"]:
+                                        cash -= add_notional
+                                    else:
+                                        cash -= fee
+                                    total_units = positions[s]["units"] + add_units
+                                    positions[s]["entry_price"] = (
+                                        (positions[s]["entry_price"] * positions[s]["units"] + op_s * add_units)
+                                        / total_units
+                                    )
+                                    positions[s]["units"] = total_units
+
+                # B. Handle discrete trade-based EXIT orders FIRST
+                for order in exit_orders:
+                    sym = order["symbol"]
+                    if sym in positions:
+                        pos = positions.pop(sym)
+                        op = float(self.indicators[sym]["opens"][i])
+                        is_short = pos["is_short"]
+                        notional = pos["units"] * op
+                        fee = notional * half_fee_rate
+                        if not is_short:
+                            cash += (notional - fee)
+                            pnl = (op - pos["entry_price"]) * pos["units"] - (fee + pos["units"] * pos["entry_price"] * half_fee_rate)
+                        else:
+                            pnl = (pos["entry_price"] - op) * pos["units"] - (fee + pos["units"] * pos["entry_price"] * half_fee_rate)
+                            cash += pnl
+
+                        risk_unit = pos.get("risk_dist", max(pos["entry_price"] * 0.01, 1e-4))
+                        r_mult = pnl / (pos["units"] * risk_unit) if risk_unit > 0 else 0.0
+                        trades_closed.append({
+                            "symbol": sym,
+                            "entry_bar": pos["entry_bar"],
+                            "exit_bar": i,
+                            "entry_price": pos["entry_price"],
+                            "exit_price": op,
+                            "pnl": pnl,
+                            "r_mult": r_mult,
+                            "reason": order.get("reason", "SIGNAL_EXIT"),
+                            "is_short": is_short,
+                        })
+
+                # C. Handle discrete trade-based ENTRY orders with Hard Zero-Leverage Clamp
+                for order in entry_orders:
+                    sym = order["symbol"]
+                    if sym in positions:
+                        continue
+                    op = float(self.indicators[sym]["opens"][i])
+                    is_short = bool(order.get("is_short", False))
+
+                    cur_open_px = {s: float(self.indicators[s]["opens"][i]) for s in self.data_bundle["all_symbols"]}
+                    cur_gross_notional = sum(p["units"] * cur_open_px[s] for s, p in positions.items())
+                    cur_equity = max(
+                        cash + sum(
+                            (p["units"] * cur_open_px[s] if not p["is_short"]
+                             else (p["entry_price"] - cur_open_px[s]) * p["units"])
+                            for s, p in positions.items()
+                        ),
+                        10.0,
+                    )
+                    cur_gross_exp = cur_gross_notional / cur_equity if cur_equity > 0 else 0.0
+
+                    if cur_gross_exp >= 1.0:
                         continue
 
-                    sym = order["symbol"]
-                    op = float(self.indicators[sym]["opens"][i])
+                    remaining_capacity = max(0.0, 1.0 - cur_gross_exp) * cur_equity
+                    requested_notional = order["target_notional"]
+                    capped_notional = min(requested_notional, remaining_capacity)
+                    if not is_short:
+                        capped_notional = min(capped_notional, cash)
 
-                    if action == "ENTRY":
-                        notional = order["target_notional"]
-                        is_short = bool(order.get("is_short", False))
-                        if notional > 10.0 and (cash >= notional or is_short):
-                            fee = notional * half_fee_rate
-                            units = (notional - fee) / op
-                            cash -= notional if not is_short else fee
-                            positions[sym] = {
-                                "units": units,
-                                "entry_price": op,
-                                "entry_bar": i,
-                                "entry_ts": cur_ts,
-                                "initial_sl": order.get("initial_sl", 0.0),
-                                "current_sl": order.get("initial_sl", 0.0),
-                                "tp": order.get("tp", 0.0),
-                                "max_hold_bars": order.get("max_hold_bars", 0),
-                                "is_short": is_short,
-                                "risk_dist": order.get("risk_dist", max(op * 0.01, 1e-4)),
-                            }
-                    elif action == "EXIT":
-                        if sym in positions:
-                            pos = positions.pop(sym)
-                            is_short = pos["is_short"]
-                            notional = pos["units"] * op
-                            fee = notional * half_fee_rate
-                            if not is_short:
-                                cash += (notional - fee)
-                                pnl = (op - pos["entry_price"]) * pos["units"] - (fee + pos["units"] * pos["entry_price"] * half_fee_rate)
-                            else:
-                                pnl = (pos["entry_price"] - op) * pos["units"] - (fee + pos["units"] * pos["entry_price"] * half_fee_rate)
-                                cash += pnl
-
-                            risk_unit = pos.get("risk_dist", max(pos["entry_price"] * 0.01, 1e-4))
-                            r_mult = pnl / (pos["units"] * risk_unit) if risk_unit > 0 else 0.0
-                            trades_closed.append({
-                                "symbol": sym,
-                                "entry_bar": pos["entry_bar"],
-                                "exit_bar": i,
-                                "entry_price": pos["entry_price"],
-                                "exit_price": op,
-                                "pnl": pnl,
-                                "r_mult": r_mult,
-                                "reason": order.get("reason", "SIGNAL_EXIT"),
-                                "is_short": is_short,
-                            })
+                    if capped_notional > 10.0:
+                        fee = capped_notional * half_fee_rate
+                        units = (capped_notional - fee) / op
+                        if not is_short:
+                            cash -= capped_notional
+                        else:
+                            cash -= fee
+                        positions[sym] = {
+                            "units": units,
+                            "entry_price": op,
+                            "entry_bar": i,
+                            "entry_ts": cur_ts,
+                            "initial_sl": order.get("initial_sl", 0.0),
+                            "current_sl": order.get("initial_sl", 0.0),
+                            "tp": order.get("tp", 0.0),
+                            "max_hold_bars": order.get("max_hold_bars", 0),
+                            "is_short": is_short,
+                            "risk_dist": order.get("risk_dist", max(op * 0.01, 1e-4)),
+                        }
 
             # 2. Check Intrabar SL / TP / Time-stops during bar i
             for sym in list(positions.keys()):
@@ -584,17 +730,27 @@ class CausalDiscoveryEngine:
                 for sym, pos in positions.items():
                     if sym in self.data_bundle["crypto_symbols"]:
                         fr = float(self.data_bundle["deriv_by_symbol"][sym]["funding_rate"][i])
-                        notional = pos["units"] * float(self.indicators[sym]["closes"][i])
+                        cl_px = float(self.indicators[sym]["closes"][i])
+                        notional = pos["units"] * cl_px
                         funding_cash_flow = -notional * fr if not pos["is_short"] else notional * fr
                         cash += funding_cash_flow
+                        # Unleveraged zero-borrowing constraint: settle negative cash by trimming position units
+                        if not pos["is_short"] and cash < 0.0:
+                            shortfall = -cash
+                            trim_units = min(shortfall / cl_px, pos["units"])
+                            pos["units"] -= trim_units
+                            cash += trim_units * cl_px
 
             # 4. Mark-to-Market Portfolio Valuation at bar close
             gross_notional = sum(p["units"] * float(self.indicators[s]["closes"][i]) for s, p in positions.items())
-            cur_equity = max(cash + sum(
-                ((float(self.indicators[s]["closes"][i]) - p["entry_price"]) * p["units"] if not p["is_short"]
-                 else (p["entry_price"] - float(self.indicators[s]["closes"][i])) * p["units"])
-                for s, p in positions.items()
-            ), 10.0)
+            cur_equity = max(
+                cash + sum(
+                    (p["units"] * float(self.indicators[s]["closes"][i]) if not p["is_short"]
+                     else (p["entry_price"] - float(self.indicators[s]["closes"][i])) * p["units"])
+                    for s, p in positions.items()
+                ),
+                10.0,
+            )
 
             equity_series[i] = cur_equity
             gross_exposure_series[i] = gross_notional / cur_equity if cur_equity > 0 else 0.0
@@ -882,14 +1038,19 @@ class CausalDiscoveryEngine:
         passed_count = sum(1 for h in hurdles.values() if h["passed"])
         failed_count = len(hurdles) - passed_count
 
-        # 5. Epistemic Verdict
-        # CANDIDATE_QUALIFIED_FOR_SHADOW_PROMOTION only if:
-        # - 6/6 CP-2 hurdles pass
-        # - Positive OOS Sharpe under both 2x friction and 1-bar delay
-        friction_oos_sh = stress_matrix["regime_2_friction_stress"]["sealed_oos"]["daily_mtm_sharpe"]
-        delay_oos_sh = stress_matrix["regime_3_delay_stress"]["sealed_oos"]["daily_mtm_sharpe"]
+        # 5. Epistemic Verdict & Strict Stress Resistance Verification
+        stress_verdict = compute_stress_resistance_verdict(
+            stress_matrix=stress_matrix,
+            max_gross_exposure=res_baseline["max_gross_exposure"],
+        )
+        stress_matrix["stress_resistance_verdict"] = stress_verdict
 
-        if passed_count == 6 and friction_oos_sh > 0 and delay_oos_sh > 0:
+        friction_oos_sh = stress_matrix["regime_2_friction_stress"]["sealed_oos"]["daily_mtm_sharpe"]
+        friction_oos_ret = stress_matrix["regime_2_friction_stress"]["sealed_oos"]["total_return_pct"]
+        delay_oos_sh = stress_matrix["regime_3_delay_stress"]["sealed_oos"]["daily_mtm_sharpe"]
+        delay_oos_ret = stress_matrix["regime_3_delay_stress"]["sealed_oos"]["total_return_pct"]
+
+        if passed_count == 6 and stress_verdict == "SURVIVES STRESS":
             verdict = "CANDIDATE_QUALIFIED_FOR_SHADOW_PROMOTION"
             verdict_rationale = (
                 f"Qualified all 6 CP-2 institutional hurdles with OOS Sharpe {strat_oos['daily_mtm_sharpe']:.2f}, "
@@ -900,10 +1061,12 @@ class CausalDiscoveryEngine:
             reasons = []
             if passed_count < 6:
                 reasons.append(f"Failed {failed_count}/6 CP-2 hurdles")
-            if friction_oos_sh <= 0:
-                reasons.append(f"Degraded to non-positive Sharpe under 2x friction ({friction_oos_sh:.2f})")
-            if delay_oos_sh <= 0:
-                reasons.append(f"Degraded to non-positive Sharpe under 1-bar delay ({delay_oos_sh:.2f})")
+            if friction_oos_sh <= 0 or friction_oos_ret <= 0:
+                reasons.append(f"Fails 2x friction stress (Sharpe: {friction_oos_sh:.2f}, Ret: {friction_oos_ret:+.2f}%)")
+            if delay_oos_sh <= 0 or delay_oos_ret <= 0:
+                reasons.append(f"Fails 1-bar delay stress (Sharpe: {delay_oos_sh:.2f}, Ret: {delay_oos_ret:+.2f}%)")
+            if res_baseline["max_gross_exposure"] > 1.0001:
+                reasons.append(f"Gross exposure breach ({res_baseline['max_gross_exposure']:.4f} > 1.0001)")
             verdict_rationale = "; ".join(reasons)
 
         result_payload = {
@@ -962,8 +1125,12 @@ class CausalDiscoveryEngine:
             "hurdles_total": 6,
             "stress_regimes": {
                 "baseline_oos_sharpe": strat_oos["daily_mtm_sharpe"],
+                "baseline_oos_return_pct": strat_oos["total_return_pct"],
                 "friction_2x_oos_sharpe": friction_oos_sh,
+                "friction_2x_oos_return_pct": friction_oos_ret,
                 "delay_1bar_oos_sharpe": delay_oos_sh,
+                "delay_1bar_oos_return_pct": delay_oos_ret,
+                "stress_resistance_verdict": stress_verdict,
             },
             "verdict": verdict,
             "verdict_rationale": verdict_rationale,
@@ -1311,4 +1478,374 @@ class H3_PostCrashLiqRebound(BaseHypothesis):
                     })
 
         return intents
+
+
+# ==============================================================================
+# MILESTONE 75.1 CLEAN DISCOVERY BATCH #2 CANDIDATE HYPOTHESES (H1_CLEAN, H4, H5)
+# ==============================================================================
+class H1_CleanVolSqueezeExpansionLong(BaseHypothesis):
+    """
+    Hypothesis 1 (Clean Re-test): Volatility Compression -> Expansion Breakout (Long-Only).
+    Evaluated under the hardened zero-leverage clamp (gross <= 1.0000).
+    Entry: close[t] > EMA200[t] AND bb_width[t-1] <= q20(bb_width_120)[t-1] AND close[t] > max(high[t-20:t]).
+    Sizing: 15% vol-targeted, max 25% notional per asset, hard gross <= 1.0.
+    Exit: 2.5 * ATR trailing stop OR close[k] < min(low[k-12:k]) at open[k+1].
+    """
+
+    def spec(self) -> HypothesisSpec:
+        return HypothesisSpec(
+            hypothesis_id="H1_CLEAN_VOL_SQUEEZE_LONG",
+            name="Clean Volatility Compression Expansion Breakout Long",
+            family="Volatility Breakout & Squeeze Expansion",
+            direction_mode="LONG_ONLY",
+            universe=["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+            timeframe="4h",
+            parameters={
+                "ema_trend_filter": 200,
+                "bollinger_window": 20,
+                "bollinger_std": 2.0,
+                "compression_quantile_window": 120,
+                "compression_quantile": 0.20,
+                "breakout_window": 20,
+                "trailing_stop_atr": 2.5,
+                "donchian_exit_window": 12,
+                "target_vol": 0.15,
+                "max_notional_per_asset": 0.25,
+                "risk_per_trade_cap": 0.01,
+                "hard_gross_clamp": 1.0,
+            },
+            economic_rationale=(
+                "Asset volatility regime clustering implies prolonged volatility contraction precedes large "
+                "directional expansion; entering breakouts in the direction of the macro trend (EMA-200) "
+                "captures convex upside under strict zero-leverage portfolio clamp."
+            ),
+            distinct_novelty_rationale=(
+                "Clean evaluation of H1 volatility breakout under hardened zero-leverage simulator clamp to measure true unlevered performance."
+            ),
+        )
+
+    def evaluate_trade_intents(
+        self,
+        data_bundle: dict[str, Any],
+        bar_idx: int,
+        state: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        intents = []
+        indicators = data_bundle["indicators"]
+        universe = self.spec().universe
+        cur_equity = state["current_equity"]
+        cash = state["cash"]
+        positions = state["positions"]
+
+        active_notional = sum(
+            p["units"] * float(indicators[s]["closes"][bar_idx]) for s, p in positions.items()
+        )
+        allocated_in_intents = 0.0
+
+        for sym in universe:
+            c_now = float(indicators[sym]["closes"][bar_idx])
+            ema200_now = float(indicators[sym]["ema200"][bar_idx])
+            bb_w_prev = float(indicators[sym]["bb_width"][bar_idx - 1])
+            bb_q20_prev = float(indicators[sym]["bb_width_q20_120"][bar_idx - 1])
+            donch_h20_now = float(indicators[sym]["donch_h20"][bar_idx])
+            donch_l12_now = float(indicators[sym]["donch_l12"][bar_idx])
+            atr_now = float(indicators[sym]["atr"][bar_idx])
+            vol_20d = float(indicators[sym]["vol_20d"][bar_idx])
+
+            if sym in positions:
+                # Update trailing stop on open position
+                pos = positions[sym]
+                new_sl = max(pos["current_sl"], c_now - 2.5 * atr_now)
+                pos["current_sl"] = new_sl
+
+                # Check Donchian-12 low exit at bar close
+                if c_now < donch_l12_now:
+                    intents.append({
+                        "symbol": sym,
+                        "action": "EXIT",
+                        "reason": "DONCHIAN_L12_EXIT",
+                    })
+            else:
+                is_bull_regime = c_now > ema200_now
+                was_compressed = (bb_q20_prev > 0.0) and (bb_w_prev <= bb_q20_prev)
+                is_breakout = c_now > donch_h20_now
+
+                if is_bull_regime and was_compressed and is_breakout:
+                    vol_scalar = min(0.15 / max(vol_20d, 0.04), 1.0)
+                    base_risk_usd = 0.01 * cur_equity * vol_scalar
+                    sl_dist = max(2.5 * atr_now, 0.01 * c_now)
+                    calc_notional = (base_risk_usd / sl_dist) * c_now
+                    max_asset_notional = 0.25 * cur_equity
+                    avail_equity = max(cur_equity - active_notional - allocated_in_intents, 0.0)
+                    target_notional = min(calc_notional, max_asset_notional, avail_equity, cash)
+
+                    if target_notional > 10.0:
+                        allocated_in_intents += target_notional
+                        intents.append({
+                            "symbol": sym,
+                            "action": "ENTRY",
+                            "target_notional": target_notional,
+                            "initial_sl": c_now - sl_dist,
+                            "risk_dist": sl_dist,
+                            "is_short": False,
+                        })
+
+        return intents
+
+
+class H4_TrendPullbackVolTarget(BaseHypothesis):
+    """
+    Hypothesis 4: Orthogonal Trend-Pullback Long with Volatility Targeting.
+    Universe: BTCUSDT, ETHUSDT, SOLUSDT.
+    Macro Trend Filter at bar close t: close[t] > EMA_200[t] AND EMA_50[t] > EMA_200[t].
+    Pullback Reclaim Trigger at bar close t (fill at open[t+1]):
+        low[t] <= EMA_20[t] AND close[t] > EMA_20[t] AND close[t] > open[t].
+    Sizing: 1.0% equity risk scaled by min(0.15 / max(vol_20d, 0.04), 1.0),
+        per-asset notional <= 25%, hard portfolio gross <= 1.0x.
+    Exit: 2.5 * ATR_14 trailing stop OR close[k] < EMA_50[k] at open[k+1].
+    Conservative SL-first intrabar tie-breaker.
+    """
+
+    def spec(self) -> HypothesisSpec:
+        return HypothesisSpec(
+            hypothesis_id="H4_TREND_PULLBACK_VOL_TARGET",
+            name="Orthogonal Trend-Pullback Long with Volatility Targeting",
+            family="Trend Following & Moving Average Pullback",
+            direction_mode="LONG_ONLY",
+            universe=["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+            timeframe="4h",
+            parameters={
+                "ema_trend_filter": 200,
+                "ema_fast_trend": 50,
+                "ema_pullback": 20,
+                "trailing_stop_atr": 2.5,
+                "target_vol": 0.15,
+                "max_notional_per_asset": 0.25,
+                "risk_per_trade_cap": 0.01,
+                "hard_gross_clamp": 1.0,
+            },
+            economic_rationale=(
+                "In established bull trends (close > EMA200, EMA50 > EMA200), pullbacks to the intermediate 20-EMA "
+                "represent temporary liquidity absorptions rather than trend reversals; buying the bullish reclaim "
+                "rejection of the 20-EMA offers superior risk-reward than chasing breakouts at highs."
+            ),
+            distinct_novelty_rationale=(
+                "Orthogonal trend pullback entry on 20-EMA reclaim in confirmed dual-EMA bull regime distinct from breakout or reversal strategies."
+            ),
+        )
+
+    def evaluate_trade_intents(
+        self,
+        data_bundle: dict[str, Any],
+        bar_idx: int,
+        state: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        intents = []
+        indicators = data_bundle["indicators"]
+        universe = self.spec().universe
+        cur_equity = state["current_equity"]
+        cash = state["cash"]
+        positions = state["positions"]
+
+        active_notional = sum(
+            p["units"] * float(indicators[s]["closes"][bar_idx]) for s, p in positions.items()
+        )
+        allocated_in_intents = 0.0
+
+        for sym in universe:
+            c_now = float(indicators[sym]["closes"][bar_idx])
+            op_now = float(indicators[sym]["opens"][bar_idx])
+            lo_now = float(indicators[sym]["lows"][bar_idx])
+            ema200_now = float(indicators[sym]["ema200"][bar_idx])
+            ema50_now = float(indicators[sym]["ema50"][bar_idx])
+            ema20_now = float(indicators[sym]["ema20"][bar_idx])
+            atr_now = float(indicators[sym]["atr"][bar_idx])
+            vol_20d = float(indicators[sym]["vol_20d"][bar_idx])
+
+            if sym in positions:
+                # Update trailing stop on open position
+                pos = positions[sym]
+                new_sl = max(pos["current_sl"], c_now - 2.5 * atr_now)
+                pos["current_sl"] = new_sl
+
+                # Check EMA-50 breakdown exit at bar close
+                if c_now < ema50_now:
+                    intents.append({
+                        "symbol": sym,
+                        "action": "EXIT",
+                        "reason": "EMA50_BREAKDOWN_EXIT",
+                    })
+            else:
+                # Macro trend: close > EMA200 AND EMA50 > EMA200
+                is_macro_bull = (c_now > ema200_now) and (ema50_now > ema200_now)
+                # Pullback reclaim: low <= EMA20 AND close > EMA20 AND close > open
+                is_reclaim = (lo_now <= ema20_now) and (c_now > ema20_now) and (c_now > op_now)
+
+                if is_macro_bull and is_reclaim:
+                    vol_scalar = min(0.15 / max(vol_20d, 0.04), 1.0)
+                    base_risk_usd = 0.01 * cur_equity * vol_scalar
+                    sl_dist = max(2.5 * atr_now, 0.01 * c_now)
+                    calc_notional = (base_risk_usd / sl_dist) * c_now
+                    max_asset_notional = 0.25 * cur_equity
+                    avail_equity = max(cur_equity - active_notional - allocated_in_intents, 0.0)
+                    target_notional = min(calc_notional, max_asset_notional, avail_equity, cash)
+
+                    if target_notional > 10.0:
+                        allocated_in_intents += target_notional
+                        intents.append({
+                            "symbol": sym,
+                            "action": "ENTRY",
+                            "target_notional": target_notional,
+                            "initial_sl": c_now - sl_dist,
+                            "risk_dist": sl_dist,
+                            "is_short": False,
+                        })
+
+        return intents
+
+
+class H5_DualHorizonRotationGold(BaseHypothesis):
+    """
+    Hypothesis 5: 14d + 60d Blended Dual-Momentum Rotation with Gold Defensive Fallback.
+    Universe: BTCUSDT, ETHUSDT, SOLUSDT, PAXGUSDT.
+    Cadence: Evaluated every 7 days (42 4h bars).
+    Score: 0.5 * (ret_14d / max(vol_20d, 0.04)) + 0.5 * (ret_60d / max(vol_20d, 0.04)).
+    Absolute Momentum Gate: Asset eligible ONLY if ret_14d > 0 AND ret_60d > 0.
+    Selection: Top-2 inverse-vol weighted, 15% hysteresis deadband, 15% basket vol-targeting.
+    Defensive: PAXG fallback if crypto majors fail gate, 100% Cash if all fail gate.
+    Hard gross <= 1.0x (zero leverage).
+    """
+
+    def __init__(self):
+        self.prev_top_assets: list[str] = []
+
+    def spec(self) -> HypothesisSpec:
+        return HypothesisSpec(
+            hypothesis_id="H5_DUAL_HORIZON_ROTATION_GOLD",
+            name="14d + 60d Blended Dual-Momentum Rotation with Gold Defensive Fallback",
+            family="Cross-Asset Dual-Momentum Rotation",
+            direction_mode="LONG_ONLY",
+            universe=["BTCUSDT", "ETHUSDT", "SOLUSDT", "PAXGUSDT"],
+            timeframe="4h",
+            parameters={
+                "rebalance_cadence_bars": 42,
+                "lookback_fast_bars": 84,  # 14 days
+                "lookback_slow_bars": 360,  # 60 days
+                "vol_lookback_bars": 120,
+                "target_vol": 0.15,
+                "hysteresis": 0.15,
+                "gross_exposure_cap": 1.0000,
+            },
+            economic_rationale=(
+                "Cross-asset dual momentum blends medium-term (14d) responsiveness with secular (60d) trend stability "
+                "to allocate capital to crypto leaders in bull runs, while falling back to gold (PAXG) during crypto bear "
+                "markets and moving to 100% cash during generalized liquidity shocks."
+            ),
+            distinct_novelty_rationale=(
+                "Blended 14d+60d dual-horizon momentum rotation with gold defensive fallback and cash capital preservation, distinct from single-asset trend and pair trading."
+            ),
+        )
+
+    def generate_target_weights(
+        self,
+        data_bundle: dict[str, Any],
+        bar_idx: int,
+        state: dict[str, Any],
+    ) -> dict[str, float]:
+        if (bar_idx - 200) % 42 != 0:
+            return {}
+
+        all_symbols = data_bundle["all_symbols"]
+        indicators = data_bundle["indicators"]
+        crypto_majors = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+
+        target_weights = {s: 0.0 for s in all_symbols}
+
+        scores: dict[str, float] = {}
+        vols: dict[str, float] = {}
+        gate_passed: dict[str, bool] = {}
+
+        for s in all_symbols:
+            c_now = float(indicators[s]["closes"][bar_idx])
+            c_14d = float(indicators[s]["closes"][bar_idx - 84])
+            c_60d = float(indicators[s]["closes"][bar_idx - 360])
+            vol = max(float(indicators[s]["vol_20d"][bar_idx]), 0.04)
+            vols[s] = vol
+
+            ret_14d = (c_now - c_14d) / c_14d if c_14d > 0 else 0.0
+            ret_60d = (c_now - c_60d) / c_60d if c_60d > 0 else 0.0
+
+            scores[s] = 0.5 * (ret_14d / vol) + 0.5 * (ret_60d / vol)
+            gate_passed[s] = (ret_14d > 0.0) and (ret_60d > 0.0)
+
+        # Check crypto majors passing absolute momentum gate
+        passing_crypto = [s for s in crypto_majors if gate_passed[s]]
+        passing_crypto.sort(key=lambda s: scores[s], reverse=True)
+
+        selected_assets: list[str] = []
+
+        if len(passing_crypto) >= 2:
+            # Top-2 crypto majors
+            c1 = passing_crypto[0]
+            c2 = passing_crypto[1]
+
+            # 15% hysteresis deadband on rank flips if previous top assets are still passing
+            if self.prev_top_assets:
+                for prev in self.prev_top_assets:
+                    if prev in passing_crypto and prev not in (c1, c2):
+                        if (scores[c2] - scores[prev]) < 0.15 * abs(scores[c2]):
+                            c2 = prev
+            selected_assets = [c1, c2]
+
+        elif len(passing_crypto) == 1:
+            c1 = passing_crypto[0]
+            if gate_passed.get("PAXGUSDT", False):
+                selected_assets = [c1, "PAXGUSDT"]
+            else:
+                selected_assets = [c1]
+
+        else:
+            # 0 crypto majors pass gate -> fallback to PAXG if it passes gate
+            if gate_passed.get("PAXGUSDT", False):
+                selected_assets = ["PAXGUSDT"]
+            else:
+                # 100% Cash
+                self.prev_top_assets = []
+                return target_weights
+
+        self.prev_top_assets = selected_assets
+
+        if len(selected_assets) == 2:
+            a1, a2 = selected_assets
+            inv1 = 1.0 / vols[a1]
+            inv2 = 1.0 / vols[a2]
+            tot_inv = inv1 + inv2
+            w1_raw = inv1 / tot_inv
+            w2_raw = inv2 / tot_inv
+
+            # Trailing 120-bar basket vol estimate
+            c1_series = indicators[a1]["closes"][bar_idx - 120 : bar_idx + 1]
+            c2_series = indicators[a2]["closes"][bar_idx - 120 : bar_idx + 1]
+            r1 = np.diff(c1_series) / c1_series[:-1]
+            r2 = np.diff(c2_series) / c2_series[:-1]
+            basket_rets = w1_raw * r1 + w2_raw * r2
+            basket_vol = float(np.std(basket_rets, ddof=1) * math.sqrt(2190.0))
+            vol_scalar = min(0.15 / max(basket_vol, 0.04), 1.0)
+
+            w1 = float(w1_raw * vol_scalar)
+            w2 = float(w2_raw * vol_scalar)
+            gross = w1 + w2
+            if gross > 1.0:
+                w1 /= gross
+                w2 /= gross
+
+            target_weights[a1] = round(w1, 4)
+            target_weights[a2] = round(w2, 4)
+
+        elif len(selected_assets) == 1:
+            a1 = selected_assets[0]
+            vol_scalar = min(0.15 / vols[a1], 1.0)
+            target_weights[a1] = round(min(vol_scalar, 1.0), 4)
+
+        return target_weights
 

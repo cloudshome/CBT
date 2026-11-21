@@ -303,3 +303,102 @@ def test_m75_governance_invariants_and_cli():
     assert data.get("baseline_trials") == 18
     assert data.get("cumulative_trials_count") >= 21
     assert len(data.get("trials", [])) >= 3
+
+
+def test_m75_1_hard_portfolio_gross_exposure_clamp():
+    """Forces simultaneous overlapping entries across all assets and asserts max_gross_exposure <= 1.0001 at every bar."""
+    from core.research.discovery_lab import BaseHypothesis, CausalDiscoveryEngine, HypothesisSpec
+
+    class OverlappingAggressiveHypothesis(BaseHypothesis):
+        def spec(self) -> HypothesisSpec:
+            return HypothesisSpec(
+                hypothesis_id="TEST_OVERLAPPING_CLAMP",
+                name="Overlapping Aggressive Entries",
+                family="Test",
+                direction_mode="LONG_ONLY",
+                universe=["BTCUSDT", "ETHUSDT", "SOLUSDT", "PAXGUSDT"],
+                timeframe="4h",
+                parameters={},
+                economic_rationale="Test",
+                distinct_novelty_rationale="Test",
+            )
+
+        def evaluate_trade_intents(self, data_bundle, bar_idx, state):
+            # Request aggressive 80% equity notional entry on EVERY asset simultaneously at bar 205
+            if bar_idx == 205:
+                intents = []
+                cur_eq = state["current_equity"]
+                for sym in self.spec().universe:
+                    intents.append({
+                        "symbol": sym,
+                        "action": "ENTRY",
+                        "target_notional": cur_eq * 0.80,  # 4 * 80% = 320% requested notional!
+                        "initial_sl": 0.0,
+                        "is_short": False,
+                    })
+                return intents
+            return []
+
+    bundle = _generate_synthetic_bundle(n_bars=260)
+    engine = CausalDiscoveryEngine(data_bundle=bundle)
+    res = engine.run_single_regime_simulation(OverlappingAggressiveHypothesis())
+
+    # Verify max_gross_exposure <= 1.0001
+    assert res["max_gross_exposure"] <= 1.0001, f"Hard clamp failed: max gross exposure was {res['max_gross_exposure']}"
+    # Verify daily gross exposure series at every single day is <= 1.0001
+    assert (res["df_daily"]["gross_exposure"] <= 1.0001).all(), "Gross exposure breached 1.0001 on one or more days"
+
+
+def test_m75_1_stress_verdict_rejects_negative_return():
+    """Verifies a stress run with oos_return_pct = -54.49 and oos_sharpe = 0.42 returns 'FAILS STRESS'."""
+    from core.research.discovery_lab import compute_stress_resistance_verdict
+
+    # Case 1: Direct parameters with negative return under delay
+    verdict1 = compute_stress_resistance_verdict(
+        friction_sharpe=0.82,
+        friction_return=21.02,
+        delay_sharpe=0.42,
+        delay_return=-54.49,
+        max_gross_exposure=0.95,
+    )
+    assert verdict1 == "FAILS STRESS", f"Expected FAILS STRESS, got {verdict1}"
+
+    # Case 2: Stress matrix structure matching M75 H1
+    mock_stress_matrix = {
+        "regime_2_friction_stress": {
+            "sealed_oos": {
+                "daily_mtm_sharpe": 0.82,
+                "total_return_pct": 21.02,
+            }
+        },
+        "regime_3_delay_stress": {
+            "sealed_oos": {
+                "daily_mtm_sharpe": 0.42,
+                "total_return_pct": -54.49,
+            }
+        },
+    }
+    verdict2 = compute_stress_resistance_verdict(stress_matrix=mock_stress_matrix, max_gross_exposure=0.95)
+    assert verdict2 == "FAILS STRESS", f"Expected FAILS STRESS from stress_matrix, got {verdict2}"
+
+    # Case 3: Surviving scenario (both positive return, positive Sharpe, gross <= 1.0001)
+    mock_surviving_matrix = {
+        "regime_2_friction_stress": {
+            "sealed_oos": {
+                "daily_mtm_sharpe": 1.20,
+                "total_return_pct": 15.5,
+            }
+        },
+        "regime_3_delay_stress": {
+            "sealed_oos": {
+                "daily_mtm_sharpe": 0.95,
+                "total_return_pct": 11.2,
+            }
+        },
+    }
+    verdict3 = compute_stress_resistance_verdict(stress_matrix=mock_surviving_matrix, max_gross_exposure=0.95)
+    assert verdict3 == "SURVIVES STRESS", f"Expected SURVIVES STRESS, got {verdict3}"
+
+    # Case 4: Gross exposure breach (> 1.0001) must return FAILS STRESS
+    verdict4 = compute_stress_resistance_verdict(stress_matrix=mock_surviving_matrix, max_gross_exposure=1.593)
+    assert verdict4 == "FAILS STRESS", f"Expected FAILS STRESS for leverage breach, got {verdict4}"

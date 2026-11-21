@@ -144,6 +144,11 @@
           "path": "scripts/research/run_m75_discovery_lab.py",
           "verdict": "FALSIFIED_BATCH_M75",
           "tested_hypothesis": "First 3-Hypothesis Batch (H1 Vol Squeeze, H2 Market-Neutral RV, H3 Liq Rebound)"
+        },
+        {
+          "path": "scripts/research/run_m75_1_clean_discovery_batch.py",
+          "verdict": "CLEAN_BATCH_M75_1",
+          "tested_hypothesis": "Clean Discovery Batch #2 (H1_CLEAN Vol Squeeze, H4 Trend Pullback, H5 Dual-Momentum Gold)"
         }
       ]
     },

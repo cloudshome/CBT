@@ -1,0 +1,1104 @@
+{
+  "milestone": "M75.1",
+  "description": "Clean Discovery Batch #2 (Hardened Zero-Leverage Engine)",
+  "evaluation_timestamp_utc": "2026-11-21T10:32:01.490444+00:00",
+  "total_runtime_seconds": 11.8,
+  "hypotheses": {
+    "H1_CLEAN_VOL_SQUEEZE_LONG": {
+      "hypothesis_id": "H1_CLEAN_VOL_SQUEEZE_LONG",
+      "name": "Clean Volatility Compression Expansion Breakout Long",
+      "family": "Volatility Breakout & Squeeze Expansion",
+      "direction_mode": "LONG_ONLY",
+      "universe": [
+        "BTCUSDT",
+        "ETHUSDT",
+        "SOLUSDT"
+      ],
+      "parameters": {
+        "ema_trend_filter": 200,
+        "bollinger_window": 20,
+        "bollinger_std": 2.0,
+        "compression_quantile_window": 120,
+        "compression_quantile": 0.2,
+        "breakout_window": 20,
+        "trailing_stop_atr": 2.5,
+        "donchian_exit_window": 12,
+        "target_vol": 0.15,
+        "max_notional_per_asset": 0.25,
+        "risk_per_trade_cap": 0.01,
+        "hard_gross_clamp": 1.0
+      },
+      "evaluation_timestamp_utc": "2026-11-21T10:31:55.159788+00:00",
+      "m_cum": 22,
+      "splits_scorecard": {
+        "train": {
+          "days": 1100,
+          "strategy": {
+            "cagr_pct": 2.91,
+            "daily_mtm_sharpe": 0.9546,
+            "daily_mtm_sortino": 1.2471,
+            "max_drawdown_pct": 2.57,
+            "calmar_ratio": 1.1303,
+            "total_return_pct": 9.02,
+            "annualized_vol_pct": 3.05
+          },
+          "bnh": {
+            "cagr_pct": 111.0,
+            "daily_mtm_sharpe": 1.3125,
+            "daily_mtm_sortino": 1.8394,
+            "max_drawdown_pct": 85.14,
+            "calmar_ratio": 1.3037,
+            "total_return_pct": 847.61,
+            "annualized_vol_pct": 84.05
+          }
+        },
+        "val": {
+          "days": 550,
+          "strategy": {
+            "cagr_pct": 3.57,
+            "daily_mtm_sharpe": 0.9181,
+            "daily_mtm_sortino": 0.8903,
+            "max_drawdown_pct": 3.48,
+            "calmar_ratio": 1.0269,
+            "total_return_pct": 5.43,
+            "annualized_vol_pct": 3.59
+          },
+          "bnh": {
+            "cagr_pct": 88.29,
+            "daily_mtm_sharpe": 1.2863,
+            "daily_mtm_sortino": 1.9518,
+            "max_drawdown_pct": 49.14,
+            "calmar_ratio": 1.7967,
+            "total_return_pct": 159.31,
+            "annualized_vol_pct": 64.25
+          }
+        },
+        "sealed_oos": {
+          "days": 551,
+          "strategy": {
+            "cagr_pct": 5.99,
+            "daily_mtm_sharpe": 0.6374,
+            "daily_mtm_sortino": 0.9404,
+            "max_drawdown_pct": 6.94,
+            "calmar_ratio": 0.8631,
+            "total_return_pct": 9.17,
+            "annualized_vol_pct": 9.71
+          },
+          "bnh": {
+            "cagr_pct": -6.15,
+            "daily_mtm_sharpe": 0.1506,
+            "daily_mtm_sortino": 0.2288,
+            "max_drawdown_pct": 64.32,
+            "calmar_ratio": -0.0956,
+            "total_return_pct": -9.13,
+            "annualized_vol_pct": 55.03
+          }
+        },
+        "combined_walk_forward": {
+          "days": 1101,
+          "strategy": {
+            "cagr_pct": 4.74,
+            "daily_mtm_sharpe": 0.6481,
+            "daily_mtm_sortino": 0.8761,
+            "max_drawdown_pct": 6.94,
+            "calmar_ratio": 0.6825,
+            "total_return_pct": 14.97,
+            "annualized_vol_pct": 7.32
+          },
+          "bnh": {
+            "cagr_pct": 32.59,
+            "daily_mtm_sharpe": 0.7595,
+            "daily_mtm_sortino": 1.1536,
+            "max_drawdown_pct": 64.32,
+            "calmar_ratio": 0.5067,
+            "total_return_pct": 134.05,
+            "annualized_vol_pct": 59.82
+          }
+        },
+        "full_period": {
+          "days": 2201,
+          "strategy": {
+            "cagr_pct": 3.75,
+            "daily_mtm_sharpe": 0.6828,
+            "daily_mtm_sortino": 0.888,
+            "max_drawdown_pct": 6.94,
+            "calmar_ratio": 0.5401,
+            "total_return_pct": 24.82,
+            "annualized_vol_pct": 5.61
+          },
+          "bnh": {
+            "cagr_pct": 66.76,
+            "daily_mtm_sharpe": 1.0674,
+            "daily_mtm_sortino": 1.5219,
+            "max_drawdown_pct": 85.14,
+            "calmar_ratio": 0.7841,
+            "total_return_pct": 2079.4,
+            "annualized_vol_pct": 72.94
+          }
+        }
+      },
+      "yearly_benchmark": {
+        "2022": {
+          "days": 360,
+          "strategy": {
+            "cagr_pct": -0.84,
+            "daily_mtm_sharpe": -0.5308,
+            "daily_mtm_sortino": -0.3967,
+            "max_drawdown_pct": 2.1,
+            "calmar_ratio": -0.4013,
+            "total_return_pct": -0.83,
+            "annualized_vol_pct": 1.57
+          },
+          "bnh": {
+            "cagr_pct": -80.24,
+            "daily_mtm_sharpe": -1.366,
+            "daily_mtm_sortino": -1.8428,
+            "max_drawdown_pct": 79.96,
+            "calmar_ratio": -1.0035,
+            "total_return_pct": -79.77,
+            "annualized_vol_pct": 87.31
+          }
+        },
+        "2023": {
+          "days": 365,
+          "strategy": {
+            "cagr_pct": 6.85,
+            "daily_mtm_sharpe": 1.4656,
+            "daily_mtm_sortino": 1.7838,
+            "max_drawdown_pct": 2.01,
+            "calmar_ratio": 3.403,
+            "total_return_pct": 6.85,
+            "annualized_vol_pct": 4.59
+          },
+          "bnh": {
+            "cagr_pct": 293.98,
+            "daily_mtm_sharpe": 2.717,
+            "daily_mtm_sortino": 4.9173,
+            "max_drawdown_pct": 27.96,
+            "calmar_ratio": 10.5136,
+            "total_return_pct": 293.61,
+            "annualized_vol_pct": 56.37
+          }
+        },
+        "2024": {
+          "days": 366,
+          "strategy": {
+            "cagr_pct": 3.13,
+            "daily_mtm_sharpe": 0.8978,
+            "daily_mtm_sortino": 0.953,
+            "max_drawdown_pct": 3.48,
+            "calmar_ratio": 0.8989,
+            "total_return_pct": 3.13,
+            "annualized_vol_pct": 3.74
+          },
+          "bnh": {
+            "cagr_pct": 80.38,
+            "daily_mtm_sharpe": 1.3542,
+            "daily_mtm_sortino": 2.1601,
+            "max_drawdown_pct": 32.98,
+            "calmar_ratio": 2.4371,
+            "total_return_pct": 80.6,
+            "annualized_vol_pct": 60.9
+          }
+        },
+        "2025": {
+          "days": 365,
+          "strategy": {
+            "cagr_pct": 0.05,
+            "daily_mtm_sharpe": 0.0327,
+            "daily_mtm_sortino": 0.037,
+            "max_drawdown_pct": 2.71,
+            "calmar_ratio": 0.0198,
+            "total_return_pct": 0.05,
+            "annualized_vol_pct": 3.1
+          },
+          "bnh": {
+            "cagr_pct": -15.52,
+            "daily_mtm_sharpe": 0.0714,
+            "daily_mtm_sortino": 0.1053,
+            "max_drawdown_pct": 48.53,
+            "calmar_ratio": -0.3199,
+            "total_return_pct": -15.51,
+            "annualized_vol_pct": 63.21
+          }
+        },
+        "2026": {
+          "days": 304,
+          "strategy": {
+            "cagr_pct": 12.38,
+            "daily_mtm_sharpe": 0.9793,
+            "daily_mtm_sortino": 1.3895,
+            "max_drawdown_pct": 5.99,
+            "calmar_ratio": 2.0665,
+            "total_return_pct": 10.2,
+            "annualized_vol_pct": 12.7
+          },
+          "bnh": {
+            "cagr_pct": -23.56,
+            "daily_mtm_sharpe": -0.2021,
+            "daily_mtm_sortino": -0.2941,
+            "max_drawdown_pct": 49.77,
+            "calmar_ratio": -0.4734,
+            "total_return_pct": -20.04,
+            "annualized_vol_pct": 53.62
+          }
+        }
+      },
+      "stress_matrix": {
+        "regime_1_baseline": {
+          "description": "Baseline Causal (20 bps roundtrip + 8h funding, open[t+1])",
+          "sealed_oos": {
+            "cagr_pct": 5.99,
+            "daily_mtm_sharpe": 0.6374,
+            "daily_mtm_sortino": 0.9404,
+            "max_drawdown_pct": 6.94,
+            "calmar_ratio": 0.8631,
+            "total_return_pct": 9.17,
+            "annualized_vol_pct": 9.71
+          },
+          "full_period": {
+            "cagr_pct": 3.75,
+            "daily_mtm_sharpe": 0.6828,
+            "daily_mtm_sortino": 0.888,
+            "max_drawdown_pct": 6.94,
+            "calmar_ratio": 0.5401,
+            "total_return_pct": 24.82,
+            "annualized_vol_pct": 5.61
+          }
+        },
+        "regime_2_friction_stress": {
+          "description": "2x Friction Stress (40 bps roundtrip + 8h funding, open[t+1])",
+          "sealed_oos": {
+            "cagr_pct": 4.8,
+            "daily_mtm_sharpe": 0.5197,
+            "daily_mtm_sortino": 0.7517,
+            "max_drawdown_pct": 7.87,
+            "calmar_ratio": 0.6104,
+            "total_return_pct": 7.33,
+            "annualized_vol_pct": 9.75
+          },
+          "full_period": {
+            "cagr_pct": 3.07,
+            "daily_mtm_sharpe": 0.5638,
+            "daily_mtm_sortino": 0.7123,
+            "max_drawdown_pct": 7.87,
+            "calmar_ratio": 0.3904,
+            "total_return_pct": 19.99,
+            "annualized_vol_pct": 5.63
+          }
+        },
+        "regime_3_delay_stress": {
+          "description": "1-Bar Delay Stress (20 bps roundtrip + 8h funding, open[t+2])",
+          "sealed_oos": {
+            "cagr_pct": 8.24,
+            "daily_mtm_sharpe": 0.8603,
+            "daily_mtm_sortino": 1.283,
+            "max_drawdown_pct": 5.29,
+            "calmar_ratio": 1.557,
+            "total_return_pct": 12.69,
+            "annualized_vol_pct": 9.63
+          },
+          "full_period": {
+            "cagr_pct": 3.84,
+            "daily_mtm_sharpe": 0.7095,
+            "daily_mtm_sortino": 0.9477,
+            "max_drawdown_pct": 5.29,
+            "calmar_ratio": 0.7264,
+            "total_return_pct": 25.52,
+            "annualized_vol_pct": 5.52
+          }
+        },
+        "stress_resistance_verdict": "SURVIVES STRESS"
+      },
+      "trade_metrics": {
+        "total_trades": 248,
+        "win_rate_pct": 36.69,
+        "profit_factor": 1.8111,
+        "expectancy_net_r": 0.3276,
+        "oos_trades": 71,
+        "oos_expectancy_net_r": 0.4998
+      },
+      "statistical_rigor": {
+        "m_cum": 22,
+        "dsr_oos": 0.1632,
+        "pval_oos": 0.8368,
+        "dsr_comb": 0.305,
+        "pval_comb": 0.695,
+        "cpcv_median_sharpe": 0.0
+      },
+      "cp2_hurdles": {
+        "hurdle_1_alpha_and_expectancy": {
+          "name": "Alpha & Positive Expectancy",
+          "requirement": "OOS Return > BnH Return AND Positive Expectancy",
+          "passed": true,
+          "details": "OOS Ret: +9.17% vs BnH: -9.13%, Net E[R]: +0.4998R"
+        },
+        "hurdle_2_daily_mtm_sharpe_ge_1_0": {
+          "name": "Daily MtM Sharpe >= 1.00 on OOS",
+          "requirement": "Sealed OOS Sharpe >= 1.00",
+          "passed": false,
+          "details": "Sealed OOS Sharpe: 0.6374 (req >= 1.00)"
+        },
+        "hurdle_3_cumulative_dsr_ge_0_95": {
+          "name": "Cumulative DSR >= 0.95 (M_cum = 22)",
+          "requirement": "DSR(M_cum=22) >= 0.95",
+          "passed": false,
+          "details": "OOS DSR: 0.1632 (p=0.8368), Combined DSR: 0.3050 (p=0.6950)"
+        },
+        "hurdle_4_bear_market_survival": {
+          "name": "2022 Bear Market Survival (< Half BnH DD)",
+          "requirement": "2022 Max DD < 39.98% (Half of BnH 79.96%)",
+          "passed": true,
+          "details": "2022 Max DD: Strategy = 2.10% vs Threshold 39.98%"
+        },
+        "hurdle_5_sample_size_integrity": {
+          "name": "Sample Size Integrity",
+          "requirement": "Total Trades / Allocation Bars >= 100 AND OOS Days >= 500",
+          "passed": true,
+          "details": "Sample Count: 248 (req >= 100), OOS Days: 551 (req >= 500)"
+        },
+        "hurdle_6_zero_leverage_invariant": {
+          "name": "Zero Leverage Invariant",
+          "requirement": "Gross Exposure <= 1.0001 at all times",
+          "passed": true,
+          "details": "Max Gross Exposure: 0.7797 (req <= 1.0001)"
+        }
+      },
+      "hurdle_summary": {
+        "passed_count": 4,
+        "failed_count": 2,
+        "summary_text": "4/6 PASS | 2/6 FAIL"
+      },
+      "epistemic_verdict": "FALSIFIED",
+      "verdict_rationale": "Failed 2/6 CP-2 hurdles"
+    },
+    "H4_TREND_PULLBACK_VOL_TARGET": {
+      "hypothesis_id": "H4_TREND_PULLBACK_VOL_TARGET",
+      "name": "Orthogonal Trend-Pullback Long with Volatility Targeting",
+      "family": "Trend Following & Moving Average Pullback",
+      "direction_mode": "LONG_ONLY",
+      "universe": [
+        "BTCUSDT",
+        "ETHUSDT",
+        "SOLUSDT"
+      ],
+      "parameters": {
+        "ema_trend_filter": 200,
+        "ema_fast_trend": 50,
+        "ema_pullback": 20,
+        "trailing_stop_atr": 2.5,
+        "target_vol": 0.15,
+        "max_notional_per_asset": 0.25,
+        "risk_per_trade_cap": 0.01,
+        "hard_gross_clamp": 1.0
+      },
+      "evaluation_timestamp_utc": "2026-11-21T10:31:57.652001+00:00",
+      "m_cum": 23,
+      "splits_scorecard": {
+        "train": {
+          "days": 1100,
+          "strategy": {
+            "cagr_pct": 2.35,
+            "daily_mtm_sharpe": 0.6196,
+            "daily_mtm_sortino": 0.753,
+            "max_drawdown_pct": 9.06,
+            "calmar_ratio": 0.259,
+            "total_return_pct": 7.24,
+            "annualized_vol_pct": 3.86
+          },
+          "bnh": {
+            "cagr_pct": 111.0,
+            "daily_mtm_sharpe": 1.3125,
+            "daily_mtm_sortino": 1.8394,
+            "max_drawdown_pct": 85.14,
+            "calmar_ratio": 1.3037,
+            "total_return_pct": 847.61,
+            "annualized_vol_pct": 84.05
+          }
+        },
+        "val": {
+          "days": 550,
+          "strategy": {
+            "cagr_pct": 12.43,
+            "daily_mtm_sharpe": 1.8316,
+            "daily_mtm_sortino": 2.6905,
+            "max_drawdown_pct": 4.67,
+            "calmar_ratio": 2.6599,
+            "total_return_pct": 19.29,
+            "annualized_vol_pct": 6.36
+          },
+          "bnh": {
+            "cagr_pct": 88.29,
+            "daily_mtm_sharpe": 1.2863,
+            "daily_mtm_sortino": 1.9518,
+            "max_drawdown_pct": 49.14,
+            "calmar_ratio": 1.7967,
+            "total_return_pct": 159.31,
+            "annualized_vol_pct": 64.25
+          }
+        },
+        "sealed_oos": {
+          "days": 551,
+          "strategy": {
+            "cagr_pct": -0.34,
+            "daily_mtm_sharpe": -0.0041,
+            "daily_mtm_sortino": -0.0066,
+            "max_drawdown_pct": 9.53,
+            "calmar_ratio": -0.0354,
+            "total_return_pct": -0.51,
+            "annualized_vol_pct": 9.3
+          },
+          "bnh": {
+            "cagr_pct": -6.15,
+            "daily_mtm_sharpe": 0.1506,
+            "daily_mtm_sortino": 0.2288,
+            "max_drawdown_pct": 64.32,
+            "calmar_ratio": -0.0956,
+            "total_return_pct": -9.13,
+            "annualized_vol_pct": 55.03
+          }
+        },
+        "combined_walk_forward": {
+          "days": 1101,
+          "strategy": {
+            "cagr_pct": 5.78,
+            "daily_mtm_sharpe": 0.7277,
+            "daily_mtm_sortino": 1.1103,
+            "max_drawdown_pct": 9.53,
+            "calmar_ratio": 0.6065,
+            "total_return_pct": 18.46,
+            "annualized_vol_pct": 7.97
+          },
+          "bnh": {
+            "cagr_pct": 32.59,
+            "daily_mtm_sharpe": 0.7595,
+            "daily_mtm_sortino": 1.1536,
+            "max_drawdown_pct": 64.32,
+            "calmar_ratio": 0.5067,
+            "total_return_pct": 134.05,
+            "annualized_vol_pct": 59.82
+          }
+        },
+        "full_period": {
+          "days": 2201,
+          "strategy": {
+            "cagr_pct": 3.98,
+            "daily_mtm_sharpe": 0.6542,
+            "daily_mtm_sortino": 0.91,
+            "max_drawdown_pct": 9.53,
+            "calmar_ratio": 0.4177,
+            "total_return_pct": 26.53,
+            "annualized_vol_pct": 6.26
+          },
+          "bnh": {
+            "cagr_pct": 66.76,
+            "daily_mtm_sharpe": 1.0674,
+            "daily_mtm_sortino": 1.5219,
+            "max_drawdown_pct": 85.14,
+            "calmar_ratio": 0.7841,
+            "total_return_pct": 2079.4,
+            "annualized_vol_pct": 72.94
+          }
+        }
+      },
+      "yearly_benchmark": {
+        "2022": {
+          "days": 360,
+          "strategy": {
+            "cagr_pct": -0.57,
+            "daily_mtm_sharpe": -0.2768,
+            "daily_mtm_sortino": -0.1955,
+            "max_drawdown_pct": 2.06,
+            "calmar_ratio": -0.2742,
+            "total_return_pct": -0.56,
+            "annualized_vol_pct": 1.98
+          },
+          "bnh": {
+            "cagr_pct": -80.24,
+            "daily_mtm_sharpe": -1.366,
+            "daily_mtm_sortino": -1.8428,
+            "max_drawdown_pct": 79.96,
+            "calmar_ratio": -1.0035,
+            "total_return_pct": -79.77,
+            "annualized_vol_pct": 87.31
+          }
+        },
+        "2023": {
+          "days": 365,
+          "strategy": {
+            "cagr_pct": 0.92,
+            "daily_mtm_sharpe": 0.1794,
+            "daily_mtm_sortino": 0.2515,
+            "max_drawdown_pct": 8.13,
+            "calmar_ratio": 0.113,
+            "total_return_pct": 0.92,
+            "annualized_vol_pct": 6.14
+          },
+          "bnh": {
+            "cagr_pct": 293.98,
+            "daily_mtm_sharpe": 2.717,
+            "daily_mtm_sortino": 4.9173,
+            "max_drawdown_pct": 27.96,
+            "calmar_ratio": 10.5136,
+            "total_return_pct": 293.61,
+            "annualized_vol_pct": 56.37
+          }
+        },
+        "2024": {
+          "days": 366,
+          "strategy": {
+            "cagr_pct": 10.72,
+            "daily_mtm_sharpe": 1.7155,
+            "daily_mtm_sortino": 2.771,
+            "max_drawdown_pct": 4.67,
+            "calmar_ratio": 2.295,
+            "total_return_pct": 10.75,
+            "annualized_vol_pct": 6.57
+          },
+          "bnh": {
+            "cagr_pct": 80.38,
+            "daily_mtm_sharpe": 1.3542,
+            "daily_mtm_sortino": 2.1601,
+            "max_drawdown_pct": 32.98,
+            "calmar_ratio": 2.4371,
+            "total_return_pct": 80.6,
+            "annualized_vol_pct": 60.9
+          }
+        },
+        "2025": {
+          "days": 365,
+          "strategy": {
+            "cagr_pct": 2.03,
+            "daily_mtm_sharpe": 0.37,
+            "daily_mtm_sortino": 0.4967,
+            "max_drawdown_pct": 5.75,
+            "calmar_ratio": 0.3525,
+            "total_return_pct": 2.03,
+            "annualized_vol_pct": 5.89
+          },
+          "bnh": {
+            "cagr_pct": -15.52,
+            "daily_mtm_sharpe": 0.0714,
+            "daily_mtm_sortino": 0.1053,
+            "max_drawdown_pct": 48.53,
+            "calmar_ratio": -0.3199,
+            "total_return_pct": -15.51,
+            "annualized_vol_pct": 63.21
+          }
+        },
+        "2026": {
+          "days": 304,
+          "strategy": {
+            "cagr_pct": -1.3,
+            "daily_mtm_sharpe": -0.0671,
+            "daily_mtm_sortino": -0.1091,
+            "max_drawdown_pct": 7.93,
+            "calmar_ratio": -0.1643,
+            "total_return_pct": -1.09,
+            "annualized_vol_pct": 10.91
+          },
+          "bnh": {
+            "cagr_pct": -23.56,
+            "daily_mtm_sharpe": -0.2021,
+            "daily_mtm_sortino": -0.2941,
+            "max_drawdown_pct": 49.77,
+            "calmar_ratio": -0.4734,
+            "total_return_pct": -20.04,
+            "annualized_vol_pct": 53.62
+          }
+        }
+      },
+      "stress_matrix": {
+        "regime_1_baseline": {
+          "description": "Baseline Causal (20 bps roundtrip + 8h funding, open[t+1])",
+          "sealed_oos": {
+            "cagr_pct": -0.34,
+            "daily_mtm_sharpe": -0.0041,
+            "daily_mtm_sortino": -0.0066,
+            "max_drawdown_pct": 9.53,
+            "calmar_ratio": -0.0354,
+            "total_return_pct": -0.51,
+            "annualized_vol_pct": 9.3
+          },
+          "full_period": {
+            "cagr_pct": 3.98,
+            "daily_mtm_sharpe": 0.6542,
+            "daily_mtm_sortino": 0.91,
+            "max_drawdown_pct": 9.53,
+            "calmar_ratio": 0.4177,
+            "total_return_pct": 26.53,
+            "annualized_vol_pct": 6.26
+          }
+        },
+        "regime_2_friction_stress": {
+          "description": "2x Friction Stress (40 bps roundtrip + 8h funding, open[t+1])",
+          "sealed_oos": {
+            "cagr_pct": -4.48,
+            "daily_mtm_sharpe": -0.4546,
+            "daily_mtm_sortino": -0.7093,
+            "max_drawdown_pct": 13.47,
+            "calmar_ratio": -0.3324,
+            "total_return_pct": -6.68,
+            "annualized_vol_pct": 9.39
+          },
+          "full_period": {
+            "cagr_pct": 1.69,
+            "daily_mtm_sharpe": 0.2965,
+            "daily_mtm_sortino": 0.402,
+            "max_drawdown_pct": 13.47,
+            "calmar_ratio": 0.1256,
+            "total_return_pct": 10.64,
+            "annualized_vol_pct": 6.32
+          }
+        },
+        "regime_3_delay_stress": {
+          "description": "1-Bar Delay Stress (20 bps roundtrip + 8h funding, open[t+2])",
+          "sealed_oos": {
+            "cagr_pct": -2.59,
+            "daily_mtm_sharpe": -0.3386,
+            "daily_mtm_sortino": -0.45,
+            "max_drawdown_pct": 10.37,
+            "calmar_ratio": -0.2501,
+            "total_return_pct": -3.89,
+            "annualized_vol_pct": 7.33
+          },
+          "full_period": {
+            "cagr_pct": 2.37,
+            "daily_mtm_sharpe": 0.4763,
+            "daily_mtm_sortino": 0.5726,
+            "max_drawdown_pct": 10.37,
+            "calmar_ratio": 0.2288,
+            "total_return_pct": 15.18,
+            "annualized_vol_pct": 5.2
+          }
+        },
+        "stress_resistance_verdict": "FAILS STRESS"
+      },
+      "trade_metrics": {
+        "total_trades": 959,
+        "win_rate_pct": 27.42,
+        "profit_factor": 1.3349,
+        "expectancy_net_r": 0.112,
+        "oos_trades": 273,
+        "oos_expectancy_net_r": 0.0164
+      },
+      "statistical_rigor": {
+        "m_cum": 23,
+        "dsr_oos": 0.0246,
+        "pval_oos": 0.9754,
+        "dsr_comb": 0.2838,
+        "pval_comb": 0.7162,
+        "cpcv_median_sharpe": 0.0
+      },
+      "cp2_hurdles": {
+        "hurdle_1_alpha_and_expectancy": {
+          "name": "Alpha & Positive Expectancy",
+          "requirement": "OOS Return > BnH Return AND Positive Expectancy",
+          "passed": true,
+          "details": "OOS Ret: -0.51% vs BnH: -9.13%, Net E[R]: +0.0164R"
+        },
+        "hurdle_2_daily_mtm_sharpe_ge_1_0": {
+          "name": "Daily MtM Sharpe >= 1.00 on OOS",
+          "requirement": "Sealed OOS Sharpe >= 1.00",
+          "passed": false,
+          "details": "Sealed OOS Sharpe: -0.0041 (req >= 1.00)"
+        },
+        "hurdle_3_cumulative_dsr_ge_0_95": {
+          "name": "Cumulative DSR >= 0.95 (M_cum = 23)",
+          "requirement": "DSR(M_cum=23) >= 0.95",
+          "passed": false,
+          "details": "OOS DSR: 0.0246 (p=0.9754), Combined DSR: 0.2838 (p=0.7162)"
+        },
+        "hurdle_4_bear_market_survival": {
+          "name": "2022 Bear Market Survival (< Half BnH DD)",
+          "requirement": "2022 Max DD < 39.98% (Half of BnH 79.96%)",
+          "passed": true,
+          "details": "2022 Max DD: Strategy = 2.06% vs Threshold 39.98%"
+        },
+        "hurdle_5_sample_size_integrity": {
+          "name": "Sample Size Integrity",
+          "requirement": "Total Trades / Allocation Bars >= 100 AND OOS Days >= 500",
+          "passed": true,
+          "details": "Sample Count: 959 (req >= 100), OOS Days: 551 (req >= 500)"
+        },
+        "hurdle_6_zero_leverage_invariant": {
+          "name": "Zero Leverage Invariant",
+          "requirement": "Gross Exposure <= 1.0001 at all times",
+          "passed": true,
+          "details": "Max Gross Exposure: 0.5202 (req <= 1.0001)"
+        }
+      },
+      "hurdle_summary": {
+        "passed_count": 4,
+        "failed_count": 2,
+        "summary_text": "4/6 PASS | 2/6 FAIL"
+      },
+      "epistemic_verdict": "FALSIFIED",
+      "verdict_rationale": "Failed 2/6 CP-2 hurdles; Fails 2x friction stress (Sharpe: -0.45, Ret: -6.68%); Fails 1-bar delay stress (Sharpe: -0.34, Ret: -3.89%)"
+    },
+    "H5_DUAL_HORIZON_ROTATION_GOLD": {
+      "hypothesis_id": "H5_DUAL_HORIZON_ROTATION_GOLD",
+      "name": "14d + 60d Blended Dual-Momentum Rotation with Gold Defensive Fallback",
+      "family": "Cross-Asset Dual-Momentum Rotation",
+      "direction_mode": "LONG_ONLY",
+      "universe": [
+        "BTCUSDT",
+        "ETHUSDT",
+        "SOLUSDT",
+        "PAXGUSDT"
+      ],
+      "parameters": {
+        "rebalance_cadence_bars": 42,
+        "lookback_fast_bars": 84,
+        "lookback_slow_bars": 360,
+        "vol_lookback_bars": 120,
+        "target_vol": 0.15,
+        "hysteresis": 0.15,
+        "gross_exposure_cap": 1.0
+      },
+      "evaluation_timestamp_utc": "2026-11-21T10:32:01.484330+00:00",
+      "m_cum": 24,
+      "splits_scorecard": {
+        "train": {
+          "days": 1100,
+          "strategy": {
+            "cagr_pct": 11.51,
+            "daily_mtm_sharpe": 0.8578,
+            "daily_mtm_sortino": 0.8974,
+            "max_drawdown_pct": 24.21,
+            "calmar_ratio": 0.4755,
+            "total_return_pct": 38.83,
+            "annualized_vol_pct": 13.81
+          },
+          "bnh": {
+            "cagr_pct": 111.0,
+            "daily_mtm_sharpe": 1.3125,
+            "daily_mtm_sortino": 1.8394,
+            "max_drawdown_pct": 85.14,
+            "calmar_ratio": 1.3037,
+            "total_return_pct": 847.61,
+            "annualized_vol_pct": 84.05
+          }
+        },
+        "val": {
+          "days": 550,
+          "strategy": {
+            "cagr_pct": 38.02,
+            "daily_mtm_sharpe": 2.1502,
+            "daily_mtm_sortino": 3.3783,
+            "max_drawdown_pct": 8.65,
+            "calmar_ratio": 4.3957,
+            "total_return_pct": 62.45,
+            "annualized_vol_pct": 15.38
+          },
+          "bnh": {
+            "cagr_pct": 88.29,
+            "daily_mtm_sharpe": 1.2863,
+            "daily_mtm_sortino": 1.9518,
+            "max_drawdown_pct": 49.14,
+            "calmar_ratio": 1.7967,
+            "total_return_pct": 159.31,
+            "annualized_vol_pct": 64.25
+          }
+        },
+        "sealed_oos": {
+          "days": 551,
+          "strategy": {
+            "cagr_pct": 11.51,
+            "daily_mtm_sharpe": 0.76,
+            "daily_mtm_sortino": 0.7965,
+            "max_drawdown_pct": 11.98,
+            "calmar_ratio": 0.9608,
+            "total_return_pct": 17.87,
+            "annualized_vol_pct": 15.59
+          },
+          "bnh": {
+            "cagr_pct": -6.15,
+            "daily_mtm_sharpe": 0.1506,
+            "daily_mtm_sortino": 0.2288,
+            "max_drawdown_pct": 64.32,
+            "calmar_ratio": -0.0956,
+            "total_return_pct": -9.13,
+            "annualized_vol_pct": 55.03
+          }
+        },
+        "combined_walk_forward": {
+          "days": 1101,
+          "strategy": {
+            "cagr_pct": 23.89,
+            "daily_mtm_sharpe": 1.4494,
+            "daily_mtm_sortino": 1.8302,
+            "max_drawdown_pct": 11.98,
+            "calmar_ratio": 1.9934,
+            "total_return_pct": 90.74,
+            "annualized_vol_pct": 15.49
+          },
+          "bnh": {
+            "cagr_pct": 32.59,
+            "daily_mtm_sharpe": 0.7595,
+            "daily_mtm_sortino": 1.1536,
+            "max_drawdown_pct": 64.32,
+            "calmar_ratio": 0.5067,
+            "total_return_pct": 134.05,
+            "annualized_vol_pct": 59.82
+          }
+        },
+        "full_period": {
+          "days": 2201,
+          "strategy": {
+            "cagr_pct": 17.44,
+            "daily_mtm_sharpe": 1.1688,
+            "daily_mtm_sortino": 1.3509,
+            "max_drawdown_pct": 24.21,
+            "calmar_ratio": 0.7206,
+            "total_return_pct": 163.5,
+            "annualized_vol_pct": 14.67
+          },
+          "bnh": {
+            "cagr_pct": 66.76,
+            "daily_mtm_sharpe": 1.0674,
+            "daily_mtm_sortino": 1.5219,
+            "max_drawdown_pct": 85.14,
+            "calmar_ratio": 0.7841,
+            "total_return_pct": 2079.4,
+            "annualized_vol_pct": 72.94
+          }
+        }
+      },
+      "yearly_benchmark": {
+        "2022": {
+          "days": 360,
+          "strategy": {
+            "cagr_pct": -16.43,
+            "daily_mtm_sharpe": -1.2468,
+            "daily_mtm_sortino": -0.8602,
+            "max_drawdown_pct": 20.85,
+            "calmar_ratio": -0.7879,
+            "total_return_pct": -16.21,
+            "annualized_vol_pct": 13.55
+          },
+          "bnh": {
+            "cagr_pct": -80.24,
+            "daily_mtm_sharpe": -1.366,
+            "daily_mtm_sortino": -1.8428,
+            "max_drawdown_pct": 79.96,
+            "calmar_ratio": -1.0035,
+            "total_return_pct": -79.77,
+            "annualized_vol_pct": 87.31
+          }
+        },
+        "2023": {
+          "days": 365,
+          "strategy": {
+            "cagr_pct": 22.3,
+            "daily_mtm_sharpe": 1.3642,
+            "daily_mtm_sortino": 1.8358,
+            "max_drawdown_pct": 20.38,
+            "calmar_ratio": 1.0941,
+            "total_return_pct": 22.28,
+            "annualized_vol_pct": 15.73
+          },
+          "bnh": {
+            "cagr_pct": 293.98,
+            "daily_mtm_sharpe": 2.717,
+            "daily_mtm_sortino": 4.9173,
+            "max_drawdown_pct": 27.96,
+            "calmar_ratio": 10.5136,
+            "total_return_pct": 293.61,
+            "annualized_vol_pct": 56.37
+          }
+        },
+        "2024": {
+          "days": 366,
+          "strategy": {
+            "cagr_pct": 25.18,
+            "daily_mtm_sharpe": 1.676,
+            "daily_mtm_sortino": 2.6308,
+            "max_drawdown_pct": 8.65,
+            "calmar_ratio": 2.9114,
+            "total_return_pct": 25.24,
+            "annualized_vol_pct": 14.67
+          },
+          "bnh": {
+            "cagr_pct": 80.38,
+            "daily_mtm_sharpe": 1.3542,
+            "daily_mtm_sortino": 2.1601,
+            "max_drawdown_pct": 32.98,
+            "calmar_ratio": 2.4371,
+            "total_return_pct": 80.6,
+            "annualized_vol_pct": 60.9
+          }
+        },
+        "2025": {
+          "days": 365,
+          "strategy": {
+            "cagr_pct": 19.9,
+            "daily_mtm_sharpe": 1.1526,
+            "daily_mtm_sortino": 1.3758,
+            "max_drawdown_pct": 11.98,
+            "calmar_ratio": 1.6605,
+            "total_return_pct": 19.89,
+            "annualized_vol_pct": 16.99
+          },
+          "bnh": {
+            "cagr_pct": -15.52,
+            "daily_mtm_sharpe": 0.0714,
+            "daily_mtm_sortino": 0.1053,
+            "max_drawdown_pct": 48.53,
+            "calmar_ratio": -0.3199,
+            "total_return_pct": -15.51,
+            "annualized_vol_pct": 63.21
+          }
+        },
+        "2026": {
+          "days": 304,
+          "strategy": {
+            "cagr_pct": 8.03,
+            "daily_mtm_sharpe": 0.6249,
+            "daily_mtm_sortino": 0.6338,
+            "max_drawdown_pct": 8.24,
+            "calmar_ratio": 0.9735,
+            "total_return_pct": 6.64,
+            "annualized_vol_pct": 14.0
+          },
+          "bnh": {
+            "cagr_pct": -23.56,
+            "daily_mtm_sharpe": -0.2021,
+            "daily_mtm_sortino": -0.2941,
+            "max_drawdown_pct": 49.77,
+            "calmar_ratio": -0.4734,
+            "total_return_pct": -20.04,
+            "annualized_vol_pct": 53.62
+          }
+        }
+      },
+      "stress_matrix": {
+        "regime_1_baseline": {
+          "description": "Baseline Causal (20 bps roundtrip + 8h funding, open[t+1])",
+          "sealed_oos": {
+            "cagr_pct": 11.51,
+            "daily_mtm_sharpe": 0.76,
+            "daily_mtm_sortino": 0.7965,
+            "max_drawdown_pct": 11.98,
+            "calmar_ratio": 0.9608,
+            "total_return_pct": 17.87,
+            "annualized_vol_pct": 15.59
+          },
+          "full_period": {
+            "cagr_pct": 17.44,
+            "daily_mtm_sharpe": 1.1688,
+            "daily_mtm_sortino": 1.3509,
+            "max_drawdown_pct": 24.21,
+            "calmar_ratio": 0.7206,
+            "total_return_pct": 163.5,
+            "annualized_vol_pct": 14.67
+          }
+        },
+        "regime_2_friction_stress": {
+          "description": "2x Friction Stress (40 bps roundtrip + 8h funding, open[t+1])",
+          "sealed_oos": {
+            "cagr_pct": 9.33,
+            "daily_mtm_sharpe": 0.6324,
+            "daily_mtm_sortino": 0.6645,
+            "max_drawdown_pct": 12.35,
+            "calmar_ratio": 0.7554,
+            "total_return_pct": 14.4,
+            "annualized_vol_pct": 15.61
+          },
+          "full_period": {
+            "cagr_pct": 15.58,
+            "daily_mtm_sharpe": 1.0586,
+            "daily_mtm_sortino": 1.2248,
+            "max_drawdown_pct": 26.67,
+            "calmar_ratio": 0.5841,
+            "total_return_pct": 139.27,
+            "annualized_vol_pct": 14.69
+          }
+        },
+        "regime_3_delay_stress": {
+          "description": "1-Bar Delay Stress (20 bps roundtrip + 8h funding, open[t+2])",
+          "sealed_oos": {
+            "cagr_pct": 9.64,
+            "daily_mtm_sharpe": 0.6528,
+            "daily_mtm_sortino": 0.6863,
+            "max_drawdown_pct": 13.33,
+            "calmar_ratio": 0.7228,
+            "total_return_pct": 14.89,
+            "annualized_vol_pct": 15.54
+          },
+          "full_period": {
+            "cagr_pct": 16.46,
+            "daily_mtm_sharpe": 1.1105,
+            "daily_mtm_sortino": 1.2755,
+            "max_drawdown_pct": 25.99,
+            "calmar_ratio": 0.633,
+            "total_return_pct": 150.42,
+            "annualized_vol_pct": 14.68
+          }
+        },
+        "stress_resistance_verdict": "SURVIVES STRESS"
+      },
+      "trade_metrics": {
+        "total_trades": 125,
+        "win_rate_pct": 43.2,
+        "profit_factor": 1.0675,
+        "expectancy_net_r": 0.0,
+        "oos_trades": 35,
+        "oos_expectancy_net_r": 0.0
+      },
+      "statistical_rigor": {
+        "m_cum": 24,
+        "dsr_oos": 0.1467,
+        "pval_oos": 0.8533,
+        "dsr_comb": 0.7068,
+        "pval_comb": 0.2932,
+        "cpcv_median_sharpe": 0.0
+      },
+      "cp2_hurdles": {
+        "hurdle_1_alpha_and_expectancy": {
+          "name": "Alpha & Positive Expectancy",
+          "requirement": "OOS Return > BnH Return AND Positive Expectancy",
+          "passed": true,
+          "details": "OOS Ret: +17.87% vs BnH: -9.13%, Net E[R]: +0.0000R"
+        },
+        "hurdle_2_daily_mtm_sharpe_ge_1_0": {
+          "name": "Daily MtM Sharpe >= 1.00 on OOS",
+          "requirement": "Sealed OOS Sharpe >= 1.00",
+          "passed": false,
+          "details": "Sealed OOS Sharpe: 0.7600 (req >= 1.00)"
+        },
+        "hurdle_3_cumulative_dsr_ge_0_95": {
+          "name": "Cumulative DSR >= 0.95 (M_cum = 24)",
+          "requirement": "DSR(M_cum=24) >= 0.95",
+          "passed": false,
+          "details": "OOS DSR: 0.1467 (p=0.8533), Combined DSR: 0.7068 (p=0.2932)"
+        },
+        "hurdle_4_bear_market_survival": {
+          "name": "2022 Bear Market Survival (< Half BnH DD)",
+          "requirement": "2022 Max DD < 39.98% (Half of BnH 79.96%)",
+          "passed": true,
+          "details": "2022 Max DD: Strategy = 20.85% vs Threshold 39.98%"
+        },
+        "hurdle_5_sample_size_integrity": {
+          "name": "Sample Size Integrity",
+          "requirement": "Total Trades / Allocation Bars >= 100 AND OOS Days >= 500",
+          "passed": true,
+          "details": "Sample Count: 125 (req >= 100), OOS Days: 551 (req >= 500)"
+        },
+        "hurdle_6_zero_leverage_invariant": {
+          "name": "Zero Leverage Invariant",
+          "requirement": "Gross Exposure <= 1.0001 at all times",
+          "passed": true,
+          "details": "Max Gross Exposure: 1.0000 (req <= 1.0001)"
+        }
+      },
+      "hurdle_summary": {
+        "passed_count": 4,
+        "failed_count": 2,
+        "summary_text": "4/6 PASS | 2/6 FAIL"
+      },
+      "epistemic_verdict": "FALSIFIED",
+      "verdict_rationale": "Failed 2/6 CP-2 hurdles"
+    }
+  }
+}

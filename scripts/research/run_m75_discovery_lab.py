@@ -33,6 +33,7 @@ from core.research.discovery_lab import (
     H3_PostCrashLiqRebound,
     NumpyJSONEncoder,
     TrialLedgerManager,
+    compute_stress_resistance_verdict,
 )
 
 logging.basicConfig(
@@ -105,8 +106,10 @@ def format_markdown_report(results: dict[str, Any], report_path: Path) -> str:
         sh_delay = sm["regime_3_delay_stress"]["sealed_oos"]["daily_mtm_sharpe"]
         ret_delay = sm["regime_3_delay_stress"]["sealed_oos"]["total_return_pct"]
 
-        survives = (sh_fric > 0) and (sh_delay > 0)
-        res_text = "SURVIVES STRESS" if survives else "FAILS STRESS"
+        res_text = compute_stress_resistance_verdict(
+            stress_matrix=sm,
+            max_gross_exposure=h_res.get("cp2_hurdles", {}).get("hurdle_6_zero_leverage_invariant", {}).get("max_gross_exposure", 1.0),
+        )
 
         rep.append(
             f"| **{hid}** | Ret: {ret_base:+.2f}%, Sh: {sh_base:.2f} | Ret: {ret_fric:+.2f}%, Sh: {sh_fric:.2f} | Ret: {ret_delay:+.2f}%, Sh: {sh_delay:.2f} | **`{res_text}`** |"
