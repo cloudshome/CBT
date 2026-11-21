@@ -70,9 +70,44 @@ FALSIFIED_M67_RECORD = FailureMemoryRecord(
     autopsy_text="M67 causal research benchmark falsified standalone S3-Carry sleeve across Sealed OOS (2025-2026). While highly profitable in 2020-2024 bull/high-vol regimes (Sharpe > 3.7), compressed funding rates in 2025-2026 failed to cover institutional two-leg execution frictions (40 bps roundtrip). Future carry strategies require dynamic funding persistence or volatility filtering before allocating capital.",
 )
 
+FALSIFIED_M72_RECORD = FailureMemoryRecord(
+    failure_id="FALSIFIED_M72",
+    hypothesis_id="M72_STRATEGY_S4_ASYMMETRIC_SHORTING",
+    hypothesis_text="Asymmetric Shorting Engine S4 on 4h crypto majors with Macro Bear Gate, Donchian-48 breakdown, derivatives liquidation flush confirmation, and +1.5R breakeven ratchet",
+    target_symbol="BTCUSDT,ETHUSDT,SOLUSDT",
+    timeframe="4h",
+    parameters={
+        "macro_gate": "close < EMA_200 and EMA_50 < EMA_200",
+        "breakdown_channel": "48-bar Donchian Low",
+        "reversal_exit": "24-bar Donchian High or EMA_200 breach",
+        "tp1_rr": 1.5,
+        "tp2_rr": 2.5,
+        "sl_atr_mult": 2.5,
+        "risk_per_trade_cap": 0.01,
+        "per_asset_notional_cap": 0.25,
+        "sleeve_notional_cap": 0.75,
+        "m_cum": 18,
+    },
+    failure_reason="Failed CP-2 hurdles 2 (OOS Sharpe >= 1.00) and 3 (Cumulative DSR >= 0.95 with M_cum = 18). While trade-level expectancy was positive (+0.3803R on OOS, PF 2.02) and 2026 crash performance was positive (+1.79% S4-B, +1.94% S4-A), mark-to-market Sharpe on Sealed OOS reached only 0.2672 (S4-B) and 0.0547 (S4-A), yielding DSR of 0.0642.",
+    metrics={
+        "full_period_return_pct": 2.63,
+        "full_period_sharpe": 0.2509,
+        "train_sharpe": 0.1779,
+        "val_sharpe": 0.5192,
+        "oos_sharpe": 0.2672,
+        "oos_return_pct": 0.63,
+        "oos_trade_expectancy_net_r": 0.3803,
+        "oos_profit_factor": 2.0152,
+        "dsr_oos": 0.0642,
+        "status": "FALSIFIED_M72",
+    },
+    autopsy_text="M72 causal research benchmark falsified Strategy S4 (Asymmetric Shorting Engine) across 2022-2026. Despite positive trade expectancy (+0.37R net, 50% win rate, PF 2.1) and bear market protection (2022 Max DD 1.73%, 2026 return +1.79%), low trade frequency in chop and whipsaw exits during sudden bear-market mean reversions compressed continuous MtM Sharpe below institutional hurdle (0.27 vs 1.00 req), failing DSR rigor under M_cum = 18 trials. Standalone shorting without cross-sectional relative value or options convexity remains uncertified for production.",
+)
+
 STATIC_FALSIFIED_RECORDS: list[FailureMemoryRecord] = [
     FALSIFIED_M63_RECORD,
     FALSIFIED_M67_RECORD,
+    FALSIFIED_M72_RECORD,
 ]
 
 
@@ -143,9 +178,10 @@ class FailureMemoryEngine:
             jaccard = len(intersection) / len(union) if union else 0.0
 
             # Symbol and timeframe match boost
-            exact_context = (
-                fail.target_symbol.upper() == target_symbol.upper()
-                and fail.timeframe.lower() == timeframe.lower()
+            fail_syms = {s.strip().upper() for s in fail.target_symbol.split(",")}
+            query_syms = {s.strip().upper() for s in target_symbol.split(",")}
+            exact_context = bool(fail_syms.intersection(query_syms)) and (
+                fail.timeframe.lower() == timeframe.lower()
             )
 
             # Check parameter match if available

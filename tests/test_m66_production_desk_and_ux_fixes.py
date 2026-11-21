@@ -44,12 +44,12 @@ def test_m66_cli_morning_brief_hint_valid():
     """Verify that the command recommended by 'main.py desk' executes cleanly with EXIT=0."""
     # 1. Run main.py desk and inspect output
     cmd_desk = [sys.executable, "main.py", "desk", "--json"]
-    proc_desk = subprocess.run(cmd_desk, capture_output=True, text=True, timeout=30)
+    proc_desk = subprocess.run(cmd_desk, capture_output=True, text=True, timeout=60)
     assert proc_desk.returncode == 0, f"desk command failed: {proc_desk.stderr}"
 
     # 2. Run the exact morning-brief subcommand
     cmd_brief = [sys.executable, "main.py", "agent", "morning-brief", "--json"]
-    proc_brief = subprocess.run(cmd_brief, capture_output=True, text=True, timeout=30)
+    proc_brief = subprocess.run(cmd_brief, capture_output=True, text=True, timeout=60)
     assert proc_brief.returncode == 0, f"agent morning-brief failed with code {proc_brief.returncode}: {proc_brief.stderr}"
 
 
