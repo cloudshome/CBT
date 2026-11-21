@@ -3304,6 +3304,10 @@ export interface WatchdogReport {
   active_alerts: WatchdogAlert[];
   capital_mode: string;
   real_capital_enabled: boolean;
+  challenger_status?: 'HEALTHY' | 'DEGRADED' | 'CRITICAL' | 'NOT_INITIALIZED' | string | null;
+  challenger_db_integrity?: boolean | null;
+  challenger_last_bar_age_hours?: number | null;
+  challenger_backup_count?: number;
 }
 
 // Milestone 73: 24/7 Proactive Market Radar & Trader Copilot Types
@@ -3356,6 +3360,53 @@ export interface MarketRadarReport {
   capital_mode: string;
   real_capital_enabled: boolean;
 }
+
+// Milestone 78/79: Champion vs. Challenger Parallel Live Shadow Arena Types
+export interface ArenaParticipant {
+  strategy_id: string;
+  name: string;
+  equity_usd: number;
+  total_return_pct: number;
+  max_drawdown_pct: number;
+  gross_exposure: number;
+  pvt_scalar?: number;
+  bars_ticked: number;
+  days_tracked: number;
+  regime: string;
+  total_fills: number;
+}
+
+export interface ArenaComparison {
+  evaluation_timestamp_utc: string;
+  target_proof_days: number;
+  proof_days_elapsed: number;
+  proof_progress_pct: number;
+  champion_proof_days?: number;
+  challenger_proof_days?: number;
+  champion_proof_progress_pct?: number;
+  challenger_proof_progress_pct?: number;
+  champion: ArenaParticipant;
+  challenger: ArenaParticipant;
+  benchmark_bnh: {
+    equity_usd: number;
+    total_return_pct: number;
+  };
+  comparison: {
+    current_leader: string;
+    equity_delta_usd: number;
+    return_spread_pct: number;
+    dd_spread_pct: number;
+    verdict_reason_en: string;
+    verdict_reason_bn: string;
+  };
+  governance: {
+    capital_mode: string;
+    real_capital_enabled: boolean;
+    champion_db_mode: string;
+    isolation_verified: boolean;
+  };
+}
+
 
 
 

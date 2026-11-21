@@ -95,6 +95,7 @@ import {
   ShadowRunResponse,
   WatchdogReport,
   MarketRadarReport,
+  ArenaComparison,
 } from '../types';
 
 const getApiBaseUrl = (): string => {
@@ -494,6 +495,19 @@ export const api = {
   async getDeskRadar(): Promise<MarketRadarReport> {
     const res = await authFetch(`${BASE_URL}/api/desk/radar`);
     return handleResponse<MarketRadarReport>(res);
+  },
+
+  /**
+   * GET /api/desk/arena
+   * Milestone 78/79: Champion vs. Challenger Parallel Live Shadow Arena
+   */
+  async getDeskArena(): Promise<ArenaComparison> {
+    const res = await authFetch(`${BASE_URL}/api/desk/arena`);
+    return handleResponse<ArenaComparison>(res);
+  },
+
+  async fetchDeskArena(): Promise<ArenaComparison> {
+    return this.getDeskArena();
   },
 
   /**

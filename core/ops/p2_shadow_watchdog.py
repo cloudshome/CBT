@@ -99,6 +99,10 @@ class WatchdogReport:
     active_alerts: list[WatchdogAlert]
     capital_mode: str = CAPITAL_MODE
     real_capital_enabled: bool = REAL_CAPITAL_ENABLED
+    challenger_status: str | None = None
+    challenger_db_integrity: bool | None = None
+    challenger_last_bar_age_hours: float | None = None
+    challenger_backup_count: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -114,6 +118,10 @@ class WatchdogReport:
             "active_alerts": [a.to_dict() if hasattr(a, "to_dict") else a for a in self.active_alerts],
             "capital_mode": self.capital_mode,
             "real_capital_enabled": self.real_capital_enabled,
+            "challenger_status": self.challenger_status,
+            "challenger_db_integrity": self.challenger_db_integrity,
+            "challenger_last_bar_age_hours": self.challenger_last_bar_age_hours,
+            "challenger_backup_count": self.challenger_backup_count,
         }
 
 
@@ -126,7 +134,16 @@ def get_default_paths() -> tuple[Path, Path, Path]:
     return db_path, backup_dir, state_path
 
 
-def get_backup_metadata(backup_dir: Path | str | None = None) -> tuple[str | None, str | None, int]:
+def get_default_challenger_db_path() -> Path:
+    """Returns default path to isolated Challenger SQLite database."""
+    base_dir = Path(__file__).resolve().parent.parent.parent
+    return base_dir / "data" / "v2b_challenger_shadow_ledger.db"
+
+
+def get_backup_metadata(
+    backup_dir: Path | str | None = None,
+    prefix: str = "p2_shadow_ledger",
+) -> tuple[str | None, str | None, int]:
     """Inspects backup directory and returns (last_backup_file, last_backup_at_utc, backup_count)."""
     if backup_dir is None:
         _, backup_dir, _ = get_default_paths()
@@ -134,7 +151,7 @@ def get_backup_metadata(backup_dir: Path | str | None = None) -> tuple[str | Non
     if not d.exists():
         return None, None, 0
 
-    gz_files = sorted(d.glob("p2_shadow_ledger_*.db.gz"))
+    gz_files = sorted(d.glob(f"{prefix}_*.db.gz"))
     if not gz_files:
         return None, None, 0
 
@@ -148,6 +165,7 @@ def backup_shadow_ledger(
     backup_dir: Path | str | None = None,
     keep_days: int = 30,
     now_utc: datetime | None = None,
+    prefix: str | None = None,
 ) -> Path | None:
     """Safe online SQLite backup using sqlite3.Connection.backup() into a verified .db.gz archive.
 
@@ -155,7 +173,7 @@ def backup_shadow_ledger(
     1. Connects read-only to source SQLite database.
     2. Performs online backup into a temporary .db file.
     3. Runs PRAGMA integrity_check on the backup file.
-    4. Compresses with gzip to data/backups/p2_shadow_ledger_YYYYMMDD.db.gz.
+    4. Compresses with gzip to data/backups/{prefix}_YYYYMMDD.db.gz.
     5. Prunes backup files older than keep_days (keeping at most keep_days files).
     """
     default_db, default_backup, _ = get_default_paths()
@@ -167,10 +185,16 @@ def backup_shadow_ledger(
         logger.warning(f"backup_shadow_ledger: Source DB {src_path} does not exist.")
         return None
 
+    if prefix is not None:
+        resolved_prefix = prefix
+    elif "challenger" in src_path.name.lower():
+        resolved_prefix = "v2b_challenger_shadow_ledger"
+    else:
+        resolved_prefix = "p2_shadow_ledger"
     now = now_utc if now_utc is not None else datetime.now(UTC)
     date_str = now.strftime("%Y%m%d")
-    final_gz_path = dst_dir / f"p2_shadow_ledger_{date_str}.db.gz"
-    temp_db_path = dst_dir / f"p2_shadow_ledger_{date_str}.tmp.db"
+    final_gz_path = dst_dir / f"{resolved_prefix}_{date_str}.db.gz"
+    temp_db_path = dst_dir / f"{resolved_prefix}_{date_str}.tmp.db"
 
     # 1. Native online SQLite backup in read-only mode
     try:
@@ -206,7 +230,7 @@ def backup_shadow_ledger(
         temp_db_path.unlink(missing_ok=True)
 
     # 4. Prune backups older than keep_days
-    all_backups = sorted(dst_dir.glob("p2_shadow_ledger_*.db.gz"))
+    all_backups = sorted(dst_dir.glob(f"{resolved_prefix}_*.db.gz"))
     if len(all_backups) > keep_days:
         prune_count = len(all_backups) - keep_days
         for old_backup in all_backups[:prune_count]:
@@ -224,6 +248,7 @@ def run_watchdog_check(
     db_path: Path | str | None = None,
     backup_dir: Path | str | None = None,
     state_path: Path | str | None = None,
+    challenger_db_path: Path | str | None = None,
     now_utc: datetime | None = None,
     notify_callback: Callable[[Any], Any] | None = None,
     auto_backup: bool = True,
@@ -231,12 +256,13 @@ def run_watchdog_check(
     min_disk_mb: float = DEFAULT_MIN_DISK_MB,
     keep_days: int = 30,
 ) -> WatchdogReport:
-    """Evaluates 4 hard operational health checks:
+    """Evaluates hard operational health checks across Champion and Challenger desks:
 
-    1. SQLite Integrity (DB_INTEGRITY_ALERT - CRITICAL)
-    2. Missed 4h Bar (MISSED_BAR_ALERT - DEGRADED)
+    1. SQLite Integrity for Champion (DB_INTEGRITY_ALERT - CRITICAL)
+    2. Missed 4h Bar for Champion (MISSED_BAR_ALERT - DEGRADED)
     3. Stale Market Data Feed (STALE_FEED_ALERT - DEGRADED)
     4. Disk Capacity (LOW_DISK_ALERT - CRITICAL)
+    5. Challenger DB Integrity & Missed 4h Bar (CHALLENGER_DB_INTEGRITY_ALERT / CHALLENGER_MISSED_BAR_ALERT)
 
     Handles anti-spam cooldowns (4h) and auto-recovery notifications via state_path.
     """
@@ -244,6 +270,16 @@ def run_watchdog_check(
     resolved_db = Path(db_path) if db_path is not None else default_db
     resolved_backup = Path(backup_dir) if backup_dir is not None else default_backup
     resolved_state = Path(state_path) if state_path is not None else default_state
+
+    # Resolve Challenger DB
+    if challenger_db_path is not None:
+        resolved_challenger_db: Path | None = Path(challenger_db_path)
+    elif db_path is not None:
+        # Isolated test environment provided custom Champion DB: skip default prod challenger DB
+        resolved_challenger_db = None
+    else:
+        prod_challenger = get_default_challenger_db_path()
+        resolved_challenger_db = prod_challenger if prod_challenger.exists() else None
 
     now = now_utc if now_utc is not None else datetime.now(UTC)
     checked_at_iso = now.isoformat()
@@ -255,7 +291,7 @@ def run_watchdog_check(
     last_bar_age_hours: float | None = None
 
     # --------------------------------------------------------------------------
-    # Check 1: SQLite DB Integrity & Initialization
+    # Check 1: SQLite DB Integrity & Initialization (Champion)
     # --------------------------------------------------------------------------
     db_exists = resolved_db.exists()
     if not db_exists:
@@ -291,7 +327,7 @@ def run_watchdog_check(
             )
 
     # --------------------------------------------------------------------------
-    # Check 2 & 3: Missed 4h Bar & Stale Data Feed
+    # Check 2 & 3: Missed 4h Bar & Stale Data Feed (Champion)
     # --------------------------------------------------------------------------
     if db_exists and db_integrity:
         try:
@@ -300,7 +336,6 @@ def run_watchdog_check(
             conn.row_factory = sqlite3.Row
             cur = conn.cursor()
 
-            # Check if shadow_bars table exists
             table_exists = cur.execute(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name='shadow_bars'"
             ).fetchone()
@@ -314,13 +349,11 @@ def run_watchdog_check(
                     last_bar_ts_utc = int(row["bar_ts_utc"])
                     stale_warning = int(row["stale_warning"])
 
-                    # Normalize timestamp (milliseconds vs seconds)
                     bar_ts_sec = (
                         last_bar_ts_utc / 1000.0 if last_bar_ts_utc > 1e11 else float(last_bar_ts_utc)
                     )
                     last_bar_age_hours = max(0.0, round((now_ts - bar_ts_sec) / 3600.0, 2))
 
-                    # Missed 4h bar check (> 5.0h)
                     if last_bar_age_hours > max_bar_age_hours:
                         active_alerts.append(
                             WatchdogAlert(
@@ -337,7 +370,6 @@ def run_watchdog_check(
                             )
                         )
 
-                    # Stale feed check
                     if stale_warning == 1:
                         active_alerts.append(
                             WatchdogAlert(
@@ -379,6 +411,123 @@ def run_watchdog_check(
         disk_free_mb = 0.0
 
     # --------------------------------------------------------------------------
+    # Check 5: Challenger SQLite Integrity & Missed 4h Bar (Milestone 79)
+    # --------------------------------------------------------------------------
+    challenger_status: str | None = None
+    challenger_db_integrity: bool | None = None
+    challenger_last_bar_age_hours: float | None = None
+    challenger_last_bar_ts: int | None = None
+    challenger_backup_count: int = 0
+
+    if resolved_challenger_db is None or not resolved_challenger_db.exists():
+        challenger_status = "NOT_INITIALIZED"
+        challenger_db_integrity = True  # Not corrupted, simply uninitialized
+    else:
+        try:
+            uri_c = f"file:{resolved_challenger_db.resolve().as_posix()}?mode=ro"
+            conn_c = sqlite3.connect(uri_c, uri=True, timeout=5.0)
+            res_c = conn_c.execute("PRAGMA integrity_check").fetchone()
+            conn_c.close()
+            if not res_c or str(res_c[0]).lower() != "ok":
+                challenger_db_integrity = False
+                active_alerts.append(
+                    WatchdogAlert(
+                        code="CHALLENGER_DB_INTEGRITY_ALERT",
+                        severity="CRITICAL",
+                        message_en=f"Challenger SQLite integrity check failed: {res_c[0] if res_c else 'Unknown'}",
+                        message_bn=f"চ্যালেঞ্জার SQLite ইন্টিগ্রিটি চেক ব্যর্থ হয়েছে: {res_c[0] if res_c else 'অজানা'}",
+                    )
+                )
+            else:
+                challenger_db_integrity = True
+        except Exception as exc:
+            challenger_db_integrity = False
+            active_alerts.append(
+                WatchdogAlert(
+                    code="CHALLENGER_DB_INTEGRITY_ALERT",
+                    severity="CRITICAL",
+                    message_en=f"Challenger SQLite database is unreadable or corrupt: {exc}",
+                    message_bn=f"চ্যালেঞ্জার SQLite ডাটাবেস পাঠযোগ্য নয় বা ক্ষতিগ্রস্ত: {exc}",
+                )
+            )
+
+        if challenger_db_integrity:
+            try:
+                uri_c = f"file:{resolved_challenger_db.resolve().as_posix()}?mode=ro"
+                conn_c = sqlite3.connect(uri_c, uri=True, timeout=5.0)
+                conn_c.row_factory = sqlite3.Row
+                cur_c = conn_c.cursor()
+                t_check = cur_c.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='shadow_bars'"
+                ).fetchone()
+                if t_check:
+                    row_c = cur_c.execute(
+                        "SELECT bar_ts_utc FROM shadow_bars ORDER BY bar_ts_utc DESC LIMIT 1"
+                    ).fetchone()
+                    if row_c is not None:
+                        challenger_last_bar_ts = int(row_c["bar_ts_utc"])
+                        ts_sec = (
+                            challenger_last_bar_ts / 1000.0
+                            if challenger_last_bar_ts > 1e11
+                            else float(challenger_last_bar_ts)
+                        )
+                        challenger_last_bar_age_hours = max(0.0, round((now_ts - ts_sec) / 3600.0, 2))
+                        if challenger_last_bar_age_hours > max_bar_age_hours:
+                            active_alerts.append(
+                                WatchdogAlert(
+                                    code="CHALLENGER_MISSED_BAR_ALERT",
+                                    severity="DEGRADED",
+                                    message_en=(
+                                        f"Missed Challenger 4h bar: last bar age is {challenger_last_bar_age_hours:.1f}h "
+                                        f"(> {max_bar_age_hours:.1f}h limit)"
+                                    ),
+                                    message_bn=(
+                                        f"চ্যালেঞ্জার ৪ ঘণ্টার বার মিস হয়েছে: সর্বশেষ বারের বয়স {challenger_last_bar_age_hours:.1f} ঘণ্টা "
+                                        f"(> {max_bar_age_hours:.1f} ঘণ্টা সীমা)"
+                                    ),
+                                )
+                            )
+                conn_c.close()
+            except Exception as exc:
+                active_alerts.append(
+                    WatchdogAlert(
+                        code="CHALLENGER_DB_INTEGRITY_ALERT",
+                        severity="CRITICAL",
+                        message_en=f"Failed to query Challenger shadow_bars: {exc}",
+                        message_bn=f"চ্যালেঞ্জার shadow_bars টেবিল কুয়েরি করতে ব্যর্থ: {exc}",
+                    )
+                )
+
+        c_crit = any(a.code.startswith("CHALLENGER_") and a.severity == "CRITICAL" for a in active_alerts)
+        c_deg = any(a.code.startswith("CHALLENGER_") and a.severity == "DEGRADED" for a in active_alerts)
+        if c_crit:
+            challenger_status = "CRITICAL"
+        elif c_deg:
+            challenger_status = "DEGRADED"
+        elif challenger_last_bar_ts is not None:
+            challenger_status = "HEALTHY"
+        else:
+            challenger_status = "NOT_INITIALIZED"
+
+        # Automated daily backup of Challenger DB
+        if auto_backup and challenger_db_integrity and challenger_status != "CRITICAL":
+            today_date_str = now.strftime("%Y%m%d")
+            expected_today_chall_gz = resolved_backup / f"v2b_challenger_shadow_ledger_{today_date_str}.db.gz"
+            if not expected_today_chall_gz.exists():
+                try:
+                    backup_shadow_ledger(
+                        db_path=resolved_challenger_db,
+                        backup_dir=resolved_backup,
+                        keep_days=keep_days,
+                        now_utc=now,
+                        prefix="v2b_challenger_shadow_ledger",
+                    )
+                except Exception as b_err:
+                    logger.error(f"Automated daily Challenger backup failed: {b_err}")
+
+        _, _, challenger_backup_count = get_backup_metadata(resolved_backup, prefix="v2b_challenger_shadow_ledger")
+
+    # --------------------------------------------------------------------------
     # Status Determination
     # --------------------------------------------------------------------------
     if not db_exists or (last_bar_ts_utc is None and not active_alerts):
@@ -391,7 +540,7 @@ def run_watchdog_check(
         status = "HEALTHY"
 
     # --------------------------------------------------------------------------
-    # Automated Daily Backup (if enabled, DB healthy, and not yet backed up today)
+    # Automated Daily Backup (Champion)
     # --------------------------------------------------------------------------
     if auto_backup and db_exists and db_integrity and status != "CRITICAL":
         today_date_str = now.strftime("%Y%m%d")
@@ -403,12 +552,13 @@ def run_watchdog_check(
                     backup_dir=resolved_backup,
                     keep_days=keep_days,
                     now_utc=now,
+                    prefix="p2_shadow_ledger",
                 )
             except Exception as b_err:
                 logger.error(f"Automated daily backup failed: {b_err}")
 
-    # Inspect backup directory metadata
-    last_backup_file, last_backup_at_utc, backup_count = get_backup_metadata(resolved_backup)
+    # Inspect backup directory metadata (Champion)
+    last_backup_file, last_backup_at_utc, backup_count = get_backup_metadata(resolved_backup, prefix="p2_shadow_ledger")
 
     # --------------------------------------------------------------------------
     # Anti-Spam Notification Cooldown & Auto-Recovery Handling
@@ -424,7 +574,6 @@ def run_watchdog_check(
     last_status = state_data.get("last_status", "HEALTHY")
     alerts_last_notified = state_data.get("alerts_last_notified", {})
 
-    # Trigger notifications for active alerts if not in cooldown
     for alert in active_alerts:
         last_notified_ts = alerts_last_notified.get(alert.code)
         if last_notified_ts is None or (now_ts - float(last_notified_ts)) >= ALERT_COOLDOWN_SECONDS:
@@ -442,7 +591,6 @@ def run_watchdog_check(
                     logger.error(f"Error in watchdog notify_callback: {n_err}")
             alerts_last_notified[alert.code] = now_ts
 
-    # Check for recovery notification: transitioning from DEGRADED/CRITICAL to HEALTHY
     if status == "HEALTHY" and last_status in ("DEGRADED", "CRITICAL"):
         if notify_callback is not None:
             try:
@@ -456,10 +604,8 @@ def run_watchdog_check(
                 notify_callback(rec_notif)
             except Exception as n_err:
                 logger.error(f"Error in watchdog recovery notify_callback: {n_err}")
-        # Clear cooldowns on recovery
         alerts_last_notified = {}
 
-    # Save state
     new_state = {
         "last_status": status,
         "alerts_last_notified": alerts_last_notified,
@@ -485,6 +631,10 @@ def run_watchdog_check(
         active_alerts=active_alerts,
         capital_mode=CAPITAL_MODE,
         real_capital_enabled=REAL_CAPITAL_ENABLED,
+        challenger_status=challenger_status,
+        challenger_db_integrity=challenger_db_integrity,
+        challenger_last_bar_age_hours=challenger_last_bar_age_hours,
+        challenger_backup_count=challenger_backup_count,
     )
 
 
@@ -502,6 +652,11 @@ def format_watchdog_report(report: WatchdogReport | dict[str, Any], lang: str = 
     real_cap = data.get("real_capital_enabled", False)
     active_alerts = data.get("active_alerts", [])
 
+    chall_status = data.get("challenger_status")
+    chall_integrity = data.get("challenger_db_integrity")
+    chall_bar_age = data.get("challenger_last_bar_age_hours")
+    chall_bcount = data.get("challenger_backup_count", 0)
+
     if lang.lower() == "bn":
         bar_age_str_bn = f"{bar_age:.1f} ঘণ্টা আগে" if bar_age is not None else "অনুপস্থিত"
         lines = [
@@ -514,9 +669,15 @@ def format_watchdog_report(report: WatchdogReport | dict[str, Any], lang: str = 
             f"সর্বশেষ শ্যাডো বার : {bar_age_str_bn}",
             f"ফ্রি ডিস্ক স্পেস   : {disk_free:,.1f} MB",
             f"সর্বশেষ ব্যাকআপ   : {backup_file} (মোট: {backup_count}টি)",
+        ]
+        if chall_status is not None:
+            c_bar_str_bn = f"{chall_bar_age:.1f} ঘণ্টা আগে" if chall_bar_age is not None else "অনুপস্থিত"
+            c_int_str = "OK" if chall_integrity else "FAIL"
+            lines.append(f"চ্যালেঞ্জার স্ট্যাটাস: {chall_status} (ইন্টিগ্রিটি: {c_int_str}, বার: {c_bar_str_bn}, ব্যাকআপ: {chall_bcount}টি)")
+        lines.extend([
             f"ক্যাপিটাল মোড     : {capital_mode} (রিয়েল ক্যাপিটাল: {'সক্রিয়' if real_cap else 'নিষ্ক্রিয়'})",
             "------------------------------------------------------------------",
-        ]
+        ])
         if not active_alerts:
             lines.append("সক্রিয় অ্যালার্ট   : কোনো অ্যালার্ট নেই (সব সিস্টেম স্বাভাবিক)")
         else:
@@ -540,9 +701,15 @@ def format_watchdog_report(report: WatchdogReport | dict[str, Any], lang: str = 
         f"Last Shadow Bar : {bar_age_str_en}",
         f"Disk Free Space : {disk_free:,.1f} MB",
         f"Last Backup File: {backup_file} (Total: {backup_count})",
+    ]
+    if chall_status is not None:
+        c_bar_str = f"{chall_bar_age:.1f}h ago" if chall_bar_age is not None else "N/A"
+        c_int_str = "OK" if chall_integrity else "FAIL"
+        lines.append(f"Challenger Stat : {chall_status} (Integrity: {c_int_str}, Last Bar: {c_bar_str}, Backups: {chall_bcount})")
+    lines.extend([
         f"Capital Mode    : {capital_mode} (Real Capital: {real_cap})",
         "------------------------------------------------------------------",
-    ]
+    ])
     if not active_alerts:
         lines.append("Active Alerts   : None (All systems green)")
     else:

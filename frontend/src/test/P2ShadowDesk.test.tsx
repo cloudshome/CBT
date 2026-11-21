@@ -12,6 +12,8 @@ vi.mock('../services/api', () => ({
     runShadowCycle: vi.fn(),
     getWatchdogReport: vi.fn(),
     getDeskRadar: vi.fn(),
+    getDeskArena: vi.fn(),
+    fetchDeskArena: vi.fn(),
   },
   ApiError: class ApiError extends Error {
     statusCode: number;
@@ -250,6 +252,56 @@ const mockRadarReport = {
   real_capital_enabled: false,
 };
 
+const mockArenaComparison = {
+  evaluation_timestamp_utc: '2026-11-21T12:00:00Z',
+  target_proof_days: 60,
+  proof_days_elapsed: 20.7,
+  proof_progress_pct: 34.5,
+  champion: {
+    strategy_id: 'CHAMPION_P2_RP',
+    name: 'Champion (P2_RP Risk Parity)',
+    equity_usd: 10000.0,
+    total_return_pct: 0.0,
+    max_drawdown_pct: 0.0,
+    gross_exposure: 0.0,
+    bars_ticked: 10,
+    days_tracked: 20.7,
+    regime: 'BEAR_SHIELD',
+    total_fills: 0,
+  },
+  challenger: {
+    strategy_id: 'CHALLENGER_V2B_PVT',
+    name: 'Challenger (P2_RP_V2B_PVT)',
+    equity_usd: 10000.0,
+    total_return_pct: 0.0,
+    max_drawdown_pct: 0.0,
+    gross_exposure: 0.0,
+    pvt_scalar: 0.0,
+    bars_ticked: 2,
+    days_tracked: 20.7,
+    regime: 'BEAR_SHIELD',
+    total_fills: 0,
+  },
+  benchmark_bnh: {
+    equity_usd: 10000.0,
+    total_return_pct: 0.0,
+  },
+  comparison: {
+    current_leader: 'TIE_WARMUP',
+    equity_delta_usd: 0.0,
+    return_spread_pct: 0.0,
+    dd_spread_pct: 0.0,
+    verdict_reason_en: 'Tied forward performance within 0.05% margin (Spread: +0.00%).',
+    verdict_reason_bn: '০.০৫% ব্যবধানের মধ্যে সম ফরোয়ার্ড পারফরম্যান্স (ব্যবধান: +0.00%)।',
+  },
+  governance: {
+    capital_mode: 'TIER_0_PAPER',
+    real_capital_enabled: false,
+    champion_db_mode: 'STRICT_READ_ONLY',
+    isolation_verified: true,
+  },
+};
+
 describe('P2ShadowDesk Component', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -259,6 +311,7 @@ describe('P2ShadowDesk Component', () => {
     vi.mocked(api.getShadowHistory).mockResolvedValue(mockShadowHistory as any);
     vi.mocked(api.getWatchdogReport).mockResolvedValue(mockWatchdogReport as any);
     vi.mocked(api.getDeskRadar).mockResolvedValue(mockRadarReport as any);
+    vi.mocked(api.getDeskArena).mockResolvedValue(mockArenaComparison as any);
     vi.mocked(api.runShadowCycle).mockResolvedValue({
       cycle: { status: 'COMPLETED', fills: 1 },
       scorecard: mockShadowScorecard as any,
@@ -463,5 +516,35 @@ describe('P2ShadowDesk Component', () => {
     await waitFor(() => {
       expect(screen.getByText('OPS: ALERT (1)')).toBeInTheDocument();
     });
+  });
+
+  it('renders Champion vs. Challenger Arena card with participants and leader badge', async () => {
+    render(<P2ShadowDesk />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/CHAMPION vs. CHALLENGER ARENA/i)).toBeInTheDocument();
+    });
+
+    expect(screen.getAllByText(/Champion \(P2_RP\)/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Challenger \(V2B_PVT\)/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/Current Arena Leader: TIE_WARMUP/i)).toBeInTheDocument();
+    expect(screen.getByText(/Tied forward performance within 0.05% margin/i)).toBeInTheDocument();
+  });
+
+  it('switches Arena card to Bengali when BN language is selected', async () => {
+    render(<P2ShadowDesk />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/CHAMPION vs. CHALLENGER ARENA/i)).toBeInTheDocument();
+    });
+
+    const bnBtn = screen.getByRole('button', { name: /বাংলা/i });
+    fireEvent.click(bnBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/চ্যাম্পিয়ন বনাম চ্যালেঞ্জার এরিনা/i)).toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/বর্তমান এরিনা লিডার: TIE_WARMUP/i)).toBeInTheDocument();
   });
 });

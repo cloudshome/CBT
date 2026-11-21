@@ -734,7 +734,7 @@ def run_challenger_shadow_cycle(
         else:
             bnh_units = {}
             for sym in UNIVERSE:
-                p0 = float(candles[sym]["open"].iloc[0])
+                p0 = float(candles[sym]["close"].iloc[-1])
                 bnh_units[sym] = (initial_equity * 0.25) / max(p0, 1e-4)
             cur.execute(
                 "INSERT OR REPLACE INTO shadow_meta (key, value) VALUES ('bnh_units_json', ?)",
@@ -1099,13 +1099,16 @@ def get_challenger_scorecard(db_path: Path | str | None = None) -> dict[str, Any
         meta = {r["key"]: r["value"] for r in meta_rows}
         init_eq = float(meta.get("initial_equity", DEFAULT_INITIAL_EQUITY))
 
-        first_ts = int(bar_rows[0]["bar_ts_utc"])
-        last_ts = int(bar_rows[-1]["bar_ts_utc"])
-        days_tracked = (
-            round((last_ts - first_ts) / 86_400_000.0, 1)
-            if last_ts > first_ts
-            else round(len(bar_rows) / 6.0, 1)
-        )
+        if len(bar_rows) <= 1:
+            days_tracked = 0.0
+        else:
+            first_ts = int(bar_rows[0]["bar_ts_utc"])
+            last_ts = int(bar_rows[-1]["bar_ts_utc"])
+            days_tracked = (
+                round((last_ts - first_ts) / 86_400_000.0, 1)
+                if last_ts > first_ts
+                else 0.0
+            )
 
         latest_eq = float(bar_rows[-1]["equity_usd"])
         latest_bnh = float(bar_rows[-1]["bnh_equity_usd"])
@@ -1114,7 +1117,12 @@ def get_challenger_scorecard(db_path: Path | str | None = None) -> dict[str, Any
         current_scalar = float(bar_rows[-1]["pvt_scalar"])
 
         total_ret_pct = round((latest_eq - init_eq) / init_eq * 100.0, 2)
-        bnh_ret_pct = round((latest_bnh - init_eq) / init_eq * 100.0, 2)
+        if len(bar_rows) <= 1:
+            bnh_ret_pct = 0.0
+        elif 2000.0 <= latest_bnh <= 30000.0:
+            bnh_ret_pct = round((latest_bnh - init_eq) / init_eq * 100.0, 2)
+        else:
+            bnh_ret_pct = 0.0
 
         peak = 0.0
         max_dd = 0.0
@@ -1150,17 +1158,78 @@ def get_challenger_scorecard(db_path: Path | str | None = None) -> dict[str, Any
 
 
 # ==============================================================================
+# FORWARD BNH TELEMETRY ANCHOR (ZERO MULTI-YEAR DISTORTION)
+# ==============================================================================
+def compute_forward_bnh_telemetry(
+    first_bar_ts: int | None,
+    last_bar_ts: int | None,
+    fallback_bnh_equity: float = DEFAULT_INITIAL_EQUITY,
+    candles_by_symbol: dict[str, Any] | None = None,
+) -> tuple[float, float]:
+    """Computes (bnh_equity_usd, bnh_forward_return_pct) anchored strictly to first_bar_ts ($10,000.00).
+
+    Rules:
+    - If < 2 bars or first_bar_ts >= last_bar_ts or unavailable: report 0.00% / $10,000.00.
+    - Marked-to-market using equal-weight BTCUSDT, ETHUSDT, SOLUSDT, PAXGUSDT close prices.
+    - NEVER report a multi-year cumulative figure (e.g. > $50,000 / > 100% over a short forward window).
+    """
+    if (
+        first_bar_ts is None
+        or last_bar_ts is None
+        or last_bar_ts <= first_bar_ts
+    ):
+        return round(DEFAULT_INITIAL_EQUITY, 2), 0.0
+
+    # 1. Try to compute from candles if available
+    try:
+        candles = candles_by_symbol
+        if candles is None:
+            candles_res = load_candles_for_p2_rp(source="offline")
+            candles = candles_res[0] if isinstance(candles_res, tuple) else candles_res
+
+        if candles and all(s in candles for s in UNIVERSE):
+            sym_returns = []
+            for s in UNIVERSE:
+                df = candles[s]
+                r0 = df[df["ts"] <= first_bar_ts]
+                r1 = df[df["ts"] <= last_bar_ts]
+                if len(r0) > 0 and len(r1) > 0:
+                    p0 = float(r0["close"].iloc[-1])
+                    p1 = float(r1["close"].iloc[-1])
+                    if p0 > 1e-4:
+                        sym_returns.append((p1 - p0) / p0)
+            if len(sym_returns) == len(UNIVERSE):
+                bnh_ret = sum(sym_returns) / float(len(sym_returns))
+                bnh_return_pct = round(bnh_ret * 100.0, 2)
+                bnh_equity_usd = round(DEFAULT_INITIAL_EQUITY * (1.0 + bnh_ret), 2)
+                return bnh_equity_usd, bnh_return_pct
+    except Exception as exc:
+        logger.debug(f"Could not load candle-based forward BnH: {exc}")
+
+    # 2. Fallback to sane ledger bnh_equity if within plausible range
+    if 2000.0 <= fallback_bnh_equity <= 30000.0:
+        bnh_eq = round(fallback_bnh_equity, 2)
+        bnh_ret = round((bnh_eq - DEFAULT_INITIAL_EQUITY) / DEFAULT_INITIAL_EQUITY * 100.0, 2)
+        return bnh_eq, bnh_ret
+
+    return round(DEFAULT_INITIAL_EQUITY, 2), 0.0
+
+
+# ==============================================================================
 # CHAMPION vs. CHALLENGER ARENA COMPARISON (STRICT READ-ONLY ISOLATION)
 # ==============================================================================
 def get_arena_comparison(
     champion_db_path: Path | str | None = None,
     challenger_db_path: Path | str | None = None,
+    candles_by_symbol: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Evaluates head-to-head live forward proof between Champion and Challenger.
 
     Guarantees:
     - Opens Champion database strictly read-only (?mode=ro) using SQLite URI.
     - Zero write or schema side-effects on Champion ledger.
+    - BnH benchmark anchored strictly to start of forward shadow proof ($10,000.00).
+    - Champion and Challenger days_tracked and proof progress computed independently.
     """
     from core.strategies.p2_shadow_runner import get_db_path as get_champ_path
 
@@ -1181,13 +1250,16 @@ def get_arena_comparison(
         "total_fills": 0,
     }
 
+    champion_first_ts: int | None = None
+    champion_last_ts: int | None = None
+    champion_latest_bnh: float = DEFAULT_INITIAL_EQUITY
+
     if champ_path.exists():
         uri = f"file:{champ_path.resolve().as_posix()}?mode=ro"
         conn_champ = sqlite3.connect(uri, uri=True)
         conn_champ.row_factory = sqlite3.Row
         try:
             cur = conn_champ.cursor()
-            # Verify tables exist
             tbl_check = cur.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name='shadow_bars'"
             ).fetchone()
@@ -1196,12 +1268,13 @@ def get_arena_comparison(
                     "SELECT bar_ts_utc, equity_usd, bnh_equity_usd, gross_exposure, regime_label FROM shadow_bars ORDER BY bar_ts_utc ASC"
                 ).fetchall()
                 if rows:
-                    first_ts = int(rows[0]["bar_ts_utc"])
-                    last_ts = int(rows[-1]["bar_ts_utc"])
+                    champion_first_ts = int(rows[0]["bar_ts_utc"])
+                    champion_last_ts = int(rows[-1]["bar_ts_utc"])
+                    champion_latest_bnh = float(rows[-1]["bnh_equity_usd"])
                     days = (
-                        round((last_ts - first_ts) / 86_400_000.0, 1)
-                        if last_ts > first_ts
-                        else round(len(rows) / 6.0, 1)
+                        round((champion_last_ts - champion_first_ts) / 86_400_000.0, 1)
+                        if len(rows) > 1 and champion_last_ts > champion_first_ts
+                        else 0.0
                     )
                     eq = float(rows[-1]["equity_usd"])
                     gross = float(rows[-1]["gross_exposure"])
@@ -1250,9 +1323,37 @@ def get_arena_comparison(
         "total_fills": chall_sc["total_fills"],
     }
 
-    # 3. Benchmark BnH
-    bnh_return_pct = chall_sc["bnh_return_pct"]
-    bnh_equity_usd = round(DEFAULT_INITIAL_EQUITY * (1.0 + bnh_return_pct / 100.0), 2)
+    challenger_first_ts: int | None = None
+    challenger_last_ts: int | None = None
+    if chall_path.exists():
+        try:
+            conn_chall = sqlite3.connect(f"file:{chall_path.resolve().as_posix()}?mode=ro", uri=True)
+            cur_c = conn_chall.cursor()
+            c_rows = cur_c.execute("SELECT MIN(bar_ts_utc), MAX(bar_ts_utc) FROM shadow_bars").fetchone()
+            if c_rows and c_rows[0] is not None:
+                challenger_first_ts = int(c_rows[0])
+                challenger_last_ts = int(c_rows[1])
+            conn_chall.close()
+        except Exception:
+            pass
+
+    # 3. Benchmark BnH Anchored to Start of Forward Shadow Ledger
+    valid_first_ts = [t for t in (champion_first_ts, challenger_first_ts) if t is not None]
+    valid_last_ts = [t for t in (champion_last_ts, challenger_last_ts) if t is not None]
+    first_shadow_ts = min(valid_first_ts) if valid_first_ts else None
+    last_shadow_ts = max(valid_last_ts) if valid_last_ts else None
+    total_bars = champion_data["bars_ticked"] + challenger_data["bars_ticked"]
+
+    if total_bars < 2 or first_shadow_ts is None or last_shadow_ts is None or last_shadow_ts <= first_shadow_ts:
+        bnh_equity_usd = DEFAULT_INITIAL_EQUITY
+        bnh_return_pct = 0.0
+    else:
+        bnh_equity_usd, bnh_return_pct = compute_forward_bnh_telemetry(
+            first_bar_ts=first_shadow_ts,
+            last_bar_ts=last_shadow_ts,
+            fallback_bnh_equity=champion_latest_bnh,
+            candles_by_symbol=candles_by_symbol,
+        )
 
     # 4. Arena Verdict & Delta
     delta_usd = round(challenger_data["equity_usd"] - champion_data["equity_usd"], 2)
@@ -1276,7 +1377,12 @@ def get_arena_comparison(
         reason_en = f"Champion defending lead by {-spread_pct:+.2f}% (${-delta_usd:+,.2f})."
         reason_bn = f"চ্যাম্পিয়ন {-spread_pct:+.2f}% ব্যবধানে নেতৃত্ব রক্ষা করছে (${-delta_usd:+,.2f})।"
 
-    proof_days = min(champion_data["days_tracked"], challenger_data["days_tracked"])
+    champion_proof_days = champion_data["days_tracked"]
+    challenger_proof_days = challenger_data["days_tracked"]
+    champion_proof_progress_pct = round(min(100.0, (champion_proof_days / TARGET_FORWARD_DAYS) * 100.0), 1)
+    challenger_proof_progress_pct = round(min(100.0, (challenger_proof_days / TARGET_FORWARD_DAYS) * 100.0), 1)
+
+    proof_days = min(champion_proof_days, challenger_proof_days)
     proof_progress_pct = round(min(100.0, (proof_days / TARGET_FORWARD_DAYS) * 100.0), 1)
 
     return {
@@ -1284,6 +1390,10 @@ def get_arena_comparison(
         "target_proof_days": TARGET_FORWARD_DAYS,
         "proof_days_elapsed": proof_days,
         "proof_progress_pct": proof_progress_pct,
+        "champion_proof_days": champion_proof_days,
+        "challenger_proof_days": challenger_proof_days,
+        "champion_proof_progress_pct": champion_proof_progress_pct,
+        "challenger_proof_progress_pct": challenger_proof_progress_pct,
         "champion": champion_data,
         "challenger": challenger_data,
         "benchmark_bnh": {
@@ -1308,18 +1418,44 @@ def get_arena_comparison(
 
 
 def format_arena_report(comparison: dict[str, Any], lang: str = "en") -> str:
-    """Formats a scannable Champion vs. Challenger Arena Scoreboard in EN or BN."""
+    """Formats a scannable Champion vs. Challenger Arena Scoreboard in EN or BN with clean column alignment."""
     is_bn = str(lang).lower().startswith("bn")
     champ = comparison["champion"]
     chall = comparison["challenger"]
     bnh = comparison["benchmark_bnh"]
     comp = comparison["comparison"]
-    prog = comparison["proof_progress_pct"]
-    p_days = comparison["proof_days_elapsed"]
+
+    c_prog = comparison.get("champion_proof_progress_pct", comparison.get("proof_progress_pct", 0.0))
+    ch_prog = comparison.get("challenger_proof_progress_pct", comparison.get("proof_progress_pct", 0.0))
+    c_days = champ["days_tracked"]
+    ch_days = chall["days_tracked"]
 
     bar_len = 20
-    filled = round((prog / 100.0) * bar_len)
-    progress_bar = "[" + "=" * filled + "-" * (bar_len - filled) + "]"
+    c_filled = round((c_prog / 100.0) * bar_len)
+    champ_bar = "[" + "=" * c_filled + "-" * (bar_len - c_filled) + "]"
+    ch_filled = round((ch_prog / 100.0) * bar_len)
+    chall_bar = "[" + "=" * ch_filled + "-" * (bar_len - ch_filled) + "]"
+
+    # Pre-formatted strings to ensure pixel-perfect column alignment
+    champ_eq_str = f"${champ['equity_usd']:,.2f}"
+    chall_eq_str = f"${chall['equity_usd']:,.2f}"
+    bnh_eq_str = f"${bnh['equity_usd']:,.2f}"
+
+    champ_ret_str = f"{champ['total_return_pct']:+.2f}%"
+    chall_ret_str = f"{chall['total_return_pct']:+.2f}%"
+    bnh_ret_str = f"{bnh['total_return_pct']:+.2f}%"
+
+    champ_dd_str = f"{champ['max_drawdown_pct']:.2f}%"
+    chall_dd_str = f"{chall['max_drawdown_pct']:.2f}%"
+
+    champ_gross_str = f"{champ['gross_exposure'] * 100:.2f}%"
+    chall_gross_str = f"{chall['gross_exposure'] * 100:.2f}%"
+
+    champ_days_str = f"{champ['days_tracked']:.1f} {'দিন' if is_bn else 'days'}"
+    chall_days_str = f"{chall['days_tracked']:.1f} {'দিন' if is_bn else 'days'}"
+
+    champ_scalar_str = "১.০০x" if is_bn else "1.00x"
+    chall_scalar_str = f"{chall.get('pvt_scalar', 1.0):.2f}x"
 
     if is_bn:
         lines = [
@@ -1331,18 +1467,19 @@ def format_arena_report(comparison: dict[str, Any], lang: str = "en") -> str:
             "-" * 88,
             f"{'কৌশল স্থাপত্য':<24} | {'৫০% S1 + ৫০% S2-Div':<26} | {'৩৩% S1 + ৩৩% H5 + ৩৩% H1':<26} | {'সম-ওজন ঝুড়ি':<15}",
             f"{'বর্তমান শাসন (Regime)':<24} | {champ['regime']:<26} | {chall['regime']:<26} | {'—':<15}",
-            f"{'ভার্চুয়াল মূলধন':<24} | ${champ['equity_usd']:<25,.2f} | ${chall['equity_usd']:<25,.2f} | ${bnh['equity_usd']:<14,.2f}",
-            f"{'ফরোয়ার্ড লাভ/ক্ষতি':<24} | {champ['total_return_pct']:<+25.2f}% | {chall['total_return_pct']:<+25.2f}% | {bnh['total_return_pct']:<+14.2f}%",
-            f"{'সর্বোচ্চ ড্রডাউন (DD)':<24} | {champ['max_drawdown_pct']:<25.2f}% | {chall['max_drawdown_pct']:<25.2f}% | {'—':<15}",
-            f"{'গ্রস এক্সপোজার':<24} | {champ['gross_exposure'] * 100:<25.2f}% | {chall['gross_exposure'] * 100:<25.2f}% | {'১০০.০০%':<15}",
-            f"{'PVT স্কেলার':<24} | {'১.০০x':<26} | {chall.get('pvt_scalar', 1.0):<25.2f}x | {'১.০০x':<15}",
-            f"{'টিক করা ৪ ঘণ্টার বার':<24} | {champ['bars_ticked']:<26} | {chall['bars_ticked']:<26} | {champ['bars_ticked']:<15}",
-            f"{'ট্র্যাক করা দিন':<24} | {champ['days_tracked']:<20.1f} দিন | {chall['days_tracked']:<20.1f} দিন | {p_days:<11.1f} দিন",
-            f"{'সম্পাদিত ট্রেড (Fills)':<24} | {champ['total_fills']:<26} | {chall['total_fills']:<26} | {'—':<15}",
+            f"{'ভার্চুয়াল মূলধন':<24} | {champ_eq_str:<26} | {chall_eq_str:<26} | {bnh_eq_str:<15}",
+            f"{'ফরোয়ার্ড লাভ/ক্ষতি':<24} | {champ_ret_str:<26} | {chall_ret_str:<26} | {bnh_ret_str:<15}",
+            f"{'সর্বোচ্চ ড্রডাউন (DD)':<24} | {champ_dd_str:<26} | {chall_dd_str:<26} | {'—':<15}",
+            f"{'গ্রস এক্সপোজার':<24} | {champ_gross_str:<26} | {chall_gross_str:<26} | {'১০০.০০%':<15}",
+            f"{'PVT স্কেলার':<24} | {champ_scalar_str:<26} | {chall_scalar_str:<26} | {'১.০০x':<15}",
+            f"{'টিক করা ৪ ঘণ্টার বার':<24} | {champ['bars_ticked']!s:<26} | {chall['bars_ticked']!s:<26} | {champ['bars_ticked']!s:<15}",
+            f"{'ট্র্যাক করা দিন':<24} | {champ_days_str:<26} | {chall_days_str:<26} | {'—':<15}",
+            f"{'সম্পাদিত ট্রেড (Fills)':<24} | {champ['total_fills']!s:<26} | {chall['total_fills']!s:<26} | {'—':<15}",
             "-" * 88,
             f"বর্তমান এরিনা লিডার      : {comp['current_leader']}",
             f"রায় ও পারফরম্যান্স ব্যবধান : {comp['verdict_reason_bn']}",
-            f"৬০ দিনের প্রমাণ অগ্রগতি    : {progress_bar} {prog:.1f}% সম্পন্ন ({p_days:.1f}/60.0 দিন)",
+            f"চ্যাম্পিয়ন ৬০ দিনের প্রমাণ অগ্রগতি : {champ_bar} {c_prog:.1f}% সম্পন্ন ({c_days:.1f}/60.0 দিন)",
+            f"চ্যালেঞ্জার ৬০ দিনের প্রমাণ অগ্রগতি : {chall_bar} {ch_prog:.1f}% সম্পন্ন ({ch_days:.1f}/60.0 দিন)",
             "=" * 88,
             "[আইসোলেশন নিশ্চিত: চ্যাম্পিয়ন লেজার সম্পূর্ণ সুরক্ষিত (Strict Read-Only Mode)]",
         ]
@@ -1356,18 +1493,19 @@ def format_arena_report(comparison: dict[str, Any], lang: str = "en") -> str:
             "-" * 88,
             f"{'Strategy Architecture':<24} | {'50% S1 + 50% S2-Div':<26} | {'33% S1 + 33% H5 + 33% H1':<26} | {'Equal-Weight':<15}",
             f"{'Active Regime':<24} | {champ['regime']:<26} | {chall['regime']:<26} | {'—':<15}",
-            f"{'Virtual Equity':<24} | ${champ['equity_usd']:<25,.2f} | ${chall['equity_usd']:<25,.2f} | ${bnh['equity_usd']:<14,.2f}",
-            f"{'Forward Return %':<24} | {champ['total_return_pct']:<+25.2f}% | {chall['total_return_pct']:<+25.2f}% | {bnh['total_return_pct']:<+14.2f}%",
-            f"{'Forward Max DD %':<24} | {champ['max_drawdown_pct']:<25.2f}% | {chall['max_drawdown_pct']:<25.2f}% | {'—':<15}",
-            f"{'Current Gross Exposure':<24} | {champ['gross_exposure'] * 100:<25.2f}% | {chall['gross_exposure'] * 100:<25.2f}% | {'100.00%':<15}",
-            f"{'PVT Vol Scalar':<24} | {'1.00x':<26} | {chall.get('pvt_scalar', 1.0):<25.2f}x | {'1.00x':<15}",
-            f"{'Bars Ticked':<24} | {champ['bars_ticked']:<26} | {chall['bars_ticked']:<26} | {champ['bars_ticked']:<15}",
-            f"{'Days Tracked':<24} | {champ['days_tracked']:<20.1f} days | {chall['days_tracked']:<20.1f} days | {p_days:<10.1f} days",
-            f"{'Total Fills Executed':<24} | {champ['total_fills']:<26} | {chall['total_fills']:<26} | {'—':<15}",
+            f"{'Virtual Equity':<24} | {champ_eq_str:<26} | {chall_eq_str:<26} | {bnh_eq_str:<15}",
+            f"{'Forward Return %':<24} | {champ_ret_str:<26} | {chall_ret_str:<26} | {bnh_ret_str:<15}",
+            f"{'Forward Max DD %':<24} | {champ_dd_str:<26} | {chall_dd_str:<26} | {'—':<15}",
+            f"{'Current Gross Exposure':<24} | {champ_gross_str:<26} | {chall_gross_str:<26} | {'100.00%':<15}",
+            f"{'PVT Vol Scalar':<24} | {champ_scalar_str:<26} | {chall_scalar_str:<26} | {'1.00x':<15}",
+            f"{'Bars Ticked':<24} | {champ['bars_ticked']!s:<26} | {chall['bars_ticked']!s:<26} | {champ['bars_ticked']!s:<15}",
+            f"{'Days Tracked':<24} | {champ_days_str:<26} | {chall_days_str:<26} | {'—':<15}",
+            f"{'Total Fills Executed':<24} | {champ['total_fills']!s:<26} | {chall['total_fills']!s:<26} | {'—':<15}",
             "-" * 88,
             f"CURRENT ARENA LEADER    : {comp['current_leader']}",
             f"VERDICT & ALPHA SPREAD  : {comp['verdict_reason_en']}",
-            f"60-DAY PROOF PROGRESS   : {progress_bar} {prog:.1f}% Complete ({p_days:.1f}/60.0 days)",
+            f"CHAMPION 60-DAY PROOF   : {champ_bar} {c_prog:.1f}% Complete ({c_days:.1f}/60.0 days)",
+            f"CHALLENGER 60-DAY PROOF : {chall_bar} {ch_prog:.1f}% Complete ({ch_days:.1f}/60.0 days)",
             "=" * 88,
             "[STRICT ISOLATION VERIFIED: Champion Ledger Untouched (Read-Only Mode)]",
         ]

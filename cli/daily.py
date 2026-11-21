@@ -1174,16 +1174,27 @@ def cmd_watchdog(args) -> int:
     as_json = bool(getattr(args, "json", False))
     lang = str(getattr(args, "lang", "en") or "en").lower()
     do_backup = bool(getattr(args, "backup", False))
+    do_check = bool(getattr(args, "check", False))
 
-    if do_backup:
+    if do_backup and not do_check:
         try:
-            backup_file = backup_shadow_ledger()
+            champ_backup = backup_shadow_ledger()
+            from core.ops.p2_shadow_watchdog import get_default_challenger_db_path
+
+            chall_db = get_default_challenger_db_path()
+            chall_backup = None
+            if chall_db.exists():
+                chall_backup = backup_shadow_ledger(
+                    db_path=chall_db, prefix="v2b_challenger_shadow_ledger"
+                )
+
             if as_json:
                 print(
                     json.dumps(
                         {
                             "backup_status": "SUCCESS",
-                            "backup_file": str(backup_file),
+                            "champion_backup_file": str(champ_backup),
+                            "challenger_backup_file": str(chall_backup) if chall_backup else None,
                             "integrity_check": "OK",
                         },
                         indent=2,
@@ -1192,7 +1203,9 @@ def cmd_watchdog(args) -> int:
             else:
                 print("=" * 64)
                 print("CBT SHADOW LEDGER BACKUP: SUCCESS")
-                print(f"Archive  : {backup_file}")
+                print(f"Champion Archive  : {champ_backup}")
+                if chall_backup:
+                    print(f"Challenger Archive: {chall_backup}")
                 print("Integrity: PRAGMA integrity_check OK")
                 print("=" * 64)
             return 0
@@ -1214,12 +1227,16 @@ def cmd_watchdog(args) -> int:
                 print("=" * 64)
             return 1
 
-    # Default or --check: run watchdog check
+    # Default or --check (and --check --backup): run watchdog check
     try:
         report = run_watchdog_check(auto_backup=True)
         if as_json:
             print(json.dumps(report.to_dict(), indent=2, default=str))
         else:
+            if do_backup:
+                print("=" * 64)
+                print("CBT SHADOW LEDGER ONLINE BACKUP & OPS VERIFICATION")
+                print("=" * 64)
             print(format_watchdog_report(report, lang=lang))
         return 0
     except Exception as e:

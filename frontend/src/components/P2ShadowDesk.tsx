@@ -10,6 +10,8 @@ import {
   Layers,
   CheckCircle2,
   Radio,
+  Swords,
+  Trophy,
 } from 'lucide-react';
 import { api, ApiError } from '../services/api';
 import {
@@ -19,6 +21,7 @@ import {
   ShadowFill,
   WatchdogReport,
   MarketRadarReport,
+  ArenaComparison,
 } from '../types';
 
 interface P2ShadowDeskProps {
@@ -96,6 +99,23 @@ const I18N = {
     radarClosestSetup: "#1 CLOSEST ACTIONABLE SETUP",
     radarNoAlerts: "No setups within 3% trigger zone — Bear Shield active.",
     radarAlertsHeading: "Active Proximity Alerts",
+    arenaTitle: "CHAMPION vs. CHALLENGER ARENA",
+    arenaSubtitle: "Parallel 60-Day Forward Proof · Champion (P2_RP) vs. Challenger (V2B_PVT)",
+    arenaLeader: "Current Arena Leader",
+    arenaSpread: "Alpha Spread",
+    arenaProofProgress: "60-Day Proof Progress",
+    arenaReadOnlyIsolation: "STRICT ISOLATION VERIFIED · Champion Ledger Untouched (Read-Only Mode)",
+    arenaParticipantChampion: "Champion (P2_RP)",
+    arenaParticipantChallenger: "Challenger (V2B_PVT)",
+    arenaStrategyArch: "Strategy Architecture",
+    arenaArchChampion: "50% S1 + 50% S2-Div",
+    arenaArchChallenger: "33% S1 + 33% H5 + 33% H1",
+    arenaBarsTicked: "Bars Ticked",
+    arenaDaysTracked: "Days Tracked",
+    arenaGrossExposure: "Gross Exposure",
+    arenaMaxDD: "Max Drawdown",
+    arenaPvtScalar: "PVT Vol Scalar",
+    arenaBenchmarkBnh: "Equal-Weight BnH",
   },
   bn: {
     deskTitle: "P2_RP রিস্ক-প্যারিটি শ্যাডো ডেস্ক",
@@ -167,6 +187,23 @@ const I18N = {
     radarClosestSetup: "#১ নিকটতম অ্যাকশনেবল সেটআপ",
     radarNoAlerts: "৩% ট্রিগার জোনের মধ্যে কোনো সেটআপ নেই — বেয়ার শিল্ড সক্রিয়।",
     radarAlertsHeading: "সক্রিয় প্রক্সিমিটি অ্যালার্ট",
+    arenaTitle: "চ্যাম্পিয়ন বনাম চ্যালেঞ্জার এরিনা",
+    arenaSubtitle: "সমান্তরাল ৬০ দিনের ফরোয়ার্ড প্রুফ · চ্যাম্পিয়ন (P2_RP) বনাম চ্যালেঞ্জার (V2B_PVT)",
+    arenaLeader: "বর্তমান এরিনা লিডার",
+    arenaSpread: "আলফা ব্যবধান",
+    arenaProofProgress: "৬০ দিনের প্রমাণ অগ্রগতি",
+    arenaReadOnlyIsolation: "আইসোলেশন নিশ্চিত · চ্যাম্পিয়ন লেজার সম্পূর্ণ সুরক্ষিত (Strict Read-Only Mode)",
+    arenaParticipantChampion: "চ্যাম্পিয়ন (P2_RP)",
+    arenaParticipantChallenger: "চ্যালেঞ্জার (V2B_PVT)",
+    arenaStrategyArch: "কৌশল স্থাপত্য",
+    arenaArchChampion: "৫০% S1 + ৫০% S2-Div",
+    arenaArchChallenger: "৩৩% S1 + ৩৩% H5 + ৩৩% H1",
+    arenaBarsTicked: "টিক করা ৪ ঘণ্টার বার",
+    arenaDaysTracked: "ট্র্যাক করা দিন",
+    arenaGrossExposure: "গ্রস এক্সপোজার",
+    arenaMaxDD: "সর্বোচ্চ ড্রডাউন",
+    arenaPvtScalar: "PVT স্কেলার",
+    arenaBenchmarkBnh: "সম-ওজন ঝুড়ি (BnH)",
   },
 };
 
@@ -181,6 +218,7 @@ export const P2ShadowDesk: React.FC<P2ShadowDeskProps> = ({ onNotify }) => {
   const [fills, setFills] = useState<ShadowFill[]>([]);
   const [watchdog, setWatchdog] = useState<WatchdogReport | null>(null);
   const [radar, setRadar] = useState<MarketRadarReport | null>(null);
+  const [arena, setArena] = useState<ArenaComparison | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const t = I18N[lang];
@@ -234,6 +272,14 @@ export const P2ShadowDesk: React.FC<P2ShadowDeskProps> = ({ onNotify }) => {
         setRadar(radarData);
       } catch (err: unknown) {
         console.warn('Could not load market radar report:', err);
+      }
+
+      // 6. Fetch Champion vs. Challenger Arena (Milestone 78/79)
+      try {
+        const arenaData = await api.getDeskArena();
+        setArena(arenaData);
+      } catch (err: unknown) {
+        console.warn('Could not load arena comparison:', err);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Network error loading shadow desk';
@@ -677,6 +723,175 @@ export const P2ShadowDesk: React.FC<P2ShadowDeskProps> = ({ onNotify }) => {
           )}
         </div>
       </div>
+
+      {/* 2.4.5 CHAMPION vs. CHALLENGER ARENA CARD (Milestone 78/79) */}
+      {arena && (
+        <div className="bg-[#090d16] border border-[#1e293b] rounded-lg p-4 space-y-3.5 shadow-md">
+          {/* Header */}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#1e293b]/70 pb-3">
+            <div className="flex items-center gap-2">
+              <Swords className="w-4 h-4 text-amber-400" />
+              <h3 className="text-sm font-bold text-white tracking-wide">{t.arenaTitle}</h3>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded text-[10px] font-bold border tracking-wider uppercase bg-amber-950/60 border-amber-500/60 text-amber-300">
+                {t.arenaLeader}: {arena.comparison.current_leader}
+              </span>
+              <span className="text-[11px] text-slate-400 hidden sm:inline">{t.arenaSubtitle}</span>
+            </div>
+          </div>
+
+          {/* Leader & Verdict Banner */}
+          <div className="bg-[#0c1424] border border-amber-500/30 rounded-lg p-3 flex flex-col md:flex-row md:items-center justify-between gap-2">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Trophy className="w-4 h-4 text-amber-400 shrink-0" />
+                <span className="text-xs font-bold text-white">
+                  {lang === 'bn' ? arena.comparison.verdict_reason_bn : arena.comparison.verdict_reason_en}
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-400">
+                {t.arenaReadOnlyIsolation}
+              </div>
+            </div>
+            <div className="flex items-center gap-4 text-xs font-semibold shrink-0">
+              <div>
+                <span className="text-slate-400 block text-[10px]">{t.arenaSpread}</span>
+                <span className={arena.comparison.return_spread_pct >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                  {arena.comparison.return_spread_pct >= 0 ? '+' : ''}{arena.comparison.return_spread_pct.toFixed(2)}% (${arena.comparison.equity_delta_usd >= 0 ? '+' : ''}{arena.comparison.equity_delta_usd.toFixed(2)})
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[10px]">{t.arenaProofProgress}</span>
+                <span className="text-sky-300">
+                  {arena.proof_progress_pct.toFixed(1)}% ({arena.proof_days_elapsed.toFixed(1)}/{arena.target_proof_days}d)
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Arena Participants Side-by-Side Comparison Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {/* Champion Box */}
+            <div className="bg-[#0e1626] border border-sky-500/30 rounded-lg p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-sky-400 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  {t.arenaParticipantChampion}
+                </span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-950 border border-sky-800 text-sky-300">
+                  {arena.champion.regime}
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-400">{t.arenaArchChampion}</div>
+              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800 text-xs">
+                <div>
+                  <span className="text-[10px] text-slate-400 block">{t.kpiEquityTitle}</span>
+                  <span className="font-bold text-white">${arena.champion.equity_usd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block">{lang === 'bn' ? 'ফরোয়ার্ড রিটার্ন' : 'Forward Return'}</span>
+                  <span className={`font-bold ${arena.champion.total_return_pct >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {arena.champion.total_return_pct >= 0 ? '+' : ''}{arena.champion.total_return_pct.toFixed(2)}%
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block">{t.arenaMaxDD}</span>
+                  <span className="font-bold text-rose-400">-{arena.champion.max_drawdown_pct.toFixed(2)}%</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block">{t.arenaGrossExposure}</span>
+                  <span className="font-bold text-slate-200">{(arena.champion.gross_exposure * 100).toFixed(1)}%</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block">{t.arenaBarsTicked}</span>
+                  <span className="text-slate-300">{arena.champion.bars_ticked} ({arena.champion.days_tracked.toFixed(1)}d)</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block">{lang === 'bn' ? 'ট্রেড সংখ্যা' : 'Total Fills'}</span>
+                  <span className="text-slate-300">{arena.champion.total_fills}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Challenger Box */}
+            <div className="bg-[#0e1626] border border-amber-500/30 rounded-lg p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                  <Swords className="w-3.5 h-3.5" />
+                  {t.arenaParticipantChallenger}
+                </span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-950 border border-amber-800 text-amber-300">
+                  {arena.challenger.regime}
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-400">{t.arenaArchChallenger}</div>
+              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800 text-xs">
+                <div>
+                  <span className="text-[10px] text-slate-400 block">{t.kpiEquityTitle}</span>
+                  <span className="font-bold text-white">${arena.challenger.equity_usd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block">{lang === 'bn' ? 'ফরোয়ার্ড রিটার্ন' : 'Forward Return'}</span>
+                  <span className={`font-bold ${arena.challenger.total_return_pct >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {arena.challenger.total_return_pct >= 0 ? '+' : ''}{arena.challenger.total_return_pct.toFixed(2)}%
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block">{t.arenaMaxDD}</span>
+                  <span className="font-bold text-rose-400">-{arena.challenger.max_drawdown_pct.toFixed(2)}%</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block">{t.arenaGrossExposure}</span>
+                  <span className="font-bold text-slate-200">{(arena.challenger.gross_exposure * 100).toFixed(1)}% ({arena.challenger.pvt_scalar !== undefined ? `${arena.challenger.pvt_scalar.toFixed(2)}x` : '1.00x'})</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block">{t.arenaBarsTicked}</span>
+                  <span className="text-slate-300">{arena.challenger.bars_ticked} ({arena.challenger.days_tracked.toFixed(1)}d)</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block">{lang === 'bn' ? 'ট্রেড সংখ্যা' : 'Total Fills'}</span>
+                  <span className="text-slate-300">{arena.challenger.total_fills}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Benchmark BnH Box */}
+            <div className="bg-[#0e1626] border border-slate-700/50 rounded-lg p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5" />
+                  {t.arenaBenchmarkBnh}
+                </span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300">
+                  4-ASSET BASKET
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-400">{lang === 'bn' ? 'BTC, ETH, SOL, PAXG সম-ওজন' : 'Equal-Weight (BTC, ETH, SOL, PAXG)'}</div>
+              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800 text-xs">
+                <div>
+                  <span className="text-[10px] text-slate-400 block">{lang === 'bn' ? 'বেঞ্চমার্ক ইকুইটি' : 'Benchmark Equity'}</span>
+                  <span className="font-bold text-white">${arena.benchmark_bnh.equity_usd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block">{lang === 'bn' ? 'বেঞ্চমার্ক রিটার্ন' : 'Benchmark Return'}</span>
+                  <span className={`font-bold ${arena.benchmark_bnh.total_return_pct >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {arena.benchmark_bnh.total_return_pct >= 0 ? '+' : ''}{arena.benchmark_bnh.total_return_pct.toFixed(2)}%
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block">{t.arenaGrossExposure}</span>
+                  <span className="font-bold text-slate-200">100.0%</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block">{lang === 'bn' ? 'অ্যাঙ্কর বার' : 'Anchor Status'}</span>
+                  <span className="text-emerald-400 font-semibold">{lang === 'bn' ? 'সিঙ্গেল-পিরিয়ড ফরোয়ার্ড' : 'Forward Anchored'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 2.5. WHY TRADE / WHY WAITING & EXACT NEXT TRIGGER CONDITIONS */}
       <div className="bg-[#090d16] border border-[#1e293b] rounded-lg p-4 space-y-4 shadow-md">

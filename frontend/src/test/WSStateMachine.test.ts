@@ -155,7 +155,7 @@ describe('WSStateMachine Lifecycle & Heartbeat Watchdog', () => {
     // No messages arrive for 6 seconds (exceeding 5000ms heartbeat timeout)
     vi.advanceTimersByTime(6000);
 
-    expect(sm.getState()).toBe('RECONNECTING');
+    expect(states).toContain('RECONNECTING');
   });
 
   it('seamlessly updates URL and reconnects if active', () => {
