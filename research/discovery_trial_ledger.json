@@ -1,8 +1,8 @@
 {
   "ledger_version": "1.0.0",
   "baseline_trials": 18,
-  "cumulative_trials_count": 27,
-  "last_updated_utc": "2026-11-21T10:50:00.859022+00:00",
+  "cumulative_trials_count": 29,
+  "last_updated_utc": "2026-11-21T12:55:05.302259+00:00",
   "trials": [
     {
       "hypothesis_id": "H1_VOL_SQUEEZE_EXPANSION_LONG",
@@ -252,6 +252,60 @@
       "m_cum": 27,
       "trial_number": 27,
       "recorded_at_utc": "2026-11-21T10:50:00.858994+00:00"
+    },
+    {
+      "hypothesis_id": "P2_RP_V2C_PVT",
+      "name": "P2_RP_V2C_PVT (4-Sleeve + 15% Vol Target)",
+      "family": "Multi-Strategy Causal Risk-Parity Ensemble Vol-Target Upgrade",
+      "direction_mode": "LONG_ONLY_ENSEMBLE",
+      "train_sharpe": 1.2282,
+      "val_sharpe": 1.9182,
+      "oos_sharpe": 0.5947,
+      "oos_return_pct": 12.49,
+      "oos_max_dd_pct": 14.56,
+      "cpcv_median_sharpe": 1.302,
+      "dsr_oos": 0.1017,
+      "dsr_pval": 0.8983,
+      "hurdles_passed": 3,
+      "hurdles_total": 5,
+      "stress_regimes": {
+        "baseline_oos_sharpe": 0.5947,
+        "friction_2x_oos_sharpe": 0.4285,
+        "delay_1bar_oos_sharpe": 0.5453,
+        "stress_resistance_verdict": "SURVIVES STRESS"
+      },
+      "verdict": "KEEP_P2_RP_BASELINE",
+      "verdict_rationale": "Failed Gate 1 (Full Sharpe: 1.21 vs 1.22, Calmar: 1.03 vs 0.89); Failed Gate 3 (Full DD: 16.40% vs 19.58%)",
+      "m_cum": 28,
+      "trial_number": 28,
+      "recorded_at_utc": "2026-11-21T12:51:55.627599+00:00"
+    },
+    {
+      "hypothesis_id": "P2_RP_V2B_PVT",
+      "name": "P2_RP_V2B_PVT (3-Sleeve + 15% Vol Target)",
+      "family": "Multi-Strategy Causal Risk-Parity Ensemble Vol-Target Upgrade",
+      "direction_mode": "LONG_ONLY_ENSEMBLE",
+      "train_sharpe": 1.1139,
+      "val_sharpe": 1.9923,
+      "oos_sharpe": 1.019,
+      "oos_return_pct": 22.63,
+      "oos_max_dd_pct": 10.93,
+      "cpcv_median_sharpe": 1.3037,
+      "dsr_oos": 0.2491,
+      "dsr_pval": 0.7509,
+      "hurdles_passed": 4,
+      "hurdles_total": 5,
+      "stress_regimes": {
+        "baseline_oos_sharpe": 1.019,
+        "friction_2x_oos_sharpe": 0.8591,
+        "delay_1bar_oos_sharpe": 0.9452,
+        "stress_resistance_verdict": "SURVIVES STRESS"
+      },
+      "verdict": "KEEP_P2_RP_BASELINE",
+      "verdict_rationale": "Failed Gate 3 (Full DD: 13.82% vs 19.58%)",
+      "m_cum": 29,
+      "trial_number": 29,
+      "recorded_at_utc": "2026-11-21T12:51:55.638330+00:00"
     }
   ]
 }

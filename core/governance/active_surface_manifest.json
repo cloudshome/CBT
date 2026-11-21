@@ -154,6 +154,11 @@
           "path": "scripts/research/run_m76_ensemble_upgrade_audit.py",
           "verdict": "ENSEMBLE_AUDIT_M76",
           "tested_hypothesis": "Milestone 76 Causal Ensemble Upgrade Audit (P2_RP vs P2_RP_V2 with H5 and H1_CLEAN)"
+        },
+        {
+          "path": "scripts/research/run_m77_portfolio_vol_targeting_audit.py",
+          "verdict": "VOL_TARGET_AUDIT_M77",
+          "tested_hypothesis": "Milestone 77 Causal Portfolio-Level 15% Vol-Targeting Audit (V2B and V2C vs P2_RP_BASELINE)"
         }
       ]
     },
