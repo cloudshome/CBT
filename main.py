@@ -61,6 +61,7 @@ from cli.analytics import (
 from cli.daily import (
     cmd_agent,
     cmd_analyze,
+    cmd_arena,
     cmd_ask,
     cmd_brief,
     cmd_card,
@@ -953,6 +954,42 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_shadow.add_argument("--json", action="store_true", help="Output JSON format")
     p_shadow.set_defaults(func=cmd_shadow)
+
+    p_arena = sub.add_parser(
+        "arena",
+        help="Champion (P2_RP) vs. Challenger (P2_RP_V2B_PVT) parallel live shadow arena",
+    )
+    p_arena.add_argument(
+        "--run-once",
+        "--once",
+        dest="run_once",
+        action="store_true",
+        help="Execute one idempotent 4h shadow cycle for Challenger and display arena scoreboard",
+    )
+    p_arena.add_argument(
+        "--status",
+        action="store_true",
+        help="Display live Champion vs. Challenger arena scoreboard (default)",
+    )
+    p_arena.add_argument(
+        "--source",
+        choices=["live", "parquet", "auto"],
+        default="live",
+        help="Data source: live, parquet, or auto",
+    )
+    p_arena.add_argument(
+        "--offline",
+        action="store_true",
+        help="Use offline local parquet candles instead of live network",
+    )
+    p_arena.add_argument(
+        "--lang",
+        choices=["en", "bn"],
+        default="en",
+        help="Display language: en (English) or bn (Bengali)",
+    )
+    p_arena.add_argument("--json", action="store_true", help="Output JSON format")
+    p_arena.set_defaults(func=cmd_arena)
 
     p_watchdog = sub.add_parser(
         "watchdog",

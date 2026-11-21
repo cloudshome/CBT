@@ -82,6 +82,18 @@
         {
           "path": "deploy/systemd/cbt-market-radar.timer",
           "role": "Systemd Timer for 4h Market Radar Checks (00:07, 04:07, 08:07, 12:07, 16:07, 20:07 UTC)"
+        },
+        {
+          "path": "core/strategies/v2b_challenger_shadow.py",
+          "role": "24/7 Challenger Live Shadow Runner & Arena Scoreboard (P2_RP_V2B_PVT)"
+        },
+        {
+          "path": "deploy/systemd/cbt-v2b-challenger.service",
+          "role": "Systemd Service for 24/7 Challenger V2B Shadow Runner"
+        },
+        {
+          "path": "deploy/systemd/cbt-v2b-challenger.timer",
+          "role": "Systemd Timer for 4h Challenger Execution (00:06, 04:06, 08:06, 12:06, 16:06, 20:06 UTC)"
         }
       ]
     },

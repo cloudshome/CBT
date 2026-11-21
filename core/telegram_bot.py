@@ -3389,6 +3389,33 @@ class TelegramBotDispatcher:
             )
             return {"status": "EXECUTED", "command": "/radar", "response": response_text}
 
+        # Check Bengali and English Champion vs Challenger Arena triggers (Milestone 78)
+        if (
+            clean_nl in (
+                "এরিনা",
+                "চ্যালেঞ্জার",
+                "চ্যাম্পিয়ন",
+                "arena",
+                "challenger",
+                "champion",
+                "champion vs challenger",
+                "/arena",
+                "/challenger",
+                "/champion",
+            )
+            or "এরিনা" in text
+            or "চ্যালেঞ্জার" in text
+            or "champion vs challenger" in text
+        ):
+            from core.telegram.handlers import handle_arena
+
+            target_l = "bn" if any(c in text for c in ["এরিনা", "চ্যালেঞ্জার", "চ্যাম্পিয়ন"]) else "en"
+            response_text = await handle_arena(args=target_l, chat_id=chat_id, identity=identity, lang=target_l)
+            telegram_audit.log_command_execution(
+                identity, "/arena", target_l, execution_result="EXECUTED"
+            )
+            return {"status": "EXECUTED", "command": "/arena", "response": response_text}
+
         # 6. Natural Language Conversational AI Query
         try:
             ai_reply = await self.state_mind.handle_conversational_query(

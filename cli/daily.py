@@ -1110,6 +1110,59 @@ def cmd_shadow(args) -> int:
     return 0
 
 
+def cmd_arena(args) -> int:
+    """Milestone 78: Champion (P2_RP) vs. Challenger (P2_RP_V2B_PVT) Parallel Live Shadow Arena CLI."""
+    from core.strategies.v2b_challenger_shadow import (
+        format_arena_report,
+        get_arena_comparison,
+        run_challenger_shadow_cycle,
+    )
+
+    run_once = bool(getattr(args, "run_once", False) or getattr(args, "once", False))
+    source = str(getattr(args, "source", "live") or "live").lower()
+    if getattr(args, "offline", False):
+        source = "parquet"
+    lang = str(getattr(args, "lang", "en") or "en").lower()
+    as_json = bool(getattr(args, "json", False))
+
+    if run_once:
+        result = run_challenger_shadow_cycle(source=source)
+        if as_json:
+            print(json.dumps(result, indent=2, default=str))
+        else:
+            status_code = result.get("status", "UNKNOWN")
+            fills = result.get("fills", 0)
+            eq = result.get("equity_usd", 0.0)
+            gross = result.get("gross_exposure", 0.0)
+            regime = result.get("regime_label", "UNKNOWN")
+            scalar = result.get("pvt_scalar", 1.0)
+            print("=" * 88)
+            print(f"CBT V2B_PVT CHALLENGER CYCLE: {status_code}")
+            print(f"Regime: {regime} | Fills Executed: {fills} | PVT Scalar: {scalar:.2f}x")
+            print(f"Portfolio Equity: ${eq:,.2f} | Gross Exposure: {gross * 100.0:.2f}%")
+            if fills > 0:
+                print("-" * 88)
+                print("FILLS:")
+                for f in result.get("fill_details", []):
+                    print(
+                        f"  • {f['side']} {f['symbol']}: {f['units']} @ ${f['live_exec_price']:,.2f} "
+                        f"(slippage: {f['slippage_bps']:.2f} bps, fee: ${f['fee_usd']:,.2f})"
+                    )
+            print("=" * 88)
+            print("[TIER_0_PAPER — NO REAL CAPITAL]")
+            print()
+            comp = get_arena_comparison()
+            print(format_arena_report(comp, lang=lang))
+        return 0
+
+    comparison = get_arena_comparison()
+    if as_json:
+        print(json.dumps(comparison, indent=2, default=str))
+    else:
+        print(format_arena_report(comparison, lang=lang))
+    return 0
+
+
 def cmd_watchdog(args) -> int:
     """Milestone 71: 24/7 CBT Ops Watchdog and Automated Ledger Backup CLI."""
     from core.ops.p2_shadow_watchdog import (

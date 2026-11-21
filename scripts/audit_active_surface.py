@@ -116,10 +116,12 @@ def audit_active_surface() -> int:
         import core.ops.p2_shadow_watchdog as p2_wd
         import core.strategies.p2_risk_parity as p2_rp
         import core.strategies.p2_shadow_runner as p2_sr
+        import core.strategies.v2b_challenger_shadow as v2b_cs
 
         op_modules = [
             ("core.strategies.p2_risk_parity", p2_rp),
             ("core.strategies.p2_shadow_runner", p2_sr),
+            ("core.strategies.v2b_challenger_shadow", v2b_cs),
             ("core.ops.p2_shadow_watchdog", p2_wd),
             ("core.ops.market_radar", mr),
         ]

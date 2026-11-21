@@ -1,0 +1,24 @@
+[Unit]
+Description=CBT 24/7 Challenger P2_RP_V2B_PVT Live Shadow Runner (4h Cycle)
+Documentation=https://github.com/cloudshome/CBT
+After=network.target
+
+[Service]
+Type=oneshot
+User=cloudslover
+Group=cloudslover
+WorkingDirectory=/home/cloudslover/CBT
+Environment="PYTHONPATH=/home/cloudslover/CBT"
+Environment="PYTHONUNBUFFERED=1"
+Environment="CBT_CHALLENGER_DB_PATH=/home/cloudslover/CBT/data/v2b_challenger_shadow_ledger.db"
+ExecStart=/home/cloudslover/CBT/.venv/bin/python /home/cloudslover/CBT/main.py arena --run-once --source live
+TimeoutStartSec=120
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cbt-v2b-challenger
+
+# Security Hardening (TIER_0_PAPER Permanent Invariant)
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/home/cloudslover/CBT/data

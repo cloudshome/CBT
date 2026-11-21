@@ -870,6 +870,35 @@ async def handle_shadow(
     return msg
 
 
+async def handle_arena(
+    args: str = "",
+    chat_id: Any = None,
+    identity: TelegramUserIdentity | None = None,
+    lang: str | None = None,
+) -> str:
+    """Milestone 78: Champion (P2_RP) vs. Challenger (P2_RP_V2B_PVT) Arena Scoreboard in English or Bengali."""
+    from core.strategies.v2b_challenger_shadow import (
+        format_arena_report,
+        get_arena_comparison,
+    )
+    from core.telegram_bot import telegram_bot
+
+    clean_args = (args or "").strip().lower()
+    is_bn = (
+        lang == "bn"
+        or clean_args in ("bn", "bangla", "bengali", "এরিনা", "চ্যালেঞ্জার", "arena bn")
+        or any(0x0980 <= ord(c) <= 0x09FF for c in clean_args)
+    )
+    target_lang = "bn" if is_bn else "en"
+
+    comp = get_arena_comparison()
+    report_str = format_arena_report(comp, lang=target_lang)
+    msg = f"```\n{report_str}\n```"
+    if chat_id:
+        await telegram_bot.send_message(msg, chat_id=chat_id)
+    return msg
+
+
 async def handle_ops(
     args: str = "",
     chat_id: Any = None,
@@ -1798,6 +1827,14 @@ def register_all_v5_commands() -> None:
             handler=handle_radar,
             required_role=TelegramRole.ANALYST,
             aliases=["/watch", "/setup_radar", "/market_radar"],
+            argument_schema="[bn|en]",
+        ),
+        TelegramCommand(
+            name="/arena",
+            description="Champion (P2_RP) vs. Challenger (P2_RP_V2B_PVT) Arena Scoreboard (English/Bengali)",
+            handler=handle_arena,
+            required_role=TelegramRole.ANALYST,
+            aliases=["/challenger", "/champion", "/arena_report"],
             argument_schema="[bn|en]",
         ),
     ]

@@ -1817,6 +1817,26 @@ async def run_desk_shadow_cycle(
         }
 
 
+@app.get("/api/desk/arena")
+async def get_desk_arena():
+    """Milestone 78: Champion (P2_RP) vs. Challenger (P2_RP_V2B_PVT) Parallel Live Shadow Arena endpoint."""
+    from core.strategies.v2b_challenger_shadow import get_arena_comparison
+
+    try:
+        comparison = get_arena_comparison()
+        return comparison
+    except Exception as e:
+        logger.error(f"Error fetching arena comparison: {e}")
+        return {
+            "error": str(e),
+            "champion": {"equity_usd": 10000.0, "total_return_pct": 0.0},
+            "challenger": {"equity_usd": 10000.0, "total_return_pct": 0.0},
+            "comparison": {"current_leader": "TIE_WARMUP", "equity_delta_usd": 0.0},
+            "capital_mode": "TIER_0_PAPER",
+            "real_capital_enabled": False,
+        }
+
+
 @app.get("/api/desk/watchdog")
 async def get_desk_watchdog():
     """Milestone 71: 24/7 P2_RP Ops Watchdog Health Report."""
