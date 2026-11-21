@@ -1204,6 +1204,73 @@ def cmd_radar(args) -> int:
         return 1
 
 
+def cmd_discover(args) -> int:
+    """Milestone 75: Unified Historical Strategy Discovery Lab & Trial Ledger CLI."""
+    import json
+    from pathlib import Path
+
+    root_dir = Path(__file__).resolve().parent.parent
+    ledger_path = root_dir / "research" / "discovery_trial_ledger.json"
+    as_json = bool(getattr(args, "json", False))
+    show_ledger = bool(getattr(args, "ledger", False))
+
+    if not ledger_path.exists():
+        if as_json:
+            print(json.dumps({"error": "Discovery trial ledger not found", "trials": []}, indent=2))
+        else:
+            print("[INFO] No discovery trials recorded yet. Run `python scripts/research/run_m75_discovery_lab.py` first.")
+        return 0
+
+    try:
+        with open(ledger_path, encoding="utf-8") as f:
+            ledger_data = json.load(f)
+    except Exception as exc:
+        if as_json:
+            print(json.dumps({"error": f"Failed to read ledger: {exc}"}, indent=2))
+        else:
+            print(f"[ERROR] Failed to read trial ledger: {exc}")
+        return 1
+
+    if as_json:
+        print(json.dumps(ledger_data, indent=2))
+        return 0
+
+    trials = ledger_data.get("trials", [])
+    cum_count = ledger_data.get("cumulative_trials_count", len(trials) + 18)
+    baseline = ledger_data.get("baseline_trials", 18)
+
+    print("=" * 88)
+    print("SKY / CBT STRATEGY DISCOVERY TRIAL LEDGER (Milestone 75)")
+    print(f"Ledger Path : {ledger_path.relative_to(root_dir)}")
+    print(f"Baseline M  : {baseline} prior trials (M63-M72)")
+    print(f"Current M   : M_cum = {cum_count}")
+    print(f"Recorded    : {len(trials)} discovery trial(s)")
+    print("=" * 88)
+
+    if not trials:
+        print("No trial records found.")
+        return 0
+
+    header = f"{'Trial':<7} | {'Hypothesis ID':<30} | {'Mode':<16} | {'OOS Sh':<7} | {'DSR':<7} | {'CP2':<5} | {'Verdict'}"
+    print(header)
+    print("-" * 88)
+
+    for t in trials:
+        t_num = t.get("trial_number", t.get("m_cum", "?"))
+        hid = t.get("hypothesis_id", "UNKNOWN")[:30]
+        mode = t.get("direction_mode", "UNKNOWN")[:16]
+        sh = f"{t.get('oos_sharpe', 0.0):.2f}"
+        dsr = f"{t.get('dsr_oos', 0.0):.4f}"
+        passed = t.get("hurdles_passed", 0)
+        total = t.get("hurdles_total", 6)
+        cp2 = f"{passed}/{total}"
+        verdict = t.get("verdict", "UNKNOWN")
+        print(f"#{t_num:<6} | {hid:<30} | {mode:<16} | {sh:<7} | {dsr:<7} | {cp2:<5} | {verdict}")
+
+    print("=" * 88)
+    return 0
+
+
 # ── Agent-Reach-inspired CLI surface (P7/P8, additive) ─────────────────
 # These three commands are the install/doctor/SKILL trio borrowed from
 # Panniantong/Agent-Reach, scoped to CryptoBrain's read-only safety

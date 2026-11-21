@@ -67,6 +67,7 @@ from cli.daily import (
     cmd_coach,
     cmd_daily,
     cmd_desk,
+    cmd_discover,
     cmd_glossary,
     cmd_health,
     cmd_intelligence,
@@ -1003,6 +1004,18 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_radar.add_argument("--json", action="store_true", help="Output JSON format")
     p_radar.set_defaults(func=cmd_radar)
+
+    p_discover = sub.add_parser(
+        "discover",
+        help="Unified Historical Strategy Discovery Lab & Trial Ledger (Milestone 75)",
+    )
+    p_discover.add_argument(
+        "--ledger",
+        action="store_true",
+        help="Display all tested hypotheses, M_cum, Sharpe, DSR, and verdicts from discovery_trial_ledger.json",
+    )
+    p_discover.add_argument("--json", action="store_true", help="Output machine-readable JSON format")
+    p_discover.set_defaults(func=cmd_discover)
 
     p_daily = sub.add_parser(
         "daily",

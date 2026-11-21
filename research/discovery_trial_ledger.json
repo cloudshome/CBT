@@ -1,0 +1,86 @@
+{
+  "ledger_version": "1.0.0",
+  "baseline_trials": 18,
+  "cumulative_trials_count": 21,
+  "last_updated_utc": "2026-11-21T09:39:29.850883+00:00",
+  "trials": [
+    {
+      "hypothesis_id": "H1_VOL_SQUEEZE_EXPANSION_LONG",
+      "name": "Volatility Compression Expansion Breakout Long",
+      "family": "Volatility Breakout & Squeeze Expansion",
+      "direction_mode": "LONG_ONLY",
+      "train_sharpe": 0.2539,
+      "val_sharpe": 0.5705,
+      "oos_sharpe": 0.8287,
+      "oos_return_pct": 23.01,
+      "oos_max_dd_pct": 63.57,
+      "cpcv_median_sharpe": 0.0,
+      "dsr_oos": 0.2002,
+      "dsr_pval": 0.7998,
+      "hurdles_passed": 3,
+      "hurdles_total": 6,
+      "stress_regimes": {
+        "baseline_oos_sharpe": 0.8287,
+        "friction_2x_oos_sharpe": 0.8209,
+        "delay_1bar_oos_sharpe": 0.4193
+      },
+      "verdict": "FALSIFIED",
+      "verdict_rationale": "Failed 3/6 CP-2 hurdles",
+      "m_cum": 19,
+      "trial_number": 19,
+      "recorded_at_utc": "2026-11-21T09:39:26.542310+00:00"
+    },
+    {
+      "hypothesis_id": "H2_CROSS_ASSET_RV_PAIR",
+      "name": "Market-Neutral Cross-Asset Relative-Value Momentum Pair",
+      "family": "Cross-Asset Cross-Sectional Relative Value",
+      "direction_mode": "MARKET_NEUTRAL_RV",
+      "train_sharpe": 0.3517,
+      "val_sharpe": 0.0,
+      "oos_sharpe": 0.2058,
+      "oos_return_pct": 0.07,
+      "oos_max_dd_pct": 31.34,
+      "cpcv_median_sharpe": 0.0,
+      "dsr_oos": 0.0508,
+      "dsr_pval": 0.9492,
+      "hurdles_passed": 2,
+      "hurdles_total": 6,
+      "stress_regimes": {
+        "baseline_oos_sharpe": 0.2058,
+        "friction_2x_oos_sharpe": 0.2032,
+        "delay_1bar_oos_sharpe": 0.2122
+      },
+      "verdict": "FALSIFIED",
+      "verdict_rationale": "Failed 4/6 CP-2 hurdles",
+      "m_cum": 20,
+      "trial_number": 20,
+      "recorded_at_utc": "2026-11-21T09:39:28.196892+00:00"
+    },
+    {
+      "hypothesis_id": "H3_POST_CRASH_LIQ_REBOUND",
+      "name": "Capitulation Flush & Leverage-Exhaustion Rebound Long",
+      "family": "Derivatives Liquidation Exhaustion & Mean Reversion",
+      "direction_mode": "LONG_ONLY",
+      "train_sharpe": 0.038,
+      "val_sharpe": 0.0644,
+      "oos_sharpe": 0.0255,
+      "oos_return_pct": -0.06,
+      "oos_max_dd_pct": 4.67,
+      "cpcv_median_sharpe": 0.0,
+      "dsr_oos": 0.0293,
+      "dsr_pval": 0.9707,
+      "hurdles_passed": 2,
+      "hurdles_total": 6,
+      "stress_regimes": {
+        "baseline_oos_sharpe": 0.0255,
+        "friction_2x_oos_sharpe": 0.0228,
+        "delay_1bar_oos_sharpe": -0.678
+      },
+      "verdict": "FALSIFIED",
+      "verdict_rationale": "Failed 4/6 CP-2 hurdles; Degraded to non-positive Sharpe under 1-bar delay (-0.68)",
+      "m_cum": 21,
+      "trial_number": 21,
+      "recorded_at_utc": "2026-11-21T09:39:29.850860+00:00"
+    }
+  ]
+}

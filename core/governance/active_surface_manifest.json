@@ -134,6 +134,16 @@
           "path": "scripts/research/run_m72_s4_asymmetric_shorting.py",
           "verdict": "FALSIFIED_M72",
           "tested_hypothesis": "Strategy S4 Asymmetric Shorting Engine (Donchian-48 Breakdown + Derivatives Flush)"
+        },
+        {
+          "path": "core/research/discovery_lab.py",
+          "verdict": "OPERATIONAL_LAB",
+          "tested_hypothesis": "Unified Historical Strategy Discovery Lab & Append-Only Trial Ledger"
+        },
+        {
+          "path": "scripts/research/run_m75_discovery_lab.py",
+          "verdict": "FALSIFIED_BATCH_M75",
+          "tested_hypothesis": "First 3-Hypothesis Batch (H1 Vol Squeeze, H2 Market-Neutral RV, H3 Liq Rebound)"
         }
       ]
     },
