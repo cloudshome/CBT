@@ -1,0 +1,25 @@
+[Unit]
+Description=CBT 24/7 Proactive Market Radar & Trader Copilot (4h Surveillance Check)
+Documentation=https://github.com/cloudshome/CBT
+After=network.target
+
+[Service]
+Type=oneshot
+User=cloudslover
+Group=cloudslover
+WorkingDirectory=/home/cloudslover/CBT
+Environment="PYTHONPATH=/home/cloudslover/CBT"
+Environment="PYTHONUNBUFFERED=1"
+Environment="CBT_SHADOW_DB_PATH=/home/cloudslover/CBT/data/p2_shadow_ledger.db"
+Environment="CBT_RADAR_DB_PATH=/home/cloudslover/CBT/data/market_radar_state.db"
+ExecStart=/home/cloudslover/CBT/.venv/bin/python /home/cloudslover/CBT/main.py radar --check
+TimeoutStartSec=120
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cbt-market-radar
+
+# Security Hardening (TIER_0_PAPER Permanent Invariant)
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/home/cloudslover/CBT/data

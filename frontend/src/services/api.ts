@@ -94,6 +94,7 @@ import {
   ShadowHistoryResponse,
   ShadowRunResponse,
   WatchdogReport,
+  MarketRadarReport,
 } from '../types';
 
 const getApiBaseUrl = (): string => {
@@ -484,6 +485,15 @@ export const api = {
   async getWatchdogReport(): Promise<WatchdogReport> {
     const res = await authFetch(`${BASE_URL}/api/desk/watchdog`);
     return handleResponse<WatchdogReport>(res);
+  },
+
+  /**
+   * GET /api/desk/radar
+   * Milestone 73: 24/7 Proactive Market Radar & Trader Copilot Snapshot
+   */
+  async getDeskRadar(): Promise<MarketRadarReport> {
+    const res = await authFetch(`${BASE_URL}/api/desk/radar`);
+    return handleResponse<MarketRadarReport>(res);
   },
 
   /**
@@ -6021,6 +6031,13 @@ export async function executeRadarAlphaCandidate(candidate: any): Promise<any> {
     body: JSON.stringify(candidate),
   });
   return await handleResponse<any>(res);
+}
+
+/**
+ * Milestone 73: 24/7 Proactive Market Radar & Trader Copilot
+ */
+export async function fetchDeskRadar(): Promise<MarketRadarReport> {
+  return api.getDeskRadar();
 }
 
 

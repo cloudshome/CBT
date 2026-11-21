@@ -3306,6 +3306,57 @@ export interface WatchdogReport {
   real_capital_enabled: boolean;
 }
 
+// Milestone 73: 24/7 Proactive Market Radar & Trader Copilot Types
+export interface RadarAlert {
+  alert_key: string;
+  symbol: string;
+  alert_type: 'NEAR_S1_BREAKOUT' | 'APPROACHING_EMA200' | 'MOMENTUM_FLIP_WATCH' | 'VOLATILITY_SPIKE' | 'REGIME_SHIFT' | string;
+  priority: 'HIGH' | 'MEDIUM' | 'INFO' | 'CAUTION' | string;
+  headline_en: string;
+  headline_bn: string;
+  details_en?: string;
+  details_bn?: string;
+  timestamp_utc: string;
+}
+
+export interface AssetProximity {
+  symbol: string;
+  price: number;
+  ema_status: string;
+  distance_to_ema200_pct: number;
+  distance_to_breakout_pct: number;
+  momentum_30d_pct: number;
+  vol_20d_ann_pct: number;
+  s1_status: string;
+  s2_status: string;
+  closest_trigger_type: string;
+  proximity_pct: number;
+  rank: number;
+  summary_en: string;
+  summary_bn: string;
+}
+
+export interface MarketRadarReport {
+  radar_status: 'ACTIVE_WATCH' | 'ALERT_ACTIVE' | 'STALE_DATA' | 'NOT_INITIALIZED' | string;
+  checked_at_utc: string;
+  data_source: string;
+  data_age_hours: number;
+  stale_data_warning: boolean;
+  current_regime: string;
+  last_regime: string | null;
+  action_verdict: string;
+  closest_setup: AssetProximity | null;
+  ranked_assets: AssetProximity[];
+  active_alerts: RadarAlert[];
+  new_alerts_fired: RadarAlert[];
+  headline_en: string;
+  headline_bn: string;
+  action_guidance_en: string;
+  action_guidance_bn: string;
+  capital_mode: string;
+  real_capital_enabled: boolean;
+}
+
 
 
 

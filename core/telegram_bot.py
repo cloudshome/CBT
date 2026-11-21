@@ -3360,6 +3360,35 @@ class TelegramBotDispatcher:
             )
             return {"status": "EXECUTED", "command": "/ops", "response": response_text}
 
+        # Check Bengali and English Market Radar triggers (Milestone 73)
+        if (
+            clean_nl in (
+                "মার্কেট রাডার",
+                "মার্কেটরাডার",
+                "ট্রেড সেটআপ",
+                "ট্রেডসেটআপ",
+                "market radar",
+                "setup radar",
+                "radar",
+                "রাডার",
+                "/radar",
+                "/watch",
+                "/setup_radar",
+            )
+            or "মার্কেট রাডার" in text
+            or "ট্রেড সেটআপ" in text
+            or "market radar" in text
+            or "setup radar" in text
+        ):
+            from core.telegram.handlers import handle_radar
+
+            target_l = "bn" if any(c in text for c in ["মার্কেট", "রাডার", "সেটআপ", "ট্রেড"]) else "en"
+            response_text = await handle_radar(args=target_l, chat_id=chat_id, identity=identity, lang=target_l)
+            telegram_audit.log_command_execution(
+                identity, "/radar", target_l, execution_result="EXECUTED"
+            )
+            return {"status": "EXECUTED", "command": "/radar", "response": response_text}
+
         # 6. Natural Language Conversational AI Query
         try:
             ai_reply = await self.state_mind.handle_conversational_query(

@@ -1,0 +1,10 @@
+[Unit]
+Description=CBT 24/7 Proactive Market Radar Timer (Every 4h at :07 UTC)
+Documentation=https://github.com/cloudshome/CBT
+
+[Timer]
+OnCalendar=*-*-* 00,04,08,12,16,20:07:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

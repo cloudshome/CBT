@@ -9,6 +9,7 @@ import {
   Clock,
   Layers,
   CheckCircle2,
+  Radio,
 } from 'lucide-react';
 import { api, ApiError } from '../services/api';
 import {
@@ -17,6 +18,7 @@ import {
   ShadowBar,
   ShadowFill,
   WatchdogReport,
+  MarketRadarReport,
 } from '../types';
 
 interface P2ShadowDeskProps {
@@ -89,6 +91,11 @@ const I18N = {
     colUnrealizedPnl: "Unrealized P&L",
     colTriggerSleeve: "Trigger Sleeve",
     away: "away",
+    radarTitle: "PROACTIVE MARKET RADAR & TRADER COPILOT",
+    radarSubtitle: "Continuous Pre-Trigger Surveillance · Sub-3% Proximity Watch · Zero-Spam Alerts",
+    radarClosestSetup: "#1 CLOSEST ACTIONABLE SETUP",
+    radarNoAlerts: "No setups within 3% trigger zone — Bear Shield active.",
+    radarAlertsHeading: "Active Proximity Alerts",
   },
   bn: {
     deskTitle: "P2_RP রিস্ক-প্যারিটি শ্যাডো ডেস্ক",
@@ -155,6 +162,11 @@ const I18N = {
     colUnrealizedPnl: "অবাস্তবায়িত লাভ/ক্ষতি",
     colTriggerSleeve: "ট্রিগার স্লিভ",
     away: "দূরে",
+    radarTitle: "সার্বক্ষণিক মার্কেট রাডার ও ট্রেডার কোপাইলট",
+    radarSubtitle: "নিরবচ্ছিন্ন প্রি-ট্রিগার নজরদারি · ৩% নৈকট্য ওয়াচ · জিরো-স্প্যাম অ্যালার্ট",
+    radarClosestSetup: "#১ নিকটতম অ্যাকশনেবল সেটআপ",
+    radarNoAlerts: "৩% ট্রিগার জোনের মধ্যে কোনো সেটআপ নেই — বেয়ার শিল্ড সক্রিয়।",
+    radarAlertsHeading: "সক্রিয় প্রক্সিমিটি অ্যালার্ট",
   },
 };
 
@@ -168,6 +180,7 @@ export const P2ShadowDesk: React.FC<P2ShadowDeskProps> = ({ onNotify }) => {
   const [bars, setBars] = useState<ShadowBar[]>([]);
   const [fills, setFills] = useState<ShadowFill[]>([]);
   const [watchdog, setWatchdog] = useState<WatchdogReport | null>(null);
+  const [radar, setRadar] = useState<MarketRadarReport | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const t = I18N[lang];
@@ -213,6 +226,14 @@ export const P2ShadowDesk: React.FC<P2ShadowDeskProps> = ({ onNotify }) => {
         setWatchdog(watchData);
       } catch (err: unknown) {
         console.warn('Could not load watchdog report:', err);
+      }
+
+      // 5. Fetch 24/7 Proactive Market Radar (Milestone 73)
+      try {
+        const radarData = await api.getDeskRadar();
+        setRadar(radarData);
+      } catch (err: unknown) {
+        console.warn('Could not load market radar report:', err);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Network error loading shadow desk';
@@ -546,6 +567,114 @@ export const P2ShadowDesk: React.FC<P2ShadowDeskProps> = ({ onNotify }) => {
           <div className="mt-2 pt-2 border-t border-slate-800/80 text-[10px] text-emerald-400 truncate">
             ✓ {t.kpiExposureCap}
           </div>
+        </div>
+      </div>
+
+      {/* 2.4. PROACTIVE MARKET RADAR & TRADER COPILOT CARD (Milestone 73) */}
+      <div className="bg-[#090d16] border border-[#1e293b] rounded-lg p-4 space-y-3.5 shadow-md">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#1e293b]/70 pb-3">
+          <div className="flex items-center gap-2">
+            <Radio className="w-4 h-4 text-sky-400 animate-pulse" />
+            <h3 className="text-sm font-bold text-white tracking-wide">{t.radarTitle}</h3>
+          </div>
+          <div className="flex items-center gap-2">
+            <span
+              className={`px-2.5 py-0.5 rounded text-[10px] font-bold border tracking-wider uppercase ${
+                radar?.radar_status === 'ALERT_ACTIVE'
+                  ? 'bg-amber-950/60 border-amber-500/60 text-amber-300'
+                  : radar?.radar_status === 'STALE_DATA'
+                  ? 'bg-rose-950/60 border-rose-500/60 text-rose-300'
+                  : 'bg-sky-950/60 border-sky-500/60 text-sky-300'
+              }`}
+            >
+              {radar?.radar_status || 'ACTIVE_WATCH'}
+            </span>
+            <span className="text-[11px] text-slate-400 hidden sm:inline">{t.radarSubtitle}</span>
+          </div>
+        </div>
+
+        {/* #1 Closest Setup Headline Banner */}
+        <div className="bg-[#0c1424] border border-sky-500/30 rounded-lg p-3 flex flex-col md:flex-row md:items-center justify-between gap-2">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/40 uppercase tracking-wider">
+                {t.radarClosestSetup}
+              </span>
+              {radar?.closest_setup && (
+                <span className="text-xs font-semibold text-slate-300">
+                  {radar.closest_setup.proximity_pct.toFixed(1)}% {t.away}
+                </span>
+              )}
+            </div>
+            <p className="text-xs font-medium text-white">
+              {lang === 'bn'
+                ? radar?.headline_bn || t.radarNoAlerts
+                : radar?.headline_en || t.radarNoAlerts}
+            </p>
+            {(radar?.action_guidance_en || radar?.action_guidance_bn) && (
+              <p className="text-[11px] text-slate-400">
+                {lang === 'bn' ? radar?.action_guidance_bn : radar?.action_guidance_en}
+              </p>
+            )}
+          </div>
+
+          {radar?.closest_setup && (
+            <div className="text-right shrink-0">
+              <span className="text-xs font-bold text-white block">
+                {radar.closest_setup.symbol}
+              </span>
+              <span className="text-[11px] text-slate-400">
+                ${radar.closest_setup.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Active Proximity Alerts List */}
+        <div className="space-y-1.5 pt-1">
+          <div className="text-[11px] font-semibold text-slate-400 flex items-center justify-between">
+            <span>{t.radarAlertsHeading}</span>
+            <span className="text-[10px] text-slate-500">
+              {radar?.active_alerts?.length || 0} active
+            </span>
+          </div>
+
+          {radar?.active_alerts && radar.active_alerts.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {radar.active_alerts.map((alt, idx) => (
+                <div
+                  key={`${alt.alert_key}_${idx}`}
+                  className="bg-[#0b101c] border border-[#1e293b] rounded p-2.5 flex items-start gap-2 text-xs"
+                >
+                  <span
+                    className={`px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0 uppercase ${
+                      alt.priority === 'HIGH'
+                        ? 'bg-rose-950/60 border border-rose-500/50 text-rose-300'
+                        : alt.priority === 'MEDIUM'
+                        ? 'bg-amber-950/60 border border-amber-500/50 text-amber-300'
+                        : 'bg-slate-800 border border-slate-600 text-slate-300'
+                    }`}
+                  >
+                    {alt.priority}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-slate-200 truncate">
+                      {lang === 'bn' ? alt.headline_bn : alt.headline_en}
+                    </div>
+                    {(alt.details_bn || alt.details_en) && (
+                      <div className="text-[10px] text-slate-400 mt-0.5 truncate">
+                        {lang === 'bn' ? alt.details_bn : alt.details_en}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-xs text-slate-400 bg-[#0b101c] border border-[#1e293b] rounded p-2.5">
+              • {t.radarNoAlerts}
+            </div>
+          )}
         </div>
       </div>
 

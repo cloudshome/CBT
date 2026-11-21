@@ -1177,6 +1177,33 @@ def cmd_watchdog(args) -> int:
         return 1
 
 
+def cmd_radar(args) -> int:
+    """Milestone 73: 24/7 Proactive Market Radar & Trader Copilot CLI."""
+    from core.ops.market_radar import format_radar_report, run_market_radar
+
+    as_json = bool(getattr(args, "json", False))
+    lang = str(getattr(args, "lang", "en") or "en").lower()
+    offline = bool(getattr(args, "offline", False))
+    force_brief = bool(getattr(args, "brief", False))
+
+    try:
+        report = run_market_radar(
+            offline_only=offline,
+            force_brief=force_brief,
+        )
+        if as_json:
+            print(report.to_json(indent=2))
+        else:
+            print(format_radar_report(report, lang=lang))
+        return 0
+    except Exception as e:
+        if as_json:
+            print(json.dumps({"radar_status": "STALE_DATA", "error": str(e)}, indent=2))
+        else:
+            print(f"Market Radar Error: {e}")
+        return 1
+
+
 # ── Agent-Reach-inspired CLI surface (P7/P8, additive) ─────────────────
 # These three commands are the install/doctor/SKILL trio borrowed from
 # Panniantong/Agent-Reach, scoped to CryptoBrain's read-only safety

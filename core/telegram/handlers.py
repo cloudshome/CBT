@@ -904,6 +904,37 @@ async def handle_ops(
     return msg
 
 
+async def handle_radar(
+    args: str = "",
+    chat_id: Any = None,
+    identity: TelegramUserIdentity | None = None,
+    lang: str | None = None,
+) -> str:
+    """Milestone 73: 24/7 Proactive Market Radar & Trader Copilot in English or Bengali."""
+    from core.ops.market_radar import format_radar_report, run_market_radar
+    from core.telegram_bot import telegram_bot
+
+    clean_args = (args or "").strip().lower()
+    is_bn = (
+        lang == "bn"
+        or clean_args in ("bn", "bangla", "bengali", "মার্কেট রাডার", "ট্রেড সেটআপ", "market radar")
+        or any(0x0980 <= ord(c) <= 0x09FF for c in clean_args)
+    )
+    target_lang = "bn" if is_bn else "en"
+
+    try:
+        report = run_market_radar(force_brief=True, offline_only=False)
+        report_str = format_radar_report(report, lang=target_lang)
+    except Exception as e:
+        logger.error(f"Telegram /radar error: {e}")
+        report_str = f"Error evaluating market radar: {e}"
+
+    msg = f"```\n{report_str}\n```"
+    if chat_id:
+        await telegram_bot.send_message(msg, chat_id=chat_id)
+    return msg
+
+
 async def handle_candidate(
     args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
 ) -> str:
@@ -1759,6 +1790,14 @@ def register_all_v5_commands() -> None:
             handler=handle_ops,
             required_role=TelegramRole.ANALYST,
             aliases=["/system_check", "/watchdog", "/health_check"],
+            argument_schema="[bn|en]",
+        ),
+        TelegramCommand(
+            name="/radar",
+            description="24/7 Proactive Market Radar & Trader Copilot (English/Bengali)",
+            handler=handle_radar,
+            required_role=TelegramRole.ANALYST,
+            aliases=["/watch", "/setup_radar", "/market_radar"],
             argument_schema="[bn|en]",
         ),
     ]

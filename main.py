@@ -74,6 +74,7 @@ from cli.daily import (
     cmd_learn,
     cmd_postreview,
     cmd_practice,
+    cmd_radar,
     cmd_risk,
     cmd_scan,
     cmd_shadow,
@@ -974,6 +975,34 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_watchdog.add_argument("--json", action="store_true", help="Output JSON format")
     p_watchdog.set_defaults(func=cmd_watchdog)
+
+    p_radar = sub.add_parser(
+        "radar",
+        help="24/7 Proactive Market Radar & Trader Copilot (pre-trigger proximity & regime shifts)",
+    )
+    p_radar.add_argument(
+        "--check",
+        action="store_true",
+        help="Evaluate pre-trigger proximity & regime shifts (default)",
+    )
+    p_radar.add_argument(
+        "--brief",
+        action="store_true",
+        help="Force proactive brief output regardless of 4h alert cooldown",
+    )
+    p_radar.add_argument(
+        "--lang",
+        choices=["en", "bn"],
+        default="en",
+        help="Display language: en (English) or bn (Bengali)",
+    )
+    p_radar.add_argument(
+        "--offline",
+        action="store_true",
+        help="Run in offline mode using local parquet candles",
+    )
+    p_radar.add_argument("--json", action="store_true", help="Output JSON format")
+    p_radar.set_defaults(func=cmd_radar)
 
     p_daily = sub.add_parser(
         "daily",

@@ -1850,6 +1850,39 @@ async def get_desk_watchdog():
         }
 
 
+@app.get("/api/desk/radar")
+async def get_desk_radar():
+    """Milestone 73: 24/7 Proactive Market Radar & Trader Copilot Snapshot."""
+    from core.ops.market_radar import run_market_radar
+
+    try:
+        # Read-only surveillance, never triggers Telegram spam (notify_callback=None)
+        report = run_market_radar(offline_only=False, notify_callback=None)
+        return report.to_dict()
+    except Exception as e:
+        logger.error(f"Error evaluating market radar snapshot: {e}")
+        return {
+            "radar_status": "STALE_DATA",
+            "checked_at_utc": datetime.now(UTC).isoformat(),
+            "data_source": "ERROR",
+            "data_age_hours": 999.0,
+            "stale_data_warning": True,
+            "current_regime": "UNKNOWN",
+            "last_regime": None,
+            "action_verdict": "FAIL_CLOSED",
+            "closest_setup": None,
+            "ranked_assets": [],
+            "active_alerts": [],
+            "new_alerts_fired": [],
+            "headline_en": f"Market Radar Error: {e}",
+            "headline_bn": f"মার্কেট রাডার ত্রুটি: {e}",
+            "action_guidance_en": "Surveillance unavailable. Fail-closed active.",
+            "action_guidance_bn": "সার্ভিল্যান্স অপ্রাপ্য। ফেইল-ক্লোজড সক্রিয়।",
+            "capital_mode": "TIER_0_PAPER",
+            "real_capital_enabled": False,
+        }
+
+
 @app.post("/api/desk/ask", dependencies=[Depends(require_api_key)])
 async def ask_desk_copilot(req: AskDeskRequest):
     ctx = req.context or {}

@@ -11,6 +11,7 @@ vi.mock('../services/api', () => ({
     getShadowHistory: vi.fn(),
     runShadowCycle: vi.fn(),
     getWatchdogReport: vi.fn(),
+    getDeskRadar: vi.fn(),
   },
   ApiError: class ApiError extends Error {
     statusCode: number;
@@ -213,6 +214,42 @@ const mockWatchdogReport = {
   real_capital_enabled: false,
 };
 
+const mockRadarReport = {
+  radar_status: 'ACTIVE_WATCH',
+  checked_at_utc: '2026-11-20T12:00:00Z',
+  data_source: 'LIVE_BINANCE',
+  data_age_hours: 1.2,
+  stale_data_warning: false,
+  current_regime: 'MIXED',
+  last_regime: 'BEAR_SHIELD',
+  action_verdict: 'ACT',
+  closest_setup: {
+    symbol: 'BTCUSDT',
+    price: 92150.0,
+    ema_status: 'ABOVE',
+    distance_to_ema200_pct: 4.12,
+    distance_to_breakout_pct: 0.92,
+    momentum_30d_pct: 12.5,
+    vol_20d_ann_pct: 45.2,
+    s1_status: 'WAITING_BREAKOUT',
+    s2_status: 'SELECTED_TOP2',
+    closest_trigger_type: 'S1_BREAKOUT',
+    proximity_pct: 0.92,
+    rank: 1,
+    summary_en: 'BTCUSDT: 0.9% to S1_BREAKOUT',
+    summary_bn: 'BTCUSDT: S1_BREAKOUT থেকে 0.9% দূরে',
+  },
+  ranked_assets: [],
+  active_alerts: [],
+  new_alerts_fired: [],
+  headline_en: '#1 Closest Setup: BTCUSDT near S1 Breakout (0.9% to Donchian-48 High)',
+  headline_bn: '#১ নিকটতম সেটআপ: BTCUSDT এস১ ব্রেকআউটের কাছে (০.৯% দূরে)',
+  action_guidance_en: 'Surveillance active. Prepare for long entry when 4h close confirms breakout.',
+  action_guidance_bn: 'সার্ভিল্যান্স সক্রিয়।',
+  capital_mode: 'TIER_0_PAPER',
+  real_capital_enabled: false,
+};
+
 describe('P2ShadowDesk Component', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -221,6 +258,7 @@ describe('P2ShadowDesk Component', () => {
     vi.mocked(api.getShadowScorecard).mockResolvedValue(mockShadowScorecard as any);
     vi.mocked(api.getShadowHistory).mockResolvedValue(mockShadowHistory as any);
     vi.mocked(api.getWatchdogReport).mockResolvedValue(mockWatchdogReport as any);
+    vi.mocked(api.getDeskRadar).mockResolvedValue(mockRadarReport as any);
     vi.mocked(api.runShadowCycle).mockResolvedValue({
       cycle: { status: 'COMPLETED', fills: 1 },
       scorecard: mockShadowScorecard as any,
@@ -275,7 +313,7 @@ describe('P2ShadowDesk Component', () => {
     render(<P2ShadowDesk />);
 
     await waitFor(() => {
-      expect(screen.getByText(/Why Trade \/ Why Waiting & Exact Next Trigger Conditions/i)).toBeInTheDocument();
+      expect(screen.getByText(/PAXGUSDT: Needs 5\.2% rally to reclaim EMA-200/i)).toBeInTheDocument();
     });
 
     // Check Decision Headline
@@ -283,12 +321,23 @@ describe('P2ShadowDesk Component', () => {
     expect(screen.getByText(/100% CASH SHIELD/i)).toBeInTheDocument();
 
     // Check Top 3 Watchlist checklist items
-    expect(screen.getByText(/PAXGUSDT: Needs 5\.2% rally to reclaim EMA-200/i)).toBeInTheDocument();
     expect(screen.getByText(/BTCUSDT: Needs 4\.4% rally to reclaim EMA-200/i)).toBeInTheDocument();
     expect(screen.getByText(/ETHUSDT: Needs 7\.1% rally to reclaim EMA-200/i)).toBeInTheDocument();
 
     // Check 1-line reason for SOLUSDT
     expect(screen.getByText(/price is 5\.1% below EMA-200/i)).toBeInTheDocument();
+  });
+
+  it('renders Proactive Market Radar card with #1 closest setup', async () => {
+    render(<P2ShadowDesk />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/PROACTIVE MARKET RADAR & TRADER COPILOT/i)).toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/ACTIVE_WATCH/i)).toBeInTheDocument();
+    expect(screen.getByText(/#1 CLOSEST ACTIONABLE SETUP/i)).toBeInTheDocument();
+    expect(screen.getByText(/#1 Closest Setup: BTCUSDT near S1 Breakout/i)).toBeInTheDocument();
   });
 
   it('supports English to Bengali language toggle including trigger explainer', async () => {
